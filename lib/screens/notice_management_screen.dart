@@ -1,0 +1,13 @@
+import 'package:flutter/material.dart';
+import '../core/app_colors.dart';
+
+class NoticeManagementScreen extends StatefulWidget { const NoticeManagementScreen({super.key}); @override State<NoticeManagementScreen> createState() => _NoticeManagementScreenState(); }
+class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
+  final List<Map<String, String>> _items = [
+    {'title': '2026년 하반기 운송 일정 안내', 'date': '2026-06-20', 'content': '하반기 노선별 접수 마감일과 도착 예정일을 확인해 주세요.'},
+    {'title': '통관 서류 제출 안내', 'date': '2026-06-15', 'content': '화물 접수 전 필요한 통관 서류를 준비해 주세요.'},
+  ];
+  String _today() { final d = DateTime.now(); return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'; }
+  void _editor({Map<String, String>? existing, int? index}) { final title = TextEditingController(text: existing?['title'] ?? ''), content = TextEditingController(text: existing?['content'] ?? ''); showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: title, decoration: const InputDecoration(labelText: '제목')), TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용'))]), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')), FilledButton(onPressed: () { final item = {'title': title.text, 'date': existing?['date'] ?? _today(), 'content': content.text}; setState(() { if (index == null) { _items.add(item); } else { _items[index!] = item; } }); Navigator.pop(dialogContext); }, child: const Text('저장'))])); }
+  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white), backgroundColor: AppColors.background, body: ListView.builder(padding: const EdgeInsets.all(16), itemCount: _items.length + 1, itemBuilder: (context, index) { if (index == _items.length) return Padding(padding: const EdgeInsets.only(top: 8), child: FilledButton.icon(onPressed: () => _editor(), icon: const Icon(Icons.add), label: const Text('공지사항 추가'))); final item = _items[index]; return Card(child: ListTile(title: Text(item['title']!, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text('${item['date']}\n${item['content']}'), isThreeLine: true, trailing: Wrap(children: [IconButton(onPressed: () => _editor(existing: item, index: index), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => setState(() => _items.removeAt(index)), icon: const Icon(Icons.delete_outline, color: AppColors.error))]))); }));
+}
