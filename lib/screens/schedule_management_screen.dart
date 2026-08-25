@@ -16,6 +16,10 @@ class _Routes {
     '라오스-베트남 육로',
     '라오스-중국 육로',
     '라오스-캄보디아 육로',
+    '태국-라오스 육로',
+    '베트남-라오스 육로',
+    '중국-라오스 육로',
+    '캄보디아-라오스 육로',
   ];
   static const String defaultLabel = '한국-라오스 해상';
 }
@@ -31,6 +35,7 @@ class _Schedule {
   String to;
   String deadline;
   String arrival;
+  String details;
 
   _Schedule({
     required this.route,
@@ -40,6 +45,7 @@ class _Schedule {
     required this.to,
     required this.deadline,
     required this.arrival,
+    this.details = '',
   });
 }
 
@@ -110,6 +116,8 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     TextEditingController(text: isEdit ? original!.deadline : '');
     final arrivalCtrl =
     TextEditingController(text: isEdit ? original!.arrival : '');
+    final detailsCtrl =
+    TextEditingController(text: isEdit ? original!.details : '');
 
     String selectedRoute =
     isEdit ? original!.route : _Routes.defaultLabel;
@@ -146,6 +154,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                   to: toCtrl.text.trim(),
                   deadline: deadlineCtrl.text.trim(),
                   arrival: arrivalCtrl.text.trim(),
+                  details: detailsCtrl.text.trim(),
                 );
 
                 setState(() {
@@ -253,6 +262,13 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                         controller: arrivalCtrl,
                         decoration: _inputDecoration(hint: '예) 2026-08-01'),
                       ),
+                      const SizedBox(height: 12),
+                      _DialogLabel('상세 내용 또는 추가 내용'),
+                      TextField(
+                        controller: detailsCtrl,
+                        maxLines: 4,
+                        decoration: _inputDecoration(hint: '일정 관련 안내를 입력하세요.'),
+                      ),
                     ],
                   ),
                 ),
@@ -280,6 +296,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
       toCtrl.dispose();
       deadlineCtrl.dispose();
       arrivalCtrl.dispose();
+      detailsCtrl.dispose();
     }
   }
 
@@ -447,6 +464,16 @@ class _ScheduleCard extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (schedule.details.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '상세: ${schedule.details}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -526,3 +553,11 @@ InputDecoration _inputDecoration({String? hint, String? errorText}) {
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
   );
 }
+
+
+
+
+
+
+
+
