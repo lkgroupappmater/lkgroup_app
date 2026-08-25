@@ -54,22 +54,21 @@ class _CargoReceivingSearchScreenState
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 hintText: '입고번호 · 인보이스번호 · 수하인 · 연락처',
-                hintStyle:
-                const TextStyle(fontSize: 13, color: Colors.grey),
+                hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.grey),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _query = '');
-                  },
-                )
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      )
                     : null,
                 filled: true,
                 fillColor: const Color(0xFFF5F7FA),
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 10, horizontal: 14),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -78,14 +77,13 @@ class _CargoReceivingSearchScreenState
             ),
           ),
           Padding(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Text(
                   '검색 결과 ${_results.length}건',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF90A4AE)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF90A4AE)),
                 ),
               ],
             ),
@@ -93,23 +91,23 @@ class _CargoReceivingSearchScreenState
           Expanded(
             child: _results.isEmpty
                 ? const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.inbox_outlined,
-                      size: 48, color: Colors.grey),
-                  SizedBox(height: 8),
-                  Text('검색 결과가 없습니다.',
-                      style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            )
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inbox_outlined,
+                            size: 48, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('검색 결과가 없습니다.',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: _results.length,
-              itemBuilder: (context, index) =>
-                  _CargoCard(cargo: _results[index]),
-            ),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: _results.length,
+                    itemBuilder: (context, index) =>
+                        _CargoCard(cargo: _results[index]),
+                  ),
           ),
         ],
       ),
@@ -150,9 +148,7 @@ class _CargoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x10000000),
-              blurRadius: 6,
-              offset: Offset(0, 2)),
+              color: Color(0x10000000), blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
       child: Padding(
@@ -172,8 +168,8 @@ class _CargoCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: _statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
@@ -221,15 +217,13 @@ class _InfoRow extends StatelessWidget {
             width: 80,
             child: Text(
               label,
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF90A4AE)),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF90A4AE)),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF37474F)),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF37474F)),
             ),
           ),
         ],

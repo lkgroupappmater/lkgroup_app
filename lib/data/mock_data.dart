@@ -39,8 +39,7 @@ class MockUsers {
     ),
   ];
 
-  static AppUser byRole(UserRole role) =>
-      all.firstWhere((u) => u.role == role);
+  static AppUser byRole(UserRole role) => all.firstWhere((u) => u.role == role);
 }
 
 // ============================================================
@@ -261,7 +260,8 @@ class MockShipments {
   static Shipment? findByTracking(String trackingNumber) {
     try {
       return all.firstWhere(
-            (s) => s.trackingNumber.toLowerCase() ==
+        (s) =>
+            s.trackingNumber.toLowerCase() ==
             trackingNumber.trim().toLowerCase(),
       );
     } catch (_) {

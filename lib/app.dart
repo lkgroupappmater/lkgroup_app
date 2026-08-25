@@ -49,5 +49,3 @@ class _RootApp extends StatelessWidget {
     );
   }
 }
-
-

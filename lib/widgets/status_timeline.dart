@@ -22,14 +22,14 @@ class StatusTimeline extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(statuses.length, (i) {
         final isCompleted = i < currentIndex;
-        final isCurrent   = i == currentIndex;
-        final isLast      = i == statuses.length - 1;
+        final isCurrent = i == currentIndex;
+        final isLast = i == statuses.length - 1;
 
         final dotColor = isCompleted
             ? AppColors.success
             : isCurrent
-            ? AppColors.tealAccent
-            : AppColors.textSecondary.withOpacity(0.35);
+                ? AppColors.tealAccent
+                : AppColors.textSecondary.withOpacity(0.35);
 
         final labelStyle = TextStyle(
           fontSize: 13,
@@ -37,8 +37,8 @@ class StatusTimeline extends StatelessWidget {
           color: isCurrent
               ? AppColors.textPrimary
               : isCompleted
-              ? AppColors.textSecondary
-              : AppColors.textSecondary.withOpacity(0.6),
+                  ? AppColors.textSecondary
+                  : AppColors.textSecondary.withOpacity(0.6),
         );
 
         return IntrinsicHeight(
@@ -56,8 +56,7 @@ class StatusTimeline extends StatelessWidget {
                         color: dotColor,
                         shape: BoxShape.circle,
                         border: isCurrent
-                            ? Border.all(
-                            color: AppColors.tealAccent, width: 2)
+                            ? Border.all(color: AppColors.tealAccent, width: 2)
                             : null,
                       ),
                     ),
@@ -76,8 +75,7 @@ class StatusTimeline extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(
-                      bottom: isLast ? 0 : 20, top: 0),
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 20, top: 0),
                   child: Text(statuses[i], style: labelStyle),
                 ),
               ),

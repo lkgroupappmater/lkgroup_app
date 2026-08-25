@@ -6,8 +6,7 @@ class QuoteService {
 
   final List<Map<String, dynamic>> _quotes = [];
 
-  String _generateId() =>
-      DateTime.now().microsecondsSinceEpoch.toString();
+  String _generateId() => DateTime.now().microsecondsSinceEpoch.toString();
 
   /// 새 견적을 생성하고 저장한 뒤 반환합니다.
   Map<String, dynamic> create(Map<String, dynamic> data) {

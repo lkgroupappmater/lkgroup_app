@@ -78,9 +78,9 @@ class ShipmentSearchBody extends StatefulWidget {
 
 class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   int _selectedRoute = 0;
-  final _invoiceCtrl   = TextEditingController();
+  final _invoiceCtrl = TextEditingController();
   final _recipientCtrl = TextEditingController();
-  final _phoneCtrl     = TextEditingController();
+  final _phoneCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _results = [];
   bool _searched = false;
@@ -95,18 +95,17 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   void _search() {
     // TODO: Replace with real DB / Excel-upload API search.
-    final invoice   = _invoiceCtrl.text.trim().toLowerCase();
+    final invoice = _invoiceCtrl.text.trim().toLowerCase();
     final recipient = _recipientCtrl.text.trim().toLowerCase();
-    final phone     = _phoneCtrl.text.trim();
-    final route     = _routeCategories[_selectedRoute];
+    final phone = _phoneCtrl.text.trim();
+    final route = _routeCategories[_selectedRoute];
 
     final results = _mockShipments.where((s) {
-      final routeMatch =
-          route == '전체' || s['route'] == route;
-      final invoiceMatch =
-          invoice.isEmpty || (s['invoice'] as String).toLowerCase().contains(invoice);
-      final recipientMatch =
-          recipient.isEmpty || (s['name'] as String).toLowerCase().contains(recipient);
+      final routeMatch = route == '전체' || s['route'] == route;
+      final invoiceMatch = invoice.isEmpty ||
+          (s['invoice'] as String).toLowerCase().contains(invoice);
+      final recipientMatch = recipient.isEmpty ||
+          (s['name'] as String).toLowerCase().contains(recipient);
       final phoneMatch =
           phone.isEmpty || (s['phone'] as String).contains(phone);
       return routeMatch && invoiceMatch && recipientMatch && phoneMatch;
@@ -143,8 +142,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 borderRadius: BorderRadius.circular(10),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(
-                    color: AppColors.accent, width: 1.5),
+                borderSide:
+                    const BorderSide(color: AppColors.accent, width: 1.5),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -164,11 +163,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           const SizedBox(height: 14),
 
           // Search inputs
-          _buildInput(_invoiceCtrl,   '송장번호',       Icons.tag_rounded),
+          _buildInput(_invoiceCtrl, '송장번호', Icons.tag_rounded),
           const SizedBox(height: 10),
-          _buildInput(_recipientCtrl, '라오스 수령인',  Icons.person_outline),
+          _buildInput(_recipientCtrl, '라오스 수령인', Icons.person_outline),
           const SizedBox(height: 10),
-          _buildInput(_phoneCtrl,     '라오스 전화번호', Icons.phone_outlined,
+          _buildInput(_phoneCtrl, '라오스 전화번호', Icons.phone_outlined,
               keyboardType: TextInputType.phone),
           const SizedBox(height: 16),
 
@@ -179,8 +178,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               onPressed: _search,
               icon: const Icon(Icons.search_rounded, size: 20),
               label: const Text('검색',
-                  style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.navyPrimary,
                 foregroundColor: AppColors.white,
@@ -193,26 +191,26 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
           // Results
           if (_searched)
-            _ResultsList(results: _results, onEditRequest: widget.onEditRequest),
+            _ResultsList(
+                results: _results, onEditRequest: widget.onEditRequest),
         ],
       ),
     );
   }
 
   Widget _buildInput(
-      TextEditingController ctrl,
-      String hint,
-      IconData icon, {
-        TextInputType keyboardType = TextInputType.text,
-      }) {
+    TextEditingController ctrl,
+    String hint,
+    IconData icon, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextField(
       controller: ctrl,
       keyboardType: keyboardType,
       style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle:
-        const TextStyle(color: AppColors.textHint, fontSize: 13),
+        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
         prefixIcon: Icon(icon, size: 20, color: AppColors.textSecondary),
         filled: true,
         fillColor: AppColors.inputFill,
@@ -221,12 +219,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           borderRadius: BorderRadius.circular(10),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide:
-          const BorderSide(color: AppColors.accent, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
           borderRadius: BorderRadius.circular(10),
         ),
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
     );
   }
@@ -258,14 +255,12 @@ class _RouteChips extends StatelessWidget {
               labelStyle: TextStyle(
                 color: active ? AppColors.white : AppColors.textSecondary,
                 fontSize: 12,
-                fontWeight:
-                active ? FontWeight.w700 : FontWeight.w400,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
               ),
               side: BorderSide(
                 color: active ? AppColors.navyPrimary : AppColors.cardBorder,
               ),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           );
@@ -287,17 +282,30 @@ class _LoginRequiredView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.lock_outline, size: 58, color: AppColors.navyPrimary),
+            const Icon(Icons.lock_outline,
+                size: 58, color: AppColors.navyPrimary),
             const SizedBox(height: 14),
-            const Text('로그인 후 화물 조회가 가능합니다.', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navyPrimary)),
+            const Text('로그인 후 화물 조회가 가능합니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navyPrimary)),
             const SizedBox(height: 8),
-            const Text('다른 회원의 화물 정보 보호를 위해 로그인 후 검색해 주세요.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.45)),
+            const Text('다른 회원의 화물 정보 보호를 위해 로그인 후 검색해 주세요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.45)),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onLogin,
               icon: const Icon(Icons.login),
               label: const Text('로그인 하기'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.navyPrimary, foregroundColor: AppColors.white),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.navyPrimary,
+                  foregroundColor: AppColors.white),
             ),
           ],
         ),
@@ -324,12 +332,10 @@ class _ResultsList extends StatelessWidget {
                 size: 48, color: AppColors.textHint),
             const SizedBox(height: 8),
             const Text('검색 결과가 없습니다.',
-                style: TextStyle(
-                    fontSize: 14, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
             const SizedBox(height: 4),
             const Text('송장번호, 수령인, 전화번호를 확인해 주세요.',
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.textHint)),
+                style: TextStyle(fontSize: 12, color: AppColors.textHint)),
           ],
         ),
       );
@@ -344,7 +350,8 @@ class _ResultsList extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary)),
         const SizedBox(height: 8),
-        ...results.map((r) => _ResultCard(data: r, onEditRequest: onEditRequest)),
+        ...results
+            .map((r) => _ResultCard(data: r, onEditRequest: onEditRequest)),
       ],
     );
   }
@@ -392,9 +399,9 @@ class _ResultCard extends StatelessWidget {
             ],
           ),
           const Divider(height: 14, color: AppColors.divider),
-          _Row('송장번호',   data['invoice'] as String),
-          _Row('이름',      data['name'] as String),
-          _Row('연락처',    data['phone'] as String),
+          _Row('송장번호', data['invoice'] as String),
+          _Row('이름', data['name'] as String),
+          _Row('연락처', data['phone'] as String),
           _Row('입고 날짜', data['arrival'] as String),
           if (onEditRequest != null) ...[
             const SizedBox(height: 10),
@@ -462,22 +469,10 @@ class ShipmentSearchScreen extends StatelessWidget {
         backgroundColor: AppColors.navyPrimary,
         foregroundColor: AppColors.white,
         title: Text(AppStrings.get(language, 'tracking'),
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700)),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         elevation: 0,
       ),
       body: ShipmentSearchBody(language: language),
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-

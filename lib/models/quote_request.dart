@@ -3,9 +3,9 @@ import 'package:intl/intl.dart';
 
 // 포장 상태 enum
 enum PackagingStatus {
-  packed,    // 포장 완료
-  unpacked,  // 미포장
-  partial,   // 일부 포장
+  packed, // 포장 완료
+  unpacked, // 미포장
+  partial, // 일부 포장
 }
 
 extension PackagingStatusExtension on PackagingStatus {
@@ -23,11 +23,11 @@ extension PackagingStatusExtension on PackagingStatus {
 
 // 견적 요청 상태
 enum QuoteStatus {
-  pending,    // 접수 대기
-  reviewing,  // 검토 중
-  quoted,     // 견적 발송
-  confirmed,  // 확정
-  cancelled,  // 취소
+  pending, // 접수 대기
+  reviewing, // 검토 중
+  quoted, // 견적 발송
+  confirmed, // 확정
+  cancelled, // 취소
 }
 
 extension QuoteStatusExtension on QuoteStatus {
@@ -83,19 +83,19 @@ class QuoteRequest {
   final String destination;
   final QuoteTransportMode transportMode;
   final DateTime? desiredShipDate;
-  final String? cargoType;          // 화물 종류
-  final int? quantity;              // 수량
-  final double? totalWeightKg;      // 총 중량 (kg)
-  final double? lengthCm;           // 가로 (cm)
-  final double? widthCm;            // 세로 (cm)
-  final double? heightCm;           // 높이 (cm)
+  final String? cargoType; // 화물 종류
+  final int? quantity; // 수량
+  final double? totalWeightKg; // 총 중량 (kg)
+  final double? lengthCm; // 가로 (cm)
+  final double? widthCm; // 세로 (cm)
+  final double? heightCm; // 높이 (cm)
   final PackagingStatus packagingStatus;
   final bool customsRequired;
   final bool insuranceRequired;
-  final String? additionalNotes;    // 추가 요청사항
+  final String? additionalNotes; // 추가 요청사항
   final QuoteStatus status;
   final DateTime createdAt;
-  final String? assignedTo;         // 담당자 ID (관리자 배정)
+  final String? assignedTo; // 담당자 ID (관리자 배정)
 
   const QuoteRequest({
     required this.id,
@@ -131,7 +131,7 @@ class QuoteRequest {
       origin: json['origin'] as String,
       destination: json['destination'] as String,
       transportMode: QuoteTransportMode.values.firstWhere(
-            (m) => m.name == json['transport_mode'],
+        (m) => m.name == json['transport_mode'],
         orElse: () => QuoteTransportMode.undecided,
       ),
       desiredShipDate: json['desired_ship_date'] != null
@@ -144,14 +144,14 @@ class QuoteRequest {
       widthCm: (json['width_cm'] as num?)?.toDouble(),
       heightCm: (json['height_cm'] as num?)?.toDouble(),
       packagingStatus: PackagingStatus.values.firstWhere(
-            (p) => p.name == json['packaging_status'],
+        (p) => p.name == json['packaging_status'],
         orElse: () => PackagingStatus.unpacked,
       ),
       customsRequired: json['customs_required'] as bool? ?? false,
       insuranceRequired: json['insurance_required'] as bool? ?? false,
       additionalNotes: json['additional_notes'] as String?,
       status: QuoteStatus.values.firstWhere(
-            (s) => s.name == json['status'],
+        (s) => s.name == json['status'],
         orElse: () => QuoteStatus.pending,
       ),
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -160,28 +160,28 @@ class QuoteRequest {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'customer_name': customerName,
-    'contact_phone': contactPhone,
-    'contact_email': contactEmail,
-    'origin': origin,
-    'destination': destination,
-    'transport_mode': transportMode.name,
-    'desired_ship_date': desiredShipDate?.toIso8601String(),
-    'cargo_type': cargoType,
-    'quantity': quantity,
-    'total_weight_kg': totalWeightKg,
-    'length_cm': lengthCm,
-    'width_cm': widthCm,
-    'height_cm': heightCm,
-    'packaging_status': packagingStatus.name,
-    'customs_required': customsRequired,
-    'insurance_required': insuranceRequired,
-    'additional_notes': additionalNotes,
-    'status': status.name,
-    'created_at': createdAt.toIso8601String(),
-    'assigned_to': assignedTo,
-  };
+        'id': id,
+        'customer_name': customerName,
+        'contact_phone': contactPhone,
+        'contact_email': contactEmail,
+        'origin': origin,
+        'destination': destination,
+        'transport_mode': transportMode.name,
+        'desired_ship_date': desiredShipDate?.toIso8601String(),
+        'cargo_type': cargoType,
+        'quantity': quantity,
+        'total_weight_kg': totalWeightKg,
+        'length_cm': lengthCm,
+        'width_cm': widthCm,
+        'height_cm': heightCm,
+        'packaging_status': packagingStatus.name,
+        'customs_required': customsRequired,
+        'insurance_required': insuranceRequired,
+        'additional_notes': additionalNotes,
+        'status': status.name,
+        'created_at': createdAt.toIso8601String(),
+        'assigned_to': assignedTo,
+      };
 
   String get formattedCreatedAt =>
       DateFormat('yyyy-MM-dd HH:mm').format(createdAt);

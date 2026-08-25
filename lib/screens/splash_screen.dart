@@ -142,10 +142,9 @@ class CompanySplashLogo extends StatelessWidget {
         'assets/images/company_logo_transparent.png',
         fit: BoxFit.contain,
         // Original logo colors are intentionally preserved on the splash.
-        errorBuilder: (_, __, ___) => const Icon(Icons.local_shipping, size: 92, color: Color(0xFF123A63)),
+        errorBuilder: (_, __, ___) => const Icon(Icons.local_shipping,
+            size: 92, color: Color(0xFF123A63)),
       ),
     );
   }
 }
-
-

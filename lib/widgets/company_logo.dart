@@ -94,4 +94,3 @@ class _FallbackLogo extends StatelessWidget {
     );
   }
 }
-

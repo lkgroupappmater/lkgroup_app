@@ -170,9 +170,8 @@ class ShipmentDetailScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   const Text(
                     'Electronics — Fragile',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary),
+                    style:
+                        TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -186,16 +185,16 @@ class ShipmentDetailScreen extends StatelessWidget {
   }
 
   BoxDecoration _cardDecoration() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.06),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
-      ),
-    ],
-  );
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
 
   Widget _routeRow({
     required IconData icon,
@@ -241,8 +240,7 @@ class ShipmentDetailScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: AppColors.textSecondary.withOpacity(0.2)),
+          border: Border.all(color: AppColors.textSecondary.withOpacity(0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -313,9 +311,7 @@ class _SummaryCard extends StatelessWidget {
           const Text(
             'International Cargo',
             style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w800),
+                color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Row(
@@ -331,14 +327,12 @@ class _SummaryCard extends StatelessWidget {
   }
 
   Widget _pill(String text) => Container(
-    padding:
-    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(text,
-        style: const TextStyle(
-            color: Colors.white70, fontSize: 11)),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text,
+            style: const TextStyle(color: Colors.white70, fontSize: 11)),
+      );
 }

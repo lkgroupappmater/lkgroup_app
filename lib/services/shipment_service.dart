@@ -62,5 +62,3 @@ class ShipmentService {
 // TODO: 엑셀 업로드 후 화물 일괄 등록
 // Future<int> bulkCreateFromExcel(List<Map<String, dynamic>> rows) async {...}
 }
-
-

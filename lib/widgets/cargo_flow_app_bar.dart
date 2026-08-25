@@ -67,7 +67,8 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (showHomeActions)
                   IconButton(
                     tooltip: '알림',
-                    onPressed: onNotificationTap ?? () => _showNotifications(context),
+                    onPressed:
+                        onNotificationTap ?? () => _showNotifications(context),
                     icon: const Icon(Icons.notifications_outlined,
                         color: AppColors.white, size: 31),
                   ),
@@ -142,13 +143,9 @@ class _LanguageFlagButton extends StatelessWidget {
       }).toList(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-        child: Text(selectedLanguage.flag,
-            style: const TextStyle(fontSize: 26)),
+        child:
+            Text(selectedLanguage.flag, style: const TextStyle(fontSize: 26)),
       ),
     );
   }
 }
-
-
-
-

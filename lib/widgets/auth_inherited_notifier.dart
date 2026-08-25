@@ -14,18 +14,16 @@ class AuthControllerScope extends InheritedNotifier<AuthController> {
   }) : super(notifier: controller);
 
   static AuthController of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<AuthControllerScope>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<AuthControllerScope>();
     assert(scope != null, 'AuthControllerScope를 찾을 수 없습니다.');
     return scope!.notifier!;
   }
 
   /// rebuild 없이 현재 값만 읽을 때 사용
   static AuthController read(BuildContext context) {
-    final scope = context
-        .getInheritedWidgetOfExactType<AuthControllerScope>();
+    final scope = context.getInheritedWidgetOfExactType<AuthControllerScope>();
     assert(scope != null, 'AuthControllerScope를 찾을 수 없습니다.');
     return scope!.notifier!;
   }
 }
-

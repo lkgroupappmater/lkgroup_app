@@ -42,23 +42,20 @@ class HomeScreen extends StatelessWidget {
               color: AppColors.tealAccent,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Icon(Icons.local_shipping,
-                color: Colors.white, size: 18),
+            child:
+                const Icon(Icons.local_shipping, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 10),
           Text(
             title,
             style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 18),
+                color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
           ),
         ],
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined,
-              color: Colors.white70),
+          icon: const Icon(Icons.notifications_outlined, color: Colors.white70),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('No new notifications')),
@@ -102,15 +99,24 @@ class _DashboardBody extends StatelessWidget {
             children: const [
               Expanded(
                   child: _StatCard(
-                      label: 'Active', value: '12', icon: Icons.pending_actions, color: AppColors.inProgress)),
+                      label: 'Active',
+                      value: '12',
+                      icon: Icons.pending_actions,
+                      color: AppColors.inProgress)),
               SizedBox(width: 12),
               Expanded(
                   child: _StatCard(
-                      label: 'In Transit', value: '5', icon: Icons.local_shipping_outlined, color: AppColors.tealAccent)),
+                      label: 'In Transit',
+                      value: '5',
+                      icon: Icons.local_shipping_outlined,
+                      color: AppColors.tealAccent)),
               SizedBox(width: 12),
               Expanded(
                   child: _StatCard(
-                      label: 'Delivered', value: '48', icon: Icons.check_circle_outline, color: AppColors.success)),
+                      label: 'Delivered',
+                      value: '48',
+                      icon: Icons.check_circle_outline,
+                      color: AppColors.success)),
             ],
           ),
           const SizedBox(height: 24),
@@ -230,9 +236,7 @@ class _HeroCard extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w800),
+                color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
           const Text(
@@ -281,9 +285,7 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(value,
               style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: color)),
+                  fontSize: 20, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(
@@ -416,8 +418,7 @@ class _ShipmentListItem extends StatelessWidget {
             ),
           ),
           Container(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),

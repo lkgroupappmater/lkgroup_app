@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen>
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
           shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }
@@ -96,10 +96,14 @@ class _LoginScreenState extends State<LoginScreen>
   // ── 역할 색상 ─────────────────────────────────────────────────────────────
   Color _roleColor(UserRole role) {
     switch (role) {
-      case UserRole.admin:   return Colors.deepPurple;
-      case UserRole.partner: return Colors.orange.shade700;
-      case UserRole.member:  return _tealDark;
-      default:               return Colors.grey;
+      case UserRole.admin:
+        return Colors.deepPurple;
+      case UserRole.partner:
+        return Colors.orange.shade700;
+      case UserRole.member:
+        return _tealDark;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -115,8 +119,8 @@ class _LoginScreenState extends State<LoginScreen>
             builder: (context, _) {
               final ctrl = AuthControllerScope.of(context);
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 32),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -260,12 +264,12 @@ class _LoginScreenState extends State<LoginScreen>
               const SizedBox(height: 12),
               Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.red.shade900.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: Colors.red.shade400.withOpacity(0.5)),
+                  border:
+                      Border.all(color: Colors.red.shade400.withOpacity(0.5)),
                 ),
                 child: Row(
                   children: [
@@ -275,8 +279,8 @@ class _LoginScreenState extends State<LoginScreen>
                     Expanded(
                       child: Text(
                         ctrl.errorMessage!,
-                        style: TextStyle(
-                            color: Colors.red.shade200, fontSize: 13),
+                        style:
+                            TextStyle(color: Colors.red.shade200, fontSize: 13),
                       ),
                     ),
                   ],
@@ -302,18 +306,18 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 child: ctrl.isLoading
                     ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Text(
-                  '로그인',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+                        '로그인',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
               ),
             ),
 
@@ -357,12 +361,11 @@ class _LoginScreenState extends State<LoginScreen>
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3),
-            fontSize: 13),
+        hintStyle:
+            TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
         labelStyle:
-        TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-        prefixIcon:
-        Icon(icon, color: Colors.white.withOpacity(0.5), size: 20),
+            TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+        prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.5), size: 20),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white.withOpacity(0.06),
@@ -388,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         errorStyle: TextStyle(color: Colors.red.shade300, fontSize: 12),
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
@@ -441,13 +444,12 @@ class _LoginScreenState extends State<LoginScreen>
         child: Row(
           children: [
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _roleColor(info.role).withOpacity(0.2),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                    color: _roleColor(info.role).withOpacity(0.5)),
+                border:
+                    Border.all(color: _roleColor(info.role).withOpacity(0.5)),
               ),
               child: Text(
                 info.label,
@@ -465,14 +467,12 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   Text(
                     info.email,
-                    style: const TextStyle(
-                        color: Colors.white70, fontSize: 12),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   Text(
                     'PW: ${info.password}',
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
-                        fontSize: 11),
+                        color: Colors.white.withOpacity(0.4), fontSize: 11),
                   ),
                 ],
               ),
@@ -493,17 +493,13 @@ class _LoginScreenState extends State<LoginScreen>
           size: 18, color: Colors.white.withOpacity(0.7)),
       label: Text(
         '비로그인으로 둘러보기',
-        style:
-        TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
       ),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
         side: BorderSide(color: Colors.white.withOpacity(0.2)),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 }
-
-
