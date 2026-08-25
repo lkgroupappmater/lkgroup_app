@@ -47,30 +47,49 @@ class _AppShellState extends State<AppShell> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그아웃되었습니다.')));
   }
 
+  void _selectTab(int tabIndex) {
+    setState(() => _currentIndex = tabIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Keep five body positions stable; only the cargo-management nav item is conditional.
     final tabs = <Widget>[
       DashboardHomeBody(language: _language),
-      ShipmentSearchBody(language: _language, isLoggedIn: _isLoggedIn, onRequireLogin: _openAccount, onEditRequest: () => setState(() => _currentIndex = 3)),
+      ShipmentSearchBody(language: _language, isLoggedIn: _isLoggedIn, onRequireLogin: _openAccount, onEditRequest: () => _selectTab(3)),
       QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
-      if (_isLoggedIn) CargoManagementScreen(user: _currentUser!, onBack: () => setState(() => _currentIndex = 4)) else const SizedBox.shrink(),
-      AccountBody(language: _language, currentUser: _currentUser, onLoggedIn: _onLoggedIn, onLoggedOut: _onLoggedOut, onOpenCargoManagement: _isLoggedIn ? () => setState(() => _currentIndex = 3) : null),
+      if (_isLoggedIn) CargoManagementScreen(user: _currentUser!, onBack: () => _selectTab(4)) else const SizedBox.shrink(),
+      AccountBody(language: _language, currentUser: _currentUser, onLoggedIn: _onLoggedIn, onLoggedOut: _onLoggedOut, onOpenCargoManagement: _isLoggedIn ? () => _selectTab(3) : null),
     ];
-    final labels = <String>[AppStrings.get(_language, 'home'), AppStrings.get(_language, 'tracking'), AppStrings.get(_language, 'quote'), '화물 관리', AppStrings.get(_language, 'account')];
+
+    final navItems = <BottomNavigationBarItem>[
+      const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: '홈'),
+      BottomNavigationBarItem(icon: const Icon(Icons.local_shipping_outlined), activeIcon: const Icon(Icons.local_shipping), label: AppStrings.get(_language, 'tracking')),
+      BottomNavigationBarItem(icon: const Icon(Icons.request_quote_outlined), activeIcon: const Icon(Icons.request_quote), label: AppStrings.get(_language, 'quote')),
+    ];
+    final navIndexes = <int>[0, 1, 2];
+    if (_isLoggedIn) {
+      navItems.add(const BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: '화물 관리'));
+      navIndexes.add(3);
+    }
+    navItems.add(BottomNavigationBarItem(icon: const Icon(Icons.person_outline), activeIcon: const Icon(Icons.person), label: AppStrings.get(_language, 'account')));
+    navIndexes.add(4);
+
+    final selectedNavIndex = navIndexes.indexOf(_currentIndex);
     return Scaffold(
       appBar: CargoFlowAppBar(title: _title, selectedLanguage: _language, onLanguageChanged: _onLanguageChanged, showHomeActions: _currentIndex == 0),
       body: IndexedStack(index: _currentIndex, children: tabs),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) { if (index == 3 && !_isLoggedIn) { _openAccount(); return; } setState(() => _currentIndex = index); },
-        type: BottomNavigationBarType.fixed, backgroundColor: AppColors.primary, selectedItemColor: AppColors.tealAccent, unselectedItemColor: Colors.white70, selectedFontSize: 12, unselectedFontSize: 11, iconSize: 28,
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: '홈'),
-          BottomNavigationBarItem(icon: const Icon(Icons.local_shipping_outlined), activeIcon: const Icon(Icons.local_shipping), label: labels[1]),
-          BottomNavigationBarItem(icon: const Icon(Icons.request_quote_outlined), activeIcon: const Icon(Icons.request_quote), label: labels[2]),
-          BottomNavigationBarItem(icon: const Icon(Icons.inventory_2_outlined), activeIcon: const Icon(Icons.inventory_2), label: labels[3]),
-          BottomNavigationBarItem(icon: const Icon(Icons.person_outline), activeIcon: const Icon(Icons.person), label: labels[4]),
-        ],
+        currentIndex: selectedNavIndex < 0 ? 0 : selectedNavIndex,
+        onTap: (index) => _selectTab(navIndexes[index]),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppColors.primary,
+        selectedItemColor: AppColors.tealAccent,
+        unselectedItemColor: Colors.white70,
+        selectedFontSize: 12,
+        unselectedFontSize: 11,
+        iconSize: 28,
+        items: navItems,
       ),
     );
   }
