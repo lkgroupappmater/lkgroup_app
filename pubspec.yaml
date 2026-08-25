@@ -10,7 +10,7 @@ environment:
   sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
-  supabase: ^1.4.4
+  supabase_flutter: ^2.3.0
   http: ^1.5.5
 
   cupertino_icons: ^1.0.8
