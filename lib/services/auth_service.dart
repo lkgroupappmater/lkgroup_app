@@ -1,37 +1,158 @@
 // lib/services/auth_service.dart
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+
 import '../models/app_user.dart';
 
+// ---------------------------------------------------------------------------
+// AuthException
+// ---------------------------------------------------------------------------
+
+class AuthException implements Exception {
+  AuthException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'AuthException: $message';
+}
+
+// ---------------------------------------------------------------------------
+// Mock credentials
+// ---------------------------------------------------------------------------
+
+class _MockAccount {
+  const _MockAccount({
+    required this.email,
+    required this.password,
+    required this.id,
+    required this.name,
+    required this.role,
+    this.phone,
+    this.company,
+  });
+
+  final String email;
+  final String password;
+  final String id;
+  final String name;
+  final UserRole role;
+  final String? phone;
+  final String? company;
+}
+
+const List<_MockAccount> _mockAccounts = [
+  _MockAccount(
+    email: 'admin@cargoflow.dev',
+    password: 'admin1234',
+    id: 'mock-admin-001',
+    name: '관리자',
+    role: UserRole.admin,
+    phone: '010-0000-0001',
+    company: 'CargoFlow',
+  ),
+  _MockAccount(
+    email: 'partner@example.com',
+    password: 'partner1234',
+    id: 'mock-partner-001',
+    name: '파트너',
+    role: UserRole.partner,
+    phone: '010-0000-0002',
+    company: 'Example Co.',
+  ),
+  _MockAccount(
+    email: 'member@cargoflow.dev',
+    password: 'member1234',
+    id: 'mock-member-001',
+    name: '회원',
+    role: UserRole.member,
+    phone: '010-0000-0003',
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// AuthService singleton
+// ---------------------------------------------------------------------------
+
 class AuthService {
-  AuthService._();
-  static final AuthService instance = AuthService._();
-  sb.SupabaseClient get _client => sb.Supabase.instance.client;
-  AppUser _currentUser = const AppUser(id: 'guest', name: '게스트', role: UserRole.guest);
-  AppUser get currentUser => _currentUser;
-  bool get isAuthenticated => _client.auth.currentUser != null && _currentUser.role != UserRole.guest;
+  AuthService._internal();
 
-  Future<AppUser> _profileFor(sb.User user) async {
-    try { final row = await _client.from('profiles').select().eq('id', user.id).maybeSingle(); if (row != null) return AppUser.fromMap(Map<String, dynamic>.from(row)); } catch (_) {}
-    return AppUser(id: user.id, email: user.email ?? '', name: user.userMetadata?['full_name']?.toString() ?? '', phone: user.phone ?? '', role: UserRole.member);
+  static final AuthService instance = AuthService._internal();
+
+  AppUser? _currentUser;
+
+  AppUser? get currentUser => _currentUser;
+
+  bool get isAuthenticated =>
+      _currentUser != null && _currentUser!.role != UserRole.guest;
+
+  // -------------------------------------------------------------------------
+  // restoreSession
+  // -------------------------------------------------------------------------
+
+  Future<void> restoreSession() async {
+    // TODO(supabase): restore session from Supabase / secure storage
+    // e.g. final session = await Supabase.instance.client.auth.currentSession;
+    // if (session != null) { ... }
+    _currentUser = null;
   }
 
-  Future<AppUser> signIn({required String email, required String password}) async {
-    try { final response = await _client.auth.signInWithPassword(email: email.trim(), password: password); final user = response.user; if (user == null) throw const AuthException('로그인에 실패했습니다.'); _currentUser = await _profileFor(user); return _currentUser; }
-    on AuthException { rethrow; } on sb.AuthApiException catch (error) { throw AuthException(error.message); } catch (_) { throw const AuthException('로그인 중 오류가 발생했습니다.'); }
+  // -------------------------------------------------------------------------
+  // signIn
+  // -------------------------------------------------------------------------
+
+  Future<AppUser> signIn({
+    required String email,
+    required String password,
+  }) async {
+    // TODO(supabase): replace mock with real Supabase sign-in
+    // final response = await Supabase.instance.client.auth
+    //     .signInWithPassword(email: email, password: password);
+    // if (response.user == null) throw AuthException('로그인에 실패했습니다.');
+
+    await Future.delayed(const Duration(milliseconds: 300)); // simulate latency
+
+    final trimmedEmail = email.trim().toLowerCase();
+    final match = _mockAccounts.where(
+          (a) => a.email == trimmedEmail && a.password == password,
+    );
+
+    if (match.isEmpty) {
+      throw AuthException('계정 또는 암호가 올바르지 않습니다.');
+    }
+
+    final account = match.first;
+    final user = AppUser(
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      role: account.role,
+      phone: account.phone,
+      company: account.company,
+    );
+
+    _currentUser = user;
+    return user;
   }
 
-  Future<AuthResult> signUpGeneral({required String name, required String email, required String password, required String countryCode, required String phone, required String address}) async {
-    if (name.trim().isEmpty || email.trim().isEmpty || password.length < 6 || phone.trim().isEmpty || address.trim().isEmpty) throw const AuthException('이름, 이메일, 암호(6자 이상), 연락처, 주소를 모두 입력해 주세요.');
-    try {
-      final response = await _client.auth.signUp(email: email.trim(), password: password, data: {'full_name': name.trim(), 'phone': phone.trim(), 'country_code': countryCode, 'address': address.trim(), 'role': 'member'});
-      final user = response.user; if (user == null) throw const AuthException('회원가입에 실패했습니다.');
-      final profile = AppUser(id: user.id, email: email.trim(), name: name.trim(), phone: phone.trim(), countryCode: countryCode, address: address.trim(), role: UserRole.member);
-      return AuthResult(user: profile, emailConfirmationRequired: response.session == null);
-    } on AuthException { rethrow; } on sb.AuthApiException catch (error) { throw AuthException(error.message); } catch (_) { throw const AuthException('회원가입 중 오류가 발생했습니다.'); }
+  // -------------------------------------------------------------------------
+  // signOut
+  // -------------------------------------------------------------------------
+
+  Future<void> signOut() async {
+    // TODO(supabase): await Supabase.instance.client.auth.signOut();
+    _currentUser = null;
   }
 
-  Future<AppUser> restoreSession() async { final user = _client.auth.currentUser; if (user == null) { _currentUser = const AppUser(id: 'guest', name: '게스트', role: UserRole.guest); return _currentUser; } _currentUser = await _profileFor(user); return _currentUser; }
-  Future<void> signOut() async { await _client.auth.signOut(); _currentUser = const AppUser(id: 'guest', name: '게스트', role: UserRole.guest); }
-  Future<void> requestStaffOrPartnerAccount(AccountProvisionRequest request) async { if (_currentUser.role != UserRole.admin) throw const AuthException('총괄 관리자만 관리자 계정을 신청할 수 있습니다.'); await _client.from('account_provision_requests').insert(request.toMap()); }
-  static List<MockAccountInfo> get demoAccounts => const [];
+  // -------------------------------------------------------------------------
+  // continueAsGuest
+  // -------------------------------------------------------------------------
+
+  void continueAsGuest() {
+    // TODO(supabase): no server call needed; clears any existing session locally
+    _currentUser = AppUser(
+      id: 'guest',
+      name: '비회원',
+      email: '',
+      role: UserRole.guest,
+    );
+  }
 }

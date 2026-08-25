@@ -1,22 +1,558 @@
 // lib/screens/account_screen.dart
+
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
-import '../core/app_language.dart';
 import '../models/app_user.dart';
-import '../services/auth_service.dart';
-import 'admin_account_management_screen.dart';
 
-enum _AccountMode { login, signUp }
-class AccountBody extends StatefulWidget { const AccountBody({super.key, this.language = AppLanguage.korean, this.currentUser, this.onLoggedIn, this.onLoggedOut, this.onOpenCargoManagement}); final AppLanguage language; final AppUser? currentUser; final ValueChanged<AppUser>? onLoggedIn; final VoidCallback? onLoggedOut; final VoidCallback? onOpenCargoManagement; @override State<AccountBody> createState() => _AccountBodyState(); }
-class _AccountBodyState extends State<AccountBody> {
-  final _email = TextEditingController(); final _password = TextEditingController(); _AccountMode _mode = _AccountMode.login; bool _obscure = true; bool _loading = false;
-  @override void dispose() { _email.dispose(); _password.dispose(); super.dispose(); }
-  void _message(String text, {bool error = false}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: error ? AppColors.error : AppColors.primary));
-  Future<void> _login() async { if (_email.text.trim().isEmpty || _password.text.isEmpty) { _message('계정과 암호를 입력해 주세요.', error: true); return; } setState(() => _loading = true); try { final user = await AuthService.instance.signIn(email: _email.text, password: _password.text); if (!mounted) return; widget.onLoggedIn?.call(user); _message('${user.name.isEmpty ? '회원' : user.name}님 로그인되었습니다.'); } on AuthException catch (e) { if (mounted) _message(e.message, error: true); } finally { if (mounted) setState(() => _loading = false); } }
-  InputDecoration _input(String hint, IconData icon) => InputDecoration(hintText: hint, prefixIcon: Icon(icon, color: AppColors.textSecondary), filled: true, fillColor: AppColors.inputFill, border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(10)));
-  @override Widget build(BuildContext context) { final user = widget.currentUser; if (user != null && user.role.isLoggedIn) return _profile(user); return SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [SegmentedButton<_AccountMode>(segments: const [ButtonSegment(value: _AccountMode.login, label: Text('접속')), ButtonSegment(value: _AccountMode.signUp, label: Text('일반 회원가입'))], selected: {_mode}, onSelectionChanged: (v) => setState(() => _mode = v.first)), const SizedBox(height: 20), if (_mode == _AccountMode.login) ...[TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: _input('계정', Icons.person_outline)), const SizedBox(height: 12), TextField(controller: _password, obscureText: _obscure, decoration: _input('암호', Icons.lock_outline).copyWith(suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _obscure = !_obscure)))), const SizedBox(height: 20), SizedBox(height: 48, child: ElevatedButton(onPressed: _loading ? null : _login, child: _loading ? const CircularProgressIndicator() : const Text('접속'))), const SizedBox(height: 12), const Text('관리자·직원·협력/파트너사 계정은 총괄 관리자가 발급합니다.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)), ] else const _GeneralSignupForm()])); }
-  Widget _profile(AppUser user) => SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Card(color: AppColors.primary, child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(user.name.isEmpty ? '회원' : user.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)), const SizedBox(height: 6), Text('${user.roleLabel} · ${user.email}', style: const TextStyle(color: Colors.white70))]))), const SizedBox(height: 16), ListTile(leading: const Icon(Icons.phone), title: const Text('연락처'), subtitle: Text('${user.countryCode} ${user.phone}')), ListTile(leading: const Icon(Icons.location_on_outlined), title: const Text('주소'), subtitle: Text(user.address.isEmpty ? '주소 정보 미등록' : user.address)), if (user.role == UserRole.admin) ListTile(leading: const Icon(Icons.manage_accounts), title: const Text('일반회원·관리자·협력/파트너사 계정 관리'), subtitle: const Text('가입 및 권한 관리'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminAccountManagementScreen()))), if (user.role.canManageCargo) OutlinedButton.icon(onPressed: widget.onOpenCargoManagement, icon: const Icon(Icons.inventory_2_outlined), label: const Text('화물/입고 관리')), const SizedBox(height: 12), ElevatedButton.icon(onPressed: widget.onLoggedOut, icon: const Icon(Icons.logout), label: const Text('로그아웃'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white))]));
+// ---------------------------------------------------------------------------
+// AccountScreen – thin Scaffold wrapper (keeps existing navigation compatible)
+// ---------------------------------------------------------------------------
+
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key, this.currentUser});
+
+  final AppUser? currentUser;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: AccountBody(currentUser: currentUser),
+      ),
+    );
+  }
 }
-class _GeneralSignupForm extends StatefulWidget { const _GeneralSignupForm(); @override State<_GeneralSignupForm> createState() => _GeneralSignupFormState(); }
-class _GeneralSignupFormState extends State<_GeneralSignupForm> { final _name = TextEditingController(), _email = TextEditingController(), _password = TextEditingController(), _phone = TextEditingController(), _address = TextEditingController(); String _countryCode = '+82'; bool _loading = false, _obscure = true; static const _codes = ['+82', '+856', '+66', '+84', '+86', '+855', '+1', '+44']; @override void dispose() { for (final c in [_name, _email, _password, _phone, _address]) { c.dispose(); } super.dispose(); } InputDecoration _input(String hint, IconData icon) => InputDecoration(hintText: hint, prefixIcon: Icon(icon), filled: true, fillColor: AppColors.inputFill, border: OutlineInputBorder(borderSide: BorderSide.none, borderRadius: BorderRadius.circular(10))); void _message(String text, {bool error = false}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: error ? AppColors.error : AppColors.primary)); Future<void> _submit() async { setState(() => _loading = true); try { final result = await AuthService.instance.signUpGeneral(name: _name.text, email: _email.text, password: _password.text, countryCode: _countryCode, phone: _phone.text, address: _address.text); if (mounted) _message(result.emailConfirmationRequired ? '가입 완료. 이메일 인증 후 접속해 주세요.' : '가입 및 접속이 완료되었습니다.'); } on AuthException catch (e) { if (mounted) _message(e.message, error: true); } finally { if (mounted) setState(() => _loading = false); } } @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('일반 회원가입', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)), const SizedBox(height: 8), const Text('관리자·직원·협력/파트너사는 앱에서 가입할 수 없습니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)), const SizedBox(height: 16), TextField(controller: _name, decoration: _input('고객 및 라오스 수령인 이름(실명)', Icons.person_outline)), const SizedBox(height: 10), Row(children: [SizedBox(width: 105, child: DropdownButtonFormField<String>(value: _countryCode, decoration: const InputDecoration(labelText: '국가번호'), items: _codes.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => _countryCode = v ?? '+82'))), const SizedBox(width: 10), Expanded(child: TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: _input('연락처', Icons.phone_outlined)))]), const SizedBox(height: 10), TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: _input('이메일주소(인증용)', Icons.email_outlined)), const SizedBox(height: 10), TextField(controller: _password, obscureText: _obscure, decoration: _input('암호(6자 이상)', Icons.lock_outline).copyWith(suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _obscure = !_obscure)))), const SizedBox(height: 10), TextField(controller: _address, maxLines: 2, decoration: _input('주소', Icons.location_on_outlined)), const SizedBox(height: 14), const Text('이메일 인증을 기본으로 사용합니다. 전화번호·카카오톡·WhatsApp 인증은 별도 인증 서비스 연결 후 추가할 수 있습니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4)), const SizedBox(height: 16), SizedBox(height: 48, child: ElevatedButton(onPressed: _loading ? null : _submit, child: _loading ? const CircularProgressIndicator() : const Text('회원가입'))]); }
-class AccountScreen extends StatelessWidget { const AccountScreen({super.key, this.language = AppLanguage.korean, this.currentUser}); final AppLanguage language; final AppUser? currentUser; @override Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: AccountBody(language: language, currentUser: currentUser)); }
+
+// ---------------------------------------------------------------------------
+// AccountBody – body-only widget (used by AppShell)
+// ---------------------------------------------------------------------------
+
+class AccountBody extends StatefulWidget {
+  const AccountBody({
+    super.key,
+    this.currentUser,
+    this.onLoggedIn,
+    this.onLoggedOut,
+    this.onOpenCargoManagement,
+  });
+
+  final AppUser? currentUser;
+  final ValueChanged<AppUser>? onLoggedIn;
+  final VoidCallback? onLoggedOut;
+  final VoidCallback? onOpenCargoManagement;
+
+  @override
+  State<AccountBody> createState() => _AccountBodyState();
+}
+
+class _AccountBodyState extends State<AccountBody> {
+  // ── Form ──────────────────────────────────────────────────────────────────
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _rememberAccount = false;
+  bool _rememberPassword = false;
+
+  // ── Role selection ────────────────────────────────────────────────────────
+  UserRole _selectedRole = UserRole.member;
+
+  static const List<({String label, UserRole role})> _roleOptions = [
+    (label: '일반 회원', role: UserRole.member),
+    (label: '협력/파트너사', role: UserRole.partner),
+    (label: '관리자', role: UserRole.admin),
+  ];
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.error : AppColors.primary,
+      ),
+    );
+  }
+
+  // ── Mock login ────────────────────────────────────────────────────────────
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnackBar('계정과 암호를 입력해 주세요.', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // TODO(auth): replace mock with AuthController.instance.signIn(email, password)
+    // e.g. await AuthController.instance.signIn(email: email, password: password);
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    final mockUser = AppUser(
+      id: 'mock-${DateTime.now().millisecondsSinceEpoch}',
+      name: email.split('@').first,
+      email: email,
+      role: _selectedRole,
+    );
+
+    setState(() => _isLoading = false);
+
+    widget.onLoggedIn?.call(mockUser);
+    _showSnackBar('${mockUser.name}님, 환영합니다!');
+  }
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+
+  Future<void> _handleLogout() async {
+    // TODO(auth): await AuthController.instance.signOut();
+    widget.onLoggedOut?.call();
+    _showSnackBar('로그아웃 되었습니다.');
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.currentUser;
+    final isLoggedIn = user != null && user.role != UserRole.guest;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: isLoggedIn ? _buildProfile(user) : _buildLoginForm(),
+    );
+  }
+
+  // ── Login form ────────────────────────────────────────────────────────────
+
+  Widget _buildLoginForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Title
+          Text(
+            '계정 접속',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '서비스를 이용하려면 계정으로 접속하세요.',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Role selector
+          _buildRoleSelector(),
+          const SizedBox(height: 24),
+
+          // 계정 field
+          _buildInputLabel('계정'),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: TextStyle(color: AppColors.textPrimary),
+            decoration: _inputDecoration(hint: '이메일 주소를 입력하세요'),
+          ),
+          const SizedBox(height: 16),
+
+          // 암호 field
+          _buildInputLabel('암호'),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            style: TextStyle(color: AppColors.textPrimary),
+            decoration: _inputDecoration(hint: '암호를 입력하세요').copyWith(
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppColors.textHint,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Checkboxes
+          _buildCheckboxRow(
+            label: '회원아이디 기억하기',
+            value: _rememberAccount,
+            onChanged: (v) => setState(() => _rememberAccount = v ?? false),
+          ),
+          const SizedBox(height: 4),
+          _buildCheckboxRow(
+            label: '암호 기억하기',
+            value: _rememberPassword,
+            onChanged: (v) => setState(() => _rememberPassword = v ?? false),
+          ),
+          const SizedBox(height: 28),
+
+          // 접속 button
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text(
+                '접속',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 회원가입 button
+          SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () {
+                // TODO(nav): navigate to registration screen
+                _showSnackBar('회원가입 화면은 준비 중입니다.');
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                '회원가입',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Role selector ─────────────────────────────────────────────────────────
+
+  Widget _buildRoleSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.inputFill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: _roleOptions.map((option) {
+          final isSelected = _selectedRole == option.role;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedRole = option.role),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  option.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected ? AppColors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Profile view ──────────────────────────────────────────────────────────
+
+  Widget _buildProfile(AppUser user) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Avatar + name
+        Center(
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: AppColors.primary,
+                backgroundImage: user.avatarUrl != null
+                    ? NetworkImage(user.avatarUrl!)
+                    : null,
+                child: user.avatarUrl == null
+                    ? Text(
+                  user.name.isNotEmpty
+                      ? user.name[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    fontSize: 28,
+                    color: AppColors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                user.name,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                user.email,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _buildRoleBadge(user.role),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Info card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Column(
+            children: [
+              if (user.phone != null) ...[
+                _buildInfoRow(Icons.phone_outlined, '전화번호', user.phone!),
+                const SizedBox(height: 10),
+              ],
+              if (user.company != null) ...[
+                _buildInfoRow(
+                    Icons.business_outlined, '소속', user.company!),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Cargo management button (optional)
+        if (widget.onOpenCargoManagement != null) ...[
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: widget.onOpenCargoManagement,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: const Icon(Icons.inventory_2_outlined, size: 20),
+              label: const Text(
+                '화물 관리',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Logout button
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: _handleLogout,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: BorderSide(color: AppColors.error),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: const Icon(Icons.logout, size: 20),
+            label: const Text(
+              '로그아웃',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Small helpers ─────────────────────────────────────────────────────────
+
+  Widget _buildInputLabel(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({required String hint}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
+      filled: true,
+      fillColor: AppColors.inputFill,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.cardBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.cardBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildCheckboxRow({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppColors.primary,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => onChanged(!value),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleBadge(UserRole role) {
+    final label = switch (role) {
+      UserRole.admin => '관리자',
+      UserRole.staff => '직원',
+      UserRole.partner => '협력/파트너사',
+      UserRole.member => '일반 회원',
+      UserRole.guest => '비회원',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String title, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.textHint),
+        const SizedBox(width: 10),
+        Text(
+          '$title: ',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
