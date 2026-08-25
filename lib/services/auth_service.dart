@@ -3,19 +3,6 @@
 import '../models/app_user.dart';
 
 // ---------------------------------------------------------------------------
-// AuthException
-// ---------------------------------------------------------------------------
-
-class AuthException implements Exception {
-  AuthException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => 'AuthException: $message';
-}
-
-// ---------------------------------------------------------------------------
 // Mock credentials
 // ---------------------------------------------------------------------------
 
@@ -112,7 +99,7 @@ class AuthService {
 
     final trimmedEmail = email.trim().toLowerCase();
     final match = _mockAccounts.where(
-          (a) => a.email == trimmedEmail && a.password == password,
+      (a) => a.email == trimmedEmail && a.password == password,
     );
 
     if (match.isEmpty) {
@@ -125,8 +112,8 @@ class AuthService {
       name: account.name,
       email: account.email,
       role: account.role,
-      phone: account.phone,
-      company: account.company,
+      phone: account.phone ?? '',
+      company: account.company ?? '',
     );
 
     _currentUser = user;
@@ -154,5 +141,28 @@ class AuthService {
       email: '',
       role: UserRole.guest,
     );
+  }
+
+  /// 로그인 화면에서 사용하는 데모 계정 목록입니다.
+  static List<MockAccountInfo> get demoAccounts => _mockAccounts
+      .map(
+        (account) => MockAccountInfo(
+          label: account.name,
+          email: account.email,
+          password: account.password,
+          role: account.role,
+        ),
+      )
+      .toList(growable: false);
+
+  /// 관리자 화면의 직원·파트너 계정 발급 요청 mock입니다.
+  /// TODO(supabase): 실제 운영에서는 Edge Function/API를 통해 저장하세요.
+  Future<void> requestStaffOrPartnerAccount(
+    AccountProvisionRequest request,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (request.role != UserRole.staff && request.role != UserRole.partner) {
+      throw AuthException('직원 또는 협력·파트너사 역할만 요청할 수 있습니다.');
+    }
   }
 }

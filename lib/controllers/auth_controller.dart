@@ -4,7 +4,7 @@
 // provider 패키지 없이 InheritedNotifier / ListenableBuilder 로 사용합니다.
 
 import 'package:flutter/foundation.dart';
-import '../models/app_user.dart';
+import '../models/app_user.dart' hide AuthException;
 import '../services/auth_service.dart';
 
 class AuthController extends ChangeNotifier {
@@ -50,8 +50,11 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final restored = await _service.restoreSession();
-      _user = restored;
+      await _service.restoreSession();
+      final restored = _service.currentUser;
+      if (restored != null) {
+        _user = restored;
+      }
     } catch (_) {
       // 세션 복원 실패 → guest 유지
     } finally {
@@ -132,5 +135,3 @@ class AuthController extends ChangeNotifier {
     }
   }
 }
-
-
