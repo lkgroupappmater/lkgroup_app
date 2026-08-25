@@ -11,5 +11,17 @@ Future<void> main() async {
     anonKey: 'sb_publishable_O1kCnQpkg9SMDVcBSrOW5g_qzASvJCJ',
   );
 
+  // 연결 확인용 임시 코드
+  try {
+    final data = await Supabase.instance.client
+        .from('shipments')
+        .select('shipment_no, consignee_name, status')
+        .limit(5);
+
+    debugPrint('DB 연결 OK → $data');
+  } catch (error) {
+    debugPrint('DB 연결 실패 → $error');
+  }
+
   runApp(const CargoFlowApp());
 }
