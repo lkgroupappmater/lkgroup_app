@@ -78,8 +78,12 @@ class AuthController extends ChangeNotifier {
       _guestBrowsing = false;
       notifyListeners();
       return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
+    } catch (e) {
+      _errorMessage = e
+          .toString()
+          .replaceFirst('AuthException: ', '')
+          .replaceFirst('Exception: ', '');
+
       notifyListeners();
       return false;
     } catch (e) {
