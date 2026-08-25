@@ -1,17 +1,134 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 
-class AccountScreen extends StatelessWidget { const AccountScreen({super.key, this.currentUser}); final AppUser? currentUser; @override Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: AccountBody(currentUser: currentUser))); }
-class AccountBody extends StatefulWidget { const AccountBody({super.key, this.currentUser, this.onLoggedIn, this.onLoggedOut}); final AppUser? currentUser; final ValueChanged<AppUser>? onLoggedIn; final VoidCallback? onLoggedOut; @override State<AccountBody> createState() => _AccountBodyState(); }
+/// Body-only account tab. AppShell owns the main Scaffold and AppBar.
+class AccountBody extends StatefulWidget {
+  const AccountBody({super.key, this.currentUser, this.onLoggedIn, this.onLoggedOut});
+  final AppUser? currentUser;
+  final ValueChanged<AppUser>? onLoggedIn;
+  final VoidCallback? onLoggedOut;
+  @override State<AccountBody> createState() => _AccountBodyState();
+}
+
 class _AccountBodyState extends State<AccountBody> {
-  final _account = TextEditingController(), _password = TextEditingController(), _name = TextEditingController(), _phone = TextEditingController(), _group = TextEditingController(), _address = TextEditingController(); bool _obscure = true, _rememberAccount = false, _rememberPassword = false; UserRole _role = UserRole.member; String _avatar = '🙂';
-  @override void dispose() { for (final c in [_account, _password, _name, _phone, _group, _address]) { c.dispose(); } super.dispose(); }
-  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  void _login() { if (_account.text.trim().isEmpty || _password.text.isEmpty) { _message('계정과 암호를 입력해 주세요.'); return; } widget.onLoggedIn?.call(AppUser(id: _account.text.trim(), email: _account.text.trim(), name: _name.text.trim().isEmpty ? '회원' : _name.text.trim(), phone: _phone.text.trim(), address: _address.text.trim(), company: _group.text.trim(), role: _role)); }
-  @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [if (widget.currentUser != null) ...[_profile(), const SizedBox(height: 18), OutlinedButton(onPressed: widget.onLoggedOut, child: const Text('로그아웃'))] else ...[_rolePicker(), const SizedBox(height: 18), TextField(controller: _account, decoration: const InputDecoration(labelText: '계정', prefixIcon: Icon(Icons.person_outline), filled: true, fillColor: AppColors.inputFill)), const SizedBox(height: 10), TextField(controller: _password, obscureText: _obscure, decoration: InputDecoration(labelText: '암호', prefixIcon: const Icon(Icons.lock_outline), filled: true, fillColor: AppColors.inputFill, suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined)))), _check('회원아이디 기억하기', _rememberAccount, (v) => setState(() => _rememberAccount = v)), _check('암호 기억하기', _rememberPassword, (v) => setState(() => _rememberPassword = v)), const SizedBox(height: 8), FilledButton(onPressed: _login, child: const Text('접속')), const SizedBox(height: 8), OutlinedButton(onPressed: () => _message('회원가입 화면은 다음 단계에서 연결합니다.'), child: const Text('회원가입'))]);
-  Widget _rolePicker() => SegmentedButton<UserRole>(segments: const [ButtonSegment(value: UserRole.member, label: Text('일반 회원')), ButtonSegment(value: UserRole.admin, label: Text('관리자')), ButtonSegment(value: UserRole.partner, label: Text('협력/파트너사'))], selected: {_role}, onSelectionChanged: (v) => setState(() => _role = v.first));
-  Widget _check(String label, bool value, ValueChanged<bool> onChanged) => CheckboxListTile(value: value, onChanged: (v) => onChanged(v ?? false), title: Text(label), contentPadding: EdgeInsets.zero, dense: true);
-  Widget _profile() { final user = widget.currentUser!; return Column(children: [Stack(alignment: Alignment.bottomRight, children: [CircleAvatar(radius: 48, backgroundColor: AppColors.inputFill, child: Text(_avatar, style: const TextStyle(fontSize: 42))), PopupMenuButton<String>(icon: const Icon(Icons.camera_alt, color: AppColors.primary), onSelected: (v) { if (v == 'camera') _message('카메라 연결 위치입니다.'); if (v == 'photo') _message('사진 선택 연결 위치입니다.'); if (v == 'character') setState(() => _avatar = '🐼'); }, itemBuilder: (_) => const [PopupMenuItem(value: 'camera', child: Text('카메라')), PopupMenuItem(value: 'photo', child: Text('사진 선택')), PopupMenuItem(value: 'character', child: Text('귀여운 캐릭터 선택'))])]), const SizedBox(height: 10), Text(user.name.isEmpty ? '회원' : user.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: AppColors.primary)), const SizedBox(height: 8), Chip(label: Text(user.role == UserRole.admin ? '관리자' : user.role == UserRole.partner ? '협력/파트너사' : '일반 회원')), const SizedBox(height: 12), Card(child: Column(children: [_info('전화번호', user.phone), _info('그룹', user.role == UserRole.admin ? '관리자' : user.role == UserRole.partner ? '협력/파트너사' : '일반 고객'), _info('주소', user.address)])), const SizedBox(height: 10), FilledButton.icon(onPressed: () => _message('회원 정보 변경 화면 연결 위치입니다.'), icon: const Icon(Icons.edit_outlined), label: const Text('회원 정보 변경'))]); }
-  Widget _info(String label, String value) => ListTile(title: Text(label, style: const TextStyle(color: AppColors.textSecondary)), subtitle: Text(value.isEmpty ? '등록되지 않음' : value));
+  final _account = TextEditingController();
+  final _password = TextEditingController();
+  bool _obscure = true;
+  bool _rememberAccount = false;
+  bool _rememberPassword = false;
+  UserRole _role = UserRole.member;
+
+  @override
+  void dispose() { _account.dispose(); _password.dispose(); super.dispose(); }
+
+  void _message(String text) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(text)));
+
+  void _login() {
+    final account = _account.text.trim();
+    if (account.isEmpty || _password.text.isEmpty) {
+      _message('계정과 암호를 입력해 주세요.');
+      return;
+    }
+    // TODO(supabase): replace this mock with AuthService/Supabase Auth.
+    widget.onLoggedIn?.call(AppUser(id: account, email: account, name: '회원', role: _role));
+    _message('접속이 완료되었습니다.');
+  }
+
+  void _signUp() {
+    final account = TextEditingController();
+    final password = TextEditingController();
+    final name = TextEditingController();
+    UserRole role = UserRole.member;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('회원가입'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            _dialogField(account, '계정'),
+            _dialogField(password, '암호', obscure: true),
+            _dialogField(name, '이름'),
+            DropdownButtonFormField<UserRole>(
+              value: role,
+              decoration: const InputDecoration(labelText: '회원 유형'),
+              items: const [
+                DropdownMenuItem(value: UserRole.member, child: Text('일반 회원')),
+                DropdownMenuItem(value: UserRole.partner, child: Text('협력/파트너사')),
+              ],
+              onChanged: (value) { if (value != null) setDialogState(() => role = value); },
+            ),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')),
+            FilledButton(
+              onPressed: () {
+                if (account.text.trim().isEmpty || password.text.isEmpty || name.text.trim().isEmpty) {
+                  _message('계정, 암호, 이름을 입력해 주세요.');
+                  return;
+                }
+                // TODO(supabase): auth.signUp and profiles insert/approval flow.
+                Navigator.pop(dialogContext);
+                _message('회원가입 요청이 접수되었습니다.');
+              },
+              child: const Text('가입 신청'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogField(TextEditingController controller, String label, {bool obscure = false}) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: TextField(controller: controller, obscureText: obscure, decoration: InputDecoration(
+      labelText: label, filled: true, fillColor: AppColors.inputFill,
+      border: const OutlineInputBorder(),
+    )),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.currentUser;
+    if (user != null) {
+      return ListView(padding: const EdgeInsets.all(20), children: [
+        Text(user.name.isEmpty ? '회원' : user.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary)),
+        ListTile(title: const Text('계정'), subtitle: Text(user.email)),
+        ListTile(title: const Text('권한'), subtitle: Text(user.roleLabel)),
+        OutlinedButton(onPressed: widget.onLoggedOut, child: const Text('로그아웃')),
+      ]);
+    }
+    return ListView(padding: const EdgeInsets.all(20), children: [
+      SegmentedButton<UserRole>(
+        segments: const [
+          ButtonSegment(value: UserRole.member, label: Text('일반 회원')),
+          ButtonSegment(value: UserRole.admin, label: Text('관리자')),
+          ButtonSegment(value: UserRole.partner, label: Text('협력/파트너사')),
+        ],
+        selected: {_role},
+        onSelectionChanged: (value) { if (value.isNotEmpty) setState(() => _role = value.first); },
+      ),
+      const SizedBox(height: 18),
+      TextField(controller: _account, decoration: const InputDecoration(labelText: '계정', prefixIcon: Icon(Icons.person_outline), filled: true, fillColor: AppColors.inputFill, border: OutlineInputBorder())),
+      const SizedBox(height: 10),
+      TextField(controller: _password, obscureText: _obscure, decoration: InputDecoration(labelText: '암호', prefixIcon: const Icon(Icons.lock_outline), filled: true, fillColor: AppColors.inputFill, border: const OutlineInputBorder(), suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined)))),
+      CheckboxListTile(value: _rememberAccount, onChanged: (value) => setState(() => _rememberAccount = value ?? false), title: const Text('회원아이디 기억하기'), contentPadding: EdgeInsets.zero),
+      CheckboxListTile(value: _rememberPassword, onChanged: (value) => setState(() => _rememberPassword = value ?? false), title: const Text('암호 기억하기'), contentPadding: EdgeInsets.zero),
+      FilledButton(onPressed: _login, child: const Text('접속')),
+      const SizedBox(height: 8),
+      OutlinedButton(onPressed: _signUp, child: const Text('회원가입')),
+    ]);
+  }
+}
+
+/// Compatibility wrapper for code that still uses AccountScreen directly.
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key, this.currentUser});
+  final AppUser? currentUser;
+  @override Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(child: AccountBody(currentUser: currentUser)),
+  );
 }
