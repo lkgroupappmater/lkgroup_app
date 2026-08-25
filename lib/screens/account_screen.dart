@@ -9,7 +9,88 @@ class _AccountBodyState extends State<AccountBody> {
   @override void dispose() { for (final c in [_account, _password, _name, _phone, _group, _address]) { c.dispose(); } super.dispose(); }
   void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   void _login() { if (_account.text.trim().isEmpty || _password.text.isEmpty) { _message('계정과 암호를 입력해 주세요.'); return; } widget.onLoggedIn?.call(AppUser(id: _account.text.trim(), email: _account.text.trim(), name: _name.text.trim().isEmpty ? '회원' : _name.text.trim(), phone: _phone.text.trim(), address: _address.text.trim(), company: _group.text.trim(), role: _role)); }
-  @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [if (widget.currentUser != null) ...[_profile(), const SizedBox(height: 18), OutlinedButton(onPressed: widget.onLoggedOut, child: const Text('로그아웃'))] else ...[_rolePicker(), const SizedBox(height: 18), TextField(controller: _account, decoration: const InputDecoration(labelText: '계정', prefixIcon: Icon(Icons.person_outline), filled: true, fillColor: AppColors.inputFill)), const SizedBox(height: 10), TextField(controller: _password, obscureText: _obscure, decoration: InputDecoration(labelText: '암호', prefixIcon: const Icon(Icons.lock_outline), filled: true, fillColor: AppColors.inputFill, suffixIcon: IconButton(onPressed: () => setState(() => _obscure = !_obscure), icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined)))), _check('회원아이디 기억하기', _rememberAccount, (v) => setState(() => _rememberAccount = v)), _check('암호 기억하기', _rememberPassword, (v) => setState(() => _rememberPassword = v)), const SizedBox(height: 8), FilledButton(onPressed: _login, child: const Text('접속')), const SizedBox(height: 8), OutlinedButton(onPressed: () => _message('회원가입 화면은 다음 단계에서 연결합니다.'), child: const Text('회원가입'))]);
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        if (widget.currentUser != null) ...[
+          _profile(),
+          const SizedBox(height: 18),
+          OutlinedButton(
+            onPressed: widget.onLoggedOut,
+            child: const Text('로그아웃'),
+          ),
+        ] else ...[
+          _rolePicker(),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _account,
+            decoration: const InputDecoration(
+              labelText: '계정',
+              prefixIcon: Icon(Icons.person_outline),
+              filled: true,
+              fillColor: AppColors.inputFill,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _password,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: '암호',
+              prefixIcon: const Icon(Icons.lock_outline),
+              filled: true,
+              fillColor: AppColors.inputFill,
+              suffixIcon: IconButton(
+                onPressed: () {
+                  setState(() {
+                    _obscure = !_obscure;
+                  });
+                },
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+              ),
+            ),
+          ),
+          _check(
+            '회원아이디 기억하기',
+            _rememberAccount,
+                (value) {
+              setState(() {
+                _rememberAccount = value;
+              });
+            },
+          ),
+          _check(
+            '암호 기억하기',
+            _rememberPassword,
+                (value) {
+              setState(() {
+                _rememberPassword = value;
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _login,
+            child: const Text('접속'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () {
+              _message('회원가입 화면은 다음 단계에서 연결합니다.');
+            },
+            child: const Text('회원가입'),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _rolePicker() => SegmentedButton<UserRole>(segments: const [ButtonSegment(value: UserRole.member, label: Text('일반 회원')), ButtonSegment(value: UserRole.admin, label: Text('관리자')), ButtonSegment(value: UserRole.partner, label: Text('협력/파트너사'))], selected: {_role}, onSelectionChanged: (v) => setState(() => _role = v.first));
   Widget _check(String label, bool value, ValueChanged<bool> onChanged) => CheckboxListTile(value: value, onChanged: (v) => onChanged(v ?? false), title: Text(label), contentPadding: EdgeInsets.zero, dense: true);
   Widget _profile() { final user = widget.currentUser!; return Column(children: [Stack(alignment: Alignment.bottomRight, children: [CircleAvatar(radius: 48, backgroundColor: AppColors.inputFill, child: Text(_avatar, style: const TextStyle(fontSize: 42))), PopupMenuButton<String>(icon: const Icon(Icons.camera_alt, color: AppColors.primary), onSelected: (v) { if (v == 'camera') _message('카메라 연결 위치입니다.'); if (v == 'photo') _message('사진 선택 연결 위치입니다.'); if (v == 'character') setState(() => _avatar = '🐼'); }, itemBuilder: (_) => const [PopupMenuItem(value: 'camera', child: Text('카메라')), PopupMenuItem(value: 'photo', child: Text('사진 선택')), PopupMenuItem(value: 'character', child: Text('귀여운 캐릭터 선택'))])]), const SizedBox(height: 10), Text(user.name.isEmpty ? '회원' : user.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: AppColors.primary)), const SizedBox(height: 8), Chip(label: Text(user.role == UserRole.admin ? '관리자' : user.role == UserRole.partner ? '협력/파트너사' : '일반 회원')), const SizedBox(height: 12), Card(child: Column(children: [_info('전화번호', user.phone), _info('그룹', user.role == UserRole.admin ? '관리자' : user.role == UserRole.partner ? '협력/파트너사' : '일반 고객'), _info('주소', user.address)])), const SizedBox(height: 10), FilledButton.icon(onPressed: () => _message('회원 정보 변경 화면 연결 위치입니다.'), icon: const Icon(Icons.edit_outlined), label: const Text('회원 정보 변경'))]); }
