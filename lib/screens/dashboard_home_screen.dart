@@ -19,7 +19,7 @@ class ContactLink {
 const _contactLinks = <ContactLink>[
   ContactLink(label: '카카오톡 단톡방', icon: '💬', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
   ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: '💛', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
-  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: '차후 공유'),
+  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
   ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: '🟢', placeholder: 'https://wa.me/8562052883018'),
   ContactLink(label: 'WhatsApp(대표번호)', icon: '📲', placeholder: 'https://wa.me/8562091126780'),
   ContactLink(label: 'Facebook', icon: '🔵', placeholder: 'https://www.facebook.com/LKTradingofLao'),
