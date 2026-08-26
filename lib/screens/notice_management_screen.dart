@@ -1,1 +1,100 @@
-aW1wb3J0ICdwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCc7CmltcG9ydCAnLi4vY29yZS9hcHBfY29sb3JzLmRhcnQnOwoKY2xhc3MgTm90aWNlTWFuYWdlbWVudFNjcmVlbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBjb25zdCBOb3RpY2VNYW5hZ2VtZW50U2NyZWVuKHtzdXBlci5rZXl9KTsKCiAgQG92ZXJyaWRlCiAgU3RhdGU8Tm90aWNlTWFuYWdlbWVudFNjcmVlbiA+IGNyZWF0ZVN0YXRlKCkgPT4gX05vdGljZU1hbmFnZW1lbnRTY3JlZW5TdGF0ZSgpOwp9CgpjbGFzcyBfTm90aWNlTWFuYWdlbWVudFNjcmVlblN0YXRlIGV4dGVuZHMgU3RhdGU8Tm90aWNlTWFuYWdlbWVudFNjcmVlbj4gewogIGZpbmFsIExpc3Q8TWFwPFN0cmluZywgU3RyaW5nPj4gX2l0ZW1zID0gWwogICAgeyd0aXRsZSc6ICcyMDI1vHDA7IiwgJ2RhdGUnOiAnMjAyNS0wNy0wMScsICdjb250ZW50JzogJ+2VmOuwmOq4sCDsmrTsnoQg67OA6rK9IOuCtOyaqeydhCDtmZXsnbjtlbQg7KO87IS47JqULid9LAogICAgeyd0aXRsZSc6ICfthrXqtIAg7ISc66WYIOygnOy2nCDquLDtlZwg67OA6rK9IOyViOuCtCcsICdkYXRlJzogJzIwMjUtMDYtMjAnLCAnY29udGVudCc6ICfthrXqtIAg7ISc66WYIOygnOy2nCDquLDtlZzsnbQg67OA6rK965CY7JeI7Iq164uI64ukLid9LAogIF07CgogIHZvaWQgX2VkaXQoaW50IGluZGV4KSA9PiBfc2hvd0VkaXRvcihleGlzdGluZzogX2l0ZW1zW2luZGV4XSwgaW5kZXg6IGluZGV4KTsKCiAgdm9pZCBfZGVsZXRlKGludCBpbmRleCkgewogICAgc2V0U3RhdGUoKCkgPT4gX2l0ZW1zLnJlbW92ZUF0KGluZGV4KSk7CiAgICBTY2FmZm9sZE1lc3Nlbmdlci5vZihjb250ZXh0KS5zaG93U25hY2tCYXIoY29uc3QgU25hY2tCYXIoY29udGVudDogVGV4dCgn6rO17KeA7IKs7ZWt7J20IOyCreygnOuQmOyXiOyKteuLiOuLpC4nKSkpOwogIH0KCiAgdm9pZCBfc2hvd0VkaXRvcih7TWFwPFN0cmluZywgU3RyaW5nPj8gZXhpc3RpbmcsIGludD8gaW5kZXh9KSB7CiAgICBmaW5hbCB0aXRsZSA9IFRleHRFZGl0aW5nQ29udHJvbGxlcih0ZXh0OiBleGlzdGluZz9bJ3RpdGxlJ10gPz8gJycpOwogICAgZmluYWwgY29udGVudCA9IFRleHRFZGl0aW5nQ29udHJvbGxlcih0ZXh0OiBleGlzdGluZz9bJ2NvbnRlbnQnXSA/PyAnJyk7CiAgICBzaG93RGlhbG9nPHZvaWQ+KAogICAgICBjb250ZXh0OiBjb250ZXh0LAogICAgICBidWlsZGVyOiAoZGlhbG9nQ29udGV4dCkgPT4gQWxlcnREaWFsb2coCiAgICAgICAgdGl0bGU6IFRleHQoZXhpc3RpbmcgPT0gbnVsbCA/ICfqs7Xsp4Dsgqztla0g7LaU6rCAJyA6ICfqs7Xsp4Dsgqztla0g7Y647KeRJyksCiAgICAgICAgY29udGVudDogU2luZ2xlQ2hpbGRTY3JvbGxWaWV3KGNoaWxkOiBDb2x1bW4obWFpbkF4aXNTaXplOiBNYWluQXhpc1NpemUubWluLCBjaGlsZHJlbjogW1RleHRGaWVsZChjb250cm9sbGVyOiB0aXRsZSwgZGVjb3JhdGlvbjogY29uc3QgSW5wdXREZWNvcmF0aW9uKGxhYmVsVGV4dDogJ+ygnOuqqScpKSwgVGV4dEZpZWxkKGNvbnRyb2xsZXI6IGNvbnRlbnQsIG1heExpbmVzOiA1LCBkZWNvcmF0aW9uOiBjb25zdCBJbnB1dERlY29yYXRpb24obGFiZWxUZXh0OiAn64K07JqpJykpLCBjb25zdCBTaXplZEJveChoZWlnaHQ6IDgpLCBjb25zdCBBbGlnbihhbGlnbm1lbnQ6IEFsaWdubWVudC5jZW50ZXJMZWZ0LCBjaGlsZDogVGV4dCgn65Ox66GdIOuCoOynnOuKlCDsoIDsnqUg7IucIOyekOuPmeycvOuhnCDsnoXroKXrkKnri4jri6QuJywgc3R5bGU6IFRleHRTdHlsZShmb250U2l6ZTogMTIsIGNvbG9yOiBBcHBDb2xvcnMudGV4dFNlY29uZGFyeSkpKV0pKSwKICAgICAgICBhY3Rpb25zOiBbCiAgICAgICAgICBUZXh0QnV0dG9uKG9uUHJlc3NlZDogKCkgPT4gTmF2aWdhdG9yLnBvcChkaWFsb2dDb250ZXh0KSwgY2hpbGQ6IGNvbnN0IFRleHQoJ+y3qOyGjCcpKSwKICAgICAgICAgIEZpbGxlZEJ1dHRvbihvblByZXNzZWQ6ICgpIHsKICAgICAgICAgICAgZmluYWwgdG9kYXkgPSBEYXRlVGltZS5ub3coKS50b0lzbzg2MDFTdHJpbmcoKS5zdWJzdHJpbmcoMCwgMTApOwogICAgICAgICAgICBmaW5hbCBpdGVtID0gPFN0cmluZywgU3RyaW5nPnsKICAgICAgICAgICAgICAndGl0bGUnOiB0aXRsZS50ZXh0LnRyaW0oKSwKICAgICAgICAgICAgICAnZGF0ZSc6IGV4aXN0aW5nP1snZGF0ZSddID8/IHRvZGF5LAogICAgICAgICAgICAgICdjb250ZW50JzogY29udGVudC50ZXh0LnRyaW0oKSwKICAgICAgICAgICAgfTsKICAgICAgICAgICAgaWYgKGl0ZW1bJ3RpdGxlJ10hLmlzRW1wdHkgfHwgaXRlbVsnY29udGVudCddIS5pc0VtcHR5KSB7CiAgICAgICAgICAgICAgU2NhZmZvbGRNZXNzZW5nZXIub2YoY29udGV4dCkuc2hvd1NuYWNrQmFyKGNvbnN0IFNuYWNrQmFyKGNvbnRlbnQ6IFRleHQoJ+ygnOuqqeqzvCDrgrTsmqnsnYQg7J6F66Cl7ZW0IOyjvOyEuOyalC4nKSkpOwogICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgfQogICAgICAgICAgICBzZXRTdGF0ZSgoKSB7CiAgICAgICAgICAgICAgaWYgKGluZGV4ID09IG51bGwpIHsKICAgICAgICAgICAgICAgIF9pdGVtcy5hZGQoaXRlbSk7CiAgICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgIF9pdGVtc1tpbmRleF0gPSBpdGVtOwogICAgICAgICAgICAgIH0KICAgICAgICAgICAgfSk7CiAgICAgICAgICAgIE5hdmlnYXRvci5wb3AoZGlhbG9nQ29udGV4dCk7CiAgICAgICAgICB9LCBjaGlsZDogY29uc3QgVGV4dCgn7KCA7J6lJykpLAogICAgICAgIF0sCiAgICAgICksCiAgICApLndoZW5Db21wbGV0ZSgoKSB7IHRpdGxlLmRpc3Bvc2UoKTsgY29udGVudC5kaXNwb3NlKCk7IH0pOwogIH0KCiAgQG92ZXJyaWRlCiAgV2lkZ2V0IGJ1aWxkKEJ1aWxkQ29udGV4dCBjb250ZXh0KSB7CiAgICByZXR1cm4gU2NhZmZvbGQoCiAgICAgIGFwcEJhcjogQXBwQmFyKHRpdGxlOiBjb25zdCBUZXh0KCfqs7Xsp4Dsgqztla0g66qp66GdIOq0gOumrCcpLCBiYWNrZ3JvdW5kQ29sb3I6IEFwcENvbG9ycy5wcmltYXJ5LCBmb3JlZ3JvdW5kQ29sb3I6IEFwcENvbG9ycy53aGl0ZSksCiAgICAgIGJhY2tncm91bmRDb2xvcjogQXBwQ29sb3JzLmJhY2tncm91bmQsCiAgICAgIGJvZHk6IExpc3RWaWV3LmJ1aWxkZXIoCiAgICAgICAgcGFkZGluZzogY29uc3QgRWRnZUluc2V0cy5hbGwoMTYpLAogICAgICAgIGl0ZW1Db3VudDogX2l0ZW1zLmxlbmd0aCArIDEsCiAgICAgICAgaXRlbUJ1aWxkZXI6IChjb250ZXh0LCBpbmRleCkgewogICAgICAgICAgIGlmIChpbmRleCA9PSBfaXRlbXMobGVuZ3RoKSB7IHJldHVybiBjb25zdCBTaXplZEJveC5zaHJpbms7IH0KICAgICAgICAgICBmaW5hbCBpdGVtID0gX2l0ZW1zW2luZGV4XTsKICAgICAgICAgICByZXR1cm4gQ2FyZChjaGlsZDogTGlzdFRpbGUodGl0bGU6IFRleHQoaXRlbVsn dGl0bGUnXSA/PyAnJyksIHN1YnRpdGxlOiBUZXh0KCcke2l0ZW1bJ2RhdGUnXX1cbiR7aXRlbVsnY29udGVudCddfScpKSk7CiAgICAgICAgfSwKICAgICAgKSwKICAgICk7CiAgfQp9Cg==
+import 'package:flutter/material.dart';
+import '../core/app_colors.dart';
+
+class NoticeManagementScreen extends StatefulWidget {
+  const NoticeManagementScreen({super.key});
+
+  @override
+  State<NoticeManagementScreen> createState() => _NoticeManagementScreenState();
+}
+
+class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
+  final List<Map<String, String>> _items = [
+    {'title': '2025년 하반기 운임 조정 안내', 'date': '2025-07-01', 'content': '하반기 운임 변경 내용을 확인해 주세요.'},
+    {'title': '통관 서류 제출 기한 변경 안내', 'date': '2025-06-20', 'content': '통관 서류 제출 기한이 변경되었습니다.'},
+  ];
+
+  void _edit(int index) => _showEditor(existing: _items[index], index: index);
+
+  void _delete(int index) {
+    setState(() => _items.removeAt(index));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('공지사항이 삭제되었습니다.')));
+  }
+
+  void _showEditor({Map<String, String>? existing, int? index}) {
+    final title = TextEditingController(text: existing?['title'] ?? '');
+    final content = TextEditingController(text: existing?['content'] ?? '');
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: title, decoration: const InputDecoration(labelText: '제목')),
+            TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용')),
+            const SizedBox(height: 8),
+            const Align(alignment: Alignment.centerLeft, child: Text('등록 날짜는 저장 시 자동으로 입력됩니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')),
+          FilledButton(
+            onPressed: () {
+              final item = <String, String>{
+                'title': title.text.trim(),
+                'date': existing?['date'] ?? DateTime.now().toIso8601String().substring(0, 10),
+                'content': content.text.trim(),
+              };
+              if (item['title']!.isEmpty || item['content']!.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('제목과 내용을 입력해 주세요.')));
+                return;
+              }
+              setState(() {
+                if (index == null) {
+                  _items.add(item);
+                } else {
+                  _items[index] = item;
+                }
+              });
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      title.dispose();
+      content.dispose();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
+      backgroundColor: AppColors.background,
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _items.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _items.length) {
+            return Padding(padding: const EdgeInsets.only(top: 8), child: FilledButton.icon(onPressed: () => _showEditor(), icon: const Icon(Icons.add), label: const Text('공지사항 추가')));
+          }
+          final item = _items[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              title: Text(item['title'] ?? ''),
+              subtitle: Text('${item['date']}\n${item['content']}'),
+              isThreeLine: true,
+              trailing: Wrap(children: [
+                IconButton(onPressed: () => _edit(index), icon: const Icon(Icons.edit_outlined)),
+                IconButton(onPressed: () => _delete(index), icon: const Icon(Icons.delete_outline, color: AppColors.error)),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
