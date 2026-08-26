@@ -120,7 +120,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   Widget _sectionHeader(String title, String action, VoidCallback onPressed) => Row(children: [
     Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary))),
-    TextButton(onPressed: onPressed, child: Text(action, style: const TextStyle(color: AppColors.accent, fontSize: 13))),
+    TextButton(onPressed: onPressed, child: Text(_isManager ? '목록 관리' : action, style: const TextStyle(color: AppColors.accent, fontSize: 13))),
   ]);
 
   Widget _scheduleCard(_ScheduleItem item) {
@@ -172,7 +172,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   Widget _contactCard(ContactLink link) => InkWell(onTap: () => _showContact(link), borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14), decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .05), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.primary.withValues(alpha: .18))), child: Row(children: [Text(link.icon, style: const TextStyle(fontSize: 20)), const SizedBox(width: 8), Expanded(child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)))])));
 
   Widget _managementSection() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const Text('관리자 메뉴', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+    const Text('통합 관리', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
     const SizedBox(height: 10),
     GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 2.65, children: [
       _managementButton('선적 일정 관리', Icons.calendar_month, const ScheduleManagementScreen()),
@@ -274,4 +274,6 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
+
 

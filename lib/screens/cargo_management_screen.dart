@@ -19,8 +19,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   final _searchInvoice = TextEditingController();
   final _searchName = TextEditingController();
   final _searchPhone = TextEditingController();
+  final _invoice = TextEditingController();
   final _name = TextEditingController();
   final _phone = TextEditingController();
+  final _receiptNo = TextEditingController();
   final _note = TextEditingController();
   final _weight = TextEditingController();
   final _width = TextEditingController();
@@ -34,7 +36,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   bool _searched = false;
 
   final List<Map<String, String>> _shipments = [
-    {'id':'1','invoice':'LK-2026-001','name':'김철수','phone':'020-1111-2222','route':'한국->라오스 해상','year':'2026년','voyage':'01항차','weight':'120','width':'40','length':'60','height':'35'},
+    {'id':'1','invoice':'LK-2026-001','receiptNo':'RC-2026-001','name':'김철수','phone':'020-1111-2222','route':'한국->라오스 해상','year':'2026년','voyage':'01항차','weight':'120','width':'40','length':'60','height':'35'},
     {'id':'2','invoice':'LK-2026-002','name':'이영희','phone':'020-3333-4444','route':'한국->라오스 항공','year':'2026년','voyage':'02항차','weight':'45','width':'30','length':'45','height':'25'},
     {'id':'3','invoice':'LK-2026-003','name':'박민수','phone':'020-5555-6666','route':'라오스->한국 항공 특송','year':'2026년','voyage':'01항차','weight':'78','width':'35','length':'50','height':'30'},
   ];
@@ -62,6 +64,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   Map<String, String> _normalize(Map<String, dynamic> raw) => {
     'id': (raw['id'] ?? raw['boxNo'] ?? '').toString(),
     'invoice': (raw['invoice'] ?? raw['invoiceNo'] ?? '').toString(),
+    'receiptNo': (raw['receiptNo'] ?? raw['receiptNumber'] ?? raw['receipt_no'] ?? '').toString(),
     'name': (raw['name'] ?? raw['consigneeName'] ?? '').toString(),
     'phone': (raw['phone'] ?? raw['contact'] ?? '').toString(),
     'route': (raw['route'] ?? routeLabels.first).toString(),
@@ -75,7 +78,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   @override
   void dispose() {
-    for (final controller in [_searchInvoice,_searchName,_searchPhone,_name,_phone,_note,_weight,_width,_length,_height]) controller.dispose();
+    for (final controller in [_searchInvoice,_searchName,_searchPhone,_invoice,_name,_phone,_receiptNo,_note,_weight,_width,_length,_height]) controller.dispose();
     super.dispose();
   }
 
@@ -112,8 +115,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   void _load(String id) {
     final item = _shipments.firstWhere((row) => row['id'] == id, orElse: () => <String, String>{});
     if (item.isEmpty) return;
+    _invoice.text = item['invoice'] ?? '';
     _name.text = item['name'] ?? '';
     _phone.text = item['phone'] ?? '';
+    _receiptNo.text = item['receiptNo'] ?? '';
+    _note.text = item['note'] ?? '';
     _route = item['route'] ?? routeLabels.first;
     _year = item['year'] ?? '2026년';
     _voyage = item['voyage'] ?? '01항차';
@@ -124,14 +130,26 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   }
 
   void _clearEdit() {
-    _name.clear(); _phone.clear(); _note.clear(); _weight.clear(); _width.clear(); _length.clear(); _height.clear();
+    _invoice.clear(); _name.clear(); _phone.clear(); _receiptNo.clear(); _note.clear(); _weight.clear(); _width.clear(); _length.clear(); _height.clear();
   }
 
   void _save() {
     if (_selectedId == null) return _message('먼저 수정할 화물을 선택해 주세요.');
     if (_name.text.trim().isEmpty) return _message('수령인 이름을 입력해 주세요.');
-    final changes = <String, String>{'name':_name.text.trim(),'phone':_phone.text.trim(),'route':_route,'year':_year,'voyage':_voyage};
-    if (_isPartner) changes.addAll({'weight':_weight.text.trim(),'width':_width.text.trim(),'length':_length.text.trim(),'height':_height.text.trim()});
+    final changes = <String, String>{
+      'invoice': _invoice.text.trim(),
+      'name': _name.text.trim(),
+      'phone': _phone.text.trim(),
+      'receiptNo': _receiptNo.text.trim(),
+      'note': _note.text.trim(),
+      'route': _route,
+      'year': _year,
+      'voyage': _voyage,
+      'weight': _weight.text.trim(),
+      'width': _width.text.trim(),
+      'length': _length.text.trim(),
+      'height': _height.text.trim(),
+    };
     if (_canSaveDirectly) {
       final index = _shipments.indexWhere((row) => row['id'] == _selectedId);
       if (index >= 0) setState(() => _shipments[index].addAll(changes));
@@ -179,10 +197,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       const SizedBox(height: 16),
       if (_selectedIds.isNotEmpty) ...[
         const Text('선택한 화물 정보 수정', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)), const SizedBox(height: 8),
-        // 일반 회원은 송장번호를 수정할 수 없으므로 송장번호 편집란을 표시하지 않습니다.
+        TextField(controller: _invoice, decoration: _dec('송장번호', Icons.receipt_long_outlined)), const SizedBox(height: 10),
         TextField(controller: _name, decoration: _dec('이름/라오스 수령인', Icons.person_outline)), const SizedBox(height: 10),
-        TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: _dec('연락처', Icons.phone_outlined)),
-        if (_isPartner) ...[const SizedBox(height: 10), const Text('화물 규격 수정', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)), const SizedBox(height: 8), SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [_number(_weight,'무게(kg)'), const SizedBox(width: 8), _number(_width,'가로(cm)'), const SizedBox(width: 8), _number(_length,'세로(cm)'), const SizedBox(width: 8), _number(_height,'높이(cm)')]))],
+        TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: _dec('연락처', Icons.phone_outlined)), const SizedBox(height: 10),
+        TextField(controller: _receiptNo, decoration: _dec('영수번호', Icons.confirmation_number_outlined)), const SizedBox(height: 10),
+        const Text('화물 규격 수정', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)), const SizedBox(height: 8),
+        SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [_number(_weight,'무게(kg)'), const SizedBox(width: 8), _number(_width,'가로(cm)'), const SizedBox(width: 8), _number(_length,'세로(cm)'), const SizedBox(width: 8), _number(_height,'높이(cm)')])),
         const SizedBox(height: 10), TextField(controller: _note, maxLines: 3, decoration: _dec('기타 추가 내용', Icons.edit_note_outlined)), const SizedBox(height: 14),
         Row(children: [Expanded(child: SizedBox(height: 48, child: ElevatedButton.icon(onPressed: _save, icon: Icon(_canSaveDirectly ? Icons.save : Icons.send), label: Text(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white)))), const SizedBox(width: 10), Expanded(child: SizedBox(height: 48, child: OutlinedButton(onPressed: _cancel, child: const Text('취소'))))]),
       ],
@@ -190,3 +210,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     ]);
   }
 }
+
+
+
+
+
+
+
+

@@ -23,19 +23,37 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
 
   void _showEditor({Map<String, String>? existing, int? index}) {
     final title = TextEditingController(text: existing?['title'] ?? '');
-    final date = TextEditingController(text: existing?['date'] ?? '');
     final content = TextEditingController(text: existing?['content'] ?? '');
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: title, decoration: const InputDecoration(labelText: '제목')), TextField(controller: date, decoration: const InputDecoration(labelText: '날짜')), TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용'))])),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: title, decoration: const InputDecoration(labelText: '제목')), TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용')), const SizedBox(height: 8), const Align(alignment: Alignment.centerLeft, child: Text('등록 날짜는 저장 시 자동으로 입력됩니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)))])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')),
-          FilledButton(onPressed: () { final item = {'title': title.text.trim(), 'date': date.text.trim(), 'content': content.text.trim()}; setState(() { if (index == null) { _items.add(item); } else { _items[index] = item; } }); Navigator.pop(dialogContext); }, child: const Text('저장')),
+          FilledButton(onPressed: () {
+            final today = DateTime.now().toIso8601String().substring(0, 10);
+            final item = <String, String>{
+              'title': title.text.trim(),
+              'date': existing?['date'] ?? today,
+              'content': content.text.trim(),
+            };
+            if (item['title']!.isEmpty || item['content']!.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('제목과 내용을 입력해 주세요.')));
+              return;
+            }
+            setState(() {
+              if (index == null) {
+                _items.add(item);
+              } else {
+                _items[index] = item;
+              }
+            });
+            Navigator.pop(dialogContext);
+          }, child: const Text('저장')),
         ],
       ),
-    ).whenComplete(() { title.dispose(); date.dispose(); content.dispose(); });
+    ).whenComplete(() { title.dispose(); content.dispose(); });
   }
 
   @override
@@ -55,4 +73,8 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     );
   }
 }
+
+
+
+
 
