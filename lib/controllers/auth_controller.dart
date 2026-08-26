@@ -79,15 +79,12 @@ class AuthController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e
+      final message = e
           .toString()
           .replaceFirst('AuthException: ', '')
-          .replaceFirst('Exception: ', '');
-
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = '알 수 없는 오류가 발생했습니다.';
+          .replaceFirst('Exception: ', '')
+          .trim();
+      _errorMessage = message.isEmpty ? '알 수 없는 오류가 발생했습니다.' : message;
       notifyListeners();
       return false;
     } finally {
@@ -139,3 +136,4 @@ class AuthController extends ChangeNotifier {
     }
   }
 }
+

@@ -14,8 +14,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseConfig {
   SupabaseConfig._();
 
-  static const String projectUrl = String.fromEnvironment('https://rkqwzxfcnciptnwesfbr.supabase.co');
-  static const String anonKey = String.fromEnvironment('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrcXd6eGZjbmNpcHRud2VzZmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1Njc3MTAsImV4cCI6MjEwMzE0MzcxMH0.TttUKX7et6xSv-eRNHYfKe-ZX6FFmcoiIw8KR1nhJDE');
+  static const String projectUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String anonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
   static bool get isConfigured =>
       projectUrl.trim().isNotEmpty && anonKey.trim().isNotEmpty;
@@ -35,3 +35,4 @@ class SupabaseConfig {
     );
   }
 }
+

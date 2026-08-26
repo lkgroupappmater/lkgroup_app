@@ -139,13 +139,46 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         const SizedBox(height: 6),
         Text(_canSaveDirectly ? '선택한 화물 정보를 수정하고 바로 저장할 수 있습니다.' : '화물을 검색한 뒤 수정 요청을 등록할 수 있습니다.', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: 14),
-        DropdownButtonFormField<String>(value: _route, decoration: _decoration('운송 경로', Icons.route), items: routeLabels.map((route) => DropdownMenuItem(value: route, child: Text(route))).toList(), onChanged: (value) => setState(() => _route = value ?? _route)),
+        DropdownButtonFormField<String>(
+          value: _route,
+          decoration: _decoration('운송 경로', Icons.route),
+          items: routeLabels
+              .map((route) => DropdownMenuItem<String>(value: route, child: Text(route)))
+              .toList(),
+          onChanged: (value) {
+            if (value != null) setState(() => _route = value);
+          },
+        ),
         const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: DropdownButtonFormField<String>(value: _year, decoration: _decoration('년도', Icons.calendar_today), items: const ['2026년', '2027년', '2028년'].map((year) => DropdownMenuItem(value: year, child: Text(year))).toList(), onChanged: (value) => setState(() => _year = value ?? _year))),
-          const SizedBox(width: 10),
-          Expanded(child: DropdownButtonFormField<String>(value: _voyage, decoration: _decoration('항차', Icons.confirmation_number_outlined), items: const ['01항차', '02항차', '03항차', '04항차', '05항차'].map((voyage) => DropdownMenuItem(value: voyage, child: Text(voyage))).toList(), onChanged: (value) => setState(() => _voyage = value ?? _voyage))),
-        ]),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _year,
+                decoration: _decoration('년도', Icons.calendar_today),
+                items: const ['2026년', '2027년', '2028년']
+                    .map((year) => DropdownMenuItem<String>(value: year, child: Text(year)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _year = value);
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _voyage,
+                decoration: _decoration('항차', Icons.confirmation_number_outlined),
+                items: const ['01항차', '02항차', '03항차', '04항차', '05항차']
+                    .map((voyage) => DropdownMenuItem<String>(value: voyage, child: Text(voyage)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _voyage = value);
+                },
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         TextField(controller: _searchController, onSubmitted: (_) => _search(), decoration: _decoration('화물 검색(송장번호·이름·연락처)', Icons.search)),
         const SizedBox(height: 10),
@@ -179,4 +212,5 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     );
   }
 }
+
 

@@ -185,9 +185,87 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   Widget _managementButton(String label, IconData icon, Widget page) => OutlinedButton.icon(onPressed: () => _open(context, page), icon: Icon(icon, size: 18), label: Text(label, textAlign: TextAlign.center));
 
-  Widget _consultationArea() => Column(mainAxisSize: MainAxisSize.min, children: [if (_consultationOpen) _consultationPanel(), InkWell(onTap: () => setState(() => _consultationOpen = !_consultationOpen), child: Container(width: double.infinity, color: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 14), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(_consultationOpen ? Icons.keyboard_arrow_down : Icons.chat_bubble_outline, color: Colors.white), const SizedBox(width: 8), Text(_consultationOpen ? '상담 닫기' : '상담하기', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))]))]);
+  Widget _consultationArea() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_consultationOpen) _consultationPanel(),
+        InkWell(
+          onTap: () => setState(() => _consultationOpen = !_consultationOpen),
+          child: Container(
+            width: double.infinity,
+            color: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _consultationOpen
+                      ? Icons.keyboard_arrow_down
+                      : Icons.chat_bubble_outline,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _consultationOpen ? '상담 닫기' : '상담하기',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _consultationPanel() => Container(width: double.infinity, color: Colors.white, padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('AI 상담 준비 중', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)), const SizedBox(height: 8), const Text('운송 일정·운임·화물 조회·통관 안내 기본 답변을 준비하고 있습니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)), const SizedBox(height: 10), Row(children: [Expanded(child: TextField(controller: _questionController, decoration: const InputDecoration(hintText: '질문을 입력하세요...', isDense: true, border: OutlineInputBorder()))), const SizedBox(width: 8), FilledButton(onPressed: _startConsultation, child: const Text('상담 시작'))])])));
+  Widget _consultationPanel() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI 상담 준비 중',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '운송 일정·운임·화물 조회·통관 안내 기본 답변을 준비하고 있습니다.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _questionController,
+                  decoration: const InputDecoration(
+                    hintText: '질문을 입력하세요...',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _startConsultation,
+                child: const Text('상담 시작'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class DashboardHomeScreen extends StatelessWidget {
@@ -196,3 +274,4 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
