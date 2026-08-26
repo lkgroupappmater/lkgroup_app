@@ -3,28 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
+import '../core/route_catalog.dart';
 
 // ---------------------------------------------------------------------------
 // Route options for dropdown
 // ---------------------------------------------------------------------------
-const List<String> _transportRoutes = [
-  '한국->라오스 해상',
-  '한국->라오스 항공',
-  '라오스->한국 항공 특송',
-  '라오스->태국 육로',
-  '라오스->베트남 육로',
-  '라오스->중국 육로',
-  '라오스->캄보디아 육로',
-];
+const List<String> _transportRoutes = RouteCatalog.routes;
 
 // ---------------------------------------------------------------------------
 // Box data model (local)
 // ---------------------------------------------------------------------------
 class _BoxEntry {
-  String weight = '';
-  String width = '';
-  String length = '';
-  String height = '';
+  String weight   = '';
+  String width    = '';
+  String length   = '';
+  String height   = '';
   String quantity = '1';
 
   _BoxEntry();
@@ -41,7 +34,6 @@ class QuoteRequestBody extends StatefulWidget {
   });
 
   final AppLanguage language;
-
   /// Callback invoked when a guest presses "회원 로그인" inside the dialog.
   final VoidCallback? onRequestLogin;
 
@@ -78,9 +70,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         context: context,
         builder: (_) => AlertDialog(
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: const Text('로그인 필요'),
-          content: const Text('대량·특수 견적 요청은 회원 로그인 후 이용하실 수 있습니다.'),
+          content: const Text(
+              '대량·특수 견적 요청은 회원 로그인 후 이용하실 수 있습니다.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -131,19 +124,20 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           const SizedBox(height: 8),
           ..._boxes.asMap().entries.map(
                 (e) => _BoxRow(
-                  index: e.key,
-                  entry: e.value,
-                  canDelete: _boxes.length > 1,
-                  onDelete: () => _removeBox(e.key),
-                ),
-              ),
+              index: e.key,
+              entry: e.value,
+              canDelete: _boxes.length > 1,
+              onDelete: () => _removeBox(e.key),
+            ),
+          ),
           const SizedBox(height: 8),
 
           // Add box button
           OutlinedButton.icon(
             onPressed: _addBox,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('박스 추가', style: TextStyle(fontSize: 13)),
+            label: const Text('박스 추가',
+                style: TextStyle(fontSize: 13)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.navyPrimary,
               side: const BorderSide(color: AppColors.navyPrimary),
@@ -166,7 +160,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('운임 확인',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
             ),
           ),
           const SizedBox(height: 10),
@@ -177,8 +172,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             child: OutlinedButton.icon(
               onPressed: _requestSpecialQuote,
               icon: const Icon(Icons.star_outline, size: 18),
-              label:
-                  const Text('대량 혹은 특수 견적 요청', style: TextStyle(fontSize: 14)),
+              label: const Text('대량 혹은 특수 견적 요청',
+                  style: TextStyle(fontSize: 14)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.tagOrange,
                 side: const BorderSide(color: AppColors.tagOrange),
@@ -195,11 +190,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               Checkbox(
                 value: _isLoggedIn,
                 activeColor: AppColors.navyPrimary,
-                onChanged: (v) => setState(() => _isLoggedIn = v ?? false),
+                onChanged: (v) =>
+                    setState(() => _isLoggedIn = v ?? false),
               ),
               const Text('[테스트] 로그인 상태로 전환',
-                  style:
-                      TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
             ],
           ),
         ],
@@ -306,8 +302,7 @@ class _BoxRow extends StatelessWidget {
                   initial: entry.weight,
                   onChanged: (v) => entry.weight = v,
                   width: 72,
-                  inputType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(width: 6),
                 _CompactField(
@@ -315,8 +310,7 @@ class _BoxRow extends StatelessWidget {
                   initial: entry.width,
                   onChanged: (v) => entry.width = v,
                   width: 72,
-                  inputType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(width: 6),
                 _CompactField(
@@ -324,8 +318,7 @@ class _BoxRow extends StatelessWidget {
                   initial: entry.length,
                   onChanged: (v) => entry.length = v,
                   width: 72,
-                  inputType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(width: 6),
                 _CompactField(
@@ -333,8 +326,7 @@ class _BoxRow extends StatelessWidget {
                   initial: entry.height,
                   onChanged: (v) => entry.height = v,
                   width: 72,
-                  inputType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  inputType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(width: 6),
                 _CompactField(
@@ -386,7 +378,8 @@ class _CompactField extends StatelessWidget {
               FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
             ],
             onChanged: onChanged,
-            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            style: const TextStyle(
+                fontSize: 13, color: AppColors.textPrimary),
             textAlign: TextAlign.center,
             decoration: InputDecoration(
               filled: true,
@@ -396,12 +389,12 @@ class _CompactField extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               focusedBorder: OutlineInputBorder(
-                borderSide:
-                    const BorderSide(color: AppColors.accent, width: 1.2),
+                borderSide: const BorderSide(
+                    color: AppColors.accent, width: 1.2),
                 borderRadius: BorderRadius.circular(6),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 6, vertical: 10),
             ),
           ),
         ],
@@ -445,7 +438,8 @@ class QuoteRequestScreen extends StatelessWidget {
         backgroundColor: AppColors.navyPrimary,
         foregroundColor: AppColors.white,
         title: Text(AppStrings.get(language, 'quote'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w700)),
         elevation: 0,
       ),
       body: QuoteRequestBody(
@@ -455,3 +449,6 @@ class QuoteRequestScreen extends StatelessWidget {
     );
   }
 }
+
+
+
