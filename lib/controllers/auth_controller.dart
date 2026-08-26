@@ -9,13 +9,11 @@ import '../services/auth_service.dart';
 
 class AuthController extends ChangeNotifier {
   AuthController() {
-    // 앱 시작 시 자동 로그인 시도
     _init();
   }
 
   final AuthService _service = AuthService.instance;
 
-  // ── 상태 ────────────────────────────────────────────────────────────────
   AppUser _user = const AppUser(
     id: 'guest',
     name: '게스트',
@@ -25,26 +23,21 @@ class AuthController extends ChangeNotifier {
     avatarUrl: null,
   );
   bool _isLoading = false;
-  bool _isInitializing = true; // 세션 복원 중
+  bool _isInitializing = true;
   String? _errorMessage;
 
-  // ── 공개 게터 ────────────────────────────────────────────────────────────
   AppUser get user => _user;
   bool get isLoading => _isLoading;
   bool get isInitializing => _isInitializing;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _service.isAuthenticated;
 
-  /// guest 포함 "진입 허용" 여부 (로그인 화면을 건너뛸 조건)
   bool get hasEnteredApp =>
       _user.role != UserRole.guest || _guestBrowsing;
 
-  // 게스트 둘러보기 모드 플래그
   bool _guestBrowsing = false;
   bool get guestBrowsing => _guestBrowsing;
 
-  // ── 초기화: 세션 복원 ────────────────────────────────────────────────────
-  // [SUPABASE] Supabase.instance.client.auth.onAuthStateChange 스트림을 listen 해도 됩니다.
   Future<void> _init() async {
     _isInitializing = true;
     notifyListeners();
@@ -56,15 +49,13 @@ class AuthController extends ChangeNotifier {
         _user = restored;
       }
     } catch (_) {
-      // 세션 복원 실패 → guest 유지
+      // 세션 복원 실패 시 guest 상태를 유지합니다.
     } finally {
       _isInitializing = false;
       notifyListeners();
     }
   }
 
-  // ── 로그인 ───────────────────────────────────────────────────────────────
-  /// 반환값: 성공 여부
   Future<bool> signIn({
     required String email,
     required String password,
@@ -92,7 +83,6 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ── 로그아웃 ─────────────────────────────────────────────────────────────
   Future<void> signOut() async {
     _setLoading(true);
     try {
@@ -112,7 +102,6 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ── 게스트 둘러보기 ───────────────────────────────────────────────────────
   void browseAsGuest() {
     _service.continueAsGuest();
     _guestBrowsing = true;
@@ -120,10 +109,8 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── 에러 초기화 ──────────────────────────────────────────────────────────
   void clearError() => _clearError();
 
-  // ── 내부 헬퍼 ────────────────────────────────────────────────────────────
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
