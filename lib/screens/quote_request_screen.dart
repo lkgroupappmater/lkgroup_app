@@ -8,7 +8,7 @@ import '../core/route_catalog.dart';
 // ---------------------------------------------------------------------------
 // Route options for dropdown
 // ---------------------------------------------------------------------------
-const List<String> _transportRoutes = RouteCatalog.routes;
+final List<String> _transportRoutes = RouteCatalog.routes;
 
 // ---------------------------------------------------------------------------
 // Box data model (local)
