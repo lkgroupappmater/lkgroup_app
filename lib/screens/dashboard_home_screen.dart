@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../models/app_user.dart';
-import 'cargo_management_screen.dart';
-import 'change_approval_screen.dart';
-import 'member_management_screen.dart';
 import 'notice_list_screen.dart';
-import 'notice_management_screen.dart';
 import 'schedule_management_screen.dart';
+import 'notice_management_screen.dart';
 import 'shipment_schedule_screen.dart';
 
 class ContactLink {
@@ -108,10 +105,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           ..._notices.map(_noticeCard),
           const SizedBox(height: 14),
           _contactSection(),
-          if (_isManager) ...[
-            const SizedBox(height: 18),
-            _managementSection(),
-          ],
         ],
       ),
       Positioned(left: 0, right: 0, bottom: 0, child: _consultationArea()),
@@ -170,20 +163,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   ]);
 
   Widget _contactCard(ContactLink link) => InkWell(onTap: () => _showContact(link), borderRadius: BorderRadius.circular(10), child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14), decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .05), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.primary.withValues(alpha: .18))), child: Row(children: [Text(link.icon, style: const TextStyle(fontSize: 20)), const SizedBox(width: 8), Expanded(child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)))])));
-
-  Widget _managementSection() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const Text('통합 관리', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
-    const SizedBox(height: 10),
-    GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 2.65, children: [
-      _managementButton('선적 일정 관리', Icons.calendar_month, const ScheduleManagementScreen()),
-      _managementButton('공지사항 관리', Icons.campaign_outlined, const NoticeManagementScreen()),
-      _managementButton('화물 종합 관리', Icons.inventory_2_outlined, CargoManagementScreen(user: widget.currentUser!)),
-      _managementButton('회원 종합 관리', Icons.people_alt_outlined, const MemberManagementScreen()),
-      _managementButton('변경 승인 관리', Icons.fact_check_outlined, const ChangeApprovalScreen()),
-    ]),
-  ]);
-
-  Widget _managementButton(String label, IconData icon, Widget page) => OutlinedButton.icon(onPressed: () => _open(context, page), icon: Icon(icon, size: 18), label: Text(label, textAlign: TextAlign.center));
 
   Widget _consultationArea() {
     return Column(
@@ -274,6 +253,3 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
-
-
-

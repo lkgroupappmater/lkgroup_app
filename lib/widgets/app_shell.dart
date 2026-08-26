@@ -81,6 +81,9 @@ class _AppShellState extends State<AppShell> {
       QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
       if (_isLoggedIn)
         CargoManagementScreen(
+          key: ValueKey<String>(
+            _selectedCargo.map((item) => item['boxNo'] ?? item['id'] ?? '').join('|'),
+          ),
           user: _currentUser!,
           initialShipments: _selectedCargo,
         )
@@ -115,7 +118,10 @@ class _AppShellState extends State<AppShell> {
         BottomNavigationBarItem(
           icon: const Icon(Icons.inventory_2_outlined),
           activeIcon: const Icon(Icons.inventory_2),
-          label: _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리',
+          label: (_currentUser?.role == UserRole.admin ||
+                  _currentUser?.role == UserRole.staff)
+              ? '통합 관리'
+              : '화물 관리',
         ),
       );
       navIndexes.add(3);
