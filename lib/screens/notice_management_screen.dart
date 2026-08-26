@@ -1,80 +1,36 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../services/content_service.dart';
 
 class NoticeManagementScreen extends StatefulWidget {
   const NoticeManagementScreen({super.key});
-
   @override
   State<NoticeManagementScreen> createState() => _NoticeManagementScreenState();
 }
 
 class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
-  final List<Map<String, String>> _items = [
-    {'title': '2025년 하반기 운임 조정 안내', 'date': '2025-07-01', 'content': '하반기 운임 변경 내용을 확인해 주세요.'},
-    {'title': '통관 서류 제출 기한 변경 안내', 'date': '2025-06-20', 'content': '통관 서류 제출 기한이 변경되었습니다.'},
-  ];
-
-  void _edit(int index) => _showEditor(existing: _items[index], index: index);
-
-  void _delete(int index) {
-    setState(() => _items.removeAt(index));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('공지사항이 삭제되었습니다.')));
-  }
-
-  void _showEditor({Map<String, String>? existing, int? index}) {
-    final title = TextEditingController(text: existing?['title'] ?? '');
-    final content = TextEditingController(text: existing?['content'] ?? '');
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: title, decoration: const InputDecoration(labelText: '제목')), TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용')), const SizedBox(height: 8), const Align(alignment: Alignment.centerLeft, child: Text('등록 날짜는 저장 시 자동으로 입력됩니다.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)))])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')),
-          FilledButton(onPressed: () {
-            final today = DateTime.now().toIso8601String().substring(0, 10);
-            final item = <String, String>{
-              'title': title.text.trim(),
-              'date': existing?['date'] ?? today,
-              'content': content.text.trim(),
-            };
-            if (item['title']!.isEmpty || item['content']!.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('제목과 내용을 입력해 주세요.')));
-              return;
-            }
-            setState(() {
-              if (index == null) {
-                _items.add(item);
-              } else {
-                _items[index] = item;
-              }
-            });
-            Navigator.pop(dialogContext);
-          }, child: const Text('저장')),
-        ],
-      ),
-    ).whenComplete(() { title.dispose(); content.dispose(); });
-  }
-
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
-      backgroundColor: AppColors.background,
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _items.length + 1,
-        itemBuilder: (context, index) {
-          if (index == _items.length) return Padding(padding: const EdgeInsets.only(top: 8), child: FilledButton.icon(onPressed: () => _showEditor(), icon: const Icon(Icons.add), label: const Text('공지사항 추가')));
-          final item = _items[index];
-          return Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(title: Text(item['title'] ?? ''), subtitle: Text('${item['date']}\n${item['content']}'), isThreeLine: true, trailing: Wrap(children: [IconButton(onPressed: () => _edit(index), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: () => _delete(index), icon: const Icon(Icons.delete_outline, color: AppColors.error))])));
-        },
-      ),
-    );
+  void initState() { super.initState(); _load(); }
+  String _text(Map<String, dynamic> row, String key) => (row[key] ?? '').toString();
+  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Future<void> _load() async { try { final rows = await ContentService.fetchNotices(includePendingDeletion: true); if (mounted) setState(() { _items = rows; _loading = false; }); } catch (e) { if (mounted) { setState(() => _loading = false); _message('공지사항 조회 실패: $e'); } } }
+  Future<void> _delete(Map<String, dynamic> row) async { try { await ContentService.requestNoticeDeletion(_text(row, 'id')); _message('삭제 대기중으로 변경했습니다. 30일 후 자동 삭제됩니다.'); await _load(); } catch (e) { _message('삭제 요청 실패: $e'); } }
+  Future<void> _showEditor({Map<String, dynamic>? existing}) async {
+    final title = TextEditingController(text: _text(existing ?? {}, 'title'));
+    final content = TextEditingController(text: _text(existing ?? {}, 'content'));
+    bool pinned = existing?['is_pinned'] == true;
+    try { await showDialog<void>(context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+      title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: title, decoration: const InputDecoration(labelText: '제목')), TextField(controller: content, maxLines: 5, decoration: const InputDecoration(labelText: '내용')), CheckboxListTile(value: pinned, onChanged: (v) => setDialogState(() => pinned = v ?? false), title: const Text('상단 고정'))])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')), FilledButton(onPressed: () async { if (title.text.trim().isEmpty || content.text.trim().isEmpty) { _message('제목과 내용을 입력해 주세요.'); return; } final data = <String, dynamic>{'title': title.text.trim(), 'content': content.text.trim(), 'is_pinned': pinned, 'published_at': DateTime.now().toUtc().toIso8601String()}; try { if (existing == null) { await ContentService.createNotice(data); } else { await ContentService.updateNotice(_text(existing, 'id'), data); } if (dialogContext.mounted) Navigator.pop(dialogContext); await _load(); } catch (e) { _message('저장 실패: $e'); } }, child: const Text('저장'))],
+    ))); } finally { title.dispose(); content.dispose(); }
   }
+  @override
+  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white), backgroundColor: AppColors.background, body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
+    ..._items.map((row) { final pending = _text(row, 'deletion_status') == 'pending'; return Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(title: Text(_text(row, 'title')), subtitle: Text('${_text(row, 'published_at')}\n${_text(row, 'content')}'), isThreeLine: true, trailing: Wrap(children: [if (pending) const Chip(label: Text('삭제 대기중')), IconButton(onPressed: pending ? null : () => _showEditor(existing: row), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: pending ? null : () => _delete(row), icon: const Icon(Icons.delete_outline, color: AppColors.error))]))); }),
+    FilledButton.icon(onPressed: () => _showEditor(), icon: const Icon(Icons.add), label: const Text('공지사항 추가')),
+  ])));
 }
-
-
-
-
 

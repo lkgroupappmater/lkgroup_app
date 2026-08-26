@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../models/app_user.dart';
+import '../services/content_service.dart';
 import 'notice_list_screen.dart';
 import 'schedule_management_screen.dart';
 import 'notice_management_screen.dart';
@@ -15,13 +17,13 @@ class ContactLink {
 }
 
 const _contactLinks = <ContactLink>[
-  ContactLink(label: '카카오톡 단톡방', icon: '💬', placeholder: 'https://example.com/kakao-group'),
-  ContactLink(label: '오픈상담톡(한국인)', icon: '💛', placeholder: 'https://example.com/kakao-open-kr'),
-  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: 'https://example.com/kakao-main'),
-  ContactLink(label: 'WhatsApp(한국인)', icon: '🟢', placeholder: 'https://example.com/whatsapp-kr'),
-  ContactLink(label: 'WhatsApp(대표번호)', icon: '📲', placeholder: 'https://example.com/whatsapp-main'),
-  ContactLink(label: 'Facebook', icon: '🔵', placeholder: 'https://example.com/facebook'),
-  ContactLink(label: '네이버', icon: '🟩', placeholder: 'https://example.com/naver'),
+  ContactLink(label: '카카오톡 단톡방', icon: '💬', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
+  ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: '💛', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
+  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: '차후 공유'),
+  ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: '🟢', placeholder: 'https://wa.me/8562052883018'),
+  ContactLink(label: 'WhatsApp(대표번호)', icon: '📲', placeholder: 'https://wa.me/8562091126780'),
+  ContactLink(label: 'Facebook', icon: '🔵', placeholder: 'https://www.facebook.com/LKTradingofLao'),
+  ContactLink(label: '네이버', icon: '🟩', placeholder: 'https://blog.naver.com/lkgrouplaos'),
 ];
 
 class _ScheduleItem {
@@ -57,9 +59,35 @@ class DashboardHomeBody extends StatefulWidget {
 
 class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   bool _consultationOpen = false;
+  List<_ScheduleItem> _visibleSchedules = _schedules;
+  List<_NoticeItem> _visibleNotices = _notices;
   final _questionController = TextEditingController();
 
   bool get _isManager => widget.currentUser?.role == UserRole.staff || widget.currentUser?.role == UserRole.admin;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContent();
+  }
+
+  Future<void> _loadContent() async {
+    try {
+      final schedules = await ContentService.fetchSchedules();
+      final notices = await ContentService.fetchNotices();
+      if (!mounted) return;
+      setState(() {
+        if (schedules.isNotEmpty) {
+          _visibleSchedules = schedules.map((r) => _ScheduleItem(route: '${r['origin'] ?? ''} → ${r['destination'] ?? ''}', departure: (r['closing_date'] ?? '').toString(), arrival: (r['arrival_date'] ?? '').toString(), status: '예정')).toList();
+        }
+        if (notices.isNotEmpty) {
+          _visibleNotices = notices.map((r) => _NoticeItem(title: (r['title'] ?? '').toString(), date: (r['published_at'] ?? '').toString().split('T').first, isNew: false)).toList();
+        }
+      });
+    } catch (_) {
+      // Empty/unconfigured Supabase keeps the existing standard mock layout.
+    }
+  }
 
   @override
   void dispose() {
@@ -72,13 +100,26 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   void _openSchedule() => _open(context, _isManager ? const ScheduleManagementScreen() : const ShipmentScheduleScreen());
   void _openNotice() => _open(context, _isManager ? const NoticeManagementScreen() : const NoticeListScreen());
 
-  void _showContact(ContactLink link) {
-    showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
-      title: Text(link.label, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-      content: const Text('관리자 링크 설정 필요\n\n실제 링크가 등록되면 해당 채널로 이동할 수 있습니다.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('닫기'))],
-    ));
+  Future<void> _showContact(ContactLink link) async {
+    if (link.placeholder == '차후 공유') {
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(title: Text(link.label), content: const Text('대표번호 링크는 추후 관리자 설정이 필요합니다.'), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('닫기'))]));
+      return;
+    }
+    if (link.label == '카카오톡 단톡방') {
+      await showDialog<void>(context: context, barrierDismissible: false, builder: (dialogContext) {
+        Future<void>.delayed(const Duration(seconds: 3), () async {
+          if (dialogContext.mounted) Navigator.pop(dialogContext);
+          await launchUrl(Uri.parse(link.placeholder), mode: LaunchMode.externalApplication);
+        });
+        return const AlertDialog(content: Text('참여 코드 9112', textAlign: TextAlign.center));
+      });
+      return;
+    }
+    final uri = Uri.tryParse(link.placeholder);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) _message('링크를 열 수 없습니다.');
   }
+
+  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   void _startConsultation() {
     if (_questionController.text.trim().isEmpty) {
@@ -98,11 +139,11 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         children: [
           _sectionHeader('선적 일정', '목록 자세히 보기', _openSchedule),
           const SizedBox(height: 8),
-          ..._schedules.map(_scheduleCard),
+          ..._visibleSchedules.map(_scheduleCard),
           const SizedBox(height: 14),
           _sectionHeader('공지사항', '목록 자세히 보기', _openNotice),
           const SizedBox(height: 8),
-          ..._notices.map(_noticeCard),
+          ..._visibleNotices.map(_noticeCard),
           const SizedBox(height: 14),
           _contactSection(),
         ],
@@ -253,3 +294,5 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
+
