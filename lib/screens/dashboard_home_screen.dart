@@ -196,4 +196,3 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
-
