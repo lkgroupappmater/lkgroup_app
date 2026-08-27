@@ -5,8 +5,6 @@ import '../core/app_language.dart';
 import '../models/app_user.dart';
 import '../services/content_service.dart';
 import 'notice_list_screen.dart';
-import 'schedule_management_screen.dart';
-import 'notice_management_screen.dart';
 import 'shipment_schedule_screen.dart';
 
 class ContactLink {
@@ -97,8 +95,10 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   void _open(BuildContext context, Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-  void _openSchedule() => _open(context, _isManager ? const ScheduleManagementScreen() : const ShipmentScheduleScreen());
-  void _openNotice() => _open(context, _isManager ? const NoticeManagementScreen() : const NoticeListScreen());
+  // 일정/공지의 상세 목록은 모든 사용자에게 공개합니다.
+  // 관리자용 추가·편집·삭제는 화물 관리 > 통합 관리에서만 접근합니다.
+  void _openSchedule() => _open(context, const ShipmentScheduleScreen());
+  void _openNotice() => _open(context, const NoticeListScreen());
 
   Future<void> _showContact(ContactLink link) async {
     if (link.placeholder == '차후 공유') {
@@ -154,7 +154,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   Widget _sectionHeader(String title, String action, VoidCallback onPressed) => Row(children: [
     Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary))),
-    TextButton(onPressed: onPressed, child: Text(_isManager ? '목록 관리' : action, style: const TextStyle(color: AppColors.accent, fontSize: 13))),
+    TextButton(onPressed: onPressed, child: Text(action, style: const TextStyle(color: AppColors.accent, fontSize: 13))),
   ]);
 
   Widget _scheduleCard(_ScheduleItem item) {
@@ -294,5 +294,8 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
+
+
 
 

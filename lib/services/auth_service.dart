@@ -1,11 +1,10 @@
 // lib/services/auth_service.dart
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 
-// ---------------------------------------------------------------------------
-// Mock credentials
-// ---------------------------------------------------------------------------
-
+// Supabase가 설정되지 않은 개발 환경에서는 기존 데모 계정을 사용할 수 있습니다.
 class _MockAccount {
   const _MockAccount({
     required this.email,
@@ -37,6 +36,15 @@ const List<_MockAccount> _mockAccounts = [
     company: 'CargoFlow',
   ),
   _MockAccount(
+    email: 'staff@cargoflow.dev',
+    password: 'staff1234',
+    id: 'mock-staff-001',
+    name: '직원',
+    role: UserRole.staff,
+    phone: '010-0000-0004',
+    company: 'CargoFlow',
+  ),
+  _MockAccount(
     email: 'partner@example.com',
     password: 'partner1234',
     id: 'mock-partner-001',
@@ -55,59 +63,81 @@ const List<_MockAccount> _mockAccounts = [
   ),
 ];
 
-// ---------------------------------------------------------------------------
-// AuthService singleton
-// ---------------------------------------------------------------------------
-
 class AuthService {
   AuthService._internal();
-
   static final AuthService instance = AuthService._internal();
 
   AppUser? _currentUser;
-
   AppUser? get currentUser => _currentUser;
+
+  SupabaseClient? get _client => SupabaseConfig.isConfigured
+      ? Supabase.instance.client
+      : null;
 
   bool get isAuthenticated =>
       _currentUser != null && _currentUser!.role != UserRole.guest;
 
-  // -------------------------------------------------------------------------
-  // restoreSession
-  // -------------------------------------------------------------------------
-
-  Future<void> restoreSession() async {
-    // TODO(supabase): restore session from Supabase / secure storage
-    // e.g. final session = await Supabase.instance.client.auth.currentSession;
-    // if (session != null) { ... }
-    _currentUser = null;
+  Future<AppUser?> _loadProfile(User user) async {
+    final client = _client;
+    if (client == null) return null;
+    final row = await client.from('profiles').select().eq('id', user.id).maybeSingle();
+    if (row == null) return null;
+    return AppUser.fromMap(<String, dynamic>{
+      ...Map<String, dynamic>.from(row),
+      'id': user.id,
+      'email': user.email ?? row['email'] ?? '',
+    });
   }
 
-  // -------------------------------------------------------------------------
-  // signIn
-  // -------------------------------------------------------------------------
+  Future<void> restoreSession() async {
+    final client = _client;
+    if (client == null) {
+      _currentUser = null;
+      return;
+    }
+    final user = client.auth.currentUser;
+    if (user == null) {
+      _currentUser = null;
+      return;
+    }
+    _currentUser = await _loadProfile(user) ?? AppUser(
+      id: user.id,
+      email: user.email ?? '',
+      name: (user.userMetadata?['full_name'] ?? '').toString(),
+      role: UserRole.member,
+    );
+  }
 
   Future<AppUser> signIn({
     required String email,
     required String password,
   }) async {
-    // TODO(supabase): replace mock with real Supabase sign-in
-    // final response = await Supabase.instance.client.auth
-    //     .signInWithPassword(email: email, password: password);
-    // if (response.user == null) throw AuthException('로그인에 실패했습니다.');
-
-    await Future.delayed(const Duration(milliseconds: 300)); // simulate latency
-
-    final trimmedEmail = email.trim().toLowerCase();
-    final match = _mockAccounts.where(
-      (a) => a.email == trimmedEmail && a.password == password,
-    );
-
-    if (match.isEmpty) {
-      throw AuthException('계정 또는 암호가 올바르지 않습니다.');
+    final client = _client;
+    if (client != null) {
+      final response = await client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = response.user;
+      if (user == null) throw const AuthException('로그인에 실패했습니다.');
+      _currentUser = await _loadProfile(user) ?? AppUser(
+        id: user.id,
+        email: user.email ?? email.trim(),
+        name: (user.userMetadata?['full_name'] ?? '').toString(),
+        role: UserRole.member,
+      );
+      return _currentUser!;
     }
 
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final match = _mockAccounts.where(
+      (account) =>
+          account.email == email.trim().toLowerCase() &&
+          account.password == password,
+    );
+    if (match.isEmpty) throw const AuthException('계정 또는 암호가 올바르지 않습니다.');
     final account = match.first;
-    final user = AppUser(
+    _currentUser = AppUser(
       id: account.id,
       name: account.name,
       email: account.email,
@@ -115,27 +145,17 @@ class AuthService {
       phone: account.phone ?? '',
       company: account.company ?? '',
     );
-
-    _currentUser = user;
-    return user;
+    return _currentUser!;
   }
 
-  // -------------------------------------------------------------------------
-  // signOut
-  // -------------------------------------------------------------------------
-
   Future<void> signOut() async {
-    // TODO(supabase): await Supabase.instance.client.auth.signOut();
+    final client = _client;
+    if (client != null) await client.auth.signOut();
     _currentUser = null;
   }
 
-  // -------------------------------------------------------------------------
-  // continueAsGuest
-  // -------------------------------------------------------------------------
-
   void continueAsGuest() {
-    // TODO(supabase): no server call needed; clears any existing session locally
-    _currentUser = AppUser(
+    _currentUser = const AppUser(
       id: 'guest',
       name: '비회원',
       email: '',
@@ -143,7 +163,6 @@ class AuthService {
     );
   }
 
-  /// 로그인 화면에서 사용하는 데모 계정 목록입니다.
   static List<MockAccountInfo> get demoAccounts => _mockAccounts
       .map(
         (account) => MockAccountInfo(
@@ -155,14 +174,18 @@ class AuthService {
       )
       .toList(growable: false);
 
-  /// 관리자 화면의 직원·파트너 계정 발급 요청 mock입니다.
-  /// TODO(supabase): 실제 운영에서는 Edge Function/API를 통해 저장하세요.
   Future<void> requestStaffOrPartnerAccount(
     AccountProvisionRequest request,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 150));
     if (request.role != UserRole.staff && request.role != UserRole.partner) {
-      throw AuthException('직원 또는 협력·파트너사 역할만 요청할 수 있습니다.');
+      throw const AuthException('직원 또는 협력·파트너사 역할만 요청할 수 있습니다.');
     }
+    final client = _client;
+    if (client != null) {
+      await client.from('account_provision_requests').insert(request.toMap());
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 150));
   }
 }
+
