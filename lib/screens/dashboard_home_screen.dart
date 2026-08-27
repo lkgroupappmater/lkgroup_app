@@ -31,11 +31,7 @@ class _ScheduleItem {
   const _ScheduleItem({required this.route, required this.departure, required this.arrival, required this.status});
 }
 
-const _schedules = <_ScheduleItem>[
-  _ScheduleItem(route: '인천 → 상하이', departure: '2025-07-10', arrival: '2025-07-12', status: '운송 중'),
-  _ScheduleItem(route: '부산 → 도쿄', departure: '2025-07-14', arrival: '2025-07-16', status: '예정'),
-  _ScheduleItem(route: '인천 → LA', departure: '2025-07-18', arrival: '2025-08-01', status: '예정'),
-];
+
 
 class _NoticeItem {
   final String title, date;
@@ -43,11 +39,7 @@ class _NoticeItem {
   const _NoticeItem({required this.title, required this.date, this.isNew = false});
 }
 
-const _notices = <_NoticeItem>[
-  _NoticeItem(title: '2025년 하반기 운임 조정 안내', date: '2025-07-01', isNew: true),
-  _NoticeItem(title: '중국 항구 임시 파업 관련 공지', date: '2025-06-28', isNew: true),
-  _NoticeItem(title: '통관 서류 제출 기한 변경 안내', date: '2025-06-20'),
-];
+
 
 class DashboardHomeBody extends StatefulWidget {
   const DashboardHomeBody({super.key, this.language = AppLanguage.korean, this.currentUser});
@@ -59,8 +51,8 @@ class DashboardHomeBody extends StatefulWidget {
 
 class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   bool _consultationOpen = false;
-  List<_ScheduleItem> _visibleSchedules = _schedules;
-  List<_NoticeItem> _visibleNotices = _notices;
+  List<_ScheduleItem> _visibleSchedules = <_ScheduleItem>[];
+  List<_NoticeItem> _visibleNotices = <_NoticeItem>[];
   final _questionController = TextEditingController();
 
   bool get _isManager => widget.currentUser?.role == UserRole.staff || widget.currentUser?.role == UserRole.admin;
@@ -77,15 +69,12 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       final notices = await ContentService.fetchNotices();
       if (!mounted) return;
       setState(() {
-        if (schedules.isNotEmpty) {
-          _visibleSchedules = schedules.map((r) => _ScheduleItem(route: '${r['origin'] ?? ''} → ${r['destination'] ?? ''}', departure: (r['closing_date'] ?? '').toString(), arrival: (r['arrival_date'] ?? '').toString(), status: '예정')).toList();
-        }
-        if (notices.isNotEmpty) {
-          _visibleNotices = notices.map((r) => _NoticeItem(title: (r['title'] ?? '').toString(), date: (r['published_at'] ?? '').toString().split('T').first, isNew: false)).toList();
-        }
+        // 실제 Supabase 데이터만 표시합니다. 데이터가 없으면 빈 영역으로 유지합니다.
+        _visibleSchedules = schedules.map((r) => _ScheduleItem(route: '${r['origin'] ?? ''} → ${r['destination'] ?? ''}', departure: (r['departure_date'] ?? r['booking_close_date'] ?? '').toString(), arrival: (r['estimated_arrival_date'] ?? '').toString(), status: (r['status'] ?? '예정').toString())).toList();
+        _visibleNotices = notices.map((r) => _NoticeItem(title: (r['title'] ?? '').toString(), date: (r['published_at'] ?? r['created_at'] ?? '').toString().split('T').first, isNew: r['is_new'] == true)).toList();
       });
     } catch (_) {
-      // Empty/unconfigured Supabase keeps the existing standard mock layout.
+      // 연결 실패도 임의의 샘플을 보여주지 않고 빈 상태로 유지합니다.
     }
   }
 
@@ -307,6 +296,7 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
 
 
 

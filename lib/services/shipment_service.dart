@@ -25,14 +25,27 @@ class ShipmentService {
   }
 
   Future<List<Map<String, dynamic>>> searchRows({
-    String route = '전체', String invoice = '', String recipient = '', String phone = '',
+    String route = '전체',
+    String boxNumber = '',
+    String invoice = '',
+    String recipient = '',
+    String phone = '',
   }) async {
     if (!SupabaseConfig.isConfigured) return const [];
     var query = SupabaseService.client.from('shipments').select();
     if (route != '전체' && route.isNotEmpty) query = query.eq('route', route);
-    if (invoice.isNotEmpty) query = query.ilike('invoice_number', '%$invoice%');
-    if (recipient.isNotEmpty) query = query.ilike('consignee_name', '%$recipient%');
-    if (phone.isNotEmpty) query = query.ilike('consignee_phone', '%$phone%');
+    if (boxNumber.isNotEmpty) {
+      query = query.ilike('box_number', '%${_escape(boxNumber)}%');
+    }
+    if (invoice.isNotEmpty) {
+      query = query.ilike('invoice_number', '%${_escape(invoice)}%');
+    }
+    if (recipient.isNotEmpty) {
+      query = query.ilike('consignee_name', '%${_escape(recipient)}%');
+    }
+    if (phone.isNotEmpty) {
+      query = query.ilike('consignee_phone', '%${_escape(phone)}%');
+    }
     final rows = await query.order('received_at', ascending: false).limit(100);
     return List<Map<String, dynamic>>.from(rows);
   }
@@ -87,9 +100,12 @@ class ShipmentService {
     'length_cm': _num(row['length_cm'] ?? row['length']),
     'height_cm': _num(row['height_cm'] ?? row['height']),
     'quantity': int.tryParse('${row['quantity'] ?? row['qty'] ?? ''}'),
+    'receipt_number': row['receipt_number'] ?? row['receiptNo'] ?? row['receipt'] ?? '',
     'cargo_type': row['cargo_type'] ?? '', 'notes': row['notes'] ?? '',
   };
 
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
+
+

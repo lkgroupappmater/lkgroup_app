@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
-import '../config/supabase_config.dart';
+import '../models/app_user.dart';
 import '../services/shipment_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -19,44 +19,6 @@ const List<String> _routeCategories = [
   '라오스->캄보디아 육로',
 ];
 
-// ---------------------------------------------------------------------------
-// Mock shipment data
-// TODO: Replace with real data from admin Excel upload / DB API.
-// ---------------------------------------------------------------------------
-final List<Map<String, dynamic>> _mockShipments = [
-  {
-    'boxNo': 'BX-0012',
-    'invoice': 'INV-2025-0701',
-    'name': 'Somsak Khamvongsa',
-    'phone': '020-5551-2345',
-    'arrival': '2025-07-05',
-    'route': '한국->라오스 해상',
-  },
-  {
-    'boxNo': 'BX-0013',
-    'invoice': 'INV-2025-0702',
-    'name': 'Phonevilay Nanthavong',
-    'phone': '020-5551-6789',
-    'arrival': '2025-07-06',
-    'route': '한국->라오스 항공',
-  },
-  {
-    'boxNo': 'BX-0014',
-    'invoice': 'INV-2025-0703',
-    'name': 'Bounmy Phommasack',
-    'phone': '021-3334-5678',
-    'arrival': '2025-07-07',
-    'route': '라오스->한국 항공 특송',
-  },
-  {
-    'boxNo': 'BX-0015',
-    'invoice': 'INV-2025-0704',
-    'name': 'Khamla Vongsay',
-    'phone': '020-7778-9012',
-    'arrival': '2025-07-08',
-    'route': '라오스->태국 육로',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Body-only widget
@@ -66,6 +28,7 @@ class ShipmentSearchBody extends StatefulWidget {
     super.key,
     this.language = AppLanguage.korean,
     this.isLoggedIn = false,
+    this.currentUser,
     this.onRequireLogin,
     this.onEditRequest,
     this.onManageSelected,
@@ -73,6 +36,7 @@ class ShipmentSearchBody extends StatefulWidget {
 
   final AppLanguage language;
   final bool isLoggedIn;
+  final AppUser? currentUser;
   final VoidCallback? onRequireLogin;
   final VoidCallback? onEditRequest;
   final ValueChanged<List<String>>? onManageSelected;
@@ -84,6 +48,7 @@ class ShipmentSearchBody extends StatefulWidget {
 class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   int _selectedRoute = 0;
   final _invoiceCtrl = TextEditingController();
+  final _boxNumberCtrl = TextEditingController();
   final _recipientCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
@@ -92,8 +57,30 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   final Set<String> _selectedInvoices = <String>{};
 
   @override
+  void initState() {
+    super.initState();
+    _prefillMemberFields();
+  }
+
+  @override
+  void didUpdateWidget(covariant ShipmentSearchBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentUser?.id != widget.currentUser?.id) {
+      _prefillMemberFields();
+    }
+  }
+
+  void _prefillMemberFields() {
+    final user = widget.currentUser;
+    if (user == null || user.role != UserRole.member) return;
+    if (_recipientCtrl.text.isEmpty) _recipientCtrl.text = user.name;
+    if (_phoneCtrl.text.isEmpty) _phoneCtrl.text = user.phone;
+  }
+
+  @override
   void dispose() {
     _invoiceCtrl.dispose();
+    _boxNumberCtrl.dispose();
     _recipientCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
@@ -101,26 +88,36 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   Future<void> _search() async {
     final invoice = _invoiceCtrl.text.trim();
+    final boxNumber = _boxNumberCtrl.text.trim();
     final recipient = _recipientCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final route = _routeCategories[_selectedRoute];
     try {
       final dbRows = await ShipmentService.instance.searchRows(
-        route: route, invoice: invoice, recipient: recipient, phone: phone,
+        route: route,
+        boxNumber: boxNumber,
+        invoice: invoice,
+        recipient: recipient,
+        phone: phone,
       );
-      final results = dbRows.isEmpty && !SupabaseConfig.isConfigured
-          ? _mockShipments
-          : dbRows.map((row) => <String, dynamic>{
+      final results = dbRows.map((row) => <String, dynamic>{
               'boxNo': row['box_number'] ?? '',
               'invoice': row['invoice_number'] ?? row['shipment_no'] ?? '',
               'name': row['consignee_name'] ?? '',
               'phone': row['consignee_phone'] ?? '',
               'arrival': row['received_at'] ?? '',
               'route': row['route'] ?? '',
+              'weight': row['weight_kg'] ?? '',
+              'size': '${row['width_cm'] ?? ''} × ${row['length_cm'] ?? ''} × ${row['height_cm'] ?? ''}',
+              'receiptNo': row['receipt_number'] ?? '',
             }).toList();
       setState(() { _results = results; _searched = true; _selectedInvoices.clear(); });
     } catch (error) {
-      setState(() { _results = _mockShipments; _searched = true; _selectedInvoices.clear(); });
+      setState(() {
+        _results = <Map<String, dynamic>>[];
+        _searched = true;
+        _selectedInvoices.clear();
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('화물 조회 실패: $error')));
     }
   }
@@ -177,11 +174,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           const SizedBox(height: 14),
 
           // Search inputs
+          if (widget.currentUser?.role.canSeeAllShipments == true) ...[
+            _buildInput(_boxNumberCtrl, '박스 번호', Icons.inventory_2_outlined),
+            const SizedBox(height: 10),
+          ],
           _buildInput(_invoiceCtrl, '송장번호', Icons.tag_rounded),
           const SizedBox(height: 10),
-          _buildInput(_recipientCtrl, '라오스 수령인', Icons.person_outline),
+          _buildInput(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline),
           const SizedBox(height: 10),
-          _buildInput(_phoneCtrl, '라오스 전화번호', Icons.phone_outlined,
+          _buildInput(_phoneCtrl, '라오스 수령인 연락처', Icons.phone_outlined,
               keyboardType: TextInputType.phone),
           const SizedBox(height: 16),
 
@@ -191,7 +192,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             child: ElevatedButton.icon(
               onPressed: _search,
               icon: const Icon(Icons.search_rounded, size: 20),
-              label: const Text('검색',
+              label: const Text('화물 검색',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.navyPrimary,
@@ -203,28 +204,32 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           ),
           if (_searched && _results.isNotEmpty) ...[
             const SizedBox(height: 10),
-            SizedBox(
-              height: 46,
-              child: OutlinedButton.icon(
-                onPressed: _selectedInvoices.isEmpty || widget.onManageSelected == null
-                    ? null
-                    : () => widget.onManageSelected!(_selectedInvoices.toList()),
-                icon: const Icon(Icons.inventory_2_outlined),
-                label: const Text('화물 관리'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('운임 확인 화면 연결 위치입니다.'))),
-                icon: const Icon(Icons.price_check_outlined),
-                label: const Text('운임 확인'),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.white),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _selectedInvoices.isEmpty || widget.onManageSelected == null
+                        ? null
+                        : () => widget.onManageSelected!(_selectedInvoices.toList()),
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('화물 관리'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _selectedInvoices.isEmpty
+                        ? null
+                        : () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('운임 확인 화면 연결 위치입니다.'))),
+                    icon: const Icon(Icons.price_check_outlined),
+                    label: const Text('운임 확인'),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.white),
+                  ),
+                ),
+              ],
             ),
           ],
           const SizedBox(height: 20),
@@ -235,6 +240,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 results: _results,
                 selectedInvoices: _selectedInvoices,
                 onToggle: _toggleSelected,
+                onToggleAll: () {
+                  setState(() {
+                    if (_selectedInvoices.length == _results.length) {
+                      _selectedInvoices.clear();
+                    } else {
+                      _selectedInvoices.addAll(_results.map((r) => '${r['invoice']}'));
+                    }
+                  });
+                },
                 onEditRequest: widget.onEditRequest),
         ],
       ),
@@ -361,10 +375,11 @@ class _LoginRequiredView extends StatelessWidget {
 // Results list
 // ---------------------------------------------------------------------------
 class _ResultsList extends StatelessWidget {
-  const _ResultsList({required this.results, required this.selectedInvoices, required this.onToggle, this.onEditRequest});
+  const _ResultsList({required this.results, required this.selectedInvoices, required this.onToggle, required this.onToggleAll, this.onEditRequest});
   final List<Map<String, dynamic>> results;
   final Set<String> selectedInvoices;
   final ValueChanged<String> onToggle;
+  final VoidCallback onToggleAll;
   final VoidCallback? onEditRequest;
 
   @override
@@ -389,11 +404,26 @@ class _ResultsList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('검색 결과 ${results.length}건',
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary)),
+        Row(
+          children: [
+            Expanded(
+              child: Text('검색 결과 ${results.length}건',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('전체 선택', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Checkbox(
+                  value: results.isNotEmpty && selectedInvoices.length == results.length,
+                  onChanged: (_) => onToggleAll(),
+                  activeColor: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         ...results.map((r) => _ResultCard(
               data: r,
@@ -452,9 +482,12 @@ class _ResultCard extends StatelessWidget {
           ),
           const Divider(height: 14, color: AppColors.divider),
           _Row('송장번호', data['invoice'] as String),
-          _Row('이름', data['name'] as String),
+          _Row('이름/수령인', data['name'] as String),
           _Row('연락처', data['phone'] as String),
           _Row('입고 날짜', data['arrival'] as String),
+          _Row('무게', '${data['weight'] ?? ''} kg'),
+          _Row('크기', data['size'] as String? ?? ''),
+          _Row('영수증 번호', data['receiptNo'] as String? ?? ''),
         ],
       ),
     );
@@ -513,3 +546,10 @@ class ShipmentSearchScreen extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+

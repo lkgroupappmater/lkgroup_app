@@ -86,6 +86,7 @@ class _AppShellState extends State<AppShell> {
       ShipmentSearchBody(
           language: _language,
           isLoggedIn: _isLoggedIn,
+          currentUser: _currentUser,
           onRequireLogin: _openAccount,
           onEditRequest: () => _selectTab(3),
           onManageSelected: _openCargoManagement),
@@ -150,3 +151,4 @@ class _AppShellState extends State<AppShell> {
 class TextSnackBar extends SnackBar {
   TextSnackBar(String message) : super(content: Text(message));
 }
+

@@ -19,8 +19,8 @@ extension UserRoleExtension on UserRole {
   }
 
   bool get isLoggedIn => this != UserRole.guest;
-  bool get canSeeAllShipments =>
-      this == UserRole.staff || this == UserRole.admin;
+ bool get canSeeAllShipments =>
+ this == UserRole.staff || this == UserRole.partner || this == UserRole.admin;
   bool get canAccessAdmin => this == UserRole.admin;
   bool get canManageCargo =>
       this == UserRole.staff ||
@@ -146,3 +146,4 @@ class MockAccountInfo {
   final String label, email, password;
   final UserRole role;
 }
+
