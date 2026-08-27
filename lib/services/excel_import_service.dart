@@ -15,15 +15,22 @@ class ExcelImportService {
   static final ExcelImportService instance = ExcelImportService._();
 
   Future<ExcelImportResult> pickAndImport() async {
-    final picked = await FilePicker.platform.pickFiles(
+    // file_picker 12부터는 FilePicker.platform 대신 정적 API를 사용합니다.
+    final picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
-      withData: true,
     );
-    if (picked == null || picked.files.single.bytes == null) {
-      return const ExcelImportResult(inserted: 0, skipped: 0, message: '파일을 선택하지 않았습니다.');
+    if (picked == null) {
+      return const ExcelImportResult(
+        inserted: 0,
+        skipped: 0,
+        message: '파일을 선택하지 않았습니다.',
+      );
     }
-    return importBytes(picked.files.single.bytes!);
+
+    // file_picker 12에서는 파일 내용을 readAsBytes()로 읽습니다.
+    final bytes = await picked.readAsBytes();
+    return importBytes(bytes);
   }
 
   Future<ExcelImportResult> importBytes(Uint8List bytes) async {
@@ -61,3 +68,4 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
+
