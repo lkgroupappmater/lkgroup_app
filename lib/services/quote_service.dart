@@ -1,44 +1,30 @@
-// lib/services/quote_service.dart
+import '../config/supabase_config.dart';
+import 'supabase_service.dart';
 
 class QuoteService {
   QuoteService._();
-  static final QuoteService instance = QuoteService._();
+  static final instance = QuoteService._();
 
-  final List<Map<String, dynamic>> _quotes = [];
-
-  String _generateId() => DateTime.now().microsecondsSinceEpoch.toString();
-
-  /// 새 견적을 생성하고 저장한 뒤 반환합니다.
-  Map<String, dynamic> create(Map<String, dynamic> data) {
-    final quote = <String, dynamic>{
-      'id': _generateId(),
-      'status': 'pending',
-      'createdAt': DateTime.now().toIso8601String(),
-      ...data,
-    };
-    _quotes.add(quote);
-    return quote;
-  }
-
-  /// [create]의 별칭 — 기존 코드 호환용.
-  Map<String, dynamic> submit(Map<String, dynamic> data) => create(data);
-
-  /// 저장된 모든 견적을 반환합니다.
-  List<Map<String, dynamic>> getAll() => List.unmodifiable(_quotes);
-
-  /// ID로 견적을 조회합니다.
-  Map<String, dynamic>? findById(String id) {
-    try {
-      return _quotes.firstWhere((q) => q['id'] == id);
-    } catch (_) {
-      return null;
+  Future<Map<String, dynamic>> create(Map<String, dynamic> data) async {
+    if (!SupabaseConfig.isConfigured) {
+      return {'id': DateTime.now().microsecondsSinceEpoch, 'status': 'pending', ...data};
     }
+    final row = await SupabaseService.client.from('quote_requests').insert(data).select().single();
+    return Map<String, dynamic>.from(row);
   }
 
-  /// ID로 견적을 삭제합니다.
-  bool delete(String id) {
-    final before = _quotes.length;
-    _quotes.removeWhere((q) => q['id'] == id);
-    return _quotes.length < before;
+  Future<List<Map<String, dynamic>>> listMine() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final rows = await SupabaseService.client.from('quote_requests').select().order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String, dynamic>>> listForAdmin() => listMine();
+
+  Future<void> updateStatus(int id, String status, {String? note, num? amount}) async {
+    if (!SupabaseConfig.isConfigured) return;
+    await SupabaseService.client.from('quote_requests').update({
+      'status': status, if (note != null) 'admin_note': note, if (amount != null) 'quoted_amount': amount,
+    }).eq('id', id);
   }
 }

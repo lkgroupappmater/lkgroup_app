@@ -8,6 +8,7 @@ import '../screens/shipment_search_screen.dart';
 import '../screens/quote_request_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/cargo_management_screen.dart';
+import '../services/auth_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -18,8 +19,18 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
   AppLanguage _language = AppLanguage.korean;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService.instance.restoreSession().then((_) {
+      if (mounted && AuthService.instance.currentUser != null) {
+        setState(() => _currentUser = AuthService.instance.currentUser);
+      }
+    });
+  }
   AppUser? _currentUser;
-  List<Map<String, dynamic>> _selectedCargo = <Map<String, dynamic>>[];
+  List<String> _cargoSelection = const <String>[];
   bool get _isLoggedIn => _currentUser != null && _currentUser!.role.isLoggedIn;
   String get _title {
     switch (_currentIndex) {
@@ -43,14 +54,6 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _openAccount() => setState(() => _currentIndex = 4);
-
-  void _openCargoManagement(List<Map<String, dynamic>> selected) {
-    setState(() {
-      _selectedCargo = selected;
-      _currentIndex = 3;
-    });
-  }
-
   void _onLoggedIn(AppUser user) {
     setState(() {
       _currentUser = user;
@@ -60,99 +63,87 @@ class _AppShellState extends State<AppShell> {
         .showSnackBar(TextSnackBar('${user.name}님 로그인되었습니다.'));
   }
 
-  void _onLoggedOut() => setState(() {
-        _currentUser = null;
-        _currentIndex = 0;
-        _selectedCargo = <Map<String, dynamic>>[];
-      });
-
+  Future<void> _onLoggedOut() async {
+    await AuthService.instance.signOut();
+    if (!mounted) return;
+    setState(() {
+      _currentUser = null;
+      _currentIndex = 0;
+    });
+  }
   void _selectTab(int index) => setState(() => _currentIndex = index);
 
+  void _openCargoManagement(List<String> invoices) {
+    setState(() {
+      _cargoSelection = invoices;
+      _currentIndex = 3;
+    });
+  }
   @override
   Widget build(BuildContext context) {
     final tabs = [
       DashboardHomeBody(language: _language, currentUser: _currentUser),
       ShipmentSearchBody(
-        language: _language,
-        isLoggedIn: _isLoggedIn,
-        onRequireLogin: _openAccount,
-        onCargoManagement: _openCargoManagement,
-      ),
+          language: _language,
+          isLoggedIn: _isLoggedIn,
+          onRequireLogin: _openAccount,
+          onEditRequest: () => _selectTab(3),
+          onManageSelected: _openCargoManagement),
       QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
       if (_isLoggedIn)
         CargoManagementScreen(
-          key: ValueKey<String>(
-            _selectedCargo.map((item) => item['boxNo'] ?? item['id'] ?? '').join('|'),
-          ),
-          user: _currentUser!,
-          initialShipments: _selectedCargo,
-        )
-      else
-        const SizedBox.shrink(),
+            key: ValueKey(_cargoSelection.join('|')),
+            user: _currentUser!,
+            initialSelectedInvoices: _cargoSelection),
+      if (!_isLoggedIn) const SizedBox.shrink(),
       AccountBody(
-        currentUser: _currentUser,
-        onLoggedIn: _onLoggedIn,
-        onLoggedOut: _onLoggedOut,
-      ),
+          currentUser: _currentUser,
+          onLoggedIn: _onLoggedIn,
+          onLoggedOut: _onLoggedOut)
     ];
     final navItems = [
       const BottomNavigationBarItem(
-        icon: Icon(Icons.home_outlined),
-        activeIcon: Icon(Icons.home),
-        label: '홈',
-      ),
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home),
+          label: '홈'),
       BottomNavigationBarItem(
-        icon: const Icon(Icons.local_shipping_outlined),
-        activeIcon: const Icon(Icons.local_shipping),
-        label: AppStrings.get(_language, 'tracking'),
-      ),
+          icon: const Icon(Icons.local_shipping_outlined),
+          activeIcon: const Icon(Icons.local_shipping),
+          label: AppStrings.get(_language, 'tracking')),
       BottomNavigationBarItem(
-        icon: const Icon(Icons.request_quote_outlined),
-        activeIcon: const Icon(Icons.request_quote),
-        label: AppStrings.get(_language, 'quote'),
-      ),
+          icon: const Icon(Icons.request_quote_outlined),
+          activeIcon: const Icon(Icons.request_quote),
+          label: AppStrings.get(_language, 'quote'))
     ];
     final navIndexes = [0, 1, 2];
     if (_isLoggedIn) {
-      navItems.add(
-        BottomNavigationBarItem(
+      navItems.add(BottomNavigationBarItem(
           icon: const Icon(Icons.inventory_2_outlined),
           activeIcon: const Icon(Icons.inventory_2),
-          label: (_currentUser?.role == UserRole.admin ||
-                  _currentUser?.role == UserRole.staff)
-              ? '통합 관리'
-              : '화물 관리',
-        ),
-      );
+          label: _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리'));
       navIndexes.add(3);
     }
-    navItems.add(
-      BottomNavigationBarItem(
+    navItems.add(BottomNavigationBarItem(
         icon: const Icon(Icons.person_outline),
         activeIcon: const Icon(Icons.person),
-        label: AppStrings.get(_language, 'account'),
-      ),
-    );
+        label: AppStrings.get(_language, 'account')));
     navIndexes.add(4);
     final selected = navIndexes.indexOf(_currentIndex);
     return Scaffold(
-      appBar: CargoFlowAppBar(
-        title: _title,
-        selectedLanguage: _language,
-        onLanguageChanged: _onLanguageChanged,
-        showHomeActions: _currentIndex == 0,
-      ),
-      body: IndexedStack(index: _currentIndex, children: tabs),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selected < 0 ? 0 : selected,
-        onTap: (index) => _selectTab(navIndexes[index]),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.primary,
-        selectedItemColor: AppColors.tealAccent,
-        unselectedItemColor: Colors.white70,
-        items: navItems,
-      ),
-    );
+        appBar: CargoFlowAppBar(
+            title: _title,
+            selectedLanguage: _language,
+            onLanguageChanged: _onLanguageChanged,
+            showHomeActions: _currentIndex == 0),
+        body: IndexedStack(index: _currentIndex, children: tabs),
+        bottomNavigationBar: BottomNavigationBar(
+            currentIndex: selected < 0 ? 0 : selected,
+            onTap: (index) => _selectTab(navIndexes[index]),
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: AppColors.primary,
+            selectedItemColor: AppColors.tealAccent,
+            unselectedItemColor: Colors.white70,
+            items: navItems));
   }
 }
 

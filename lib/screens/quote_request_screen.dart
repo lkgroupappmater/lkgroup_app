@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../config/supabase_config.dart';
+import '../services/quote_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ---------------------------------------------------------------------------
 // Route options for dropdown
@@ -54,14 +57,38 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     if (_boxes.length > 1) setState(() => _boxes.removeAt(i));
   }
 
-  void _requestQuote() {
-    // TODO: Connect to real freight rate / quote API endpoint.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+  Future<void> _requestQuote() async {
+    final userId = SupabaseConfig.isConfigured
+        ? Supabase.instance.client.auth.currentUser?.id
+        : null;
+    if (SupabaseConfig.isConfigured && userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('운임 확인은 회원 로그인 후 이용해 주세요.')));
+      return;
+    }
+    try {
+      await QuoteService.instance.create({
+        'requested_by': userId,
+        'customer_name': '앱 사용자',
+        'contact_phone': '',
+        'route': _selectedRoute,
+        'boxes': _boxes.map((box) => {
+          'weight_kg': double.tryParse(box.weight),
+          'width_cm': double.tryParse(box.width),
+          'length_cm': double.tryParse(box.length),
+          'height_cm': double.tryParse(box.height),
+          'quantity': int.tryParse(box.quantity) ?? 1,
+        }).toList(),
+        'total_weight_kg': _boxes.fold<double>(0, (sum, box) => sum + (double.tryParse(box.weight) ?? 0) * (int.tryParse(box.quantity) ?? 1)),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('운임 확인 요청이 접수되었습니다. 곧 안내드리겠습니다.'),
         backgroundColor: AppColors.navyPrimary,
-      ),
-    );
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('견적 요청 실패: $error')));
+    }
   }
 
   void _requestSpecialQuote() {
@@ -449,6 +476,3 @@ class QuoteRequestScreen extends StatelessWidget {
     );
   }
 }
-
-
-
