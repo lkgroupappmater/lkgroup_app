@@ -1,6 +1,6 @@
 // lib/services/auth_service.dart
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 
@@ -188,4 +188,5 @@ class AuthService {
     await Future<void>.delayed(const Duration(milliseconds: 150));
   }
 }
+
 
