@@ -173,9 +173,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     );
     if (!mounted || choice == null) return;
     Navigator.push<void>(context, MaterialPageRoute(builder: (_) {
-      if (choice == 'schedule') return const ScheduleManagementScreen();
+      if (choice == 'schedule') return ScheduleManagementScreen(user: widget.user);
       if (choice == 'excel') return const ExcelUploadScreen();
-      return const NoticeManagementScreen();
+      return NoticeManagementScreen(user: widget.user);
     }));
   }
 
@@ -273,3 +273,4 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     );
   }
 }
+

@@ -39,6 +39,8 @@ class AuthService {
     required String name,
     String phone = '',
     String company = '',
+    UserRole role = UserRole.member,
+    String verificationMethod = 'email',
   }) async {
     if (!SupabaseConfig.isConfigured) {
       throw const AuthException('Supabase 설정 후 회원가입할 수 있습니다.');
@@ -46,10 +48,31 @@ class AuthService {
     final response = await SupabaseService.client.auth.signUp(
       email: email.trim(),
       password: password,
-      data: {'full_name': name, 'phone': phone, 'company': company},
+      data: {
+        'full_name': name,
+        'phone': phone,
+        'company': company,
+        'role': role.name,
+        // 추후 phone/SMS/OAuth 등을 추가할 때 이 값만 확장합니다.
+        'verification_method': verificationMethod,
+      },
     );
     final user = response.user;
     if (user == null) throw const AuthException('회원가입에 실패했습니다.');
+
+    // 일반 회원은 가입 즉시 사용할 수 있도록 승인 상태를 approved로 저장합니다.
+    // profiles 테이블에 가입 트리거가 있다면 upsert가 기존 행도 안전하게 갱신합니다.
+    if (role == UserRole.member) {
+      await SupabaseService.client.from('profiles').upsert({
+        'id': user.id,
+        'email': user.email ?? email.trim(),
+        'name': name.trim(),
+        'phone': phone.trim(),
+        'company': company.trim(),
+        'role': UserRole.member.name,
+        'approval_status': 'approved',
+      });
+    }
     final profile = await _loadProfile(user.id, fallbackEmail: user.email ?? email);
     _currentUser = profile;
     return AuthResult(
@@ -98,3 +121,4 @@ class AuthService {
 
   static List<MockAccountInfo> get demoAccounts => const <MockAccountInfo>[];
 }
+

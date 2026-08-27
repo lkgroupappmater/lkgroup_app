@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
 import '../config/supabase_config.dart';
+import '../models/app_user.dart';
 import '../services/schedule_service.dart';
 
 class ScheduleManagementScreen extends StatefulWidget {
-  const ScheduleManagementScreen({super.key});
+  const ScheduleManagementScreen({super.key, required this.user});
+  final AppUser user;
   @override State<ScheduleManagementScreen> createState() => _ScheduleManagementScreenState();
 }
 
@@ -71,3 +73,4 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     }),
   );
 }
+

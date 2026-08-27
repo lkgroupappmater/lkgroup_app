@@ -9,6 +9,88 @@ class _AccountBodyState extends State<AccountBody> {
   final _account = TextEditingController(), _password = TextEditingController(), _name = TextEditingController(), _phone = TextEditingController(), _group = TextEditingController(), _address = TextEditingController(); bool _obscure = true, _rememberAccount = false, _rememberPassword = false; UserRole _role = UserRole.member; String _avatar = '🙂';
   @override void dispose() { for (final c in [_account, _password, _name, _phone, _group, _address]) { c.dispose(); } super.dispose(); }
   void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _openMemberSignup() async {
+    final name = TextEditingController();
+    final email = TextEditingController();
+    final password = TextEditingController();
+    final phone = TextEditingController();
+    final company = TextEditingController();
+    bool loading = false;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('일반 회원가입'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: name, decoration: const InputDecoration(labelText: '이름')),
+                  TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: '이메일')),
+                  TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: '암호')),
+                  TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '전화번호')),
+                  TextField(controller: company, decoration: const InputDecoration(labelText: '회사명(선택)')),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('일반 회원은 관리자 승인 없이 가입할 수 있습니다.', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: loading ? null : () => Navigator.pop(dialogContext), child: const Text('취소')),
+              FilledButton(
+                onPressed: loading
+                    ? null
+                    : () async {
+                        if (name.text.trim().isEmpty || email.text.trim().isEmpty || password.text.isEmpty) {
+                          _message('이름, 이메일, 암호를 입력해 주세요.');
+                          return;
+                        }
+                        setDialogState(() => loading = true);
+                        try {
+                          // 일반 회원은 member + approved로 생성합니다. 관리자/파트너 계정은 별도 발급 절차를 사용합니다.
+                          final result = await AuthService.instance.signUp(
+                            email: email.text.trim(),
+                            password: password.text,
+                            name: name.text.trim(),
+                            phone: phone.text.trim(),
+                            company: company.text.trim(),
+                            role: UserRole.member,
+                            verificationMethod: 'email',
+                          );
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          if (result.emailConfirmationRequired) {
+                            _message('회원가입이 완료되었습니다. 이메일 인증 후 접속해 주세요.');
+                          } else {
+                            _message('회원가입이 완료되었습니다. 바로 접속할 수 있습니다.');
+                          }
+                        } catch (error) {
+                          if (dialogContext.mounted) {
+                            setDialogState(() => loading = false);
+                            _message('회원가입 실패: $error');
+                          }
+                        }
+                      },
+                child: loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('가입하기'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      name.dispose();
+      email.dispose();
+      password.dispose();
+      phone.dispose();
+      company.dispose();
+    }
+  }
+
   Future<void> _login() async {
     if (_account.text.trim().isEmpty || _password.text.isEmpty) { _message('계정과 암호를 입력해 주세요.'); return; }
     try {
@@ -90,9 +172,7 @@ class _AccountBodyState extends State<AccountBody> {
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: () {
-              _message('회원가입 화면은 다음 단계에서 연결합니다.');
-            },
+            onPressed: _openMemberSignup,
             child: const Text('회원가입'),
           ),
         ],
@@ -165,3 +245,4 @@ class _AccountBodyState extends State<AccountBody> {
   }
   Widget _info(String label, String value) => ListTile(title: Text(label, style: const TextStyle(color: AppColors.textSecondary)), subtitle: Text(value.isEmpty ? '등록되지 않음' : value));
 }
+
