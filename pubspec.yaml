@@ -15,7 +15,7 @@ dependencies:
 
   supabase_flutter: ^2.17.2
   excel: ^4.0.6
-  file_picker: ^8.1.7
+  file_picker: ^12.1.1
   url_launcher: ^6.3.2
 
   cupertino_icons: ^1.0.8
