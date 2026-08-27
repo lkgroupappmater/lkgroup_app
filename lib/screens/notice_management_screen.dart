@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../models/app_user.dart';
 import '../services/content_service.dart';
 
 class NoticeManagementScreen extends StatefulWidget {
-  const NoticeManagementScreen({super.key});
+  const NoticeManagementScreen({super.key, required this.user});
+  final AppUser user;
   @override
   State<NoticeManagementScreen> createState() => _NoticeManagementScreenState();
 }
@@ -12,7 +14,14 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    if (widget.user.role.canEditNotices) {
+      _load();
+    } else {
+      _loading = false;
+    }
+  }
   String _text(Map<String, dynamic> row, String key) => (row[key] ?? '').toString();
   void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   Future<void> _load() async { try { final rows = await ContentService.fetchNotices(includePendingDeletion: true); if (mounted) setState(() { _items = rows; _loading = false; }); } catch (e) { if (mounted) { setState(() => _loading = false); _message('공지사항 조회 실패: $e'); } } }
@@ -28,9 +37,18 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     ))); } finally { title.dispose(); content.dispose(); }
   }
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white), backgroundColor: AppColors.background, body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
+  Widget build(BuildContext context) {
+    if (!widget.user.role.canEditNotices) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('공지사항 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
+        body: const Center(child: Text('관리자 권한이 필요합니다.')),
+      );
+    }
+    return Scaffold(appBar: AppBar(title: const Text('공지사항 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white), backgroundColor: AppColors.background, body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
     ..._items.map((row) { final pending = _text(row, 'deletion_status') == 'pending'; return Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(title: Text(_text(row, 'title')), subtitle: Text('${_text(row, 'published_at')}\n${_text(row, 'content')}'), isThreeLine: true, trailing: Wrap(children: [if (pending) const Chip(label: Text('삭제 대기중')), IconButton(onPressed: pending ? null : () => _showEditor(existing: row), icon: const Icon(Icons.edit_outlined)), IconButton(onPressed: pending ? null : () => _delete(row), icon: const Icon(Icons.delete_outline, color: AppColors.error))]))); }),
     FilledButton.icon(onPressed: () => _showEditor(), icon: const Icon(Icons.add), label: const Text('공지사항 추가')),
   ])));
+  }
 }
+
 

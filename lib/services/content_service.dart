@@ -17,8 +17,14 @@ class ContentService {
     if (client == null) return <Map<String, dynamic>>[];
     var query = client.from('shipping_schedules').select();
     if (!includePendingDeletion) query = query.isFilter('deleted_at', null);
-    final rows = await query.order('departure_date', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    final rows = await query;
+    final result = List<Map<String, dynamic>>.from(rows);
+    result.sort((a, b) {
+      final left = (a['departure_date'] ?? a['closing_date'] ?? '').toString();
+      final right = (b['departure_date'] ?? b['closing_date'] ?? '').toString();
+      return left.compareTo(right);
+    });
+    return result;
   }
 
   static Future<List<Map<String, dynamic>>> fetchNotices({
@@ -80,4 +86,5 @@ class ContentService {
     }).eq('id', id);
   }
 }
+
 

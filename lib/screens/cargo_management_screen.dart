@@ -174,12 +174,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       {
         'label': '선적 일정 관리',
         'icon': Icons.calendar_month,
-        'page': const ScheduleManagementScreen(),
+        'page': ScheduleManagementScreen(user: widget.user),
       },
       {
         'label': '공지사항 관리',
         'icon': Icons.campaign_outlined,
-        'page': const NoticeManagementScreen(),
+        'page': NoticeManagementScreen(user: widget.user),
       },
       {
         'label': '화물 종합 관리',
@@ -263,5 +263,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     ]);
   }
 }
+
 
 

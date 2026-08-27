@@ -6,6 +6,8 @@ import '../models/app_user.dart';
 import '../services/content_service.dart';
 import 'notice_list_screen.dart';
 import 'shipment_schedule_screen.dart';
+import 'notice_management_screen.dart';
+import 'schedule_management_screen.dart';
 
 class ContactLink {
   final String label;
@@ -97,8 +99,19 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   // 일정/공지의 상세 목록은 모든 사용자에게 공개합니다.
   // 관리자용 추가·편집·삭제는 화물 관리 > 통합 관리에서만 접근합니다.
-  void _openSchedule() => _open(context, const ShipmentScheduleScreen());
-  void _openNotice() => _open(context, const NoticeListScreen());
+  void _openSchedule() => _open(
+        context,
+        _isManager
+            ? ScheduleManagementScreen(user: widget.currentUser!)
+            : const ShipmentScheduleScreen(),
+      );
+
+  void _openNotice() => _open(
+        context,
+        _isManager
+            ? NoticeManagementScreen(user: widget.currentUser!)
+            : const NoticeListScreen(),
+      );
 
   Future<void> _showContact(ContactLink link) async {
     if (link.placeholder == '차후 공유') {
@@ -137,11 +150,11 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 118),
         children: [
-          _sectionHeader('선적 일정', '목록 자세히 보기', _openSchedule),
+          _sectionHeader('선적 일정', _isManager ? '목록 관리' : '목록 자세히 보기', _openSchedule),
           const SizedBox(height: 8),
           ..._visibleSchedules.map(_scheduleCard),
           const SizedBox(height: 14),
-          _sectionHeader('공지사항', '목록 자세히 보기', _openNotice),
+          _sectionHeader('공지사항', _isManager ? '목록 관리' : '목록 자세히 보기', _openNotice),
           const SizedBox(height: 8),
           ..._visibleNotices.map(_noticeCard),
           const SizedBox(height: 14),
@@ -294,6 +307,7 @@ class DashboardHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.background, body: SafeArea(child: DashboardHomeBody(currentUser: currentUser)));
 }
+
 
 
 

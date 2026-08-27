@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
+import '../models/app_user.dart';
 import '../services/content_service.dart';
 
 class ScheduleManagementScreen extends StatefulWidget {
-  const ScheduleManagementScreen({super.key});
+  const ScheduleManagementScreen({super.key, required this.user});
+  final AppUser user;
   @override
   State<ScheduleManagementScreen> createState() => _ScheduleManagementScreenState();
 }
@@ -14,7 +16,14 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
   bool _loading = true;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    if (widget.user.role.canEditSchedules) {
+      _load();
+    } else {
+      _loading = false;
+    }
+  }
   Future<void> _load() async {
     try { final rows = await ContentService.fetchSchedules(includePendingDeletion: true); if (mounted) setState(() { _items = rows; _loading = false; }); }
     catch (e) { if (mounted) { setState(() => _loading = false); _message('선적 일정 조회 실패: $e'); } }
@@ -49,7 +58,17 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
           TextField(controller: detail, maxLines: 3, decoration: const InputDecoration(labelText: '상세 내용')),
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('취소')), FilledButton(onPressed: () async {
-          final data = <String, dynamic>{'route': route, 'origin': from.text.trim(), 'destination': to.text.trim(), 'closing_date': close.text.trim(), 'arrival_date': eta.text.trim(), 'detail': detail.text.trim()};
+          final data = <String, dynamic>{
+            'route': route,
+            'origin': from.text.trim(),
+            'destination': to.text.trim(),
+            // Keep both names populated so the app works with the original
+            // SQL schema and the current management screen.
+            'departure_date': close.text.trim(),
+            'closing_date': close.text.trim(),
+            'arrival_date': eta.text.trim(),
+            'detail': detail.text.trim(),
+          };
           try { if (existing == null) { await ContentService.createSchedule(data); } else { await ContentService.updateSchedule(_text(existing, 'id'), data); } if (dialogContext.mounted) Navigator.pop(dialogContext); await _load(); }
           catch (e) { _message('저장 실패: $e'); }
         }, child: const Text('저장'))],
@@ -58,7 +77,14 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    if (!widget.user.role.canEditSchedules) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('선적 일정 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
+        body: const Center(child: Text('관리자 권한이 필요합니다.')),
+      );
+    }
+    return Scaffold(
     appBar: AppBar(title: const Text('선적 일정 목록 관리'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white), backgroundColor: AppColors.background,
     body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
       ..._items.map((row) { final pending = _text(row, 'deletion_status') == 'pending'; return Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -67,6 +93,9 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
       ]))); }),
       FilledButton.icon(onPressed: () => _showEditor(), icon: const Icon(Icons.add), label: const Text('선적 일정 추가')),
     ])),
-  );
+    );
+  }
 }
+
+
 
