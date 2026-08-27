@@ -70,6 +70,21 @@ alter table public.shipments add column if not exists notes text not null defaul
 alter table public.shipments add column if not exists created_at timestamptz not null default now();
 alter table public.shipments add column if not exists updated_at timestamptz not null default now();
 
+-- Safe migration for projects where shipping_schedules already existed
+-- without the newer route and schedule-detail columns.
+alter table public.shipping_schedules add column if not exists route text not null default '';
+alter table public.shipping_schedules add column if not exists year text not null default '';
+alter table public.shipping_schedules add column if not exists voyage text not null default '';
+alter table public.shipping_schedules add column if not exists origin text not null default '';
+alter table public.shipping_schedules add column if not exists destination text not null default '';
+alter table public.shipping_schedules add column if not exists booking_close_date date;
+alter table public.shipping_schedules add column if not exists estimated_arrival_date date;
+alter table public.shipping_schedules add column if not exists status text not null default 'scheduled';
+alter table public.shipping_schedules add column if not exists detail text not null default '';
+alter table public.shipping_schedules add column if not exists created_by uuid references auth.users(id);
+alter table public.shipping_schedules add column if not exists created_at timestamptz not null default now();
+alter table public.shipping_schedules add column if not exists updated_at timestamptz not null default now();
+
 -- Preserve values from the old test schema when present.
 do $$
 begin
@@ -105,6 +120,22 @@ create table if not exists public.quote_requests (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Safe migration if quote_requests already existed with an older shape.
+alter table public.quote_requests add column if not exists route text not null default '';
+alter table public.quote_requests add column if not exists origin text not null default '';
+alter table public.quote_requests add column if not exists destination text not null default '';
+alter table public.quote_requests add column if not exists boxes jsonb not null default '[]'::jsonb;
+alter table public.quote_requests add column if not exists total_weight_kg numeric;
+alter table public.quote_requests add column if not exists status text not null default 'pending';
+alter table public.quote_requests add column if not exists admin_note text not null default '';
+alter table public.quote_requests add column if not exists quoted_amount numeric;
+alter table public.quote_requests add column if not exists requested_by uuid references auth.users(id);
+alter table public.quote_requests add column if not exists customer_name text not null default '';
+alter table public.quote_requests add column if not exists contact_phone text not null default '';
+alter table public.quote_requests add column if not exists contact_email text not null default '';
+alter table public.quote_requests add column if not exists created_at timestamptz not null default now();
+alter table public.quote_requests add column if not exists updated_at timestamptz not null default now();
 
 -- Add approval state without changing the requested role vocabulary.
 alter table public.profiles add column if not exists approval_status text not null default 'approved';
