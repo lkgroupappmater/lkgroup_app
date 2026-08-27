@@ -45,6 +45,49 @@ create table if not exists public.shipments (
   updated_at timestamptz not null default now()
 );
 
+-- Safe migration for projects where shipments was created by an earlier
+-- connection-test schema using shipment_no instead of invoice_number.
+alter table public.shipments add column if not exists box_number text not null default '';
+alter table public.shipments add column if not exists invoice_number text;
+alter table public.shipments add column if not exists route text not null default '';
+alter table public.shipments add column if not exists consignee_name text not null default '';
+alter table public.shipments add column if not exists consignee_phone text not null default '';
+alter table public.shipments add column if not exists customer_id uuid references auth.users(id);
+alter table public.shipments add column if not exists assigned_partner_id uuid references auth.users(id);
+alter table public.shipments add column if not exists origin text not null default '';
+alter table public.shipments add column if not exists destination text not null default '';
+alter table public.shipments add column if not exists status text not null default 'registered';
+alter table public.shipments add column if not exists received_at date;
+alter table public.shipments add column if not exists estimated_arrival date;
+alter table public.shipments add column if not exists actual_arrival date;
+alter table public.shipments add column if not exists weight_kg numeric;
+alter table public.shipments add column if not exists width_cm numeric;
+alter table public.shipments add column if not exists length_cm numeric;
+alter table public.shipments add column if not exists height_cm numeric;
+alter table public.shipments add column if not exists quantity integer;
+alter table public.shipments add column if not exists cargo_type text not null default '';
+alter table public.shipments add column if not exists notes text not null default '';
+alter table public.shipments add column if not exists created_at timestamptz not null default now();
+alter table public.shipments add column if not exists updated_at timestamptz not null default now();
+
+-- Preserve values from the old test schema when present.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'shipments'
+      and column_name = 'shipment_no'
+  ) then
+    update public.shipments
+    set invoice_number = coalesce(nullif(invoice_number, ''), shipment_no)
+    where invoice_number is null or invoice_number = '';
+  end if;
+end $$;
+
+alter table public.shipments alter column invoice_number set default '';
+update public.shipments set invoice_number = '' where invoice_number is null;
+alter table public.shipments alter column invoice_number set not null;
+
 create table if not exists public.quote_requests (
   id bigint generated always as identity primary key,
   requested_by uuid references auth.users(id),
@@ -164,3 +207,4 @@ create policy admin_manages_provision_requests on public.account_provision_reque
 -- Import helper: only admin/staff can bulk insert through the client.
 -- For large files prefer a server-side Edge Function or Supabase CSV import.
 comment on table public.shipments is 'Excel import target; map invoice_number, box_number, route, consignee_name, consignee_phone, received_at.';
+

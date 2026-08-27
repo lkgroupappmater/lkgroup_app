@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.lkgroup.trading.lkgroup_app"
-    compileSdk = flutter.compileSdkVersion
+    // file_picker and flutter_plugin_android_lifecycle currently require API 36.
+    // This changes only the compile API; targetSdk/minSdk remain Flutter-managed.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -47,3 +49,4 @@ kotlin {
 flutter {
     source = "../.."
 }
+

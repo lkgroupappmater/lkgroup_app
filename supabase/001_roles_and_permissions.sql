@@ -6,6 +6,19 @@ alter table public.profiles enable row level security;
 alter table public.account_provision_requests enable row level security;
 alter table public.shipment_change_requests enable row level security;
 create or replace function public.current_role() returns text language sql stable security definer set search_path = public as $$ select role from public.profiles where id = auth.uid() $$;
+
+-- Make this migration safe to run again in an existing project.
+drop policy if exists "profile owner reads own profile" on public.profiles;
+drop policy if exists "member creates own profile" on public.profiles;
+drop policy if exists "owner updates own profile" on public.profiles;
+drop policy if exists "admin manages profiles" on public.profiles;
+drop policy if exists "admin creates provision requests" on public.account_provision_requests;
+drop policy if exists "admin reads provision requests" on public.account_provision_requests;
+drop policy if exists "admin updates provision requests" on public.account_provision_requests;
+drop policy if exists "member creates own change request" on public.shipment_change_requests;
+drop policy if exists "admin reads all change requests" on public.shipment_change_requests;
+drop policy if exists "admin decides change requests" on public.shipment_change_requests;
+
 create policy "profile owner reads own profile" on public.profiles for select using (id = auth.uid() or public.current_role() = 'admin');
 create policy "member creates own profile" on public.profiles for insert with check (id = auth.uid() and role = 'member');
 create policy "owner updates own profile" on public.profiles for update using (id = auth.uid()) with check (id = auth.uid() and role = 'member');
