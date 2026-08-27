@@ -13,7 +13,11 @@ class SupabaseConfig {
   );
   static const String publishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: '',
+    // 기존 실행 명령과의 호환성을 위해 ANON_KEY도 허용합니다.
+    defaultValue: String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue: '',
+    ),
   );
 
   static bool get isConfigured =>
@@ -27,5 +31,6 @@ class SupabaseConfig {
     );
   }
 }
+
 
 
