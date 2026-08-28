@@ -79,6 +79,75 @@ class ShipmentService {
     await SupabaseService.client.from('shipments').update(changes).eq('id', id);
   }
 
+  Future<void> adminUpdateBoxNumber({
+    required String shipmentId,
+    required String boxNumber,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId);
+    if (id == null) return;
+    await SupabaseService.client.rpc(
+      'admin_update_shipment_box_number',
+      params: {'p_shipment_id': id, 'p_box_number': boxNumber.trim()},
+    );
+  }
+
+  Future<String> getNextBoxNumber({
+    required String route,
+    required int year,
+    required String voyage,
+    required String prefix,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return '${prefix}001';
+    final value = await SupabaseService.client.rpc(
+      'admin_next_box_number',
+      params: {
+        'p_route': route,
+        'p_year': year,
+        'p_voyage': voyage.replaceAll('항차', '').trim(),
+        'p_prefix': prefix,
+      },
+    );
+    return '${value ?? '${prefix}001'}';
+  }
+
+  Future<Map<String, dynamic>> adminAddShipmentRow({
+    required String route,
+    required int year,
+    required String voyage,
+    required String boxNumber,
+    required String invoiceNumber,
+    required String consigneeName,
+    required String consigneePhone,
+    String notes = '',
+    String unloadingZone = '',
+    num? weightKg,
+    num? lengthCm,
+    num? widthCm,
+    num? heightCm,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return const {};
+    final row = await SupabaseService.client.rpc(
+      'admin_add_shipment_row',
+      params: {
+        'p_route': route,
+        'p_year': year,
+        'p_voyage': voyage.replaceAll('항차', '').trim(),
+        'p_box_number': boxNumber.trim(),
+        'p_invoice_number': invoiceNumber.trim(),
+        'p_consignee_name': consigneeName.trim(),
+        'p_consignee_phone': consigneePhone.trim(),
+        'p_notes': notes.trim(),
+        'p_unloading_zone': unloadingZone.trim(),
+        'p_weight_kg': weightKg,
+        'p_length_cm': lengthCm,
+        'p_width_cm': widthCm,
+        'p_height_cm': heightCm,
+      },
+    );
+    return Map<String, dynamic>.from(row as Map);
+  }
+
   Future<void> requestChanges({
     required List<String> shipmentIds,
     required Map<String, dynamic> changes,

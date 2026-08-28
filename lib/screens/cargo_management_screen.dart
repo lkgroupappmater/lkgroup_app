@@ -34,6 +34,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
 
+  final _editBoxNumberController = TextEditingController();
   final _editNameController = TextEditingController();
   final _editPhoneController = TextEditingController();
   final _editNoteController = TextEditingController();
@@ -74,6 +75,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     _invoiceController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _editBoxNumberController.dispose();
     _editNameController.dispose();
     _editPhoneController.dispose();
     _editNoteController.dispose();
@@ -138,6 +140,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   void _syncEditControllers() {
     if (_selectedIds.length != 1) {
+      _editBoxNumberController.clear();
       _editNameController.clear();
       _editPhoneController.clear();
       _editNoteController.clear();
@@ -156,6 +159,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       }
     }
     if (row == null) return;
+    final rowRoute = '${row['route'] ?? ''}';
+    final prefix = RouteCatalog.boxPrefixFor(rowRoute);
+    final currentBox = '${row['box_number'] ?? ''}';
+    _editBoxNumberController.text = prefix.isNotEmpty && currentBox.startsWith(prefix)
+        ? currentBox.substring(prefix.length)
+        : currentBox;
     _editNameController.text = '${row['consignee_name'] ?? ''}';
     _editPhoneController.text = '${row['consignee_phone'] ?? ''}';
     _editNoteController.text = '${row['notes'] ?? ''}';
@@ -211,6 +220,20 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     setState(() => _busy = true);
     try {
       if (_canSaveDirectly) {
+        if (_isAdmin && _selectedIds.length == 1 && _editBoxNumberController.text.trim().isNotEmpty) {
+          final selectedId = _selectedIds.first;
+          final row = _results.firstWhere((item) => '${item['id']}' == selectedId);
+          final rowRoute = '${row['route'] ?? ''}';
+          final prefix = RouteCatalog.boxPrefixFor(rowRoute);
+          final raw = _editBoxNumberController.text.trim();
+          final fullBox = prefix.isEmpty || raw.startsWith(prefix) ? raw : '$prefix$raw';
+          if (fullBox != '${row['box_number'] ?? ''}') {
+            await ShipmentService.instance.adminUpdateBoxNumber(
+              shipmentId: selectedId,
+              boxNumber: fullBox,
+            );
+          }
+        }
         for (final id in _selectedIds) {
           await ShipmentService.instance.updateRow(id, changes);
         }
@@ -272,7 +295,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         'page': NoticeManagementScreen(user: widget.user),
       },
       {
-        'label': '화물 종합 관리',
+        'label': '화물 관리',
         'icon': Icons.inventory_2_outlined,
         'page': CargoManagementScreen(user: widget.user),
       },
@@ -415,7 +438,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isAdmin ? '통합 관리' : '화물 관리',
+                  '화물 관리',
                   style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
@@ -541,6 +564,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 ),
               ),
             ),
+            if (_isAdmin) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _showAddShipmentRowDialog,
+                icon: const Icon(Icons.add_box_outlined),
+                label: const Text('박스 추가 (행 추가)'),
+              ),
+            ],
             if (_searched) ...[
               const SizedBox(height: 16),
               Text(
@@ -561,6 +592,23 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   color: AppColors.primary,
                 ),
               ),
+              if (_isAdmin && _selectedIds.length == 1) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _editBoxNumberController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+                  ],
+                  decoration: _decoration('박스번호', Icons.inventory_2_outlined).copyWith(
+                    prefixText: _selectedBoxPrefix(),
+                    prefixStyle: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: _editNameController,
@@ -611,6 +659,139 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 
+  String _selectedBoxPrefix() {
+    if (_selectedIds.length != 1) return '';
+    final id = _selectedIds.first;
+    final row = _results.cast<Map<String, dynamic>?>().firstWhere(
+          (item) => item != null && '${item['id']}' == id,
+          orElse: () => null,
+        );
+    if (row == null) return '';
+    return RouteCatalog.boxPrefixFor('${row['route'] ?? ''}');
+  }
+
+  Future<void> _showAddShipmentRowDialog() async {
+    if (_route == '전체' || _year == '전체' || _voyage == '전체') {
+      _message('박스를 추가하려면 운송 경로, 년도, 항차를 각각 선택해 주세요.');
+      return;
+    }
+    final year = int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (year == null) {
+      _message('년도를 확인해 주세요.');
+      return;
+    }
+    final prefix = RouteCatalog.boxPrefixFor(_route);
+    if (prefix.isEmpty) {
+      _message('선택한 운송 경로의 박스번호 형식을 확인할 수 없습니다.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    String nextBox;
+    try {
+      nextBox = await ShipmentService.instance.getNextBoxNumber(
+        route: _route,
+        year: year,
+        voyage: _voyage,
+        prefix: prefix,
+      );
+    } catch (error) {
+      if (mounted) _message('다음 박스번호 확인 실패: $error');
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+    if (mounted) setState(() => _busy = false);
+    if (!mounted) return;
+
+    final invoice = TextEditingController();
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final notes = TextEditingController();
+    final zone = TextEditingController();
+    final weight = TextEditingController();
+    final length = TextEditingController();
+    final width = TextEditingController();
+    final height = TextEditingController();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('박스 추가 (행 추가)'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                readOnly: true,
+                controller: TextEditingController(text: nextBox),
+                decoration: const InputDecoration(labelText: '박스번호'),
+              ),
+              TextField(controller: invoice, decoration: const InputDecoration(labelText: '송장번호')),
+              TextField(controller: name, decoration: const InputDecoration(labelText: '이름/라오스 수령인')),
+              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처')),
+              TextField(controller: zone, decoration: const InputDecoration(labelText: '구획 (Zone)')),
+              TextField(controller: notes, decoration: const InputDecoration(labelText: '기타 내용')),
+              Row(children: [
+                Expanded(child: TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '무게(kg)'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '가로(cm)'))),
+              ]),
+              Row(children: [
+                Expanded(child: TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '세로(cm)'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '높이(cm)'))),
+              ]),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('추가'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      setState(() => _busy = true);
+      try {
+        await ShipmentService.instance.adminAddShipmentRow(
+          route: _route,
+          year: year,
+          voyage: _voyage,
+          boxNumber: nextBox,
+          invoiceNumber: invoice.text,
+          consigneeName: name.text,
+          consigneePhone: phone.text,
+          notes: notes.text,
+          unloadingZone: zone.text,
+          weightKg: num.tryParse(weight.text.trim()),
+          lengthCm: num.tryParse(length.text.trim()),
+          widthCm: num.tryParse(width.text.trim()),
+          heightCm: num.tryParse(height.text.trim()),
+        );
+        _message('$nextBox 박스 행을 추가했습니다.');
+        await _search();
+      } catch (error) {
+        _message('박스 행 추가 실패: $error');
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+
+    invoice.dispose();
+    name.dispose();
+    phone.dispose();
+    notes.dispose();
+    zone.dispose();
+    weight.dispose();
+    length.dispose();
+    width.dispose();
+    height.dispose();
+  }
+
   Widget _numberField(TextEditingController controller, String label) => TextField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -653,6 +834,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     _infoRow('무게', '${item['weight_kg'] ?? ''} kg'),
                     _infoRow('크기', size),
                     _infoRow('영수증 번호', '${item['receipt_number'] ?? ''}'),
+                    if (_isAdmin || _isStaff)
+                      _infoRow('구획 (Zone)', '${item['unloading_zone'] ?? ''}'),
                   ],
                 ),
               ),

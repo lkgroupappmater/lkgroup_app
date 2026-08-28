@@ -12,6 +12,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onNotificationTap;
   final bool showHomeActions;
   final int notificationCount;
+  final double titleFontSize;
 
   const CargoFlowAppBar({
     super.key,
@@ -21,6 +22,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onNotificationTap,
     this.showHomeActions = false,
     this.notificationCount = 0,
+    this.titleFontSize = 21,
   });
 
   // Includes the device status-bar inset; no second title row is added.
@@ -53,9 +55,9 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.white,
-                fontSize: 21,
+                fontSize: titleFontSize,
                 fontWeight: FontWeight.w800,
               ),
             ),

@@ -167,7 +167,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case 2:
         return '운임 확인 및 견적 요청';
       case 3:
-        return _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리';
+        return '화물 관리';
       default:
         return '사용자 로그인';
     }
@@ -252,7 +252,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
     ];
 
-    final navItems = [
+    final navItems = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         activeIcon: Icon(Icons.home),
@@ -263,24 +263,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         activeIcon: const Icon(Icons.local_shipping),
         label: AppStrings.get(_language, 'tracking'),
       ),
+    ];
+    final navIndexes = <int>[0, 1];
+
+    if (_isLoggedIn) {
+      navItems.add(
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.inventory_2_outlined),
+          activeIcon: Icon(Icons.inventory_2),
+          label: '화물 관리',
+        ),
+      );
+      navIndexes.add(3);
+    }
+
+    navItems.add(
       BottomNavigationBarItem(
         icon: const Icon(Icons.request_quote_outlined),
         activeIcon: const Icon(Icons.request_quote),
         label: AppStrings.get(_language, 'quote'),
       ),
-    ];
-    final navIndexes = [0, 1, 2];
-
-    if (_isLoggedIn) {
-      navItems.add(
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.inventory_2_outlined),
-          activeIcon: const Icon(Icons.inventory_2),
-          label: _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리',
-        ),
-      );
-      navIndexes.add(3);
-    }
+    );
+    navIndexes.add(2);
 
     navItems.add(
       BottomNavigationBarItem(
@@ -300,6 +304,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         showHomeActions: _currentIndex == 0,
         onNotificationTap: _openNotifications,
         notificationCount: _unreadNotifications.length,
+        titleFontSize: _currentIndex == 2 ? 17 : 21,
       ),
       body: IndexedStack(index: _currentIndex, children: tabs),
       bottomNavigationBar: BottomNavigationBar(

@@ -41,6 +41,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   final Set<String> _selectedIds = <String>{};
 
   bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
+  bool get _showZone => widget.currentUser?.role == UserRole.admin || widget.currentUser?.role == UserRole.staff;
 
   @override
   void initState() {
@@ -312,9 +313,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final size =
         '${r['length_cm'] ?? ''} × ${r['width_cm'] ?? ''} × ${r['height_cm'] ?? ''} cm';
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+      child: InkWell(
+        onTap: () => _toggle(id),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(
@@ -340,11 +343,13 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   _row('무게', '${r['weight_kg'] ?? ''} kg'),
                   _row('크기', size),
                   _row('영수증 번호', '${r['receipt_number'] ?? ''}'),
+                  if (_showZone) _row('구획 (Zone)', '${r['unloading_zone'] ?? ''}'),
                 ],
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }

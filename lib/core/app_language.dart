@@ -38,10 +38,10 @@ class AppStrings {
     AppLanguage.korean: {
       'home_title': 'LK Group',
       'tracking_title': '화물 조회',
-      'quote_title': '운임 요청',
+      'quote_title': '운임 확인',
       'account_title': '계정',
       'tracking': '화물 조회',
-      'quote': '운임 요청',
+      'quote': '운임 확인',
       'account': '계정',
       'chip_quote': '운임 견적',
     },
