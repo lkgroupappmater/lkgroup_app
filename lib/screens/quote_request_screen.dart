@@ -48,10 +48,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   String _selectedRoute = _transportRoutes.first;
   final List<_BoxEntry> _boxes = [_BoxEntry()];
 
-  // Simulated login state
-  // TODO: Replace with real AuthController.isLoggedIn
-  bool _isLoggedIn = false;
-
   void _addBox() => setState(() => _boxes.add(_BoxEntry()));
   void _removeBox(int i) {
     if (_boxes.length > 1) setState(() => _boxes.removeAt(i));
@@ -92,7 +88,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   void _requestSpecialQuote() {
-    if (!_isLoggedIn) {
+    if (Supabase.instance.client.auth.currentUser == null) {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -210,21 +206,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             ),
           ),
 
-          // Mock login toggle for testing
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Checkbox(
-                value: _isLoggedIn,
-                activeColor: AppColors.navyPrimary,
-                onChanged: (v) =>
-                    setState(() => _isLoggedIn = v ?? false),
-              ),
-              const Text('[테스트] 로그인 상태로 전환',
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
+
         ],
       ),
     );

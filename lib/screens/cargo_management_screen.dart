@@ -244,7 +244,16 @@ class _CargoManagementScreenState
           Card(
             color: AppColors.primary,
             child: ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person)),
+              leading: CircleAvatar(
+                backgroundImage: widget.user.avatarUrl != null &&
+                        widget.user.avatarUrl!.trim().isNotEmpty
+                    ? NetworkImage(widget.user.avatarUrl!)
+                    : null,
+                child: widget.user.avatarUrl == null ||
+                        widget.user.avatarUrl!.trim().isEmpty
+                    ? const Icon(Icons.person)
+                    : null,
+              ),
               title: Text(
                 widget.user.name.isEmpty ? '회원' : widget.user.name,
                 style: const TextStyle(

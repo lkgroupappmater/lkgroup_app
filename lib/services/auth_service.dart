@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import 'supabase_service.dart';
@@ -18,12 +21,30 @@ class AuthService {
     final user = SupabaseService.client.auth.currentUser;
     if (user == null) return;
     try {
-      _currentUser =
-          await _loadProfile(user.id, fallbackEmail: user.email ?? '');
+      _currentUser = await _loadProfile(user.id, fallbackEmail: user.email ?? '');
     } catch (_) {
-      // 승인대기/권한오류 세션이 앱 시작을 중단시키지 않도록 로그아웃 상태로 복구합니다.
       await SupabaseService.client.auth.signOut();
       _currentUser = null;
+    }
+  }
+
+  Future<AppUser?> refreshCurrentUser() async {
+    if (!SupabaseConfig.isConfigured) return _currentUser;
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) {
+      _currentUser = null;
+      return null;
+    }
+    try {
+      _currentUser = await _loadProfile(
+        authUser.id,
+        fallbackEmail: authUser.email ?? '',
+      );
+      return _currentUser;
+    } catch (_) {
+      await SupabaseService.client.auth.signOut();
+      _currentUser = null;
+      return null;
     }
   }
 
@@ -34,17 +55,17 @@ class AuthService {
     if (!SupabaseConfig.isConfigured) {
       throw const AuthException('Supabase 설정 후 로그인할 수 있습니다.');
     }
-
     final response = await SupabaseService.client.auth.signInWithPassword(
       email: email.trim(),
       password: password,
     );
     final user = response.user;
     if (user == null) throw const AuthException('로그인에 실패했습니다.');
-
     try {
-      _currentUser =
-          await _loadProfile(user.id, fallbackEmail: user.email ?? email);
+      _currentUser = await _loadProfile(
+        user.id,
+        fallbackEmail: user.email ?? email,
+      );
       return _currentUser!;
     } catch (e) {
       await SupabaseService.client.auth.signOut();
@@ -87,26 +108,81 @@ class AuthService {
     if (user == null) throw const AuthException('회원가입에 실패했습니다.');
 
     final pending = role != UserRole.member;
-
-    // 관리자/파트너 가입 신청이 signUp 직후 세션을 발급받더라도
-    // 승인 전에는 로그인 상태로 남기지 않습니다.
     if (pending && response.session != null) {
       await SupabaseService.client.auth.signOut();
     }
 
-    final resultUser = AppUser(
-      id: user.id,
-      email: user.email ?? email.trim(),
-      name: name.trim(),
-      phone: phone.trim(),
-      company: company.trim(),
-      role: pending ? UserRole.member : UserRole.member,
-    );
-
     return AuthResult(
-      user: resultUser,
+      user: AppUser(
+        id: user.id,
+        email: user.email ?? email.trim(),
+        name: name.trim(),
+        phone: phone.trim(),
+        company: company.trim(),
+        role: UserRole.member,
+      ),
       emailConfirmationRequired: response.session == null,
     );
+  }
+
+  Future<AppUser> updateProfile({
+    required String name,
+    required String phone,
+    required String company,
+    required String address,
+  }) async {
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+
+    await SupabaseService.client.from('profiles').update({
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'company': company.trim(),
+      'address': address.trim(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', authUser.id);
+
+    return (await refreshCurrentUser())!;
+  }
+
+  Future<void> updatePassword(String password) async {
+    if (SupabaseService.client.auth.currentUser == null) {
+      throw const AuthException('로그인이 필요합니다.');
+    }
+    await SupabaseService.client.auth.updateUser(
+      UserAttributes(password: password),
+    );
+  }
+
+  Future<AppUser> uploadAvatar(XFile image) async {
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+
+    final bytes = await image.readAsBytes();
+    if (bytes.length > 5 * 1024 * 1024) {
+      throw const AuthException('프로필 사진은 5MB 이하로 선택해 주세요.');
+    }
+
+    final ext = image.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    final path = '${authUser.id}/avatar.$ext';
+
+    await SupabaseService.client.storage.from('avatars').uploadBinary(
+          path,
+          Uint8List.fromList(bytes),
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    final publicUrl =
+        SupabaseService.client.storage.from('avatars').getPublicUrl(path);
+    final cacheBusted =
+        '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+
+    await SupabaseService.client.from('profiles').update({
+      'avatar_url': cacheBusted,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', authUser.id);
+
+    return (await refreshCurrentUser())!;
   }
 
   Future<void> signOut() async {
@@ -159,8 +235,7 @@ class AuthService {
     }
     if (request.role != UserRole.staff &&
         request.role != UserRole.partner) {
-      throw const AuthException(
-          '계정 발급 요청은 직원 또는 협력·파트너사만 가능합니다.');
+      throw const AuthException('계정 발급 요청은 직원 또는 협력·파트너사만 가능합니다.');
     }
     await SupabaseService.client
         .from('account_provision_requests')

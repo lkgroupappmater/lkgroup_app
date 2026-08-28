@@ -12,12 +12,12 @@ import '../services/auth_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
-
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   AppLanguage _language = AppLanguage.korean;
   AppUser? _currentUser;
@@ -26,10 +26,35 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AuthService.instance.restoreSession().then((_) {
-      if (mounted && AuthService.instance.currentUser != null) {
+      if (mounted) {
         setState(() => _currentUser = AuthService.instance.currentUser);
       }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshUserRole();
+    }
+  }
+
+  Future<void> _refreshUserRole() async {
+    final before = _currentUser;
+    if (before == null) return;
+    final refreshed = await AuthService.instance.refreshCurrentUser();
+    if (!mounted) return;
+    setState(() {
+      _currentUser = refreshed;
+      if (refreshed == null) _currentIndex = 4;
     });
   }
 
@@ -45,9 +70,7 @@ class _AppShellState extends State<AppShell> {
       case 2:
         return AppStrings.get(_language, 'quote_title');
       case 3:
-        return _currentUser?.role == UserRole.admin
-            ? '통합 관리'
-            : '화물 관리';
+        return _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리';
       default:
         return '사용자 로그인';
     }
@@ -70,6 +93,9 @@ class _AppShellState extends State<AppShell> {
         .showSnackBar(TextSnackBar('${user.name}님 로그인되었습니다.'));
   }
 
+  void _onUserUpdated(AppUser user) =>
+      setState(() => _currentUser = user);
+
   Future<void> _onLoggedOut() async {
     await AuthService.instance.signOut();
     if (!mounted) return;
@@ -91,8 +117,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      DashboardHomeBody(
-          language: _language, currentUser: _currentUser),
+      DashboardHomeBody(language: _language, currentUser: _currentUser),
       ShipmentSearchBody(
         language: _language,
         isLoggedIn: _isLoggedIn,
@@ -101,11 +126,10 @@ class _AppShellState extends State<AppShell> {
         onEditRequest: () => _selectTab(3),
         onManageSelected: _openCargoManagement,
       ),
-      QuoteRequestBody(
-          language: _language, onRequestLogin: _openAccount),
+      QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
       if (_isLoggedIn)
         CargoManagementScreen(
-          key: ValueKey(_cargoSelection.join('|')),
+          key: ValueKey('${_currentUser!.id}|${_currentUser!.role}|${_cargoSelection.join('|')}'),
           user: _currentUser!,
           initialSelectedIds: _cargoSelection,
         ),
@@ -114,6 +138,7 @@ class _AppShellState extends State<AppShell> {
         currentUser: _currentUser,
         onLoggedIn: _onLoggedIn,
         onLoggedOut: _onLoggedOut,
+        onUserUpdated: _onUserUpdated,
       ),
     ];
 
@@ -141,9 +166,7 @@ class _AppShellState extends State<AppShell> {
         BottomNavigationBarItem(
           icon: const Icon(Icons.inventory_2_outlined),
           activeIcon: const Icon(Icons.inventory_2),
-          label: _currentUser?.role == UserRole.admin
-              ? '통합 관리'
-              : '화물 관리',
+          label: _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리',
         ),
       );
       navIndexes.add(3);
@@ -159,7 +182,6 @@ class _AppShellState extends State<AppShell> {
     navIndexes.add(4);
 
     final selected = navIndexes.indexOf(_currentIndex);
-
     return Scaffold(
       appBar: CargoFlowAppBar(
         title: _title,
