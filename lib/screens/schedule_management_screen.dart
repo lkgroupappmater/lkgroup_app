@@ -55,21 +55,22 @@ class _ScheduleManagementScreenState
   Future<void> _requestDelete(Map<String, dynamic> row) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('선적 일정 삭제 확인'),
-        content: const Text(
-          '삭제하면 홈 화면에서는 즉시 보이지 않습니다.\n'
-          '삭제된 자료는 30일 동안 임시 보관 후 완전히 삭제됩니다.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('확인')),
-        ],
-      ),
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('선적 일정 삭제 확인'),
+            content: const Text(
+              '삭제하면 홈 화면에서는 즉시 보이지 않습니다.\n'
+                  '삭제된 자료는 30일 동안 임시 보관 후 완전히 삭제됩니다.',
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('취소')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('확인')),
+            ],
+          ),
     );
     if (ok != true) return;
 
@@ -95,19 +96,20 @@ class _ScheduleManagementScreenState
   Future<void> _hardDelete(Map<String, dynamic> row) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('바로 삭제'),
-        content:
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('바로 삭제'),
+            content:
             const Text('임시 보관 기간을 무시하고 DB에서 완전히 삭제할까요?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('바로 삭제')),
-        ],
-      ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('취소')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('바로 삭제')),
+            ],
+          ),
     );
     if (ok != true) return;
 
@@ -122,7 +124,7 @@ class _ScheduleManagementScreenState
 
   Future<void> _showEditor({Map<String, dynamic>? existing}) async {
     final from =
-        TextEditingController(text: _text(existing ?? {}, 'origin'));
+    TextEditingController(text: _text(existing ?? {}, 'origin'));
     final to = TextEditingController(
         text: _text(existing ?? {}, 'destination'));
     final close = TextEditingController(
@@ -130,12 +132,12 @@ class _ScheduleManagementScreenState
     final eta = TextEditingController(
         text: _text(existing ?? {}, 'estimated_arrival_date'));
     final detail =
-        TextEditingController(text: _text(existing ?? {}, 'detail'));
+    TextEditingController(text: _text(existing ?? {}, 'detail'));
 
     var route =
-        _text(existing ?? {}, 'route').isEmpty
-            ? RouteCatalog.routes.first
-            : _text(existing!, 'route');
+    _text(existing ?? {}, 'route').isEmpty
+        ? RouteCatalog.routes.first
+        : _text(existing!, 'route');
     var year = _text(existing ?? {}, 'year').isEmpty
         ? '2026년'
         : _text(existing!, 'year');
@@ -145,116 +147,122 @@ class _ScheduleManagementScreenState
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? '선적 일정 추가' : '선적 일정 편집'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: route,
-                  decoration:
-                      const InputDecoration(labelText: '운송 경로'),
-                  items: RouteCatalog.routes
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => route = v ?? route),
-                ),
-                DropdownButtonFormField<String>(
-                  value: year,
-                  decoration: const InputDecoration(labelText: '년도'),
-                  items: const ['2026년', '2027년', '2028년']
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => year = v ?? year),
-                ),
-                DropdownButtonFormField<String>(
-                  value: voyage,
-                  decoration: const InputDecoration(labelText: '항차'),
-                  items: List.generate(
-                    30,
-                    (i) =>
-                        '${(i + 1).toString().padLeft(2, '0')}항차',
-                  )
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => voyage = v ?? voyage),
-                ),
-                TextField(
-                    controller: from,
-                    decoration:
-                        const InputDecoration(labelText: '출발지')),
-                TextField(
-                    controller: to,
-                    decoration:
-                        const InputDecoration(labelText: '도착지')),
-                TextField(
-                    controller: close,
-                    decoration:
-                        const InputDecoration(labelText: '접수 마감일')),
-                TextField(
-                    controller: eta,
-                    decoration:
-                        const InputDecoration(labelText: '도착 예정일')),
-                TextField(
-                  controller: detail,
-                  maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: '상세 내용 또는 추가 내용'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final item = <String, dynamic>{
-                  'route': route,
-                  'year': year,
-                  'voyage': voyage,
-                  'origin': from.text.trim(),
-                  'destination': to.text.trim(),
-                  'booking_close_date':
-                      close.text.trim().isEmpty ? null : close.text.trim(),
-                  'estimated_arrival_date':
-                      eta.text.trim().isEmpty ? null : eta.text.trim(),
-                  'detail': detail.text.trim(),
-                  'status': 'scheduled',
-                };
+      builder: (dialogContext) =>
+          StatefulBuilder(
+            builder: (context, setDialogState) =>
+                AlertDialog(
+                  title: Text(existing == null ? '선적 일정 추가' : '선적 일정 편집'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: route,
+                          decoration:
+                          const InputDecoration(labelText: '운송 경로'),
+                          items: RouteCatalog.routes
+                              .map((e) =>
+                              DropdownMenuItem(value: e, child: Text(e)))
+                              .toList(),
+                          onChanged: (v) =>
+                              setDialogState(() => route = v ?? route),
+                        ),
+                        DropdownButtonFormField<String>(
+                          value: year,
+                          decoration: const InputDecoration(labelText: '년도'),
+                          items: const ['2026년', '2027년', '2028년']
+                              .map((e) =>
+                              DropdownMenuItem(value: e, child: Text(e)))
+                              .toList(),
+                          onChanged: (v) =>
+                              setDialogState(() => year = v ?? year),
+                        ),
+                        DropdownButtonFormField<String>(
+                          value: voyage,
+                          decoration: const InputDecoration(labelText: '항차'),
+                          items: List.generate(
+                            30,
+                                (i) =>
+                            '${(i + 1).toString().padLeft(2, '0')}항차',
+                          )
+                              .map((e) =>
+                              DropdownMenuItem(value: e, child: Text(e)))
+                              .toList(),
+                          onChanged: (v) =>
+                              setDialogState(() => voyage = v ?? voyage),
+                        ),
+                        TextField(
+                            controller: from,
+                            decoration:
+                            const InputDecoration(labelText: '출발지')),
+                        TextField(
+                            controller: to,
+                            decoration:
+                            const InputDecoration(labelText: '도착지')),
+                        TextField(
+                            controller: close,
+                            decoration:
+                            const InputDecoration(labelText: '접수 마감일')),
+                        TextField(
+                            controller: eta,
+                            decoration:
+                            const InputDecoration(labelText: '도착 예정일')),
+                        TextField(
+                          controller: detail,
+                          maxLines: 3,
+                          decoration:
+                          const InputDecoration(labelText: '상세 내용 또는 추가 내용'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('취소'),
+                    ),
+                    FilledButton(
+                      onPressed: () async {
+                        final item = <String, dynamic>{
+                          'route': route,
+                          'year': year,
+                          'voyage': voyage,
+                          'origin': from.text.trim(),
+                          'destination': to.text.trim(),
+                          'booking_close_date':
+                          close.text
+                              .trim()
+                              .isEmpty ? null : close.text.trim(),
+                          'estimated_arrival_date':
+                          eta.text
+                              .trim()
+                              .isEmpty ? null : eta.text.trim(),
+                          'detail': detail.text.trim(),
+                          'status': 'scheduled',
+                        };
 
-                try {
-                  if (existing == null) {
-                    await ContentService.createSchedule(item);
-                  } else {
-                    await ContentService.updateSchedule(
-                      _text(existing, 'id'),
-                      item,
-                    );
-                  }
-                  if (dialogContext.mounted) {
-                    Navigator.pop(dialogContext);
-                  }
-                  await _load();
-                } catch (e) {
-                  _message('저장 실패: $e');
-                }
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        ),
-      ),
+                        try {
+                          if (existing == null) {
+                            await ContentService.createSchedule(item);
+                          } else {
+                            await ContentService.updateSchedule(
+                              _text(existing, 'id'),
+                              item,
+                            );
+                          }
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          await _load();
+                        } catch (e) {
+                          _message('저장 실패: $e');
+                        }
+                      },
+                      child: const Text('저장'),
+                    ),
+                  ],
+                ),
+          ),
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -266,7 +274,8 @@ class _ScheduleManagementScreenState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      Scaffold(
         appBar: AppBar(
           title: const Text('선적 일정 관리'),
           backgroundColor: AppColors.primary,
@@ -281,76 +290,82 @@ class _ScheduleManagementScreenState
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_items.isEmpty)
-                      const Card(
-                        child:
-                            ListTile(title: Text('등록된 선적 일정이 없습니다.')),
-                      ),
-                    ..._items.map((row) {
-                      final pending =
-                          _text(row, 'deletion_status') == 'pending';
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Column(
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (_items.isEmpty)
+                const Card(
+                  child:
+                  ListTile(title: Text('등록된 선적 일정이 없습니다.')),
+                ),
+              ..._items.map((row) {
+                final pending =
+                    _text(row, 'deletion_status') == 'pending';
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          title: Text(
+                              '${_text(row, 'route')} · ${_text(
+                                  row, 'year')} ${_text(row, 'voyage')}'),
+                          subtitle: Text(
+                              '${_text(row, 'origin')} → ${_text(
+                                  row, 'destination')}\n마감: ${_text(
+                                  row, 'booking_close_date')} · 도착예정: ${_text(
+                                  row, 'estimated_arrival_date')}\n${_text(
+                                  row, 'detail')}'),
+                          isThreeLine: true,
+                          trailing: pending
+                              ? const Chip(
+                              label: Text('삭제 대기중'))
+                              : Wrap(
                             children: [
-                              ListTile(
-                                title: Text(
-                                    '${_text(row, 'route')} · ${_text(row, 'year')} ${_text(row, 'voyage')}'),
-                                subtitle: Text(
-                                    '${_text(row, 'origin')} → ${_text(row, 'destination')}\n마감: ${_text(row, 'booking_close_date')} · 도착예정: ${_text(row, 'estimated_arrival_date')}\n${_text(row, 'detail')}'),
-                                isThreeLine: true,
-                                trailing: pending
-                                    ? const Chip(
-                                        label: Text('삭제 대기중'))
-                                    : Wrap(
-                                        children: [
-                                          IconButton(
-                                            onPressed: () =>
-                                                _showEditor(existing: row),
-                                            icon: const Icon(
-                                                Icons.edit_outlined),
-                                          ),
-                                          IconButton(
-                                            onPressed: () =>
-                                                _requestDelete(row),
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                              color: AppColors.error,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                              IconButton(
+                                onPressed: () =>
+                                    _showEditor(existing: row),
+                                icon: const Icon(
+                                    Icons.edit_outlined),
                               ),
-                              if (pending)
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => _restore(row),
-                                        child: const Text('삭제 취소'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: () =>
-                                            _hardDelete(row),
-                                        child: const Text('바로 삭제'),
-                                      ),
-                                    ),
-                                  ],
+                              IconButton(
+                                onPressed: () =>
+                                    _requestDelete(row),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: AppColors.error,
                                 ),
+                              ),
                             ],
                           ),
                         ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
+                        if (pending)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _restore(row),
+                                  child: const Text('삭제 취소'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () =>
+                                      _hardDelete(row),
+                                  child: const Text('바로 삭제'),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
       );
+}

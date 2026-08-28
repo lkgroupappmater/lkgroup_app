@@ -1,7 +1,27 @@
--- 006_signup_approval_content_retention.sql
+-- 006_signup_approval_content_retention_FIXED.sql
 -- 기존 스키마/004/005 적용 후 실행.
--- 가입 권한 요청 + 회원 승인/거절 + 공지/일정 30일 보관/복구/즉시삭제 지원.
--- 재실행 가능하게 작성.
+-- is_content_manager()가 없는 기존 DB에서도 단독 실행 가능.
+-- 재실행 가능.
+
+-- 0) 관리자/직원 콘텐츠 관리 판별 함수 보장
+create or replace function public.is_content_manager()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role in ('staff', 'admin')
+  )
+  or coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') in ('staff', 'admin')
+  or coalesce(auth.jwt() -> 'user_metadata' ->> 'role', '') in ('staff', 'admin');
+$$;
+
+grant execute on function public.is_content_manager() to anon, authenticated;
 
 -- 1) 가입 신청 권한 보관
 alter table public.profiles
@@ -14,15 +34,12 @@ alter table public.profiles
   add constraint profiles_requested_role_check
   check (requested_role in ('member','staff','partner','admin'));
 
--- 기존 계정은 현재 role을 requested_role로 정렬
 update public.profiles
 set requested_role = role
 where requested_role is null
    or requested_role = '';
 
 -- 2) 신규 가입 trigger
--- 일반회원: 즉시 approved/member
--- 관리자/파트너: 실제 role은 member, requested_role에 희망 권한 저장, pending
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -86,11 +103,10 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure public.handle_new_user();
 
--- 3) 관리자 회원 관리에 필요한 권한
--- RLS가 최종 권한을 통제하며 admin policy가 이미 존재해야 합니다.
+-- 3) 관리자 회원 관리 권한
 grant select, update on table public.profiles to authenticated;
 
--- 4) 일정/공지 보관 컬럼 보강
+-- 4) 일정/공지 보관 컬럼
 alter table public.shipping_schedules
   add column if not exists deletion_status text not null default 'active';
 alter table public.shipping_schedules
@@ -105,8 +121,7 @@ alter table public.notices
 alter table public.notices
   add column if not exists purge_after timestamptz;
 
--- 5) 만료된 삭제 대기 자료 완전 삭제.
--- 앱에서 목록을 불러올 때 이 함수를 호출하므로 30일이 지나면 자동 정리됩니다.
+-- 5) 30일 지난 삭제대기 자료 완전삭제
 create or replace function public.purge_expired_content()
 returns void
 language plpgsql
@@ -128,7 +143,7 @@ $$;
 
 grant execute on function public.purge_expired_content() to anon, authenticated;
 
--- 6) 홈 공개 조회는 active + 미삭제만.
+-- 6) 홈 공개 조회: active만
 drop policy if exists "public can read active schedules"
   on public.shipping_schedules;
 drop policy if exists cargoflow_public_active_schedules
@@ -155,7 +170,7 @@ using (
   and deletion_status = 'active'
 );
 
--- 관리자/직원이 삭제 대기 자료까지 볼 수 있도록 기존 manager read policy 유지/복구.
+-- 관리자/직원은 삭제 대기 자료까지 조회
 drop policy if exists "managers can read all schedules"
   on public.shipping_schedules;
 create policy "managers can read all schedules"
@@ -170,7 +185,7 @@ on public.notices
 for select
 using (public.is_content_manager());
 
--- 관리자가 즉시 delete할 수 있도록 기존 delete policy도 보장.
+-- 관리자는 즉시 삭제 가능
 drop policy if exists "managers can delete schedules"
   on public.shipping_schedules;
 create policy "managers can delete schedules"
