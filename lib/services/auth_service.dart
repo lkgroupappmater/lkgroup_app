@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import 'supabase_service.dart';
