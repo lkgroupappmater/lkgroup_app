@@ -142,6 +142,22 @@ class _AccountBodyState extends State<AccountBody> {
     }
   }
 
+  Future<void> _openAccountDeletion() async {
+    final user = _displayUser;
+    if (user == null) return;
+
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _AccountDeletionDialog(email: user.email),
+    );
+    if (deleted == true && mounted) {
+      setState(() => _displayUser = null);
+      widget.onLoggedOut?.call();
+      _message('회원 탈퇴가 처리되었습니다. 계정 데이터는 약 30일 후 완전히 삭제됩니다.');
+    }
+  }
+
   Future<void> _pickAvatar(ImageSource source) async {
     try {
       final picker = ImagePicker();
@@ -179,6 +195,11 @@ class _AccountBodyState extends State<AccountBody> {
             OutlinedButton(
               onPressed: widget.onLoggedOut,
               child: const Text('로그아웃'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _openAccountDeletion,
+              child: const Text('회원 탈퇴'),
             ),
           ] else ...[
             TextField(
@@ -951,6 +972,159 @@ class _PasswordDialogState extends State<_PasswordDialog> {
           FilledButton(
             onPressed: _busy ? null : _changePassword,
             child: const Text('변경'),
+          ),
+        ],
+      );
+}
+
+
+class _AccountDeletionDialog extends StatefulWidget {
+  const _AccountDeletionDialog({required this.email});
+
+  final String email;
+
+  @override
+  State<_AccountDeletionDialog> createState() => _AccountDeletionDialogState();
+}
+
+class _AccountDeletionDialogState extends State<_AccountDeletionDialog> {
+  final _key = GlobalKey<FormState>();
+  final _currentPassword = TextEditingController();
+  final _emailCode = TextEditingController();
+  bool _codeSent = false;
+  bool _busy = false;
+  String? _serverError;
+
+  @override
+  void dispose() {
+    _currentPassword.dispose();
+    _emailCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    setState(() {
+      _busy = true;
+      _serverError = null;
+    });
+    try {
+      await AuthService.instance.sendAccountDeletionVerificationCode();
+      if (!mounted) return;
+      setState(() => _codeSent = true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _serverError = '이메일 인증 코드 전송 실패: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    if (!_key.currentState!.validate()) return;
+    if (!_codeSent || _emailCode.text.trim().isEmpty) {
+      setState(() => _serverError = '이메일 인증 코드를 먼저 받아 입력해 주세요.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _serverError = null;
+    });
+    try {
+      await AuthService.instance.deleteMyAccount(
+        currentPassword: _currentPassword.text,
+        verificationCode: _emailCode.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _serverError = '회원 탈퇴 실패: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('회원 탈퇴'),
+        content: Form(
+          key: _key,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '탈퇴 즉시 로그인할 수 없으며, 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.',
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _currentPassword,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '본인 암호',
+                    hintText: '현재 사용 중인 암호 입력',
+                  ),
+                  validator: (v) => FormValidators.requiredText(v, '본인 암호'),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '인증 이메일: ${widget.email}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _sendCode,
+                    icon: const Icon(Icons.email_outlined),
+                    label: Text(
+                      _codeSent ? '이메일 인증 코드 다시 보내기' : '이메일 인증 코드 보내기',
+                    ),
+                  ),
+                ),
+                if (_codeSent)
+                  TextFormField(
+                    controller: _emailCode,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      labelText: '이메일 인증 코드',
+                      hintText: '메일로 받은 인증 코드 입력',
+                    ),
+                    validator: (v) => (v ?? '').trim().isEmpty
+                        ? '이메일 인증 코드를 입력해 주세요.'
+                        : null,
+                  ),
+                if (_busy) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
+                if (_serverError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _serverError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: _busy ? null : _delete,
+            child: const Text('탈퇴 확인'),
           ),
         ],
       );

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
+import '../services/auth_service.dart';
 import '../utils/form_validators.dart';
 
 class MemberManagementScreen extends StatefulWidget {
@@ -51,9 +52,13 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _pendingRequests => _members.where((m) {
+        final myId = Supabase.instance.client.auth.currentUser?.id;
+        if ('${m['id']}' == myId) return false;
         final status = '${m['approval_status'] ?? ''}';
         final requested = '${m['requested_role'] ?? 'member'}';
-        return status == 'pending' &&
+        final currentRole = '${m['role'] ?? 'member'}';
+        return status != 'rejected' &&
+            requested != currentRole &&
             (requested == 'admin' || requested == 'partner');
       }).toList();
 
@@ -74,13 +79,17 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
 
   List<Map<String, dynamic>> get _filteredMembers {
     final query = _search.text.trim().toLowerCase();
-    final approved = _members
-        .where((m) => '${m['approval_status'] ?? 'approved'}' == 'approved')
-        .toList();
-    if (query.isEmpty) return approved;
-    return approved.where((m) =>
-      '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
-          .toLowerCase().contains(query)).toList();
+    if (query.isEmpty) return const [];
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    return _members.where((m) {
+      if ('${m['id']}' == myId) return false;
+      if ('${m['approval_status'] ?? 'approved'}' == 'rejected') return false;
+      // 관리자/파트너는 위 고정 목록에 항상 표시하므로 검색 영역에서는 일반회원만 표시합니다.
+      if ('${m['role'] ?? 'member'}' != 'member') return false;
+      return '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
+          .toLowerCase()
+          .contains(query);
+    }).toList();
   }
 
   Future<void> _approve(Map<String, dynamic> member) async {
@@ -89,12 +98,43 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
       _message('승인 가능한 요청 권한이 아닙니다.', error: true);
       return;
     }
+
+    var approvedRole = requested;
+    if (requested == 'admin') {
+      final selected = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('관리자 종류 선택'),
+          content: Text(
+            '${member['name'] ?? member['email']}님의 관리자 권한을 선택해 주세요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(context, 'staff'),
+              child: const Text('관리자(직원)'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'admin'),
+              child: const Text('관리자(총괄)'),
+            ),
+          ],
+        ),
+      );
+      if (selected == null) return;
+      approvedRole = selected;
+    }
+
     try {
       await Supabase.instance.client.from('profiles').update({
-        'role': requested,
+        'role': approvedRole,
+        'requested_role': approvedRole,
         'approval_status': 'approved',
       }).eq('id', member['id']);
-      _message('${_roleLabel(requested)} 권한으로 승인했습니다.');
+      _message('${_roleLabel(approvedRole)} 권한으로 승인했습니다.');
       await _loadMembers();
     } catch (e) {
       _message('승인 실패: $e', error: true);
@@ -109,7 +149,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
         content: Text(
           '${member['name'] ?? member['email']}님의 '
           '${_roleLabel(member['requested_role'])} 요청을 거절할까요?\n'
-          '거절하면 계정은 일반회원으로 승인됩니다.',
+          '거절해도 계정은 일반회원으로 계속 사용할 수 있습니다.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
@@ -124,7 +164,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
         'requested_role': 'member',
         'approval_status': 'approved',
       }).eq('id', member['id']);
-      _message('요청을 거절하고 일반회원으로 승인했습니다.');
+      _message('권한 요청을 거절했습니다. 계정은 일반회원으로 유지됩니다.');
       await _loadMembers();
     } catch (e) {
       _message('거절 처리 실패: $e', error: true);
@@ -247,6 +287,39 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     await _saveMember(result, id: '${member['id']}');
   }
 
+  Future<void> _deleteMember(Map<String, dynamic> member) async {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    if ('${member['id']}' == myId) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('회원 삭제'),
+        content: Text(
+          '${member['name'] ?? member['email']} 회원을 삭제할까요?\n\n'
+          '삭제 즉시 로그인할 수 없으며, 관련 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제 확인'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AuthService.instance.adminDeleteMember('${member['id']}');
+      _message('회원이 삭제 대기 처리되었습니다.');
+      await _loadMembers();
+    } catch (e) {
+      _message('회원 삭제 실패: $e', error: true);
+    }
+  }
+
   void _message(String text, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -264,9 +337,29 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
             '${member['email'] ?? ''}\n${member['phone'] ?? ''} ${member['company'] ?? ''}',
           ),
           isThreeLine: true,
-          trailing: IconButton(
-            onPressed: () => _openEditor(member),
-            icon: const Icon(Icons.edit_outlined),
+          trailing: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 36,
+                height: 28,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _openEditor(member),
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                ),
+              ),
+              SizedBox(
+                width: 36,
+                height: 28,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: '회원 삭제',
+                  onPressed: () => _deleteMember(member),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -343,7 +436,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                   const Divider(),
                   const SizedBox(height: 8),
                   const Text(
-                    '전체 회원',
+                    '일반 회원 검색',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
@@ -356,8 +449,8 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (list.isEmpty)
-                    const Card(child: ListTile(title: Text('회원이 없습니다.'))),
+                  if (_search.text.trim().isNotEmpty && list.isEmpty)
+                    const Card(child: ListTile(title: Text('검색된 회원이 없습니다.'))),
                   ...list.map(_memberCard),
                 ],
               ),

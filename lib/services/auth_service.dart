@@ -102,18 +102,13 @@ class AuthService {
         'phone': phone.trim(),
         'company': company.trim(),
         'requested_role': role.name,
-        'role': role.name,
+        'role': 'member',
         'verification_method': verificationMethod,
       },
     );
 
     final user = response.user;
     if (user == null) throw const AuthException('회원가입에 실패했습니다.');
-
-    final pending = role != UserRole.member;
-    if (pending && response.session != null) {
-      await SupabaseService.client.auth.signOut();
-    }
 
     return AuthResult(
       user: AppUser(
@@ -275,6 +270,60 @@ class AuthService {
     return (await refreshCurrentUser())!;
   }
 
+  /// 회원 탈퇴용 이메일 재인증 코드를 보냅니다.
+  Future<void> sendAccountDeletionVerificationCode() async {
+    await sendPasswordChangeVerificationCode();
+  }
+
+  /// 현재 암호와 이메일 재인증 코드를 검증한 뒤 계정을 탈퇴 대기 상태로 전환합니다.
+  Future<void> deleteMyAccount({
+    required String currentPassword,
+    required String verificationCode,
+  }) async {
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+    if (currentPassword.isEmpty) {
+      throw const AuthException('본인 암호를 입력해 주세요.');
+    }
+    if (verificationCode.trim().isEmpty) {
+      throw const AuthException('이메일 인증 코드를 입력해 주세요.');
+    }
+
+    // 민감 작업 재인증: 현재 암호 + Reauthentication OTP를 Supabase Auth에서 검증합니다.
+    await SupabaseService.client.auth.updateUser(
+      UserAttributes(
+        data: {
+          'account_deletion_verified_at':
+              DateTime.now().toUtc().toIso8601String(),
+        },
+        currentPassword: currentPassword,
+        nonce: verificationCode.trim(),
+      ),
+    );
+
+    final response = await SupabaseService.client.functions.invoke(
+      'member-account-delete',
+      body: {'action': 'self_delete'},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw AuthException('회원 탈퇴 처리 실패: ${response.data}');
+    }
+
+    await SupabaseService.client.auth.signOut();
+    _currentUser = null;
+  }
+
+  /// 총괄 관리자가 다른 회원을 탈퇴 대기 상태로 전환합니다.
+  Future<void> adminDeleteMember(String userId) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'member-account-delete',
+      body: {'action': 'admin_delete', 'user_id': userId},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw AuthException('회원 삭제 실패: ${response.data}');
+    }
+  }
+
   Future<void> signOut() async {
     if (SupabaseConfig.isConfigured) {
       await SupabaseService.client.auth.signOut();
@@ -299,15 +348,6 @@ class AuthService {
 
     if (row == null) {
       throw const AuthException('회원 프로필을 찾을 수 없습니다.');
-    }
-
-    final approval = row['approval_status']?.toString() ?? 'approved';
-    if (approval != 'approved') {
-      throw AuthException(
-        approval == 'pending'
-            ? '총괄 관리자 승인 대기 중인 계정입니다.'
-            : '승인되지 않은 계정입니다.',
-      );
     }
 
     return AppUser.fromMap({
