@@ -2,27 +2,11 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
+import '../core/route_catalog.dart';
 import '../models/app_user.dart';
+import '../services/freight_service.dart';
 import '../services/shipment_service.dart';
 
-// ---------------------------------------------------------------------------
-// Route categories
-// ---------------------------------------------------------------------------
-const List<String> _routeCategories = [
-  '전체',
-  '한국->라오스 해상',
-  '한국->라오스 항공',
-  '라오스->한국 항공 특송',
-  '라오스->태국 육로',
-  '라오스->베트남 육로',
-  '라오스->중국 육로',
-  '라오스->캄보디아 육로',
-];
-
-
-// ---------------------------------------------------------------------------
-// Body-only widget
-// ---------------------------------------------------------------------------
 class ShipmentSearchBody extends StatefulWidget {
   const ShipmentSearchBody({
     super.key,
@@ -54,7 +38,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   List<Map<String, dynamic>> _results = [];
   bool _searched = false;
-  final Set<String> _selectedInvoices = <String>{};
+  final Set<String> _selectedIds = <String>{};
 
   @override
   void initState() {
@@ -73,8 +57,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   void _prefillMemberFields() {
     final user = widget.currentUser;
     if (user == null || user.role != UserRole.member) return;
-    if (_recipientCtrl.text.isEmpty) _recipientCtrl.text = user.name;
-    if (_phoneCtrl.text.isEmpty) _phoneCtrl.text = user.phone;
+    _recipientCtrl.text = user.name;
+    _phoneCtrl.text = user.phone;
   }
 
   @override
@@ -87,45 +71,102 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   Future<void> _search() async {
-    final invoice = _invoiceCtrl.text.trim();
-    final boxNumber = _boxNumberCtrl.text.trim();
-    final recipient = _recipientCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
-    final route = _routeCategories[_selectedRoute];
     try {
       final dbRows = await ShipmentService.instance.searchRows(
-        route: route,
-        boxNumber: boxNumber,
-        invoice: invoice,
-        recipient: recipient,
-        phone: phone,
+        route: routeLabels[_selectedRoute],
+        boxNumber: _boxNumberCtrl.text.trim(),
+        invoice: _invoiceCtrl.text.trim(),
+        recipient: _recipientCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        currentUser: widget.currentUser,
       );
-      final results = dbRows.map((row) => <String, dynamic>{
-              'boxNo': row['box_number'] ?? '',
-              'invoice': row['invoice_number'] ?? row['shipment_no'] ?? '',
-              'name': row['consignee_name'] ?? '',
-              'phone': row['consignee_phone'] ?? '',
-              'arrival': row['received_at'] ?? '',
-              'route': row['route'] ?? '',
-              'weight': row['weight_kg'] ?? '',
-              'size': '${row['width_cm'] ?? ''} × ${row['length_cm'] ?? ''} × ${row['height_cm'] ?? ''}',
-              'receiptNo': row['receipt_number'] ?? '',
-            }).toList();
-      setState(() { _results = results; _searched = true; _selectedInvoices.clear(); });
-    } catch (error) {
+      if (!mounted) return;
       setState(() {
-        _results = <Map<String, dynamic>>[];
+        _results = dbRows;
         _searched = true;
-        _selectedInvoices.clear();
+        _selectedIds.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('화물 조회 실패: $error')));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _results = const [];
+        _searched = true;
+        _selectedIds.clear();
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('화물 조회 실패: $error')));
     }
   }
 
-  void _toggleSelected(String invoice) {
+  void _toggle(String id) {
     setState(() {
-      if (!_selectedInvoices.remove(invoice)) _selectedInvoices.add(invoice);
+      if (!_selectedIds.remove(id)) _selectedIds.add(id);
     });
+  }
+
+  void _toggleAll() {
+    setState(() {
+      final ids = _results.map((r) => '${r['id']}').toSet();
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _showFreight() async {
+    final selected =
+        _results.where((r) => _selectedIds.contains('${r['id']}')).toList();
+    if (selected.isEmpty) return;
+
+    try {
+      final result = await FreightService.instance.calculate(selected);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const Text('운임 확인',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                ...result.lines.map((line) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(line.boxNumber),
+                      subtitle: Text(
+                          '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg'),
+                      trailing:
+                          Text('\$${line.amountUsd.toStringAsFixed(2)}'),
+                    )),
+                const Divider(),
+                Text('USD  \$${result.totalUsd.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('KIP  ${result.totalKip.toStringAsFixed(0)}'),
+                Text('THB  ${result.totalThb.toStringAsFixed(1)}'),
+                Text('KRW  ${result.totalKrw.toStringAsFixed(0)}'),
+                const SizedBox(height: 8),
+                Text(
+                  '적용환율: KIP ${result.rates.appliedKip} / THB ${result.rates.appliedThb} / KRW ${result.rates.appliedKrw}',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('운임 계산 실패: $error')));
+    }
   }
 
   @override
@@ -133,12 +174,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     if (!widget.isLoggedIn) {
       return _LoginRequiredView(onLogin: widget.onRequireLogin);
     }
+
+    final canSeeAll = widget.currentUser?.role.canSeeAllShipments == true;
+    final allSelected = _results.isNotEmpty &&
+        _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         children: [
-          // Route category dropdown (견적 화면의 운송 경로 선택 방식과 동일한 풀다운 메뉴)
           DropdownButtonFormField<int>(
             value: _selectedRoute,
             isExpanded: true,
@@ -152,179 +197,163 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 borderSide: BorderSide.none,
                 borderRadius: BorderRadius.circular(10),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderSide:
-                    const BorderSide(color: AppColors.accent, width: 1.5),
-                borderRadius: BorderRadius.circular(10),
-              ),
             ),
             items: List.generate(
-              _routeCategories.length,
-              (index) => DropdownMenuItem<int>(
-                value: index,
-                child: Text(_routeCategories[index]),
-              ),
+              routeLabels.length,
+              (index) =>
+                  DropdownMenuItem(value: index, child: Text(routeLabels[index])),
             ),
             onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedRoute = value);
-              }
+              if (value != null) setState(() => _selectedRoute = value);
             },
           ),
           const SizedBox(height: 14),
-
-          // Search inputs
-          if (widget.currentUser?.role.canSeeAllShipments == true) ...[
-            _buildInput(_boxNumberCtrl, '박스 번호', Icons.inventory_2_outlined),
+          if (canSeeAll) ...[
+            _input(_boxNumberCtrl, '박스 번호', Icons.inventory_2_outlined),
             const SizedBox(height: 10),
           ],
-          _buildInput(_invoiceCtrl, '송장번호', Icons.tag_rounded),
+          _input(_invoiceCtrl, '송장번호', Icons.tag_rounded),
           const SizedBox(height: 10),
-          _buildInput(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline),
+          _input(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline,
+              readOnly: !canSeeAll),
           const SizedBox(height: 10),
-          _buildInput(_phoneCtrl, '라오스 수령인 연락처', Icons.phone_outlined,
-              keyboardType: TextInputType.phone),
+          _input(_phoneCtrl, '라오스 수령인 연락처', Icons.phone_outlined,
+              readOnly: !canSeeAll, type: TextInputType.phone),
           const SizedBox(height: 16),
-
-          // Search button
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _search,
-              icon: const Icon(Icons.search_rounded, size: 20),
-              label: const Text('화물 검색',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.navyPrimary,
-                foregroundColor: AppColors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _search,
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('화물 검색'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.navyPrimary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _selectedIds.isEmpty ? null : _showFreight,
+                    icon: const Icon(Icons.price_check_outlined),
+                    label: const Text('운임 확인'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           if (_searched && _results.isNotEmpty) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _selectedInvoices.isEmpty || widget.onManageSelected == null
-                        ? null
-                        : () => widget.onManageSelected!(_selectedInvoices.toList()),
-                    icon: const Icon(Icons.inventory_2_outlined),
-                    label: const Text('화물 관리'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _selectedInvoices.isEmpty
-                        ? null
-                        : () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('운임 확인 화면 연결 위치입니다.'))),
-                    icon: const Icon(Icons.price_check_outlined),
-                    label: const Text('운임 확인'),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.white),
-                  ),
+                Checkbox(
+                    value: allSelected,
+                    onChanged: (_) => _toggleAll(),
+                    activeColor: AppColors.primary),
+                const Text('전체 선택'),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed:
+                      _selectedIds.isEmpty || widget.onManageSelected == null
+                          ? null
+                          : () =>
+                              widget.onManageSelected!(_selectedIds.toList()),
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('화물 관리'),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 20),
-
-          // Results
-          if (_searched)
-            _ResultsList(
-                results: _results,
-                selectedInvoices: _selectedInvoices,
-                onToggle: _toggleSelected,
-                onToggleAll: () {
-                  setState(() {
-                    if (_selectedInvoices.length == _results.length) {
-                      _selectedInvoices.clear();
-                    } else {
-                      _selectedInvoices.addAll(_results.map((r) => '${r['invoice']}'));
-                    }
-                  });
-                },
-                onEditRequest: widget.onEditRequest),
+          const SizedBox(height: 18),
+          if (_searched && _results.isEmpty)
+            const Center(child: Text('검색 결과가 없습니다.')),
+          ..._results.map((r) {
+            final id = '${r['id']}';
+            final size =
+                '${r['length_cm'] ?? ''} × ${r['width_cm'] ?? ''} × ${r['height_cm'] ?? ''} cm';
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Checkbox(
+                        value: _selectedIds.contains(id),
+                        onChanged: (_) => _toggle(id)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${r['box_number'] ?? ''}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.navyPrimary)),
+                          const SizedBox(height: 6),
+                          _row('송장번호', '${r['invoice_number'] ?? ''}'),
+                          _row('이름/수령인', '${r['consignee_name'] ?? ''}'),
+                          _row('연락처', '${r['consignee_phone'] ?? ''}'),
+                          _row('입고 날짜', '${r['received_at'] ?? ''}'),
+                          _row('무게', '${r['weight_kg'] ?? ''} kg'),
+                          _row('크기', size),
+                          _row('영수증 번호', '${r['receipt_number'] ?? ''}'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildInput(
-    TextEditingController ctrl,
-    String hint,
-    IconData icon, {
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
-        prefixIcon: Icon(icon, size: 20, color: AppColors.textSecondary),
-        filled: true,
-        fillColor: AppColors.inputFill,
-        border: OutlineInputBorder(
-          borderSide: BorderSide.none,
-          borderRadius: BorderRadius.circular(10),
+  Widget _input(TextEditingController controller, String hint, IconData icon,
+          {bool readOnly = false, TextInputType type = TextInputType.text}) =>
+      TextField(
+        controller: controller,
+        readOnly: readOnly,
+        keyboardType: type,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon),
+          filled: true,
+          fillColor: AppColors.inputFill,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-          borderRadius: BorderRadius.circular(10),
+      );
+
+  Widget _row(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            SizedBox(
+                width: 88,
+                child: Text(label,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary))),
+            Expanded(
+                child: Text(value,
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600))),
+          ],
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Route chips
-// ---------------------------------------------------------------------------
-class _RouteChips extends StatelessWidget {
-  const _RouteChips({required this.selected, required this.onSelected});
-  final int selected;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(_routeCategories.length, (i) {
-          final active = selected == i;
-          return Padding(
-            padding: EdgeInsets.only(right: 8, left: i == 0 ? 0 : 0),
-            child: ChoiceChip(
-              label: Text(_routeCategories[i]),
-              selected: active,
-              onSelected: (_) => onSelected(i),
-              selectedColor: AppColors.navyPrimary,
-              backgroundColor: AppColors.inputFill,
-              labelStyle: TextStyle(
-                color: active ? AppColors.white : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              ),
-              side: BorderSide(
-                color: active ? AppColors.navyPrimary : AppColors.cardBorder,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          );
-        }),
-      ),
-    );
-  }
+      );
 }
 
 class _LoginRequiredView extends StatelessWidget {
@@ -332,224 +361,47 @@ class _LoginRequiredView extends StatelessWidget {
   final VoidCallback? onLogin;
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lock_outline,
-                size: 58, color: AppColors.navyPrimary),
-            const SizedBox(height: 14),
-            const Text('로그인 후 화물 조회가 가능합니다.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.navyPrimary)),
-            const SizedBox(height: 8),
-            const Text('다른 회원의 화물 정보 보호를 위해 로그인 후 검색해 주세요.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.45)),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: onLogin,
-              icon: const Icon(Icons.login),
-              label: const Text('로그인 하기'),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.navyPrimary,
-                  foregroundColor: AppColors.white),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Results list
-// ---------------------------------------------------------------------------
-class _ResultsList extends StatelessWidget {
-  const _ResultsList({required this.results, required this.selectedInvoices, required this.onToggle, required this.onToggleAll, this.onEditRequest});
-  final List<Map<String, dynamic>> results;
-  final Set<String> selectedInvoices;
-  final ValueChanged<String> onToggle;
-  final VoidCallback onToggleAll;
-  final VoidCallback? onEditRequest;
-
-  @override
-  Widget build(BuildContext context) {
-    if (results.isEmpty) {
-      return Center(
-        child: Column(
-          children: [
-            const Icon(Icons.inbox_outlined,
-                size: 48, color: AppColors.textHint),
-            const SizedBox(height: 8),
-            const Text('검색 결과가 없습니다.',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            const Text('송장번호, 수령인, 전화번호를 확인해 주세요.',
-                style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text('검색 결과 ${results.length}건',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('전체 선택', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                Checkbox(
-                  value: results.isNotEmpty && selectedInvoices.length == results.length,
-                  onChanged: (_) => onToggleAll(),
-                  activeColor: AppColors.primary,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...results.map((r) => _ResultCard(
-              data: r,
-              selected: selectedInvoices.contains(r['invoice']),
-              onToggle: () => onToggle(r['invoice'] as String),
-              onEditRequest: onEditRequest,
-            )),
-      ],
-    );
-  }
-}
-
-class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.data, required this.selected, required this.onToggle, this.onEditRequest});
-  final Map<String, dynamic> data;
-  final bool selected;
-  final VoidCallback onToggle;
-  final VoidCallback? onEditRequest;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Checkbox(value: selected, onChanged: (_) => onToggle(), activeColor: AppColors.primary),
-              const Icon(Icons.inventory_2_outlined,
-                  size: 16, color: AppColors.accent),
-              const SizedBox(width: 6),
-              Text(data['boxNo'] as String,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+              const Icon(Icons.lock_outline,
+                  size: 58, color: AppColors.navyPrimary),
+              const SizedBox(height: 14),
+              const Text('로그인 후 화물 조회가 가능합니다.',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.navyPrimary)),
-              const Spacer(),
-              Text(data['route'] as String,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary)),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                  onPressed: onLogin,
+                  icon: const Icon(Icons.login),
+                  label: const Text('로그인 하기')),
             ],
           ),
-          const Divider(height: 14, color: AppColors.divider),
-          _Row('송장번호', data['invoice'] as String),
-          _Row('이름/수령인', data['name'] as String),
-          _Row('연락처', data['phone'] as String),
-          _Row('입고 날짜', data['arrival'] as String),
-          _Row('무게', '${data['weight'] ?? ''} kg'),
-          _Row('크기', data['size'] as String? ?? ''),
-          _Row('영수증 번호', data['receiptNo'] as String? ?? ''),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }
 
-class _Row extends StatelessWidget {
-  const _Row(this.label, this.value);
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Legacy wrapper
-// ---------------------------------------------------------------------------
 class ShipmentSearchScreen extends StatelessWidget {
-  const ShipmentSearchScreen({super.key, this.language = AppLanguage.korean});
+  const ShipmentSearchScreen({
+    super.key,
+    this.language = AppLanguage.korean,
+    this.currentUser,
+  });
   final AppLanguage language;
+  final AppUser? currentUser;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.navyPrimary,
-        foregroundColor: AppColors.white,
-        title: Text(AppStrings.get(language, 'tracking'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        elevation: 0,
-      ),
-      body: ShipmentSearchBody(language: language),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.background,
+        body: ShipmentSearchBody(
+          language: language,
+          isLoggedIn: currentUser != null,
+          currentUser: currentUser,
+        ),
+      );
 }
-
-
-
-
-
-
-

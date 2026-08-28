@@ -1,6 +1,6 @@
 // lib/core/route_catalog.dart
-/// 앱 전체에서 공통으로 사용하는 운송 경로 목록입니다.
-/// TODO: 운영 DB의 routes 테이블에서 관리자가 추가·수정한 목록을 불러오세요.
+/// 앱 전체 공통 운송 경로.
+/// 기존 경로를 삭제하지 않고, 공유받은 Excel 파일 코드와 1:1 매칭 정보를 추가했습니다.
 const List<String> routeLabels = RouteCatalog.all;
 
 class RouteCatalog {
@@ -12,45 +12,76 @@ class RouteCatalog {
     '한국->라오스 항공',
     '라오스->한국 항공 특송',
     '라오스->태국 육로',
-    '라오스->베트남 육로',
-    '라오스->중국 육로',
-    '라오스->캄보디아 육로',
     '태국->라오스 육로',
+    '라오스->베트남 육로',
     '베트남->라오스 육로',
+    '라오스->중국 육로',
     '중국->라오스 육로',
+    '라오스->캄보디아 육로',
     '캄보디아->라오스 육로',
   ];
 
   static List<String> get routes => all.skip(1).toList(growable: false);
 
-  static String keyFor(String label) => <String, String>{
-        '전체': 'all',
-        '한국->라오스 해상': 'kr_la_sea',
-        '한국->라오스 항공': 'kr_la_air',
-        '라오스->한국 항공 특송': 'la_kr_express',
-        '라오스->태국 육로': 'la_th_road',
-        '라오스->베트남 육로': 'la_vn_road',
-        '라오스->중국 육로': 'la_cn_road',
-        '라오스->캄보디아 육로': 'la_kh_road',
-        '태국->라오스 육로': 'th_la_road',
-        '베트남->라오스 육로': 'vn_la_road',
-        '중국->라오스 육로': 'cn_la_road',
-        '캄보디아->라오스 육로': 'kh_la_road',
-      }[label] ?? label;
+  static const Map<String, String> _keys = {
+    '전체': 'all',
+    '한국->라오스 해상': 'kr_la_sea',
+    '한국->라오스 항공': 'kr_la_air',
+    '라오스->한국 항공 특송': 'la_kr_air_exp',
+    '라오스->태국 육로': 'la_th_land',
+    '태국->라오스 육로': 'th_la_land',
+    '라오스->베트남 육로': 'la_vn_land',
+    '베트남->라오스 육로': 'vn_la_land',
+    '라오스->중국 육로': 'la_ch_land',
+    '중국->라오스 육로': 'ch_la_land',
+    '라오스->캄보디아 육로': 'la_kh_land',
+    '캄보디아->라오스 육로': 'kh_la_land',
+  };
+
+  static const Map<String, String> _filePrefixes = {
+    'kr_la_sea': 'KR_LA_SEA',
+    'kr_la_air': 'KR_LA_AIR',
+    'la_kr_air_exp': 'LA_KR_AIR_EXP',
+    'la_th_land': 'LA_TH_LAND',
+    'th_la_land': 'TH_LA_LAND',
+    'la_vn_land': 'LA_VN_LAND',
+    'vn_la_land': 'VN_LA_LAND',
+    'la_ch_land': 'LA_CH_LAND',
+    'ch_la_land': 'CH_LA_LAND',
+    'la_kh_land': 'LA_KH_LAND',
+    'kh_la_land': 'KH_LA_LAND',
+  };
+
+  static String keyFor(String label) => _keys[label] ?? label;
+  static String filePrefixFor(String label) => _filePrefixes[keyFor(label)] ?? '';
+  static String labelForKey(String key) {
+    for (final entry in _keys.entries) {
+      if (entry.value == key) return entry.key;
+    }
+    return key;
+  }
+
+  static String? keyFromFileName(String fileName) {
+    final upper = fileName.toUpperCase();
+    for (final entry in _filePrefixes.entries) {
+      if (upper.startsWith(entry.value)) return entry.key;
+    }
+    return null;
+  }
 
   static String labelFor(String label) => <String, String>{
         '전체': 'All',
         '한국->라오스 해상': 'Korea -> Laos Sea',
         '한국->라오스 항공': 'Korea -> Laos Air',
         '라오스->한국 항공 특송': 'Laos -> Korea Air Express',
-        '라오스->태국 육로': 'Laos -> Thailand Road',
-        '라오스->베트남 육로': 'Laos -> Vietnam Road',
-        '라오스->중국 육로': 'Laos -> China Road',
-        '라오스->캄보디아 육로': 'Laos -> Cambodia Road',
-        '태국->라오스 육로': 'Thailand -> Laos Road',
-        '베트남->라오스 육로': 'Vietnam -> Laos Road',
-        '중국->라오스 육로': 'China -> Laos Road',
-        '캄보디아->라오스 육로': 'Cambodia -> Laos Road',
-      }[label] ?? label;
+        '라오스->태국 육로': 'Laos -> Thailand Land',
+        '태국->라오스 육로': 'Thailand -> Laos Land',
+        '라오스->베트남 육로': 'Laos -> Vietnam Land',
+        '베트남->라오스 육로': 'Vietnam -> Laos Land',
+        '라오스->중국 육로': 'Laos -> China Land',
+        '중국->라오스 육로': 'China -> Laos Land',
+        '라오스->캄보디아 육로': 'Laos -> Cambodia Land',
+        '캄보디아->라오스 육로': 'Cambodia -> Laos Land',
+      }[label] ??
+      label;
 }
-
