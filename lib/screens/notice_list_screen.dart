@@ -42,7 +42,9 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
                   decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.divider)),
                   child: ExpansionTile(
                     title: Text(_v(notice, 'title'), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    subtitle: Text(_v(notice, 'published_at'), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+                    subtitle: notice['show_published_date'] == false
+                        ? null
+                        : Text(_v(notice, 'published_at').split('T').first, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
                     childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     children: <Widget>[
                       const Divider(),

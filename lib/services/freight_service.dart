@@ -7,6 +7,7 @@ class FreightLineResult {
   const FreightLineResult({
     required this.shipmentId,
     required this.boxNumber,
+    required this.invoiceNumber,
     required this.route,
     required this.actualWeight,
     required this.volumeWeight,
@@ -17,6 +18,7 @@ class FreightLineResult {
 
   final String shipmentId;
   final String boxNumber;
+  final String invoiceNumber;
   final String route;
   final double actualWeight;
   final double volumeWeight;
@@ -86,6 +88,7 @@ class FreightService {
       lines.add(FreightLineResult(
         shipmentId: '${row['id'] ?? ''}',
         boxNumber: '${row['box_number'] ?? ''}',
+        invoiceNumber: '${row['invoice_number'] ?? ''}',
         route: routeLabel,
         actualWeight: actual,
         volumeWeight: volume,

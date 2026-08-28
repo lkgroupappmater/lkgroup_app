@@ -29,6 +29,7 @@ class CargoManagementScreen extends StatefulWidget {
 
 class _CargoManagementScreenState
     extends State<CargoManagementScreen> {
+  final _boxNumberController = TextEditingController();
   final _invoiceController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -56,6 +57,7 @@ class _CargoManagementScreenState
 
   @override
   void dispose() {
+    _boxNumberController.dispose();
     _invoiceController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
@@ -78,6 +80,7 @@ class _CargoManagementScreenState
     try {
       final rows = await ShipmentService.instance.searchRows(
         route: _route,
+        boxNumber: _boxNumberController.text.trim(),
         invoice: _invoiceController.text.trim(),
         recipient: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -110,6 +113,8 @@ class _CargoManagementScreenState
 
     for (final id in _selectedIds) {
       await ShipmentService.instance.updateRow(id, {
+        if (_selectedIds.length == 1 && _boxNumberController.text.trim().isNotEmpty)
+          'box_number': _boxNumberController.text.trim(),
         if (_invoiceController.text.trim().isNotEmpty)
           'invoice_number': _invoiceController.text.trim(),
         if (_nameController.text.trim().isNotEmpty)
@@ -287,6 +292,16 @@ class _CargoManagementScreenState
             onChanged: (value) {
               if (value != null) setState(() => _route = value);
             },
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _boxNumberController,
+            decoration: _decoration(
+              RouteCatalog.boxExampleFor(_route).isEmpty
+                  ? '박스번호'
+                  : '박스번호 (예: ${RouteCatalog.boxExampleFor(_route)})',
+              Icons.inventory_2_outlined,
+            ),
           ),
           const SizedBox(height: 10),
           Row(

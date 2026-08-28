@@ -139,7 +139,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 ...result.lines.map((line) => ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(line.boxNumber),
+                      title: Text('박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
                       subtitle: Text(
                           '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg'),
                       trailing:
@@ -151,12 +151,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 Text('KIP  ${result.totalKip.toStringAsFixed(0)}'),
                 Text('THB  ${result.totalThb.toStringAsFixed(1)}'),
                 Text('KRW  ${result.totalKrw.toStringAsFixed(0)}'),
-                const SizedBox(height: 8),
-                Text(
-                  '적용환율: KIP ${result.rates.appliedKip} / THB ${result.rates.appliedThb} / KRW ${result.rates.appliedKrw}',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textSecondary),
-                ),
+
               ],
             ),
           ),
@@ -209,7 +204,13 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           ),
           const SizedBox(height: 14),
           if (canSeeAll) ...[
-            _input(_boxNumberCtrl, '박스 번호', Icons.inventory_2_outlined),
+            _input(
+              _boxNumberCtrl,
+              RouteCatalog.boxExampleFor(routeLabels[_selectedRoute]).isEmpty
+                  ? '박스 번호'
+                  : '박스 번호 (예: ${RouteCatalog.boxExampleFor(routeLabels[_selectedRoute])})',
+              Icons.inventory_2_outlined,
+            ),
             const SizedBox(height: 10),
           ],
           _input(_invoiceCtrl, '송장번호', Icons.tag_rounded),
@@ -295,7 +296,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${r['box_number'] ?? ''}',
+                          Text('박스번호 ${r['box_number'] ?? ''}',
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.navyPrimary)),

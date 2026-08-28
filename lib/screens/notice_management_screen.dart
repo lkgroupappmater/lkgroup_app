@@ -115,6 +115,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     final title = TextEditingController(text: _text(existing ?? {}, 'title'));
     final content = TextEditingController(text: _text(existing ?? {}, 'content'));
     bool pinned = existing?['is_pinned'] == true;
+    bool showPublishedDate = existing == null || existing['show_published_date'] != false;
 
     await showDialog<void>(
       context: context,
@@ -141,6 +142,11 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                   ),
                 ),
                 CheckboxListTile(
+                  value: showPublishedDate,
+                  onChanged: (v) => setDialogState(() => showPublishedDate = v ?? true),
+                  title: const Text('등록 날짜 표시'),
+                ),
+                CheckboxListTile(
                   value: pinned,
                   onChanged: (v) => setDialogState(() => pinned = v ?? false),
                   title: const Text('상단 고정'),
@@ -163,6 +169,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                   'title': title.text.trim(),
                   'content': content.text.trim(),
                   'is_pinned': pinned,
+                  'show_published_date': showPublishedDate,
                   'published_at': DateTime.now().toUtc().toIso8601String(),
                 };
                 try {
@@ -234,7 +241,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                             ListTile(
                               title: Text(_text(row, 'title')),
                               subtitle: Text(
-                                '${_dateOnly(row['published_at'])}\n${_text(row, 'content')}',
+                                '${row['show_published_date'] != false ? '${_dateOnly(row['published_at'])}\n' : ''}${_text(row, 'content')}',
                               ),
                               isThreeLine: true,
                               trailing: pending

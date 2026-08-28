@@ -52,6 +52,52 @@ class RouteCatalog {
     'kh_la_land': 'KH_LA_LAND',
   };
 
+
+  // 실제 운송 Excel 양식의 박스/영수 번호 표기 규칙.
+  // 값 자체를 임의 생성하지 않고, 화면 입력 시 해당 노선의 표기 접두어/예시를 고정 안내합니다.
+  static const Map<String, String> _boxPrefixes = {
+    'kr_la_sea': 'S',
+    'kr_la_air': 'A',
+    'la_kr_air_exp': 'B',
+    'la_th_land': 'LT',
+    'th_la_land': 'TL',
+    'la_vn_land': 'LV',
+    'vn_la_land': 'VL',
+    'la_ch_land': 'LC',
+    'ch_la_land': 'CL',
+    'la_kh_land': 'LCBL',
+  };
+
+  static const Map<String, String> _boxExamples = {
+    'kr_la_sea': 'S001',
+    'kr_la_air': 'A001',
+    'la_kr_air_exp': 'B01-01',
+    'la_th_land': 'LT01-01',
+    'th_la_land': 'TL01-01',
+    'la_vn_land': 'LV01-01',
+    'vn_la_land': 'VL01-01',
+    'la_ch_land': 'LC01-01',
+    'ch_la_land': 'CL01-01',
+    'la_kh_land': 'LCBL10-01',
+  };
+
+  static const Map<String, String> _receiptExamples = {
+    'kr_la_sea': 'LKS 01',
+    'kr_la_air': 'LKA 01',
+    'la_kr_air_exp': 'LKB2026xx-xx',
+    'la_th_land': 'LKLT2026xx-xx',
+    'th_la_land': 'LKTL2026xx-xx',
+    'la_vn_land': 'LKLV2026xx-xx',
+    'vn_la_land': 'LKVL2026xx-xx',
+    'la_ch_land': 'LC2026xx-xx',
+    'ch_la_land': 'LKCL2026xx-xx',
+    'la_kh_land': 'LKLCBL 2026xx-xx',
+  };
+
+  static String boxPrefixFor(String label) => _boxPrefixes[keyFor(label)] ?? '';
+  static String boxExampleFor(String label) => _boxExamples[keyFor(label)] ?? '';
+  static String receiptExampleFor(String label) => _receiptExamples[keyFor(label)] ?? '';
+
   static String keyFor(String label) => _keys[label] ?? label;
   static String filePrefixFor(String label) => _filePrefixes[keyFor(label)] ?? '';
   static String labelForKey(String key) {

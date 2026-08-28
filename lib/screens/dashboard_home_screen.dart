@@ -33,6 +33,8 @@ const _contactLinks = <ContactLink>[
 
 class _ScheduleItem {
   final String route;
+  final String year;
+  final String voyage;
   final String departure;
   final String arrival;
   final String status;
@@ -40,6 +42,8 @@ class _ScheduleItem {
 
   const _ScheduleItem({
     required this.route,
+    required this.year,
+    required this.voyage,
     required this.departure,
     required this.arrival,
     required this.status,
@@ -50,12 +54,14 @@ class _ScheduleItem {
 class _NoticeItem {
   final String title;
   final String date;
+  final bool showDate;
   final String content;
   final bool isNew;
 
   const _NoticeItem({
     required this.title,
     required this.date,
+    required this.showDate,
     required this.content,
     this.isNew = false,
   });
@@ -107,11 +113,13 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         _visibleSchedules = schedules
             .map(
               (r) => _ScheduleItem(
-                route: '${r['origin'] ?? ''} → ${r['destination'] ?? ''}',
+                route: '${r['route'] ?? ''}',
+                year: '${r['year'] ?? r['shipment_year'] ?? ''}',
+                voyage: '${r['voyage'] ?? ''}',
                 departure: _dateOnly(
-                  r['departure_date'] ??
-                      r['booking_close_date'] ??
-                      r['closing_date'],
+                  r['booking_close_date'] ??
+                      r['closing_date'] ??
+                      r['departure_date'],
                 ),
                 arrival: _dateOnly(
                   r['estimated_arrival_date'] ?? r['arrival_date'],
@@ -127,6 +135,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               (r) => _NoticeItem(
                 title: '${r['title'] ?? ''}',
                 date: _dateOnly(r['published_at'] ?? r['created_at']),
+                showDate: r['show_published_date'] != false,
                 content: '${r['content'] ?? ''}',
                 isNew: r['is_new'] == true,
               ),
@@ -178,7 +187,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         title: const Text('선적 일정 상세'),
         content: SingleChildScrollView(
           child: Text(
-            '출발: ${item.departure}\n'
+            '접수 마감: ${item.departure}\n'
             '도착: ${item.arrival}\n'
             '상태: ${item.status}'
             '${item.detail.trim().isEmpty ? '' : '\n\n${item.detail}'}',
@@ -201,8 +210,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         title: Text(item.title),
         content: SingleChildScrollView(
           child: Text(
-            '${item.date}'
-            '${item.content.trim().isEmpty ? '' : '\n\n${item.content}'}',
+            '${item.showDate ? item.date : ''}'
+            '${item.content.trim().isEmpty ? '' : '${item.showDate ? '\n\n' : ''}${item.content}'}',
           ),
         ),
         actions: [
@@ -295,7 +304,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
             ..._visibleSchedules.map(_scheduleCard),
             const SizedBox(height: 14),
             _sectionHeader(
-              '공지사항',
+              '공지 및 안내',
               _isManager ? '목록 관리' : '목록 자세히 보기',
               _openNotice,
             ),
@@ -376,7 +385,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.route,
+                    '${item.route} · ${item.year} · ${item.voyage}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -385,7 +394,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '출발: ${item.departure}  도착: ${item.arrival}',
+                    '접수 마감: ${item.departure}  도착: ${item.arrival}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -470,13 +479,14 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                     ),
                   ),
                 ),
-              Text(
-                item.date,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
+              if (item.showDate)
+                Text(
+                  item.date,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
