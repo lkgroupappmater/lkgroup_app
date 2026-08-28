@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
 import '../models/app_user.dart';
@@ -75,12 +76,20 @@ class _CargoManagementScreenState
     });
   }
 
+  String _boxNumberForRequest() {
+    final raw = _boxNumberController.text.trim();
+    if (raw.isEmpty) return '';
+    final prefix = RouteCatalog.boxPrefixFor(_route);
+    if (prefix.isEmpty) return raw;
+    return '$prefix$raw';
+  }
+
   Future<void> _search() async {
     setState(() => _busy = true);
     try {
       final rows = await ShipmentService.instance.searchRows(
         route: _route,
-        boxNumber: _boxNumberController.text.trim(),
+        boxNumber: _boxNumberForRequest(),
         invoice: _invoiceController.text.trim(),
         recipient: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -114,7 +123,7 @@ class _CargoManagementScreenState
     for (final id in _selectedIds) {
       await ShipmentService.instance.updateRow(id, {
         if (_selectedIds.length == 1 && _boxNumberController.text.trim().isNotEmpty)
-          'box_number': _boxNumberController.text.trim(),
+          'box_number': _boxNumberForRequest(),
         if (_invoiceController.text.trim().isNotEmpty)
           'invoice_number': _invoiceController.text.trim(),
         if (_nameController.text.trim().isNotEmpty)
@@ -234,7 +243,9 @@ class _CargoManagementScreenState
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (widget.onBack != null)
@@ -290,17 +301,38 @@ class _CargoManagementScreenState
                     DropdownMenuItem(value: route, child: Text(route)))
                 .toList(),
             onChanged: (value) {
-              if (value != null) setState(() => _route = value);
+              if (value != null) {
+                setState(() {
+                  _route = value;
+                  _boxNumberController.clear();
+                });
+              }
             },
           ),
           const SizedBox(height: 10),
           TextField(
             controller: _boxNumberController,
+            keyboardType: RouteCatalog.boxPrefixFor(_route).isEmpty
+                ? TextInputType.text
+                : TextInputType.number,
+            inputFormatters: RouteCatalog.boxPrefixFor(_route).isEmpty
+                ? null
+                : <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+                  ],
             decoration: _decoration(
               RouteCatalog.boxExampleFor(_route).isEmpty
                   ? '박스번호'
                   : '박스번호 (예: ${RouteCatalog.boxExampleFor(_route)})',
               Icons.inventory_2_outlined,
+            ).copyWith(
+              prefixText: RouteCatalog.boxPrefixFor(_route).isEmpty
+                  ? null
+                  : RouteCatalog.boxPrefixFor(_route),
+              prefixStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -429,5 +461,6 @@ class _CargoManagementScreenState
             _managementSection(),
           ],
         ],
-      );
+      ),
+    );
 }

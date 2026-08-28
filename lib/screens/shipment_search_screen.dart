@@ -1,5 +1,6 @@
 // lib/screens/shipment_search_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
@@ -70,11 +71,20 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     super.dispose();
   }
 
+  String _boxNumberForSearch() {
+    final raw = _boxNumberCtrl.text.trim();
+    if (raw.isEmpty) return '';
+    final route = routeLabels[_selectedRoute];
+    final prefix = RouteCatalog.boxPrefixFor(route);
+    if (prefix.isEmpty) return raw;
+    return '$prefix$raw';
+  }
+
   Future<void> _search() async {
     try {
       final dbRows = await ShipmentService.instance.searchRows(
         route: routeLabels[_selectedRoute],
-        boxNumber: _boxNumberCtrl.text.trim(),
+        boxNumber: _boxNumberForSearch(),
         invoice: _invoiceCtrl.text.trim(),
         recipient: _recipientCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
@@ -199,7 +209,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   DropdownMenuItem(value: index, child: Text(routeLabels[index])),
             ),
             onChanged: (value) {
-              if (value != null) setState(() => _selectedRoute = value);
+              if (value != null) {
+                setState(() {
+                  _selectedRoute = value;
+                  _boxNumberCtrl.clear();
+                });
+              }
             },
           ),
           const SizedBox(height: 14),
@@ -210,6 +225,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   ? '박스 번호'
                   : '박스 번호 (예: ${RouteCatalog.boxExampleFor(routeLabels[_selectedRoute])})',
               Icons.inventory_2_outlined,
+              boxPrefix: RouteCatalog.boxPrefixFor(routeLabels[_selectedRoute]),
             ),
             const SizedBox(height: 10),
           ],
@@ -322,14 +338,26 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   Widget _input(TextEditingController controller, String hint, IconData icon,
-          {bool readOnly = false, TextInputType type = TextInputType.text}) =>
+          {bool readOnly = false,
+          TextInputType type = TextInputType.text,
+          String boxPrefix = ''}) =>
       TextField(
         controller: controller,
         readOnly: readOnly,
-        keyboardType: type,
+        keyboardType: boxPrefix.isEmpty ? type : TextInputType.number,
+        inputFormatters: boxPrefix.isEmpty
+            ? null
+            : <TextInputFormatter>[
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+              ],
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon),
+          prefixText: boxPrefix.isEmpty ? null : boxPrefix,
+          prefixStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
           filled: true,
           fillColor: AppColors.inputFill,
           border: OutlineInputBorder(
