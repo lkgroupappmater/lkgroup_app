@@ -1,6 +1,4 @@
-// lib/screens/shipment_search_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
@@ -32,14 +30,17 @@ class ShipmentSearchBody extends StatefulWidget {
 
 class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   int _selectedRoute = 0;
+  String _year = '전체';
+  String _voyage = '전체';
   final _invoiceCtrl = TextEditingController();
-  final _boxNumberCtrl = TextEditingController();
   final _recipientCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _results = [];
   bool _searched = false;
   final Set<String> _selectedIds = <String>{};
+
+  bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
 
   @override
   void initState() {
@@ -65,29 +66,20 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   @override
   void dispose() {
     _invoiceCtrl.dispose();
-    _boxNumberCtrl.dispose();
     _recipientCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
-  }
-
-  String _boxNumberForSearch() {
-    final raw = _boxNumberCtrl.text.trim();
-    if (raw.isEmpty) return '';
-    final route = routeLabels[_selectedRoute];
-    final prefix = RouteCatalog.boxPrefixFor(route);
-    if (prefix.isEmpty) return raw;
-    return '$prefix$raw';
   }
 
   Future<void> _search() async {
     try {
       final dbRows = await ShipmentService.instance.searchRows(
         route: routeLabels[_selectedRoute],
-        boxNumber: _boxNumberForSearch(),
         invoice: _invoiceCtrl.text.trim(),
         recipient: _recipientCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
+        year: _year,
+        voyage: _voyage,
         currentUser: widget.currentUser,
       );
       if (!mounted) return;
@@ -143,17 +135,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               shrinkWrap: true,
               children: [
                 const Text('운임 확인',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 ...result.lines.map((line) => ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text('박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
+                      title: Text(
+                          '박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
                       subtitle: Text(
                           '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg'),
-                      trailing:
-                          Text('\$${line.amountUsd.toStringAsFixed(2)}'),
+                      trailing: Text('\$${line.amountUsd.toStringAsFixed(2)}'),
                     )),
                 const Divider(),
                 Text('USD  \$${result.totalUsd.toStringAsFixed(2)}',
@@ -161,7 +152,6 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 Text('KIP  ${result.totalKip.toStringAsFixed(0)}'),
                 Text('THB  ${result.totalThb.toStringAsFixed(1)}'),
                 Text('KRW  ${result.totalKrw.toStringAsFixed(0)}'),
-
               ],
             ),
           ),
@@ -180,7 +170,6 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
       return _LoginRequiredView(onLogin: widget.onRequireLogin);
     }
 
-    final canSeeAll = widget.currentUser?.role.canSeeAllShipments == true;
     final allSelected = _results.isNotEmpty &&
         _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
 
@@ -192,50 +181,60 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           DropdownButtonFormField<int>(
             value: _selectedRoute,
             isExpanded: true,
-            decoration: InputDecoration(
-              labelText: '운송 경로',
-              prefixIcon: const Icon(Icons.route_outlined,
-                  color: AppColors.textSecondary),
-              filled: true,
-              fillColor: AppColors.inputFill,
-              border: OutlineInputBorder(
-                borderSide: BorderSide.none,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            decoration: _dropDecoration('운송 경로', Icons.route_outlined),
             items: List.generate(
               routeLabels.length,
-              (index) =>
-                  DropdownMenuItem(value: index, child: Text(routeLabels[index])),
+              (index) => DropdownMenuItem(
+                value: index,
+                child: Text(routeLabels[index]),
+              ),
             ),
             onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedRoute = value;
-                  _boxNumberCtrl.clear();
-                });
-              }
+              if (value != null) setState(() => _selectedRoute = value);
             },
           ),
-          const SizedBox(height: 14),
-          if (canSeeAll) ...[
-            _input(
-              _boxNumberCtrl,
-              RouteCatalog.boxExampleFor(routeLabels[_selectedRoute]).isEmpty
-                  ? '박스 번호'
-                  : '박스 번호 (예: ${RouteCatalog.boxExampleFor(routeLabels[_selectedRoute])})',
-              Icons.inventory_2_outlined,
-              boxPrefix: RouteCatalog.boxPrefixFor(routeLabels[_selectedRoute]),
-            ),
-            const SizedBox(height: 10),
-          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _year,
+                  decoration: _dropDecoration('년도', Icons.calendar_today),
+                  items: const ['전체', '2026년', '2027년', '2028년']
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _year = v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _voyage,
+                  decoration: _dropDecoration(
+                      '항차', Icons.confirmation_number_outlined),
+                  items: <String>[
+                    '전체',
+                    ...List.generate(
+                      30,
+                      (i) => '${(i + 1).toString().padLeft(2, '0')}항차',
+                    ),
+                  ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _voyage = v);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           _input(_invoiceCtrl, '송장번호', Icons.tag_rounded),
           const SizedBox(height: 10),
-          _input(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline,
-              readOnly: !canSeeAll),
+          _input(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline),
           const SizedBox(height: 10),
-          _input(_phoneCtrl, '라오스 수령인 연락처', Icons.phone_outlined,
-              readOnly: !canSeeAll, type: TextInputType.phone),
+          _input(_phoneCtrl, '연락처', Icons.phone_outlined,
+              type: TextInputType.phone),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -275,17 +274,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             Row(
               children: [
                 Checkbox(
-                    value: allSelected,
-                    onChanged: (_) => _toggleAll(),
-                    activeColor: AppColors.primary),
+                  value: allSelected,
+                  onChanged: (_) => _toggleAll(),
+                  activeColor: AppColors.primary,
+                ),
                 const Text('전체 선택'),
                 const Spacer(),
                 OutlinedButton.icon(
-                  onPressed:
-                      _selectedIds.isEmpty || widget.onManageSelected == null
-                          ? null
-                          : () =>
-                              widget.onManageSelected!(_selectedIds.toList()),
+                  onPressed: _selectedIds.isEmpty || widget.onManageSelected == null
+                      ? null
+                      : () => widget.onManageSelected!(_selectedIds.toList()),
                   icon: const Icon(Icons.inventory_2_outlined),
                   label: const Text('화물 관리'),
                 ),
@@ -295,69 +293,87 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           const SizedBox(height: 18),
           if (_searched && _results.isEmpty)
             const Center(child: Text('검색 결과가 없습니다.')),
-          ..._results.map((r) {
-            final id = '${r['id']}';
-            final size =
-                '${r['length_cm'] ?? ''} × ${r['width_cm'] ?? ''} × ${r['height_cm'] ?? ''} cm';
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Checkbox(
-                        value: _selectedIds.contains(id),
-                        onChanged: (_) => _toggle(id)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('박스번호 ${r['box_number'] ?? ''}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.navyPrimary)),
-                          const SizedBox(height: 6),
-                          _row('송장번호', '${r['invoice_number'] ?? ''}'),
-                          _row('이름/수령인', '${r['consignee_name'] ?? ''}'),
-                          _row('연락처', '${r['consignee_phone'] ?? ''}'),
-                          _row('입고 날짜', '${r['received_at'] ?? ''}'),
-                          _row('무게', '${r['weight_kg'] ?? ''} kg'),
-                          _row('크기', size),
-                          _row('영수증 번호', '${r['receipt_number'] ?? ''}'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+          ..._results.map((r) => _shipmentCard(r)),
+          if (!_canSeeAll && _searched)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                '일반 회원은 송장번호 뒤 4자리 이상, 정확한 이름 또는 연락처 뒤 8자리 기준으로 조회됩니다.',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
-            );
-          }),
+            ),
         ],
       ),
     );
   }
 
+  Widget _shipmentCard(Map<String, dynamic> r) {
+    final id = '${r['id']}';
+    final size =
+        '${r['length_cm'] ?? ''} × ${r['width_cm'] ?? ''} × ${r['height_cm'] ?? ''} cm';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: _selectedIds.contains(id),
+              onChanged: (_) => _toggle(id),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('박스번호 ${r['box_number'] ?? ''}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navyPrimary)),
+                  const SizedBox(height: 6),
+                  _row('운송 경로', '${r['route'] ?? ''}'),
+                  _row('년도', '${r['shipment_year'] ?? ''}'),
+                  _row('항차', _voyageLabel(r['voyage'])),
+                  _row('송장번호', '${r['invoice_number'] ?? ''}'),
+                  _row('이름/수령인', '${r['consignee_name'] ?? ''}'),
+                  _row('연락처', '${r['consignee_phone'] ?? ''}'),
+                  _row('입고 날짜', '${r['received_at'] ?? ''}'),
+                  _row('무게', '${r['weight_kg'] ?? ''} kg'),
+                  _row('크기', size),
+                  _row('영수증 번호', '${r['receipt_number'] ?? ''}'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _voyageLabel(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '';
+    return text.endsWith('항차') ? text : '$text항차';
+  }
+
+  InputDecoration _dropDecoration(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.textSecondary),
+        filled: true,
+        fillColor: AppColors.inputFill,
+        border: OutlineInputBorder(
+          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(10),
+        ),
+      );
+
   Widget _input(TextEditingController controller, String hint, IconData icon,
-          {bool readOnly = false,
-          TextInputType type = TextInputType.text,
-          String boxPrefix = ''}) =>
+          {TextInputType type = TextInputType.text}) =>
       TextField(
         controller: controller,
-        readOnly: readOnly,
-        keyboardType: boxPrefix.isEmpty ? type : TextInputType.number,
-        inputFormatters: boxPrefix.isEmpty
-            ? null
-            : <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
-              ],
+        keyboardType: type,
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon),
-          prefixText: boxPrefix.isEmpty ? null : boxPrefix,
-          prefixStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
           filled: true,
           fillColor: AppColors.inputFill,
           border: OutlineInputBorder(
@@ -370,16 +386,19 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   Widget _row(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-                width: 88,
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary))),
+              width: 88,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ),
             Expanded(
-                child: Text(value,
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600))),
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
           ],
         ),
       );
@@ -406,9 +425,10 @@ class _LoginRequiredView extends StatelessWidget {
                       color: AppColors.navyPrimary)),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                  onPressed: onLogin,
-                  icon: const Icon(Icons.login),
-                  label: const Text('로그인 하기')),
+                onPressed: onLogin,
+                icon: const Icon(Icons.login),
+                label: const Text('로그인 하기'),
+              ),
             ],
           ),
         ),

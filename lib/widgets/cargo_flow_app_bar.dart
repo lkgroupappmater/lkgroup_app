@@ -11,6 +11,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
   final ValueChanged<AppLanguage> onLanguageChanged;
   final VoidCallback? onNotificationTap;
   final bool showHomeActions;
+  final int notificationCount;
 
   const CargoFlowAppBar({
     super.key,
@@ -19,6 +20,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onLanguageChanged,
     this.onNotificationTap,
     this.showHomeActions = false,
+    this.notificationCount = 0,
   });
 
   // Includes the device status-bar inset; no second title row is added.
@@ -65,12 +67,39 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (showHomeActions)
-                  IconButton(
-                    tooltip: '알림',
-                    onPressed:
-                        onNotificationTap ?? () => _showNotifications(context),
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: AppColors.white, size: 31),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        tooltip: '알림',
+                        onPressed:
+                            onNotificationTap ?? () => _showNotifications(context),
+                        icon: const Icon(Icons.notifications_outlined,
+                            color: AppColors.white, size: 31),
+                      ),
+                      if (notificationCount > 0)
+                        Positioned(
+                          right: 5,
+                          top: 5,
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              notificationCount > 9 ? '9+' : '$notificationCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 _LanguageFlagButton(
                   selectedLanguage: selectedLanguage,

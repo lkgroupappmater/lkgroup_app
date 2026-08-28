@@ -154,7 +154,7 @@ class _AccountBodyState extends State<AccountBody> {
     if (deleted == true && mounted) {
       setState(() => _displayUser = null);
       widget.onLoggedOut?.call();
-      _message('회원 탈퇴가 처리되었습니다. 계정 데이터는 약 30일 후 완전히 삭제됩니다.');
+      _message('회원 탈퇴가 처리되었습니다.');
     }
   }
 
@@ -656,7 +656,7 @@ class _SignupDialogState extends State<_SignupDialog> {
           if (_codeSent)
             FilledButton(
               onPressed: _busy ? null : _verifyCode,
-              child: const Text('인증 확인'),
+              child: const Text('인증 확인 및 가입 완료'),
             ),
         ],
       );
@@ -1055,7 +1055,7 @@ class _AccountDeletionDialogState extends State<_AccountDeletionDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  '탈퇴 즉시 로그인할 수 없으며, 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.',
+                  '회원 탈퇴를 진행하시겠습니까?',
                 ),
                 const SizedBox(height: 8),
                 const Text(

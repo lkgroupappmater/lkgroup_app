@@ -9,6 +9,7 @@ import '../screens/quote_request_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/cargo_management_screen.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -16,21 +17,22 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell>
-    with WidgetsBindingObserver {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   AppLanguage _language = AppLanguage.korean;
   AppUser? _currentUser;
   List<String> _cargoSelection = const <String>[];
+  List<Map<String, dynamic>> _unreadNotifications = const [];
+  bool _popupShownForCurrentBatch = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    AuthService.instance.restoreSession().then((_) {
-      if (mounted) {
-        setState(() => _currentUser = AuthService.instance.currentUser);
-      }
+    AuthService.instance.restoreSession().then((_) async {
+      if (!mounted) return;
+      setState(() => _currentUser = AuthService.instance.currentUser);
+      await _refreshNotifications(showPopup: true);
     });
   }
 
@@ -44,6 +46,7 @@ class _AppShellState extends State<AppShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshUserRole();
+      _refreshNotifications(showPopup: false);
     }
   }
 
@@ -58,8 +61,102 @@ class _AppShellState extends State<AppShell>
     });
   }
 
-  bool get _isLoggedIn =>
-      _currentUser != null && _currentUser!.role.isLoggedIn;
+  Future<void> _refreshNotifications({required bool showPopup}) async {
+    if (_currentUser == null) {
+      if (mounted) setState(() => _unreadNotifications = const []);
+      return;
+    }
+    try {
+      final rows = await NotificationService.instance.fetchUnread();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotifications = rows;
+        if (rows.isEmpty) _popupShownForCurrentBatch = false;
+      });
+      if (showPopup && rows.isNotEmpty && !_popupShownForCurrentBatch) {
+        _popupShownForCurrentBatch = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showUnreadPopup(rows);
+        });
+      }
+    } catch (_) {
+      // Notification failure must not interrupt login or navigation.
+    }
+  }
+
+  Future<void> _showUnreadPopup(List<Map<String, dynamic>> rows) async {
+    if (!mounted || rows.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('알림'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: rows
+                .take(5)
+                .map((n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text('${n['message'] ?? ''}'),
+                    ))
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openNotifications() async {
+    try {
+      final rows = await NotificationService.instance.fetchRecent();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('알림'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: rows.isEmpty
+                ? const Text('새 알림이 없습니다.')
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: rows.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (_, index) {
+                      final n = rows[index];
+                      return Text('${n['message'] ?? ''}');
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('닫기'),
+            ),
+          ],
+        ),
+      );
+      await NotificationService.instance.markAllRead();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotifications = const [];
+        _popupShownForCurrentBatch = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('알림 조회 실패: $error')));
+    }
+  }
+
+  bool get _isLoggedIn => _currentUser != null && _currentUser!.role.isLoggedIn;
 
   String get _title {
     switch (_currentIndex) {
@@ -88,13 +185,14 @@ class _AppShellState extends State<AppShell>
     setState(() {
       _currentUser = user;
       _currentIndex = 3;
+      _popupShownForCurrentBatch = false;
     });
     ScaffoldMessenger.of(context)
         .showSnackBar(TextSnackBar('${user.name}님 로그인되었습니다.'));
+    _refreshNotifications(showPopup: true);
   }
 
-  void _onUserUpdated(AppUser user) =>
-      setState(() => _currentUser = user);
+  void _onUserUpdated(AppUser user) => setState(() => _currentUser = user);
 
   Future<void> _onLoggedOut() async {
     await AuthService.instance.signOut();
@@ -102,10 +200,15 @@ class _AppShellState extends State<AppShell>
     setState(() {
       _currentUser = null;
       _currentIndex = 0;
+      _unreadNotifications = const [];
+      _popupShownForCurrentBatch = false;
     });
   }
 
-  void _selectTab(int index) => setState(() => _currentIndex = index);
+  void _selectTab(int index) {
+    setState(() => _currentIndex = index);
+    if (index == 0) _refreshNotifications(showPopup: false);
+  }
 
   void _openCargoManagement(List<String> ids) {
     setState(() {
@@ -129,7 +232,8 @@ class _AppShellState extends State<AppShell>
       QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
       if (_isLoggedIn)
         CargoManagementScreen(
-          key: ValueKey('${_currentUser!.id}|${_currentUser!.role}|${_cargoSelection.join('|')}'),
+          key: ValueKey(
+              '${_currentUser!.id}|${_currentUser!.role}|${_cargoSelection.join('|')}'),
           user: _currentUser!,
           initialSelectedIds: _cargoSelection,
         ),
@@ -188,6 +292,8 @@ class _AppShellState extends State<AppShell>
         selectedLanguage: _language,
         onLanguageChanged: _onLanguageChanged,
         showHomeActions: _currentIndex == 0,
+        onNotificationTap: _openNotifications,
+        notificationCount: _unreadNotifications.length,
       ),
       body: IndexedStack(index: _currentIndex, children: tabs),
       bottomNavigationBar: BottomNavigationBar(
