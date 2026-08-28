@@ -18,6 +18,7 @@ class _BoxEntry {
   String height = '';
   String quantity = '1';
   bool selected = true;
+  bool boxPacking = false;
 }
 
 class QuoteRequestBody extends StatefulWidget {
@@ -46,6 +47,15 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
 
   bool get _isLoggedIn => !SupabaseConfig.isConfigured ||
       Supabase.instance.client.auth.currentUser != null;
+
+  bool get _isLaosOriginRoute {
+    final key = RouteCatalog.keyFor(_selectedRoute);
+    return key == 'la_kr_air_exp' ||
+        key == 'la_th_land' ||
+        key == 'la_vn_land' ||
+        key == 'la_ch_land' ||
+        key == 'la_kh_land';
+  }
 
   @override
   void initState() {
@@ -128,6 +138,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         widthCm: width,
         heightCm: height,
         quantity: quantity,
+        boxPacking: box.boxPacking,
       ));
     }
     if (selected.isEmpty) {
@@ -397,6 +408,17 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   if (RouteCatalog.keyFor(v) != 'la_kr_air_exp') {
                     _movingCargo = false;
                   }
+                  final routeKey = RouteCatalog.keyFor(v);
+                  final laosOrigin = routeKey == 'la_kr_air_exp' ||
+                      routeKey == 'la_th_land' ||
+                      routeKey == 'la_vn_land' ||
+                      routeKey == 'la_ch_land' ||
+                      routeKey == 'la_kh_land';
+                  if (!laosOrigin) {
+                    for (final box in _boxes) {
+                      box.boxPacking = false;
+                    }
+                  }
                   _calculation = null;
                 });
               }
@@ -404,26 +426,37 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           ),
           const SizedBox(height: 18),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Expanded(child: _SectionLabel('박스 정보 입력')),
-              if (RouteCatalog.keyFor(_selectedRoute) == 'la_kr_air_exp') ...[
-                Checkbox(
-                  value: _movingCargo,
-                  onChanged: (v) => setState(() {
-                    _movingCargo = v ?? false;
-                    _calculation = null;
-                  }),
-                  visualDensity: VisualDensity.compact,
+              Flexible(
+                flex: 3,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 0,
+                  runSpacing: 0,
+                  children: [
+                    if (RouteCatalog.keyFor(_selectedRoute) == 'la_kr_air_exp') ...[
+                      Checkbox(
+                        value: _movingCargo,
+                        onChanged: (v) => setState(() {
+                          _movingCargo = v ?? false;
+                          _calculation = null;
+                        }),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      const Text('이삿짐', style: TextStyle(fontSize: 12)),
+                    ],
+                    Checkbox(
+                      value: allSelected,
+                      onChanged: (v) => _setAllBoxes(v ?? false),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const Text('전체 박스 선택', style: TextStyle(fontSize: 12)),
+                  ],
                 ),
-                const Text('이삿짐', style: TextStyle(fontSize: 12)),
-                const SizedBox(width: 4),
-              ],
-              Checkbox(
-                value: allSelected,
-                onChanged: (v) => _setAllBoxes(v ?? false),
-                visualDensity: VisualDensity.compact,
               ),
-              const Text('전체 박스 선택', style: TextStyle(fontSize: 12)),
             ],
           ),
           const SizedBox(height: 8),
@@ -435,6 +468,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   onDelete: () => _removeBox(e.key),
                   onSelected: (v) => setState(() {
                     e.value.selected = v;
+                    _calculation = null;
+                  }),
+                  showBoxPacking: _isLaosOriginRoute,
+                  onBoxPackingChanged: (v) => setState(() {
+                    e.value.boxPacking = v;
                     _calculation = null;
                   }),
                   onChanged: () => setState(() => _calculation = null),
@@ -519,7 +557,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     children: [
                       Expanded(
                         child: Text(
-                          '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}',
+                          '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}${line.boxPackingSurchargeUsd > 0 ? ' · 박스 포장 +\$${line.boxPackingSurchargeUsd.toStringAsFixed(2)}' : ''}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -702,6 +740,8 @@ class _BoxRow extends StatelessWidget {
     required this.canDelete,
     required this.onDelete,
     required this.onSelected,
+    required this.showBoxPacking,
+    required this.onBoxPackingChanged,
     required this.onChanged,
   });
 
@@ -710,6 +750,8 @@ class _BoxRow extends StatelessWidget {
   final bool canDelete;
   final VoidCallback onDelete;
   final ValueChanged<bool> onSelected;
+  final bool showBoxPacking;
+  final ValueChanged<bool> onBoxPackingChanged;
   final VoidCallback onChanged;
 
   @override
@@ -739,6 +781,15 @@ class _BoxRow extends StatelessWidget {
                     color: AppColors.navyPrimary,
                   ),
                 ),
+                if (showBoxPacking) ...[
+                  const SizedBox(width: 8),
+                  Checkbox(
+                    value: entry.boxPacking,
+                    onChanged: (v) => onBoxPackingChanged(v ?? false),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const Text('박스 포장', style: TextStyle(fontSize: 11)),
+                ],
                 const Spacer(),
                 if (canDelete)
                   InkWell(

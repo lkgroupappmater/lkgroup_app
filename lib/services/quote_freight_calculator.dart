@@ -8,6 +8,7 @@ class QuoteBoxInput {
     required this.widthCm,
     required this.heightCm,
     required this.quantity,
+    this.boxPacking = false,
   });
 
   final int index;
@@ -16,6 +17,7 @@ class QuoteBoxInput {
   final double widthCm;
   final double heightCm;
   final int quantity;
+  final bool boxPacking;
 }
 
 class QuoteBoxFreightResult {
@@ -28,6 +30,7 @@ class QuoteBoxFreightResult {
     required this.quantity,
     required this.amountUsd,
     required this.movingCargoSurchargeUsd,
+    required this.boxPackingSurchargeUsd,
   });
 
   final int index;
@@ -38,6 +41,7 @@ class QuoteBoxFreightResult {
   final int quantity;
   final double amountUsd;
   final double movingCargoSurchargeUsd;
+  final double boxPackingSurchargeUsd;
 }
 
 class QuoteFreightResult {
@@ -177,6 +181,21 @@ class QuoteFreightCalculator {
   static bool supportsRoute(String routeLabel) =>
       _tariffs.containsKey(RouteCatalog.keyFor(routeLabel));
 
+  static bool _isLaosOrigin(String routeKey) =>
+      routeKey == 'la_kr_air_exp' ||
+      routeKey == 'la_th_land' ||
+      routeKey == 'la_vn_land' ||
+      routeKey == 'la_ch_land' ||
+      routeKey == 'la_kh_land';
+
+  static double _packingFeePerBox(double volumetricWeightKg) {
+    if (volumetricWeightKg <= 0) return 0;
+    if (volumetricWeightKg < 4) return 2;
+    if (volumetricWeightKg < 10) return 3;
+    if (volumetricWeightKg < 15) return 4;
+    return 5;
+  }
+
   static QuoteFreightResult calculate({
     required String routeLabel,
     required List<QuoteBoxInput> boxes,
@@ -210,7 +229,11 @@ class QuoteFreightCalculator {
 
       final movingCargoSurcharge =
           routeKey == 'la_kr_air_exp' && movingCargo ? 5.0 * quantity : 0.0;
-      amount += movingCargoSurcharge;
+      final boxPackingSurcharge =
+          _isLaosOrigin(routeKey) && box.boxPacking
+              ? _packingFeePerBox(unitVolume) * quantity
+              : 0.0;
+      amount += movingCargoSurcharge + boxPackingSurcharge;
 
       lines.add(QuoteBoxFreightResult(
         index: box.index,
@@ -221,6 +244,7 @@ class QuoteFreightCalculator {
         quantity: quantity,
         amountUsd: amount,
         movingCargoSurchargeUsd: movingCargoSurcharge,
+        boxPackingSurchargeUsd: boxPackingSurcharge,
       ));
     }
 
