@@ -22,51 +22,17 @@ class ContactLink {
 }
 
 const _contactLinks = <ContactLink>[
-  ContactLink(
-    label: '카카오톡 단톡방',
-    icon: '💬',
-    placeholder: 'https://open.kakao.com/o/gvMbtWJc',
-  ),
-  ContactLink(
-    label: '오픈상담톡(한국어, Eng, ລາວ)',
-    icon: '💛',
-    placeholder: 'https://open.kakao.com/o/sYly2bxf',
-  ),
-  ContactLink(
-    label: '카카오톡(대표번호)',
-    icon: '📱',
-    placeholder:
-        'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-',
-  ),
-  ContactLink(
-    label: 'WhatsApp(한국어, Eng, ລາວ)',
-    icon: '🟢',
-    placeholder: 'https://wa.me/8562052883018',
-  ),
-  ContactLink(
-    label: 'WhatsApp(대표번호)',
-    icon: '📲',
-    placeholder: 'https://wa.me/8562091126780',
-  ),
-  ContactLink(
-    label: 'Facebook',
-    icon: '🔵',
-    placeholder: 'https://www.facebook.com/LKTradingofLao',
-  ),
-  ContactLink(
-    label: '네이버',
-    icon: '🟩',
-    placeholder: 'https://blog.naver.com/lkgrouplaos',
-  ),
+  ContactLink(label: '카카오톡 단톡방', icon: '💬', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
+  ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: '💛', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
+  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
+  ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: '🟢', placeholder: 'https://wa.me/8562052883018'),
+  ContactLink(label: 'WhatsApp(대표번호)', icon: '📲', placeholder: 'https://wa.me/8562091126780'),
+  ContactLink(label: 'Facebook', icon: '🔵', placeholder: 'https://www.facebook.com/LKTradingofLao'),
+  ContactLink(label: '네이버', icon: '🟩', placeholder: 'https://blog.naver.com/lkgrouplaos'),
 ];
 
 class _ScheduleItem {
   final String route;
-  final String routeName;
-  final String year;
-  final String voyage;
-  final String origin;
-  final String destination;
   final String departure;
   final String arrival;
   final String status;
@@ -74,11 +40,6 @@ class _ScheduleItem {
 
   const _ScheduleItem({
     required this.route,
-    required this.routeName,
-    required this.year,
-    required this.voyage,
-    required this.origin,
-    required this.destination,
     required this.departure,
     required this.arrival,
     required this.status,
@@ -143,36 +104,29 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       if (!mounted) return;
 
       setState(() {
-        _visibleSchedules = schedules.map((r) {
-          final origin = '${r['origin'] ?? ''}';
-          final destination = '${r['destination'] ?? ''}';
-          return _ScheduleItem(
-            route: '$origin → $destination',
-            routeName: '${r['route'] ?? ''}',
-            year: '${r['year'] ?? ''}',
-            voyage: '${r['voyage'] ?? ''}',
-            origin: origin,
-            destination: destination,
-            departure: _dateOnly(
-              r['departure_date'] ??
-                  r['booking_close_date'] ??
-                  r['closing_date'],
-            ),
-            arrival: _dateOnly(
-              r['estimated_arrival_date'] ?? r['arrival_date'],
-            ),
-            status: '${r['status'] ?? '예정'}',
-            detail: '${r['detail'] ?? ''}',
-          );
-        }).toList();
+        _visibleSchedules = schedules
+            .map(
+              (r) => _ScheduleItem(
+                route: '${r['origin'] ?? ''} → ${r['destination'] ?? ''}',
+                departure: _dateOnly(
+                  r['departure_date'] ??
+                      r['booking_close_date'] ??
+                      r['closing_date'],
+                ),
+                arrival: _dateOnly(
+                  r['estimated_arrival_date'] ?? r['arrival_date'],
+                ),
+                status: '${r['status'] ?? '예정'}',
+                detail: '${r['detail'] ?? ''}',
+              ),
+            )
+            .toList();
 
         _visibleNotices = notices
             .map(
               (r) => _NoticeItem(
                 title: '${r['title'] ?? ''}',
-                date: _dateOnly(
-                  r['published_at'] ?? r['created_at'],
-                ),
+                date: _dateOnly(r['published_at'] ?? r['created_at']),
                 content: '${r['content'] ?? ''}',
                 isNew: r['is_new'] == true,
               ),
@@ -180,7 +134,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
             .toList();
       });
     } catch (_) {
-      // 실제 DB 데이터만 표시하며 연결 실패 시 임의 샘플은 표시하지 않습니다.
+      // 실제 DB 데이터만 표시합니다.
     }
   }
 
@@ -196,30 +150,26 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       MaterialPageRoute(builder: (_) => page),
     );
 
-    // 관리 화면에서 추가/편집/삭제/삭제취소 후 홈으로 돌아오면
-    // DB를 즉시 다시 읽어 홈 목록을 최신 상태로 맞춥니다.
+    // 일정/공지 추가·삭제대기·삭제취소·편집 후 홈으로 복귀하면
+    // 항상 DB를 다시 읽어 현재 상태를 반영합니다.
     if (mounted) {
       await _loadContent();
     }
   }
 
-  void _openSchedule() {
-    _open(
-      context,
-      _isManager
-          ? ScheduleManagementScreen(user: widget.currentUser!)
-          : const ShipmentScheduleScreen(),
-    );
-  }
+  void _openSchedule() => _open(
+        context,
+        _isManager
+            ? ScheduleManagementScreen(user: widget.currentUser!)
+            : const ShipmentScheduleScreen(),
+      );
 
-  void _openNotice() {
-    _open(
-      context,
-      _isManager
-          ? NoticeManagementScreen(user: widget.currentUser!)
-          : const NoticeListScreen(),
-    );
-  }
+  void _openNotice() => _open(
+        context,
+        _isManager
+            ? NoticeManagementScreen(user: widget.currentUser!)
+            : const NoticeListScreen(),
+      );
 
   Future<void> _showScheduleDetail(_ScheduleItem item) async {
     await showDialog<void>(
@@ -228,13 +178,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         title: const Text('선적 일정 상세'),
         content: SingleChildScrollView(
           child: Text(
-            '운송 경로: ${item.routeName}\n'
-            '년도: ${item.year}\n'
-            '항차: ${item.voyage}\n'
-            '출발지: ${item.origin}\n'
-            '도착지: ${item.destination}\n'
-            '접수 마감: ${item.departure}\n'
-            '도착 예정: ${item.arrival}\n'
+            '출발: ${item.departure}\n'
+            '도착: ${item.arrival}\n'
             '상태: ${item.status}'
             '${item.detail.trim().isEmpty ? '' : '\n\n${item.detail}'}',
           ),
@@ -301,10 +246,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
             );
           });
           return const AlertDialog(
-            content: Text(
-              '참여 코드 9112',
-              textAlign: TextAlign.center,
-            ),
+            content: Text('참여 코드 9112', textAlign: TextAlign.center),
           );
         },
       );
@@ -318,10 +260,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
     }
   }
 
-  void _message(String text) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(text)));
-  }
+  void _message(String text) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(text)));
 
   void _startConsultation() {
     if (_questionController.text.trim().isEmpty) {

@@ -5,11 +5,7 @@ import '../models/app_user.dart';
 import '../services/content_service.dart';
 
 class ScheduleManagementScreen extends StatefulWidget {
-  const ScheduleManagementScreen({
-    super.key,
-    required this.user,
-  });
-
+  const ScheduleManagementScreen({super.key, required this.user});
   final AppUser user;
 
   @override
@@ -31,26 +27,22 @@ class _ScheduleManagementScreenState
   String _text(Map<String, dynamic> row, String key) =>
       '${row[key] ?? ''}';
 
-  String _dateOnly(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    if (text.isEmpty) return '';
-    return text.contains('T') ? text.split('T').first : text.split(' ').first;
-  }
-
   Future<void> _load() async {
     try {
       final rows = await ContentService.fetchSchedules(
         includePendingDeletion: true,
       );
-      if (!mounted) return;
-      setState(() {
-        _items = rows;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _items = rows;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      _message('일정 조회 실패: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+        _message('일정 조회 실패: $e');
+      }
     }
   }
 
@@ -108,9 +100,8 @@ class _ScheduleManagementScreenState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('바로 삭제'),
-        content: const Text(
-          '임시 보관 기간을 무시하고 DB에서 완전히 삭제할까요?',
-        ),
+        content:
+            const Text('임시 보관 기간을 무시하고 DB에서 완전히 삭제할까요?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -135,36 +126,23 @@ class _ScheduleManagementScreenState
     }
   }
 
-  Future<void> _showEditor({
-    Map<String, dynamic>? existing,
-  }) async {
-    final from = TextEditingController(
-      text: _text(existing ?? {}, 'origin'),
-    );
+  Future<void> _showEditor({Map<String, dynamic>? existing}) async {
+    final from =
+        TextEditingController(text: _text(existing ?? {}, 'origin'));
     final to = TextEditingController(
-      text: _text(existing ?? {}, 'destination'),
-    );
+        text: _text(existing ?? {}, 'destination'));
     final voyage = TextEditingController(
-      text: _text(existing ?? {}, 'voyage'),
-    );
+        text: _text(existing ?? {}, 'voyage'));
     final close = TextEditingController(
-      text: _dateOnly(
-        existing?['booking_close_date'] ?? existing?['closing_date'],
-      ),
-    );
+        text: _text(existing ?? {}, 'booking_close_date'));
     final eta = TextEditingController(
-      text: _dateOnly(
-        existing?['estimated_arrival_date'] ?? existing?['arrival_date'],
-      ),
-    );
-    final detail = TextEditingController(
-      text: _text(existing ?? {}, 'detail'),
-    );
+        text: _text(existing ?? {}, 'estimated_arrival_date'));
+    final detail =
+        TextEditingController(text: _text(existing ?? {}, 'detail'));
 
     var route = _text(existing ?? {}, 'route').isEmpty
         ? RouteCatalog.routes.first
         : _text(existing!, 'route');
-
     var year = _text(existing ?? {}, 'year').isEmpty
         ? '2026년'
         : _text(existing!, 'year');
@@ -173,9 +151,7 @@ class _ScheduleManagementScreenState
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            existing == null ? '선적 일정 추가' : '선적 일정 편집',
-          ),
+          title: Text(existing == null ? '선적 일정 추가' : '선적 일정 편집'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -185,12 +161,8 @@ class _ScheduleManagementScreenState
                   decoration:
                       const InputDecoration(labelText: '운송 경로'),
                   items: RouteCatalog.routes
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e,
-                          child: Text(e),
-                        ),
-                      )
+                      .map((e) =>
+                          DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
                   onChanged: (v) =>
                       setDialogState(() => route = v ?? route),
@@ -200,33 +172,23 @@ class _ScheduleManagementScreenState
                   decoration:
                       const InputDecoration(labelText: '년도'),
                   items: const ['2026년', '2027년', '2028년']
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e,
-                          child: Text(e),
-                        ),
-                      )
+                      .map((e) =>
+                          DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
                   onChanged: (v) =>
                       setDialogState(() => year = v ?? year),
                 ),
                 TextField(
                   controller: voyage,
-                  keyboardType: TextInputType.text,
-                  decoration: const InputDecoration(
-                    labelText: '항차',
-                    hintText: '예: 01항차, 31항차, 특별항차',
-                  ),
+                  decoration: const InputDecoration(labelText: '항차'),
                 ),
                 TextField(
                   controller: from,
-                  decoration:
-                      const InputDecoration(labelText: '출발지'),
+                  decoration: const InputDecoration(labelText: '출발지'),
                 ),
                 TextField(
                   controller: to,
-                  decoration:
-                      const InputDecoration(labelText: '도착지'),
+                  decoration: const InputDecoration(labelText: '도착지'),
                 ),
                 TextField(
                   controller: close,
@@ -261,13 +223,19 @@ class _ScheduleManagementScreenState
                   'voyage': voyage.text.trim(),
                   'origin': from.text.trim(),
                   'destination': to.text.trim(),
-                  'booking_close_date':
-                      close.text.trim().isEmpty ? null : close.text.trim(),
-                  'estimated_arrival_date':
-                      eta.text.trim().isEmpty ? null : eta.text.trim(),
+                  'booking_close_date': close.text.trim().isEmpty
+                      ? null
+                      : close.text.trim(),
+                  'estimated_arrival_date': eta.text.trim().isEmpty
+                      ? null
+                      : eta.text.trim(),
                   'detail': detail.text.trim(),
-                  'status': 'scheduled',
                 };
+
+                // 편집일 때는 기존 status를 그대로 보존합니다.
+                if (existing != null && existing['status'] != null) {
+                  item['status'] = existing['status'];
+                }
 
                 try {
                   if (existing == null) {
@@ -306,7 +274,7 @@ class _ScheduleManagementScreenState
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('선적 일정 관리'),
+          title: const Text('선적 일정 목록 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -333,14 +301,6 @@ class _ScheduleManagementScreenState
                       final pending =
                           _text(row, 'deletion_status') == 'pending';
 
-                      final closeDate = _dateOnly(
-                        row['booking_close_date'] ?? row['closing_date'],
-                      );
-                      final arrivalDate = _dateOnly(
-                        row['estimated_arrival_date'] ??
-                            row['arrival_date'],
-                      );
-
                       return Card(
                         child: Padding(
                           padding: const EdgeInsets.all(8),
@@ -355,8 +315,8 @@ class _ScheduleManagementScreenState
                                 subtitle: Text(
                                   '${_text(row, 'origin')} → '
                                   '${_text(row, 'destination')}\n'
-                                  '마감: $closeDate · '
-                                  '도착예정: $arrivalDate\n'
+                                  '마감: ${_text(row, 'booking_close_date')} · '
+                                  '도착예정: ${_text(row, 'estimated_arrival_date')}\n'
                                   '${_text(row, 'detail')}',
                                 ),
                                 isThreeLine: true,
@@ -370,8 +330,7 @@ class _ScheduleManagementScreenState
                                             onPressed: () =>
                                                 _showEditor(existing: row),
                                             icon: const Icon(
-                                              Icons.edit_outlined,
-                                            ),
+                                                Icons.edit_outlined),
                                           ),
                                           IconButton(
                                             onPressed: () =>
