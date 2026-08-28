@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
@@ -7,6 +8,7 @@ import '../utils/form_validators.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key, this.currentUser});
+
   final AppUser? currentUser;
 
   @override
@@ -70,7 +72,6 @@ class _AccountBodyState extends State<AccountBody> {
         .showSnackBar(SnackBar(content: Text(text)));
   }
 
-  // LK_EMAIL_VERIFICATION_V1
   Future<void> _openSignup() async {
     final message = await showDialog<String>(
       context: context,
@@ -81,11 +82,13 @@ class _AccountBodyState extends State<AccountBody> {
       _message(message);
     }
   }
+
   Future<void> _login() async {
     if (_account.text.trim().isEmpty || _password.text.isEmpty) {
       _message('계정과 암호를 입력해 주세요.');
       return;
     }
+
     try {
       final user = await AuthService.instance.signIn(
         email: _account.text.trim(),
@@ -100,12 +103,14 @@ class _AccountBodyState extends State<AccountBody> {
   Future<void> _openProfileEdit() async {
     final user = _displayUser;
     if (user == null) return;
+
     final result = await showDialog<_ProfileEditData>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _ProfileEditDialog(user: user),
     );
     if (result == null) return;
+
     try {
       final updated = await AuthService.instance.updateProfile(
         name: result.name,
@@ -133,9 +138,10 @@ class _AccountBodyState extends State<AccountBody> {
     );
 
     if (changed == true && mounted) {
-      _message('?뷀샇瑜?蹂寃쏀뻽?듬땲?? ?대찓??蹂몄씤 ?몄쬆???꾨즺?섏뿀?듬땲??');
+      _message('암호를 변경했습니다. 이메일 본인 인증도 완료되었습니다.');
     }
   }
+
   Future<void> _pickAvatar(ImageSource source) async {
     try {
       final picker = ImagePicker();
@@ -146,6 +152,7 @@ class _AccountBodyState extends State<AccountBody> {
         maxHeight: 1200,
       );
       if (file == null) return;
+
       final updated = await AuthService.instance.uploadAvatar(file);
       if (!mounted) return;
       setState(() => _displayUser = updated);
@@ -196,9 +203,11 @@ class _AccountBodyState extends State<AccountBody> {
                 fillColor: AppColors.inputFill,
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: Icon(_obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined),
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
                 ),
               ),
             ),
@@ -219,7 +228,10 @@ class _AccountBodyState extends State<AccountBody> {
               dense: true,
             ),
             const SizedBox(height: 8),
-            FilledButton(onPressed: _login, child: const Text('접속')),
+            FilledButton(
+              onPressed: _login,
+              child: const Text('접속'),
+            ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: _openSignup,
@@ -232,6 +244,7 @@ class _AccountBodyState extends State<AccountBody> {
   Widget _profile(AppUser user) {
     final hasAvatar =
         user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty;
+
     return Column(
       children: [
         Stack(
@@ -244,17 +257,23 @@ class _AccountBodyState extends State<AccountBody> {
                   hasAvatar ? NetworkImage(user.avatarUrl!) : null,
               child: hasAvatar
                   ? null
-                  : Text(_fallbackAvatar(user),
-                      style: const TextStyle(fontSize: 42)),
+                  : Text(
+                      _fallbackAvatar(user),
+                      style: const TextStyle(fontSize: 42),
+                    ),
             ),
             PopupMenuButton<ImageSource>(
               icon: const Icon(Icons.camera_alt, color: AppColors.primary),
               onSelected: _pickAvatar,
               itemBuilder: (_) => const [
                 PopupMenuItem(
-                    value: ImageSource.camera, child: Text('카메라')),
+                  value: ImageSource.camera,
+                  child: Text('카메라'),
+                ),
                 PopupMenuItem(
-                    value: ImageSource.gallery, child: Text('사진 선택')),
+                  value: ImageSource.gallery,
+                  child: Text('사진 선택'),
+                ),
               ],
             ),
           ],
@@ -306,8 +325,10 @@ class _AccountBodyState extends State<AccountBody> {
   }
 
   Widget _info(String label, String value) => ListTile(
-        title: Text(label,
-            style: const TextStyle(color: AppColors.textSecondary)),
+        title: Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
         subtitle: Text(value.isEmpty ? '등록되지 않음' : value),
       );
 }
@@ -369,8 +390,8 @@ class _SignupDialogState extends State<_SignupDialog> {
         if (!mounted) return;
         setState(() {
           _serverError =
-              'Supabase??Confirm Email ?ㅼ젙??爰쇱졇 ?덉뒿?덈떎. '
-              '?대찓???몄쬆 肄붾뱶 ?뚯썝媛?낆쓣 ?ъ슜?섎젮硫?Confirm Email???쒖꽦?뷀빐 二쇱꽭??';
+              'Supabase의 Confirm Email 설정이 꺼져 있습니다. '
+              '이메일 인증 코드 회원가입을 사용하려면 Confirm Email을 활성화해 주세요.';
         });
         return;
       }
@@ -382,9 +403,13 @@ class _SignupDialogState extends State<_SignupDialog> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _serverError = '?몄쬆 肄붾뱶 ?꾩넚 ?ㅽ뙣: $e');
+      setState(() {
+        _serverError = '인증 코드 전송 실패: $e';
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -395,18 +420,26 @@ class _SignupDialogState extends State<_SignupDialog> {
     });
 
     try {
-      await AuthService.instance.resendSignupEmailCode(_email.text.trim());
+      await AuthService.instance.resendSignupEmailCode(
+        _email.text.trim(),
+      );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _serverError = '?몄쬆 肄붾뱶 ?ъ쟾???ㅽ뙣: $e');
+      setState(() {
+        _serverError = '인증 코드 재전송 실패: $e';
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   Future<void> _verifyCode() async {
     if (_emailCode.text.trim().isEmpty) {
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶瑜??낅젰??二쇱꽭??');
+      setState(() {
+        _serverError = '이메일 인증 코드를 입력해 주세요.';
+      });
       return;
     }
 
@@ -422,22 +455,28 @@ class _SignupDialogState extends State<_SignupDialog> {
       );
 
       if (!mounted) return;
+
       final message = _role == UserRole.member
-          ? '?대찓???몄쬆 諛??뚯썝媛?낆씠 ?꾨즺?섏뿀?듬땲?? 濡쒓렇?명빐 二쇱꽭??'
-          : '?대찓???몄쬆 諛?${_role.label} 媛???좎껌???꾨즺?섏뿀?듬땲?? '
-              '珥앷큵 愿由ъ옄 ?뱀씤 ??濡쒓렇?명븷 ???덉뒿?덈떎.';
+          ? '이메일 인증 및 회원가입이 완료되었습니다. 로그인해 주세요.'
+          : '이메일 인증 및 ${_role.label} 가입 신청이 완료되었습니다. '
+              '총괄 관리자 승인 후 로그인할 수 있습니다.';
+
       Navigator.pop(context, message);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _serverError = '?대찓???몄쬆 ?ㅽ뙣: $e');
+      setState(() {
+        _serverError = '이메일 인증 실패: $e';
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('?뚯썝 媛??),
+        title: const Text('회원 가입'),
         content: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -449,18 +488,19 @@ class _SignupDialogState extends State<_SignupDialog> {
                   controller: _name,
                   readOnly: _codeSent,
                   decoration: const InputDecoration(
-                    labelText: '?대쫫',
-                    hintText: '?? ?띻만??,
+                    labelText: '이름',
+                    hintText: '예: 홍길동',
                   ),
-                  validator: (v) => FormValidators.requiredText(v, '?대쫫'),
+                  validator: (v) =>
+                      FormValidators.requiredText(v, '이름'),
                 ),
                 TextFormField(
                   controller: _email,
                   readOnly: _codeSent,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: '?대찓??,
-                    hintText: '?? member@example.com',
+                    labelText: '이메일',
+                    hintText: '예: member@example.com',
                   ),
                   validator: FormValidators.email,
                 ),
@@ -469,9 +509,10 @@ class _SignupDialogState extends State<_SignupDialog> {
                   readOnly: _codeSent,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '?뷀샇',
-                    hintText: '?? Lkgroup2026',
-                    helperText: '?臾몄옄쨌?뚮Ц?먃룹닽?먮? 媛곴컖 1???댁긽 ?ы븿, 8???댁긽',
+                    labelText: '암호',
+                    hintText: '예: Lkgroup2026',
+                    helperText:
+                        '대문자·소문자·숫자를 각각 1자 이상 포함, 8자 이상',
                   ),
                   validator: FormValidators.password,
                 ),
@@ -480,12 +521,12 @@ class _SignupDialogState extends State<_SignupDialog> {
                   readOnly: _codeSent,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '?뷀샇?뺤씤',
-                    hintText: '???뷀샇瑜??ㅼ떆 ?낅젰',
+                    labelText: '암호확인',
+                    hintText: '위 암호를 다시 입력',
                   ),
                   validator: (v) {
                     if ((v ?? '') != _password.text) {
-                      return '?뷀샇媛 ?쒕줈 ?쇱튂?섏? ?딆뒿?덈떎.';
+                      return '암호가 서로 일치하지 않습니다.';
                     }
                     return null;
                   },
@@ -495,9 +536,10 @@ class _SignupDialogState extends State<_SignupDialog> {
                   readOnly: _codeSent,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: '?꾪솕踰덊샇',
-                    hintText: '?? 020-5889-2547',
-                    helperText: '02058892547濡??낅젰?대룄 ??????먮룞?쇰줈 ?뺤떇??留욎땅?덈떎.',
+                    labelText: '전화번호',
+                    hintText: '예: 020-5889-2547',
+                    helperText:
+                        '02058892547로 입력해도 저장 시 자동으로 형식을 맞춥니다.',
                   ),
                   validator: FormValidators.phone,
                 ),
@@ -505,15 +547,15 @@ class _SignupDialogState extends State<_SignupDialog> {
                   controller: _company,
                   readOnly: _codeSent,
                   decoration: const InputDecoration(
-                    labelText: '?뚯궗紐??좏깮)',
-                    hintText: '?? LK Trading',
+                    labelText: '회사명(선택)',
+                    hintText: '예: LK Trading',
                   ),
                 ),
                 const SizedBox(height: 10),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '?묐젰/?뚰듃?덉궗 諛?愿由ъ옄??珥앷큵 愿由ъ옄 ?뱀씤???꾩슂 ?⑸땲??',
+                    '협력/파트너사 및 관리자는 총괄 관리자 승인이 필요 합니다.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
@@ -522,15 +564,15 @@ class _SignupDialogState extends State<_SignupDialog> {
                   segments: const [
                     ButtonSegment(
                       value: UserRole.member,
-                      label: Text('?쇰컲?뚯썝'),
+                      label: Text('일반회원'),
                     ),
                     ButtonSegment(
                       value: UserRole.admin,
-                      label: Text('愿由ъ옄'),
+                      label: Text('관리자'),
                     ),
                     ButtonSegment(
                       value: UserRole.partner,
-                      label: Text('?묐젰/?뚰듃?덉궗'),
+                      label: Text('협력/파트너사'),
                     ),
                   ],
                   selected: {_role},
@@ -545,7 +587,7 @@ class _SignupDialogState extends State<_SignupDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : _sendCode,
                       icon: const Icon(Icons.email_outlined),
-                      label: const Text('?대찓???몄쬆 肄붾뱶 蹂대궡湲?),
+                      label: const Text('이메일 인증 코드 보내기'),
                     ),
                   ),
                 if (_codeSent) ...[
@@ -554,8 +596,8 @@ class _SignupDialogState extends State<_SignupDialog> {
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
-                      labelText: '?대찓???몄쬆 肄붾뱶',
-                      hintText: '硫붿씪濡?諛쏆? ?몄쬆 肄붾뱶 ?낅젰',
+                      labelText: '이메일 인증 코드',
+                      hintText: '메일로 받은 인증 코드 입력',
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -563,7 +605,7 @@ class _SignupDialogState extends State<_SignupDialog> {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: _busy ? null : _resendCode,
-                      child: const Text('?몄쬆 肄붾뱶 ?ㅼ떆 蹂대궡湲?),
+                      child: const Text('인증 코드 다시 보내기'),
                     ),
                   ),
                 ],
@@ -576,7 +618,7 @@ class _SignupDialogState extends State<_SignupDialog> {
                   Text(
                     _serverError!,
                     style: const TextStyle(
-                      color: AppColors.error,
+                      color: Colors.red,
                       fontSize: 12,
                     ),
                   ),
@@ -588,18 +630,20 @@ class _SignupDialogState extends State<_SignupDialog> {
         actions: [
           TextButton(
             onPressed: _busy ? null : () => Navigator.pop(context),
-            child: const Text('痍⑥냼'),
+            child: const Text('취소'),
           ),
           if (_codeSent)
             FilledButton(
               onPressed: _busy ? null : _verifyCode,
-              child: const Text('?몄쬆 ?뺤씤'),
+              child: const Text('인증 확인'),
             ),
         ],
       );
 }
+
 class _ProfileEditDialog extends StatefulWidget {
   const _ProfileEditDialog({required this.user});
+
   final AppUser user;
 
   @override
@@ -644,27 +688,33 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                 TextFormField(
                   controller: _name,
                   decoration: const InputDecoration(
-                      labelText: '이름', hintText: '예: 홍길동'),
-                  validator: (v) => FormValidators.requiredText(v, '이름'),
+                    labelText: '이름',
+                    hintText: '예: 홍길동',
+                  ),
+                  validator: (v) =>
+                      FormValidators.requiredText(v, '이름'),
                 ),
                 TextFormField(
                   controller: _phone,
                   decoration: const InputDecoration(
-                      labelText: '전화번호',
-                      hintText: '예: 020-5889-2547'),
+                    labelText: '전화번호',
+                    hintText: '예: 020-5889-2547',
+                  ),
                   validator: FormValidators.phone,
                 ),
                 TextFormField(
                   controller: _company,
                   decoration: const InputDecoration(
-                      labelText: '회사명(선택)',
-                      hintText: '예: LK Trading'),
+                    labelText: '회사명(선택)',
+                    hintText: '예: LK Trading',
+                  ),
                 ),
                 TextFormField(
                   controller: _address,
                   decoration: const InputDecoration(
-                      labelText: '주소(선택)',
-                      hintText: '예: Vientiane, Laos'),
+                    labelText: '주소(선택)',
+                    hintText: '예: Vientiane, Laos',
+                  ),
                 ),
               ],
             ),
@@ -672,8 +722,9 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
           FilledButton(
             onPressed: () {
               if (!_key.currentState!.validate()) return;
@@ -700,7 +751,11 @@ class _ProfileEditData {
     required this.company,
     required this.address,
   });
-  final String name, phone, company, address;
+
+  final String name;
+  final String phone;
+  final String company;
+  final String address;
 }
 
 class _PasswordDialog extends StatefulWidget {
@@ -741,19 +796,28 @@ class _PasswordDialogState extends State<_PasswordDialog> {
     try {
       await AuthService.instance.sendPasswordChangeVerificationCode();
       if (!mounted) return;
-      setState(() => _codeSent = true);
+      setState(() {
+        _codeSent = true;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶 ?꾩넚 ?ㅽ뙣: $e');
+      setState(() {
+        _serverError = '이메일 인증 코드 전송 실패: $e';
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   Future<void> _changePassword() async {
     if (!_key.currentState!.validate()) return;
+
     if (!_codeSent || _emailCode.text.trim().isEmpty) {
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶瑜?癒쇱? 諛쏆븘 ?낅젰??二쇱꽭??');
+      setState(() {
+        _serverError = '이메일 인증 코드를 먼저 받아 입력해 주세요.';
+      });
       return;
     }
 
@@ -768,19 +832,24 @@ class _PasswordDialogState extends State<_PasswordDialog> {
         newPassword: _newPassword.text,
         verificationCode: _emailCode.text.trim(),
       );
+
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _serverError = '?뷀샇 蹂寃??ㅽ뙣: $e');
+      setState(() {
+        _serverError = '암호 변경 실패: $e';
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('?뷀샇 蹂寃?),
+        title: const Text('암호 변경'),
         content: Form(
           key: _key,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -792,18 +861,19 @@ class _PasswordDialogState extends State<_PasswordDialog> {
                   controller: _currentPassword,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '湲곗〈 ?뷀샇',
-                    hintText: '?꾩옱 ?ъ슜 以묒씤 ?뷀샇 ?낅젰',
+                    labelText: '기존 암호',
+                    hintText: '현재 사용 중인 암호 입력',
                   ),
-                  validator: (v) => FormValidators.requiredText(v, '湲곗〈 ?뷀샇'),
+                  validator: (v) =>
+                      FormValidators.requiredText(v, '기존 암호'),
                 ),
                 TextFormField(
                   controller: _newPassword,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '???뷀샇',
-                    hintText: '?? Lkgroup2026',
-                    helperText: '?臾몄옄쨌?뚮Ц?먃룹닽???ы븿 8???댁긽',
+                    labelText: '새 암호',
+                    hintText: '예: Lkgroup2026',
+                    helperText: '대문자·소문자·숫자 포함 8자 이상',
                   ),
                   validator: FormValidators.password,
                 ),
@@ -811,17 +881,17 @@ class _PasswordDialogState extends State<_PasswordDialog> {
                   controller: _newPasswordConfirm,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '???뷀샇 ?뺤씤',
+                    labelText: '새 암호 확인',
                   ),
                   validator: (v) => v == _newPassword.text
                       ? null
-                      : '???뷀샇媛 ?쒕줈 ?쇱튂?섏? ?딆뒿?덈떎.',
+                      : '새 암호가 서로 일치하지 않습니다.',
                 ),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '?몄쬆 ?대찓?? ${widget.email}',
+                    '인증 이메일: ${widget.email}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -836,25 +906,24 @@ class _PasswordDialogState extends State<_PasswordDialog> {
                     icon: const Icon(Icons.email_outlined),
                     label: Text(
                       _codeSent
-                          ? '?대찓???몄쬆 肄붾뱶 ?ㅼ떆 蹂대궡湲?
-                          : '?대찓???몄쬆 肄붾뱶 蹂대궡湲?,
+                          ? '이메일 인증 코드 다시 보내기'
+                          : '이메일 인증 코드 보내기',
                     ),
                   ),
                 ),
-                if (_codeSent) ...[
+                if (_codeSent)
                   TextFormField(
                     controller: _emailCode,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
                     decoration: const InputDecoration(
-                      labelText: '?대찓???몄쬆 肄붾뱶',
-                      hintText: '硫붿씪濡?諛쏆? ?몄쬆 肄붾뱶 ?낅젰',
+                      labelText: '이메일 인증 코드',
+                      hintText: '메일로 받은 인증 코드 입력',
                     ),
                     validator: (v) => (v ?? '').trim().isEmpty
-                        ? '?대찓???몄쬆 肄붾뱶瑜??낅젰??二쇱꽭??'
+                        ? '이메일 인증 코드를 입력해 주세요.'
                         : null,
                   ),
-                ],
                 if (_busy) ...[
                   const SizedBox(height: 12),
                   const LinearProgressIndicator(),
@@ -864,7 +933,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
                   Text(
                     _serverError!,
                     style: const TextStyle(
-                      color: AppColors.error,
+                      color: Colors.red,
                       fontSize: 12,
                     ),
                   ),
@@ -875,12 +944,13 @@ class _PasswordDialogState extends State<_PasswordDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context, false),
-            child: const Text('痍⑥냼'),
+            onPressed:
+                _busy ? null : () => Navigator.pop(context, false),
+            child: const Text('취소'),
           ),
           FilledButton(
             onPressed: _busy ? null : _changePassword,
-            child: const Text('蹂寃?),
+            child: const Text('변경'),
           ),
         ],
       );
