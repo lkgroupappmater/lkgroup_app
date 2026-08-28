@@ -34,7 +34,14 @@ class ShipmentService {
     var query = SupabaseService.client.from('shipments').select();
 
     if (route != '전체' && route.isNotEmpty) query = query.eq('route', route);
-    if (year.isNotEmpty) query = query.eq('shipment_year', int.tryParse(year.replaceAll(RegExp(r'[^0-9]'), '')));
+    if (year.isNotEmpty) {
+      final parsedYear = int.tryParse(
+        year.replaceAll(RegExp(r'[^0-9]'), ''),
+      );
+      if (parsedYear != null) {
+        query = query.eq('shipment_year', parsedYear);
+      }
+    }
     if (voyage.isNotEmpty) query = query.eq('voyage', voyage.replaceAll('항차', '').trim());
 
     if (currentUser.role.canSeeAllShipments) {
@@ -62,7 +69,7 @@ class ShipmentService {
     final rows = await SupabaseService.client
         .from('shipments')
         .select()
-        .inFilter('id', ids.map((e) => int.tryParse(e) ?? e).toList());
+        .inFilter('id', ids.map(int.tryParse).whereType<int>().toList());
     return List<Map<String, dynamic>>.from(rows);
   }
 
