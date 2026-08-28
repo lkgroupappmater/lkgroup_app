@@ -146,7 +146,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   Future<void> _loadSpecialQuotes() async {
-    if (!_isLoggedIn || !SupabaseConfig.isConfigured) return;
+    if (!_isLoggedIn || !SupabaseConfig.isConfigured) {
+      if (mounted) setState(() => _specialQuotes = const []);
+      return;
+    }
     setState(() => _loadingQuotes = true);
     try {
       final rows = await QuoteService.instance.listMySpecialQuotes();
