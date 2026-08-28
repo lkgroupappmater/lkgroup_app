@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
+
   @override
   State<AppShell> createState() => _AppShellState();
 }
@@ -44,9 +45,11 @@ class _AppShellState extends State<AppShell> {
       case 2:
         return AppStrings.get(_language, 'quote_title');
       case 3:
-        return _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리';
+        return _currentUser?.role == UserRole.admin
+            ? '통합 관리'
+            : '화물 관리';
       default:
-        return AppStrings.get(_language, 'account_title');
+        return '사용자 로그인';
     }
   }
 
@@ -88,7 +91,8 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      DashboardHomeBody(language: _language, currentUser: _currentUser),
+      DashboardHomeBody(
+          language: _language, currentUser: _currentUser),
       ShipmentSearchBody(
         language: _language,
         isLoggedIn: _isLoggedIn,
@@ -97,7 +101,8 @@ class _AppShellState extends State<AppShell> {
         onEditRequest: () => _selectTab(3),
         onManageSelected: _openCargoManagement,
       ),
-      QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
+      QuoteRequestBody(
+          language: _language, onRequestLogin: _openAccount),
       if (_isLoggedIn)
         CargoManagementScreen(
           key: ValueKey(_cargoSelection.join('|')),
@@ -114,36 +119,47 @@ class _AppShellState extends State<AppShell> {
 
     final navItems = [
       const BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: '홈'),
+        icon: Icon(Icons.home_outlined),
+        activeIcon: Icon(Icons.home),
+        label: '홈',
+      ),
       BottomNavigationBarItem(
-          icon: const Icon(Icons.local_shipping_outlined),
-          activeIcon: const Icon(Icons.local_shipping),
-          label: AppStrings.get(_language, 'tracking')),
+        icon: const Icon(Icons.local_shipping_outlined),
+        activeIcon: const Icon(Icons.local_shipping),
+        label: AppStrings.get(_language, 'tracking'),
+      ),
       BottomNavigationBarItem(
-          icon: const Icon(Icons.request_quote_outlined),
-          activeIcon: const Icon(Icons.request_quote),
-          label: AppStrings.get(_language, 'quote')),
+        icon: const Icon(Icons.request_quote_outlined),
+        activeIcon: const Icon(Icons.request_quote),
+        label: AppStrings.get(_language, 'quote'),
+      ),
     ];
     final navIndexes = [0, 1, 2];
 
     if (_isLoggedIn) {
-      navItems.add(BottomNavigationBarItem(
+      navItems.add(
+        BottomNavigationBarItem(
           icon: const Icon(Icons.inventory_2_outlined),
           activeIcon: const Icon(Icons.inventory_2),
-          label:
-              _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리'));
+          label: _currentUser?.role == UserRole.admin
+              ? '통합 관리'
+              : '화물 관리',
+        ),
+      );
       navIndexes.add(3);
     }
 
-    navItems.add(BottomNavigationBarItem(
+    navItems.add(
+      BottomNavigationBarItem(
         icon: const Icon(Icons.person_outline),
         activeIcon: const Icon(Icons.person),
-        label: AppStrings.get(_language, 'account')));
+        label: AppStrings.get(_language, 'account'),
+      ),
+    );
     navIndexes.add(4);
 
     final selected = navIndexes.indexOf(_currentIndex);
+
     return Scaffold(
       appBar: CargoFlowAppBar(
         title: _title,
