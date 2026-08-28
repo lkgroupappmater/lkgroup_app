@@ -42,6 +42,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   QuoteFreightResult? _calculation;
   List<Map<String, dynamic>> _specialQuotes = const [];
   bool _loadingQuotes = false;
+  bool _movingCargo = false;
 
   bool get _isLoggedIn => !SupabaseConfig.isConfigured ||
       Supabase.instance.client.auth.currentUser != null;
@@ -138,6 +139,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       final result = QuoteFreightCalculator.calculate(
         routeLabel: _selectedRoute,
         boxes: selected,
+        movingCargo: _movingCargo,
       );
       setState(() => _calculation = result);
     } catch (error) {
@@ -392,6 +394,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               if (v != null) {
                 setState(() {
                   _selectedRoute = v;
+                  if (RouteCatalog.keyFor(v) != 'la_kr_air_exp') {
+                    _movingCargo = false;
+                  }
                   _calculation = null;
                 });
               }
@@ -401,6 +406,18 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           Row(
             children: [
               const Expanded(child: _SectionLabel('박스 정보 입력')),
+              if (RouteCatalog.keyFor(_selectedRoute) == 'la_kr_air_exp') ...[
+                Checkbox(
+                  value: _movingCargo,
+                  onChanged: (v) => setState(() {
+                    _movingCargo = v ?? false;
+                    _calculation = null;
+                  }),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const Text('이삿짐', style: TextStyle(fontSize: 12)),
+                const SizedBox(width: 4),
+              ],
               Checkbox(
                 value: allSelected,
                 onChanged: (v) => _setAllBoxes(v ?? false),
@@ -502,7 +519,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     children: [
                       Expanded(
                         child: Text(
-                          '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}',
+                          '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),

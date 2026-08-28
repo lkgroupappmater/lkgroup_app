@@ -22,13 +22,13 @@ class ContactLink {
 }
 
 const _contactLinks = <ContactLink>[
-  ContactLink(label: '카카오톡 단톡방', icon: '💬', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
-  ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: '💛', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
-  ContactLink(label: '카카오톡(대표번호)', icon: '📱', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
-  ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: '🟢', placeholder: 'https://wa.me/8562052883018'),
-  ContactLink(label: 'WhatsApp(대표번호)', icon: '📲', placeholder: 'https://wa.me/8562091126780'),
-  ContactLink(label: 'Facebook', icon: '🔵', placeholder: 'https://www.facebook.com/LKTradingofLao'),
-  ContactLink(label: '네이버', icon: '🟩', placeholder: 'https://blog.naver.com/lkgrouplaos'),
+  ContactLink(label: 'LK그룹 카카오톡 단톡방', icon: 'kakao_group', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
+  ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: 'kakao_open', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
+  ContactLink(label: '카카오톡(대표번호, Eng, ລາວ)', icon: 'kakao', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
+  ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: 'whatsapp', placeholder: 'https://wa.me/8562052883018'),
+  ContactLink(label: 'WhatsApp(대표번호, Eng, ລາວ)', icon: 'whatsapp', placeholder: 'https://wa.me/8562091126780'),
+  ContactLink(label: 'LK Trading Facebook', icon: 'facebook', placeholder: 'https://www.facebook.com/LKTradingofLao'),
+  ContactLink(label: 'LK Group 블로그', icon: 'naver', placeholder: 'https://blog.naver.com/lkgrouplaos'),
 ];
 
 class _ScheduleItem {
@@ -242,7 +242,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       return;
     }
 
-    if (link.label == '카카오톡 단톡방') {
+    if (link.label == 'LK그룹 카카오톡 단톡방') {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -528,6 +528,90 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         ],
       );
 
+  Widget _contactLogo(String type) {
+    switch (type) {
+      case 'kakao_group':
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFE812),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.groups_rounded, size: 16, color: Color(0xFF1E1E1E)),
+        );
+      case 'kakao_open':
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFE812),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.forum_rounded, size: 15, color: Color(0xFF1E1E1E)),
+        );
+      case 'kakao':
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFE812),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.chat_bubble_rounded, size: 15, color: Color(0xFF1E1E1E)),
+        );
+      case 'whatsapp':
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: Color(0xFF25D366),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.phone_rounded, size: 15, color: Colors.white),
+        );
+      case 'facebook':
+        return Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1877F2),
+            shape: BoxShape.circle,
+          ),
+          child: const Text(
+            'f',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              height: 1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        );
+      case 'naver':
+        return Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF03C75A),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: const Text(
+            'N',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        );
+      default:
+        return const SizedBox(width: 24, height: 24);
+    }
+  }
+
   Widget _contactCard(ContactLink link) => InkWell(
         onTap: () => _showContact(link),
         borderRadius: BorderRadius.circular(10),
@@ -545,7 +629,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           ),
           child: Row(
             children: [
-              Text(link.icon, style: const TextStyle(fontSize: 20)),
+              _contactLogo(link.icon),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

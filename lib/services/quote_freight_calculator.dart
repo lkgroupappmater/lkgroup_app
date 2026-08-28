@@ -27,6 +27,7 @@ class QuoteBoxFreightResult {
     required this.ratePerKg,
     required this.quantity,
     required this.amountUsd,
+    required this.movingCargoSurchargeUsd,
   });
 
   final int index;
@@ -36,6 +37,7 @@ class QuoteBoxFreightResult {
   final double ratePerKg;
   final int quantity;
   final double amountUsd;
+  final double movingCargoSurchargeUsd;
 }
 
 class QuoteFreightResult {
@@ -178,6 +180,7 @@ class QuoteFreightCalculator {
   static QuoteFreightResult calculate({
     required String routeLabel,
     required List<QuoteBoxInput> boxes,
+    bool movingCargo = false,
   }) {
     final routeKey = RouteCatalog.keyFor(routeLabel);
     final tariff = _tariffs[routeKey];
@@ -205,6 +208,10 @@ class QuoteFreightCalculator {
         amount = tariff.minimumCharge;
       }
 
+      final movingCargoSurcharge =
+          routeKey == 'la_kr_air_exp' && movingCargo ? 5.0 * quantity : 0.0;
+      amount += movingCargoSurcharge;
+
       lines.add(QuoteBoxFreightResult(
         index: box.index,
         actualWeightKg: actualTotal,
@@ -213,6 +220,7 @@ class QuoteFreightCalculator {
         ratePerKg: rate,
         quantity: quantity,
         amountUsd: amount,
+        movingCargoSurchargeUsd: movingCargoSurcharge,
       ));
     }
 
