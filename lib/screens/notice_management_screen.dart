@@ -238,26 +238,76 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                         padding: const EdgeInsets.all(8),
                         child: Column(
                           children: [
-                            ListTile(
-                              title: Text(_text(row, 'title')),
-                              subtitle: Text(
-                                '${row['show_published_date'] != false ? '${_dateOnly(row['published_at'])}\n' : ''}${_text(row, 'content')}',
-                              ),
-                              isThreeLine: true,
-                              trailing: pending
-                                  ? const Chip(label: Text('삭제 대기중'))
-                                  : Wrap(
-                                      children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(top: 8),
+                                          child: Text(
+                                            _text(row, 'title'),
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (pending)
+                                        const Padding(
+                                          padding: EdgeInsets.only(left: 8),
+                                          child: Chip(label: Text('삭제 대기중')),
+                                        )
+                                      else ...[
                                         IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 40,
+                                            minHeight: 40,
+                                          ),
                                           onPressed: () => _showEditor(existing: row),
                                           icon: const Icon(Icons.edit_outlined),
                                         ),
                                         IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 40,
+                                            minHeight: 40,
+                                          ),
                                           onPressed: () => _requestDelete(row),
-                                          icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: AppColors.error,
+                                          ),
                                         ),
                                       ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (row['show_published_date'] != false) ...[
+                                    Text(
+                                      _dateOnly(row['published_at']),
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: AppColors.textSecondary),
                                     ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Text(
+                                    _text(row, 'content'),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
                             if (pending)
                               Row(
