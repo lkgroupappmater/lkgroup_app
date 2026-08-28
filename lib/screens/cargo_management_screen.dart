@@ -295,7 +295,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         'page': NoticeManagementScreen(user: widget.user),
       },
       {
-        'label': '화물 관리',
+        'label': '화물 종합 관리',
         'icon': Icons.inventory_2_outlined,
         'page': CargoManagementScreen(user: widget.user),
       },
@@ -650,10 +650,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 icon: const Icon(Icons.save),
                 label: Text(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청'),
               ),
-            ],
-            if (_isAdmin || _isStaff) ...[
-              const SizedBox(height: 22),
-              _managementSection(),
             ],
           ],
         ),

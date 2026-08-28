@@ -8,6 +8,7 @@ import '../screens/shipment_search_screen.dart';
 import '../screens/quote_request_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/cargo_management_screen.dart';
+import '../screens/management_menu_screen.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 
@@ -157,6 +158,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   bool get _isLoggedIn => _currentUser != null && _currentUser!.role.isLoggedIn;
+  bool get _hasManagementMenu =>
+      _currentUser?.role == UserRole.admin ||
+      _currentUser?.role == UserRole.staff ||
+      _currentUser?.role == UserRole.partner;
+
 
   String get _title {
     switch (_currentIndex) {
@@ -168,6 +174,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return '운임 확인 및 견적 요청';
       case 3:
         return '화물 관리';
+      case 4:
+        return '관리 메뉴';
       default:
         return '사용자 로그인';
     }
@@ -179,7 +187,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         .showSnackBar(SnackBar(content: Text('${value.flag} ${value.label}')));
   }
 
-  void _openAccount() => setState(() => _currentIndex = 4);
+  void _openAccount() => setState(() => _currentIndex = 5);
 
   void _onLoggedIn(AppUser user) {
     setState(() {
@@ -244,6 +252,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           initialSelectedIds: _cargoSelection,
         ),
       if (!_isLoggedIn) const SizedBox.shrink(),
+      if (_hasManagementMenu)
+        ManagementMenuScreen(
+          user: _currentUser!,
+          onOpenCargoManagement: () => _selectTab(3),
+        ),
+      if (!_hasManagementMenu) const SizedBox.shrink(),
       AccountBody(
         currentUser: _currentUser,
         onLoggedIn: _onLoggedIn,
@@ -286,6 +300,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
     navIndexes.add(2);
 
+    if (_hasManagementMenu) {
+      navItems.add(
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.admin_panel_settings_outlined),
+          activeIcon: Icon(Icons.admin_panel_settings),
+          label: '관리 메뉴',
+        ),
+      );
+      navIndexes.add(4);
+    }
+
     navItems.add(
       BottomNavigationBarItem(
         icon: const Icon(Icons.person_outline),
@@ -293,7 +318,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         label: AppStrings.get(_language, 'account'),
       ),
     );
-    navIndexes.add(4);
+    navIndexes.add(5);
 
     final selected = navIndexes.indexOf(_currentIndex);
     return Scaffold(
