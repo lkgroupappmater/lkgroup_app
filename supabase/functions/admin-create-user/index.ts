@@ -48,35 +48,21 @@ Deno.serve(async (req) => {
       return json({ error: "로그인 사용자를 확인할 수 없습니다." }, 401);
     }
 
-    const { data: callerProfile, error: profileError } = await admin
-      .from("profiles")
-      .select("role,approval_status")
-      .eq("id", caller.id)
-      .maybeSingle();
+    const { data: isTotalAdmin, error: adminCheckError } = await admin
+      .rpc("is_total_admin_user", { target_user_id: caller.id });
 
-    if (profileError || !callerProfile) {
+    if (adminCheckError) {
       return json(
         {
-          error: "총괄 관리자 프로필을 확인할 수 없습니다.",
-          detail: profileError?.message ?? null,
+          error: "총괄 관리자 권한을 확인할 수 없습니다.",
+          detail: adminCheckError.message,
         },
         403,
       );
     }
 
-    // 실제 DB의 현재 role을 기준으로만 총괄 관리자 권한을 허용합니다.
-    // approval_status가 legacy 데이터에서 null인 경우는 허용하되,
-    // 명시적으로 pending/rejected 상태이면 거부합니다.
-    const approval = String(callerProfile.approval_status ?? "approved");
-    if (callerProfile.role !== "admin" || approval !== "approved") {
-      return json(
-        {
-          error: "총괄 관리자 권한이 필요합니다.",
-          current_role: callerProfile.role ?? null,
-          approval_status: callerProfile.approval_status ?? null,
-        },
-        403,
-      );
+    if (isTotalAdmin !== true) {
+      return json({ error: "총괄 관리자 권한이 필요합니다." }, 403);
     }
 
     const body = await req.json();

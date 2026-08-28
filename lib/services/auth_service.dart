@@ -94,18 +94,28 @@ class AuthService {
       throw const AuthException('가입 신청 가능한 권한이 아닙니다.');
     }
 
-    final response = await SupabaseService.client.auth.signUp(
-      email: email.trim(),
-      password: password,
-      data: {
-        'full_name': name.trim(),
-        'phone': phone.trim(),
-        'company': company.trim(),
-        'requested_role': role.name,
-        'role': 'member',
-        'verification_method': verificationMethod,
-      },
-    );
+    late final AuthResponse response;
+    try {
+      response = await SupabaseService.client.auth.signUp(
+        email: email.trim(),
+        password: password,
+        data: {
+          'full_name': name.trim(),
+          'phone': phone.trim(),
+          'company': company.trim(),
+          'requested_role': role.name,
+          'role': 'member',
+          'verification_method': verificationMethod,
+        },
+      );
+    } catch (e) {
+      if (e.toString().contains('SELF_DELETION_EMAIL_COOLDOWN')) {
+        throw const AuthException(
+          '자진 탈퇴한 이메일은 탈퇴 후 3일 동안 재가입할 수 없습니다.',
+        );
+      }
+      rethrow;
+    }
 
     final user = response.user;
     if (user == null) throw const AuthException('회원가입에 실패했습니다.');
@@ -270,12 +280,22 @@ class AuthService {
     return (await refreshCurrentUser())!;
   }
 
-  /// 회원 탈퇴용 이메일 재인증 코드를 보냅니다.
+  /// 회원 탈퇴 전용 이메일 인증 코드를 보냅니다.
+  /// 암호 변경용 Supabase Reauthentication OTP와 별도의 Edge Function/Resend OTP입니다.
   Future<void> sendAccountDeletionVerificationCode() async {
-    await sendPasswordChangeVerificationCode();
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+
+    final response = await SupabaseService.client.functions.invoke(
+      'member-account-delete',
+      body: {'action': 'send_self_delete_code'},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw AuthException('회원 탈퇴 인증 코드 전송 실패: ${response.data}');
+    }
   }
 
-  /// 현재 암호와 이메일 재인증 코드를 검증한 뒤 계정을 탈퇴 대기 상태로 전환합니다.
+  /// 현재 암호 + 회원 탈퇴 전용 이메일 OTP를 서버에서 확인한 뒤 자진 탈퇴합니다.
   Future<void> deleteMyAccount({
     required String currentPassword,
     required String verificationCode,
@@ -289,21 +309,13 @@ class AuthService {
       throw const AuthException('이메일 인증 코드를 입력해 주세요.');
     }
 
-    // 민감 작업 재인증: 현재 암호 + Reauthentication OTP를 Supabase Auth에서 검증합니다.
-    await SupabaseService.client.auth.updateUser(
-      UserAttributes(
-        data: {
-          'account_deletion_verified_at':
-              DateTime.now().toUtc().toIso8601String(),
-        },
-        currentPassword: currentPassword,
-        nonce: verificationCode.trim(),
-      ),
-    );
-
     final response = await SupabaseService.client.functions.invoke(
       'member-account-delete',
-      body: {'action': 'self_delete'},
+      body: {
+        'action': 'self_delete',
+        'current_password': currentPassword,
+        'verification_code': verificationCode.trim(),
+      },
     );
     if (response.status < 200 || response.status >= 300) {
       throw AuthException('회원 탈퇴 처리 실패: ${response.data}');
@@ -321,6 +333,28 @@ class AuthService {
     );
     if (response.status < 200 || response.status >= 300) {
       throw AuthException('회원 삭제 실패: ${response.data}');
+    }
+  }
+
+  /// 총괄 관리자가 탈퇴 대기 회원을 다시 정상 회원으로 복구합니다.
+  Future<void> adminCancelMemberDeletion(String userId) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'member-account-delete',
+      body: {'action': 'admin_cancel_delete', 'user_id': userId},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw AuthException('탈퇴 취소 실패: ${response.data}');
+    }
+  }
+
+  /// 총괄 관리자가 탈퇴 대기 회원을 즉시 완전 삭제합니다.
+  Future<void> adminConfirmMemberDeletion(String userId) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'member-account-delete',
+      body: {'action': 'admin_confirm_delete', 'user_id': userId},
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw AuthException('탈퇴 확정 실패: ${response.data}');
     }
   }
 

@@ -1057,6 +1057,14 @@ class _AccountDeletionDialogState extends State<_AccountDeletionDialog> {
                 const Text(
                   '탈퇴 즉시 로그인할 수 없으며, 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.',
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  '탈퇴 시 3일 동안 탈퇴 아이디/Email로 재가입이 안되니 신중하게 확인 바랍니다.',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _currentPassword,

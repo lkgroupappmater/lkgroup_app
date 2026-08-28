@@ -40,7 +40,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
       } else {
         final rows = await Supabase.instance.client
             .from('profiles')
-            .select('id,email,name,phone,company,role,requested_role,approval_status,avatar_url,created_at')
+            .select('id,email,name,phone,company,role,requested_role,approval_status,avatar_url,created_at,deletion_status,deletion_type,deleted_at,purge_after')
             .order('created_at', ascending: false);
         _members = List<Map<String, dynamic>>.from(rows);
       }
@@ -54,6 +54,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   List<Map<String, dynamic>> get _pendingRequests => _members.where((m) {
         final myId = Supabase.instance.client.auth.currentUser?.id;
         if ('${m['id']}' == myId) return false;
+        if ('${m['deletion_status'] ?? 'active'}' != 'active') return false;
         final status = '${m['approval_status'] ?? ''}';
         final requested = '${m['requested_role'] ?? 'member'}';
         final currentRole = '${m['role'] ?? 'member'}';
@@ -66,8 +67,10 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     final myId = Supabase.instance.client.auth.currentUser?.id;
     final rows = _members.where((m) {
       if ('${m['id']}' == myId) return false;
-      return ['admin', 'staff', 'partner'].contains('${m['role']}') &&
-          '${m['approval_status'] ?? 'approved'}' == 'approved';
+      if ('${m['deletion_status'] ?? 'active'}' != 'active') return false;
+      // 관리자(총괄/직원)와 협력·파트너사는 승인 상태와 관계없이
+      // 활성 계정이면 항상 고정 영역에 표시합니다.
+      return ['admin', 'staff', 'partner'].contains('${m['role']}');
     }).toList();
     rows.sort((a, b) {
       const order = {'admin': 0, 'staff': 1, 'partner': 2};
@@ -83,6 +86,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     final myId = Supabase.instance.client.auth.currentUser?.id;
     return _members.where((m) {
       if ('${m['id']}' == myId) return false;
+      if ('${m['deletion_status'] ?? 'active'}' != 'active') return false;
       if ('${m['approval_status'] ?? 'approved'}' == 'rejected') return false;
       // 관리자/파트너는 위 고정 목록에 항상 표시하므로 검색 영역에서는 일반회원만 표시합니다.
       if ('${m['role'] ?? 'member'}' != 'member') return false;
@@ -90,6 +94,20 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
           .toLowerCase()
           .contains(query);
     }).toList();
+  }
+
+  List<Map<String, dynamic>> get _deletedMembers {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    final rows = _members.where((m) {
+      if ('${m['id']}' == myId) return false;
+      return '${m['deletion_status'] ?? 'active'}' == 'pending';
+    }).toList();
+    rows.sort((a, b) {
+      final ad = DateTime.tryParse('${a['deleted_at'] ?? ''}');
+      final bd = DateTime.tryParse('${b['deleted_at'] ?? ''}');
+      return (bd ?? DateTime(1970)).compareTo(ad ?? DateTime(1970));
+    });
+    return rows;
   }
 
   Future<void> _approve(Map<String, dynamic> member) async {
@@ -320,6 +338,102 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     }
   }
 
+  Future<void> _cancelDeletion(Map<String, dynamic> member) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('탈퇴 취소'),
+        content: Text(
+          '${member['name'] ?? member['email']} 회원의 탈퇴를 취소하고 정상 회원으로 복구할까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('탈퇴 취소'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AuthService.instance.adminCancelMemberDeletion('${member['id']}');
+      _message('탈퇴를 취소하고 정상 회원으로 복구했습니다.');
+      await _loadMembers();
+    } catch (e) {
+      _message('탈퇴 취소 실패: $e', error: true);
+    }
+  }
+
+  Future<void> _confirmDeletion(Map<String, dynamic> member) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('탈퇴 확정'),
+        content: Text(
+          '${member['name'] ?? member['email']} 회원을 DB에서 완전히 삭제할까요?\n\n'
+          '이 작업은 되돌릴 수 없습니다. 탈퇴 확정 후 동일 이메일은 3일 제한 없이 즉시 신규 가입할 수 있습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('탈퇴 확정'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AuthService.instance.adminConfirmMemberDeletion('${member['id']}');
+      _message('탈퇴를 확정하고 회원 계정 데이터를 완전히 삭제했습니다.');
+      await _loadMembers();
+    } catch (e) {
+      _message('탈퇴 확정 실패: $e', error: true);
+    }
+  }
+
+  Widget _deletedMemberCard(Map<String, dynamic> member) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${member['name'] ?? ''} · ${_roleLabel(member['role'])}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('${member['email'] ?? ''}'),
+              Text('${member['phone'] ?? ''} ${member['company'] ?? ''}'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _cancelDeletion(member),
+                      child: const Text('탈퇴 취소'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _confirmDeletion(member),
+                      child: const Text('탈퇴 확정'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
   void _message(String text, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -369,6 +483,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     final pending = _pendingRequests;
     final fixed = _fixedManagementMembers;
     final list = _filteredMembers;
+    final deleted = _deletedMembers;
 
     return Scaffold(
       appBar: AppBar(
@@ -452,6 +567,17 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                   if (_search.text.trim().isNotEmpty && list.isEmpty)
                     const Card(child: ListTile(title: Text('검색된 회원이 없습니다.'))),
                   ...list.map(_memberCard),
+                  const SizedBox(height: 18),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '탈퇴 회원',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  if (deleted.isEmpty)
+                    const Card(child: ListTile(title: Text('탈퇴 처리 중인 회원이 없습니다.'))),
+                  ...deleted.map(_deletedMemberCard),
                 ],
               ),
             ),
