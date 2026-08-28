@@ -6,6 +6,7 @@ import '../config/supabase_config.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
 
@@ -41,6 +42,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   String _selectedRoute = _transportRoutes.first;
   final List<_BoxEntry> _boxes = [_BoxEntry()];
   QuoteFreightResult? _calculation;
+  ExchangeRateSettings? _calculationRates;
   List<Map<String, dynamic>> _specialQuotes = const [];
   bool _loadingQuotes = false;
   bool _movingCargo = false;
@@ -66,6 +68,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   void _addBox() => setState(() {
         _boxes.add(_BoxEntry());
         _calculation = null;
+        _calculationRates = null;
       });
 
   void _removeBox(int i) {
@@ -152,7 +155,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         boxes: selected,
         movingCargo: _movingCargo,
       );
-      setState(() => _calculation = result);
+      final rates = await ExchangeRateService.instance.fetch();
+      if (!mounted) return;
+      setState(() {
+        _calculation = result;
+        _calculationRates = rates;
+      });
     } catch (error) {
       _message('$error\n대량 혹은 특수 견적 요청을 이용해 주세요.');
     }
@@ -539,48 +547,118 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     );
   }
 
-  Widget _freightResultCard(QuoteFreightResult result) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                result.route,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.navyPrimary),
+  String _moneyNumber(double value, {int decimals = 0}) {
+    final fixed = value.toStringAsFixed(decimals);
+    final parts = fixed.split('.');
+    final raw = parts.first;
+    final negative = raw.startsWith('-');
+    final digits = negative ? raw.substring(1) : raw;
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(digits[i]);
+    }
+    final prefix = negative ? '-' : '';
+    if (parts.length == 1 || decimals == 0) return '$prefix$buffer';
+    return '$prefix$buffer.${parts[1]}';
+  }
+
+  Widget _freightResultCard(QuoteFreightResult result) {
+    final rates = _calculationRates;
+    final kip = rates == null ? null : result.totalUsd * rates.appliedKip;
+    final thb = rates == null ? null : result.totalUsd * rates.appliedThb;
+    final krw = rates == null ? null : result.totalUsd * rates.appliedKrw;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              result.route,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.navyPrimary,
               ),
-              const SizedBox(height: 8),
-              ...result.lines.map(
-                (line) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}${line.boxPackingSurchargeUsd > 0 ? ' · 박스 포장 +\$${line.boxPackingSurchargeUsd.toStringAsFixed(2)}' : ''}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
+            ),
+            const SizedBox(height: 8),
+            ...result.lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}${line.boxPackingSurchargeUsd > 0 ? ' · 박스 포장 +\$${line.boxPackingSurchargeUsd.toStringAsFixed(2)}' : ''}',
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      Text(
-                        '\$${line.amountUsd.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                    ),
+                    Text(
+                      '\$${line.amountUsd.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '총 운임  USD \$${result.totalUsd.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                  if (kip != null && rates!.appliedKip > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'LAK  ${_moneyNumber(kip)} ກີບ',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                  if (thb != null && rates!.appliedThb > 0)
+                    Text(
+                      'THB  ฿${_moneyNumber(thb, decimals: 2)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  if (krw != null && rates!.appliedKrw > 0)
+                    Text(
+                      'KRW  ₩${_moneyNumber(krw)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFB74D)),
+              ),
+              child: const Text(
+                '운임은 USD 기준이며, 이외 화폐는 가견적 안내시의 환율 기준이므로, 최종 운임 책정시의 환율변동으로 인한 운임 차이가 발생할수 있으니, 참고용으로만 확인 부탁 드립니다.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: Color(0xFFE65100),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const Divider(),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '총 운임  USD \$${result.totalUsd.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   Widget _specialQuoteCard(Map<String, dynamic> quote) {
     final messages = _messages(quote);
