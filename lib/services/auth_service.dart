@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
+
 import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import 'supabase_service.dart';
@@ -21,7 +23,8 @@ class AuthService {
     final user = SupabaseService.client.auth.currentUser;
     if (user == null) return;
     try {
-      _currentUser = await _loadProfile(user.id, fallbackEmail: user.email ?? '');
+      _currentUser =
+          await _loadProfile(user.id, fallbackEmail: user.email ?? '');
     } catch (_) {
       await SupabaseService.client.auth.signOut();
       _currentUser = null;
@@ -125,6 +128,49 @@ class AuthService {
     );
   }
 
+  /// 회원가입 확인 메일을 다시 보냅니다.
+  Future<void> resendSignupEmailCode(String email) async {
+    if (!SupabaseConfig.isConfigured) {
+      throw const AuthException('Supabase 설정이 필요합니다.');
+    }
+    await SupabaseService.client.auth.resend(
+      type: OtpType.signup,
+      email: email.trim(),
+    );
+  }
+
+  /// Confirm signup 메일 템플릿의 {{ .Token }} 값을 확인합니다.
+  /// 성공 후 profiles.email_ownership_verified_at을 기록하고
+  /// 회원가입 과정에서 생성된 세션은 로그아웃하여 일반 로그인 화면으로 돌려보냅니다.
+  Future<void> verifySignupEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    if (!SupabaseConfig.isConfigured) {
+      throw const AuthException('Supabase 설정이 필요합니다.');
+    }
+
+    final response = await SupabaseService.client.auth.verifyOTP(
+      type: OtpType.email,
+      email: email.trim(),
+      token: code.trim(),
+    );
+
+    final user = response.user;
+    if (user == null) {
+      throw const AuthException('이메일 인증에 실패했습니다.');
+    }
+
+    await SupabaseService.client.from('profiles').update({
+      'email_ownership_verified_at':
+          DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', user.id);
+
+    await SupabaseService.client.auth.signOut();
+    _currentUser = null;
+  }
+
   Future<AppUser> updateProfile({
     required String name,
     required String phone,
@@ -145,6 +191,8 @@ class AuthService {
     return (await refreshCurrentUser())!;
   }
 
+  /// 기존 호출부 호환용. 새 계정 화면에서는 아래의
+  /// updatePasswordWithVerification()을 사용합니다.
   Future<void> updatePassword(String password) async {
     if (SupabaseService.client.auth.currentUser == null) {
       throw const AuthException('로그인이 필요합니다.');
@@ -152,6 +200,48 @@ class AuthService {
     await SupabaseService.client.auth.updateUser(
       UserAttributes(password: password),
     );
+  }
+
+  /// Supabase Reauthentication 메일(OTP)을 현재 로그인 사용자의
+  /// 확인된 이메일로 전송합니다.
+  Future<void> sendPasswordChangeVerificationCode() async {
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+    if ((authUser.email ?? '').trim().isEmpty) {
+      throw const AuthException('등록된 이메일이 없습니다.');
+    }
+    await SupabaseService.client.auth.reauthenticate();
+  }
+
+  /// 기존 암호 + 이메일 재인증 코드 + 새 암호를 서버에서 함께 검증합니다.
+  Future<void> updatePasswordWithVerification({
+    required String currentPassword,
+    required String newPassword,
+    required String verificationCode,
+  }) async {
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) throw const AuthException('로그인이 필요합니다.');
+
+    if (currentPassword.isEmpty) {
+      throw const AuthException('기존 암호를 입력해 주세요.');
+    }
+    if (verificationCode.trim().isEmpty) {
+      throw const AuthException('이메일 인증 코드를 입력해 주세요.');
+    }
+
+    await SupabaseService.client.auth.updateUser(
+      UserAttributes(
+        password: newPassword,
+        currentPassword: currentPassword,
+        nonce: verificationCode.trim(),
+      ),
+    );
+
+    await SupabaseService.client.from('profiles').update({
+      'email_ownership_verified_at':
+          DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', authUser.id);
   }
 
   Future<AppUser> uploadAvatar(XFile image) async {

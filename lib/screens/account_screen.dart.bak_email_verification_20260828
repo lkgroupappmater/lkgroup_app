@@ -70,17 +70,36 @@ class _AccountBodyState extends State<AccountBody> {
         .showSnackBar(SnackBar(content: Text(text)));
   }
 
-  // LK_EMAIL_VERIFICATION_V1
   Future<void> _openSignup() async {
-    final message = await showDialog<String>(
+    final result = await showDialog<_SignupData>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const _SignupDialog(),
     );
-    if (message != null && mounted) {
-      _message(message);
+    if (result == null || !mounted) return;
+
+    try {
+      final authResult = await AuthService.instance.signUp(
+        email: result.email,
+        password: result.password,
+        name: result.name,
+        phone: result.phone,
+        company: result.company,
+        role: result.role,
+      );
+      if (!mounted) return;
+      if (result.role == UserRole.member) {
+        _message(authResult.emailConfirmationRequired
+            ? '회원가입이 완료되었습니다. 이메일 인증 후 접속해 주세요.'
+            : '회원가입이 완료되었습니다. 바로 접속할 수 있습니다.');
+      } else {
+        _message('${result.role.label} 가입 신청이 완료되었습니다. 총괄 관리자 승인 후 접속할 수 있습니다.');
+      }
+    } catch (error) {
+      _message('회원가입 실패: $error');
     }
   }
+
   Future<void> _login() async {
     if (_account.text.trim().isEmpty || _password.text.isEmpty) {
       _message('계정과 암호를 입력해 주세요.');
@@ -123,19 +142,20 @@ class _AccountBodyState extends State<AccountBody> {
   }
 
   Future<void> _openPasswordChange() async {
-    final user = _displayUser;
-    if (user == null) return;
-
-    final changed = await showDialog<bool>(
+    final password = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _PasswordDialog(email: user.email),
+      builder: (_) => const _PasswordDialog(),
     );
-
-    if (changed == true && mounted) {
-      _message('?뷀샇瑜?蹂寃쏀뻽?듬땲?? ?대찓??蹂몄씤 ?몄쬆???꾨즺?섏뿀?듬땲??');
+    if (password == null) return;
+    try {
+      await AuthService.instance.updatePassword(password);
+      _message('암호를 변경했습니다.');
+    } catch (e) {
+      _message('암호 변경 실패: $e');
     }
   }
+
   Future<void> _pickAvatar(ImageSource source) async {
     try {
       final picker = ImagePicker();
@@ -327,12 +347,7 @@ class _SignupDialogState extends State<_SignupDialog> {
   final _passwordConfirm = TextEditingController();
   final _phone = TextEditingController();
   final _company = TextEditingController();
-  final _emailCode = TextEditingController();
-
   UserRole _role = UserRole.member;
-  bool _codeSent = false;
-  bool _busy = false;
-  String? _serverError;
 
   @override
   void dispose() {
@@ -342,102 +357,12 @@ class _SignupDialogState extends State<_SignupDialog> {
     _passwordConfirm.dispose();
     _phone.dispose();
     _company.dispose();
-    _emailCode.dispose();
     super.dispose();
-  }
-
-  Future<void> _sendCode() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _busy = true;
-      _serverError = null;
-    });
-
-    try {
-      final result = await AuthService.instance.signUp(
-        email: _email.text.trim(),
-        password: _password.text,
-        name: _name.text.trim(),
-        phone: FormValidators.normalizePhone(_phone.text),
-        company: _company.text.trim(),
-        role: _role,
-      );
-
-      if (!result.emailConfirmationRequired) {
-        await AuthService.instance.signOut();
-        if (!mounted) return;
-        setState(() {
-          _serverError =
-              'Supabase??Confirm Email ?ㅼ젙??爰쇱졇 ?덉뒿?덈떎. '
-              '?대찓???몄쬆 肄붾뱶 ?뚯썝媛?낆쓣 ?ъ슜?섎젮硫?Confirm Email???쒖꽦?뷀빐 二쇱꽭??';
-        });
-        return;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _codeSent = true;
-        _emailCode.clear();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _serverError = '?몄쬆 肄붾뱶 ?꾩넚 ?ㅽ뙣: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _resendCode() async {
-    setState(() {
-      _busy = true;
-      _serverError = null;
-    });
-
-    try {
-      await AuthService.instance.resendSignupEmailCode(_email.text.trim());
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _serverError = '?몄쬆 肄붾뱶 ?ъ쟾???ㅽ뙣: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _verifyCode() async {
-    if (_emailCode.text.trim().isEmpty) {
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶瑜??낅젰??二쇱꽭??');
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _serverError = null;
-    });
-
-    try {
-      await AuthService.instance.verifySignupEmailCode(
-        email: _email.text.trim(),
-        code: _emailCode.text.trim(),
-      );
-
-      if (!mounted) return;
-      final message = _role == UserRole.member
-          ? '?대찓???몄쬆 諛??뚯썝媛?낆씠 ?꾨즺?섏뿀?듬땲?? 濡쒓렇?명빐 二쇱꽭??'
-          : '?대찓???몄쬆 諛?${_role.label} 媛???좎껌???꾨즺?섏뿀?듬땲?? '
-              '珥앷큵 愿由ъ옄 ?뱀씤 ??濡쒓렇?명븷 ???덉뒿?덈떎.';
-      Navigator.pop(context, message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _serverError = '?대찓???몄쬆 ?ㅽ뙣: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('?뚯썝 媛??),
+        title: const Text('회원 가입'),
         content: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -447,73 +372,62 @@ class _SignupDialogState extends State<_SignupDialog> {
               children: [
                 TextFormField(
                   controller: _name,
-                  readOnly: _codeSent,
                   decoration: const InputDecoration(
-                    labelText: '?대쫫',
-                    hintText: '?? ?띻만??,
-                  ),
-                  validator: (v) => FormValidators.requiredText(v, '?대쫫'),
+                      labelText: '이름', hintText: '예: 홍길동'),
+                  validator: (v) => FormValidators.requiredText(v, '이름'),
                 ),
                 TextFormField(
                   controller: _email,
-                  readOnly: _codeSent,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: '?대찓??,
-                    hintText: '?? member@example.com',
-                  ),
+                      labelText: '이메일',
+                      hintText: '예: member@example.com'),
                   validator: FormValidators.email,
                 ),
                 TextFormField(
                   controller: _password,
-                  readOnly: _codeSent,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '?뷀샇',
-                    hintText: '?? Lkgroup2026',
-                    helperText: '?臾몄옄쨌?뚮Ц?먃룹닽?먮? 媛곴컖 1???댁긽 ?ы븿, 8???댁긽',
+                    labelText: '암호',
+                    hintText: '예: Lkgroup2026',
+                    helperText: '대문자·소문자·숫자를 각각 1자 이상 포함, 8자 이상',
                   ),
                   validator: FormValidators.password,
                 ),
                 TextFormField(
                   controller: _passwordConfirm,
-                  readOnly: _codeSent,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: '?뷀샇?뺤씤',
-                    hintText: '???뷀샇瑜??ㅼ떆 ?낅젰',
-                  ),
+                      labelText: '암호확인',
+                      hintText: '위 암호를 다시 입력'),
                   validator: (v) {
                     if ((v ?? '') != _password.text) {
-                      return '?뷀샇媛 ?쒕줈 ?쇱튂?섏? ?딆뒿?덈떎.';
+                      return '암호가 서로 일치하지 않습니다.';
                     }
                     return null;
                   },
                 ),
                 TextFormField(
                   controller: _phone,
-                  readOnly: _codeSent,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: '?꾪솕踰덊샇',
-                    hintText: '?? 020-5889-2547',
-                    helperText: '02058892547濡??낅젰?대룄 ??????먮룞?쇰줈 ?뺤떇??留욎땅?덈떎.',
+                    labelText: '전화번호',
+                    hintText: '예: 020-5889-2547',
+                    helperText: '02058892547로 입력해도 저장 시 자동으로 형식을 맞춥니다.',
                   ),
                   validator: FormValidators.phone,
                 ),
                 TextFormField(
                   controller: _company,
-                  readOnly: _codeSent,
                   decoration: const InputDecoration(
-                    labelText: '?뚯궗紐??좏깮)',
-                    hintText: '?? LK Trading',
-                  ),
+                      labelText: '회사명(선택)',
+                      hintText: '예: LK Trading'),
                 ),
                 const SizedBox(height: 10),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '?묐젰/?뚰듃?덉궗 諛?愿由ъ옄??珥앷큵 愿由ъ옄 ?뱀씤???꾩슂 ?⑸땲??',
+                    '협력/파트너사 및 관리자는 총괄 관리자 승인이 필요 합니다.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
@@ -521,83 +435,60 @@ class _SignupDialogState extends State<_SignupDialog> {
                 SegmentedButton<UserRole>(
                   segments: const [
                     ButtonSegment(
-                      value: UserRole.member,
-                      label: Text('?쇰컲?뚯썝'),
-                    ),
+                        value: UserRole.member, label: Text('일반회원')),
                     ButtonSegment(
-                      value: UserRole.admin,
-                      label: Text('愿由ъ옄'),
-                    ),
+                        value: UserRole.admin, label: Text('관리자')),
                     ButtonSegment(
-                      value: UserRole.partner,
-                      label: Text('?묐젰/?뚰듃?덉궗'),
-                    ),
+                        value: UserRole.partner,
+                        label: Text('협력/파트너사')),
                   ],
                   selected: {_role},
-                  onSelectionChanged: _codeSent
-                      ? null
-                      : (v) => setState(() => _role = v.first),
+                  onSelectionChanged: (v) =>
+                      setState(() => _role = v.first),
                 ),
-                const SizedBox(height: 14),
-                if (!_codeSent)
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : _sendCode,
-                      icon: const Icon(Icons.email_outlined),
-                      label: const Text('?대찓???몄쬆 肄붾뱶 蹂대궡湲?),
-                    ),
-                  ),
-                if (_codeSent) ...[
-                  TextFormField(
-                    controller: _emailCode,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: '?대찓???몄쬆 肄붾뱶',
-                      hintText: '硫붿씪濡?諛쏆? ?몄쬆 肄붾뱶 ?낅젰',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : _resendCode,
-                      child: const Text('?몄쬆 肄붾뱶 ?ㅼ떆 蹂대궡湲?),
-                    ),
-                  ),
-                ],
-                if (_busy) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ],
-                if (_serverError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _serverError!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context),
-            child: const Text('痍⑥냼'),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
           ),
-          if (_codeSent)
-            FilledButton(
-              onPressed: _busy ? null : _verifyCode,
-              child: const Text('?몄쬆 ?뺤씤'),
-            ),
+          FilledButton(
+            onPressed: () {
+              if (!_formKey.currentState!.validate()) return;
+              Navigator.pop(
+                context,
+                _SignupData(
+                  name: _name.text.trim(),
+                  email: _email.text.trim(),
+                  password: _password.text,
+                  phone: FormValidators.normalizePhone(_phone.text),
+                  company: _company.text.trim(),
+                  role: _role,
+                ),
+              );
+            },
+            child: const Text('가입하기'),
+          ),
         ],
       );
 }
+
+class _SignupData {
+  const _SignupData({
+    required this.name,
+    required this.email,
+    required this.password,
+    required this.phone,
+    required this.company,
+    required this.role,
+  });
+  final String name, email, password, phone, company;
+  final UserRole role;
+}
+
 class _ProfileEditDialog extends StatefulWidget {
   const _ProfileEditDialog({required this.user});
   final AppUser user;
@@ -704,9 +595,7 @@ class _ProfileEditData {
 }
 
 class _PasswordDialog extends StatefulWidget {
-  const _PasswordDialog({required this.email});
-
-  final String email;
+  const _PasswordDialog();
 
   @override
   State<_PasswordDialog> createState() => _PasswordDialogState();
@@ -714,173 +603,56 @@ class _PasswordDialog extends StatefulWidget {
 
 class _PasswordDialogState extends State<_PasswordDialog> {
   final _key = GlobalKey<FormState>();
-  final _currentPassword = TextEditingController();
-  final _newPassword = TextEditingController();
-  final _newPasswordConfirm = TextEditingController();
-  final _emailCode = TextEditingController();
-
-  bool _codeSent = false;
-  bool _busy = false;
-  String? _serverError;
+  final _p1 = TextEditingController();
+  final _p2 = TextEditingController();
 
   @override
   void dispose() {
-    _currentPassword.dispose();
-    _newPassword.dispose();
-    _newPasswordConfirm.dispose();
-    _emailCode.dispose();
+    _p1.dispose();
+    _p2.dispose();
     super.dispose();
-  }
-
-  Future<void> _sendCode() async {
-    setState(() {
-      _busy = true;
-      _serverError = null;
-    });
-
-    try {
-      await AuthService.instance.sendPasswordChangeVerificationCode();
-      if (!mounted) return;
-      setState(() => _codeSent = true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶 ?꾩넚 ?ㅽ뙣: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _changePassword() async {
-    if (!_key.currentState!.validate()) return;
-    if (!_codeSent || _emailCode.text.trim().isEmpty) {
-      setState(() => _serverError = '?대찓???몄쬆 肄붾뱶瑜?癒쇱? 諛쏆븘 ?낅젰??二쇱꽭??');
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _serverError = null;
-    });
-
-    try {
-      await AuthService.instance.updatePasswordWithVerification(
-        currentPassword: _currentPassword.text,
-        newPassword: _newPassword.text,
-        verificationCode: _emailCode.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _serverError = '?뷀샇 蹂寃??ㅽ뙣: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('?뷀샇 蹂寃?),
+        title: const Text('암호 변경'),
         content: Form(
           key: _key,
           autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _currentPassword,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '湲곗〈 ?뷀샇',
-                    hintText: '?꾩옱 ?ъ슜 以묒씤 ?뷀샇 ?낅젰',
-                  ),
-                  validator: (v) => FormValidators.requiredText(v, '湲곗〈 ?뷀샇'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _p1,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: '새 암호',
+                  hintText: '예: Lkgroup2026',
+                  helperText: '대문자·소문자·숫자 포함 8자 이상',
                 ),
-                TextFormField(
-                  controller: _newPassword,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '???뷀샇',
-                    hintText: '?? Lkgroup2026',
-                    helperText: '?臾몄옄쨌?뚮Ц?먃룹닽???ы븿 8???댁긽',
-                  ),
-                  validator: FormValidators.password,
-                ),
-                TextFormField(
-                  controller: _newPasswordConfirm,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '???뷀샇 ?뺤씤',
-                  ),
-                  validator: (v) => v == _newPassword.text
-                      ? null
-                      : '???뷀샇媛 ?쒕줈 ?쇱튂?섏? ?딆뒿?덈떎.',
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '?몄쬆 ?대찓?? ${widget.email}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _sendCode,
-                    icon: const Icon(Icons.email_outlined),
-                    label: Text(
-                      _codeSent
-                          ? '?대찓???몄쬆 肄붾뱶 ?ㅼ떆 蹂대궡湲?
-                          : '?대찓???몄쬆 肄붾뱶 蹂대궡湲?,
-                    ),
-                  ),
-                ),
-                if (_codeSent) ...[
-                  TextFormField(
-                    controller: _emailCode,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: '?대찓???몄쬆 肄붾뱶',
-                      hintText: '硫붿씪濡?諛쏆? ?몄쬆 肄붾뱶 ?낅젰',
-                    ),
-                    validator: (v) => (v ?? '').trim().isEmpty
-                        ? '?대찓???몄쬆 肄붾뱶瑜??낅젰??二쇱꽭??'
-                        : null,
-                  ),
-                ],
-                if (_busy) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ],
-                if (_serverError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _serverError!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                validator: FormValidators.password,
+              ),
+              TextFormField(
+                controller: _p2,
+                obscureText: true,
+                decoration:
+                    const InputDecoration(labelText: '새 암호 확인'),
+                validator: (v) =>
+                    v == _p1.text ? null : '암호가 서로 일치하지 않습니다.',
+              ),
+            ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context, false),
-            child: const Text('痍⑥냼'),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소')),
           FilledButton(
-            onPressed: _busy ? null : _changePassword,
-            child: const Text('蹂寃?),
+            onPressed: () {
+              if (!_key.currentState!.validate()) return;
+              Navigator.pop(context, _p1.text);
+            },
+            child: const Text('변경'),
           ),
         ],
       );
