@@ -10,6 +10,7 @@ import 'excel_upload_screen.dart';
 import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
 import 'change_approval_screen.dart';
+import 'quote_request_management_screen.dart';
 
 class CargoManagementScreen extends StatefulWidget {
   const CargoManagementScreen({
@@ -296,6 +297,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           'label': '변경 승인 관리',
           'icon': Icons.fact_check_outlined,
           'page': const ChangeApprovalScreen(),
+        },
+        {
+          'label': '견적 요청 관리',
+          'icon': Icons.request_quote_outlined,
+          'page': const QuoteRequestManagementScreen(),
         },
         {
           'label': '기준 환율 입력',

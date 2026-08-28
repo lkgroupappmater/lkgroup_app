@@ -165,7 +165,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case 1:
         return AppStrings.get(_language, 'tracking_title');
       case 2:
-        return AppStrings.get(_language, 'quote_title');
+        return '운임 확인 및 견적 요청';
       case 3:
         return _currentUser?.role == UserRole.admin ? '통합 관리' : '화물 관리';
       default:
@@ -229,7 +229,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onEditRequest: () => _selectTab(3),
         onManageSelected: _openCargoManagement,
       ),
-      QuoteRequestBody(language: _language, onRequestLogin: _openAccount),
+      QuoteRequestBody(
+        language: _language,
+        onRequestLogin: _openAccount,
+        onNotificationsChanged: () {
+          _refreshNotifications(showPopup: false);
+        },
+      ),
       if (_isLoggedIn)
         CargoManagementScreen(
           key: ValueKey(
