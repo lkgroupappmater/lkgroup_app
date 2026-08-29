@@ -622,9 +622,68 @@ class _RouteDefinitionEditorScreenState
               ),
             ],
           ),
+          if (!_isCreate || _savedDraft) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: _busy ? null : _deleteRoute,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('운송 경로 삭제'),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _deleteRoute() async {
+    final key = _savedDraft
+        ? _draftRouteKey
+        : (_isCreate ? null : '${widget.route?['route_key'] ?? ''}');
+    if (key == null || key.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('운송 경로 삭제'),
+            content: const Text(
+              '삭제하면 해당 운송 경로는 즉시 기존 메뉴 및 신규 업무 선택 목록에서 사라집니다.\n\n'
+              '운송 경로 설정, BASE Excel 및 운임 정책은 30일 동안 삭제 대기 상태로 보관된 후 '
+              '자동으로 완전히 삭제됩니다.\n\n'
+              '즉시 완전 삭제 기능은 제공되지 않습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red,
+                ),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    setState(() => _busy = true);
+    try {
+      await RouteDevelopmentService.instance.deleteRoute(key);
+      if (!mounted) return;
+      _message('삭제 요청이 완료되었습니다. 30일 후 자동으로 완전히 삭제됩니다.');
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) _message('운송 경로 삭제 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _save() async {

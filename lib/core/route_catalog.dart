@@ -120,14 +120,11 @@ class RouteCatalog {
   ];
 
   static Map<String, RouteDefinition> _runtime = const {};
+  static bool _databaseLoaded = false;
 
   static List<RouteDefinition> get definitions {
-    if (_runtime.isEmpty) return List.unmodifiable(_builtIns);
-    final merged = <String, RouteDefinition>{
-      for (final item in _builtIns) item.routeKey: item,
-      ..._runtime,
-    };
-    return merged.values
+    if (!_databaseLoaded) return List.unmodifiable(_builtIns);
+    return _runtime.values
         .where((item) => item.status == 'active')
         .toList(growable: false);
   }
@@ -151,11 +148,13 @@ class RouteCatalog {
       next[item.routeKey] = item;
     }
     _runtime = Map.unmodifiable(next);
+    _databaseLoaded = true;
   }
 
   static RouteDefinition? definitionForKey(String key) {
     final runtime = _runtime[key];
     if (runtime != null) return runtime;
+    if (_databaseLoaded) return null;
     for (final item in _builtIns) {
       if (item.routeKey == key) return item;
     }

@@ -113,6 +113,15 @@ class RouteDevelopmentService {
     await RouteCatalogService.instance.refresh();
   }
 
+
+  Future<void> deleteRoute(String key) async {
+    await SupabaseService.client.rpc(
+      'admin_soft_delete_route',
+      params: {'p_route_key': key},
+    );
+    await RouteCatalogService.instance.refresh();
+  }
+
   Future<void> _saveExtension({
     required String key,
     required String filePrefix,
