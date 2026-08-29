@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../core/route_catalog.dart';
 import 'shipment_service.dart';
 import 'supabase_service.dart';
