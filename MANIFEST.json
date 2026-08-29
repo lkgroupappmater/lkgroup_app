@@ -1,0 +1,19 @@
+{
+  "quotation_templates": [
+    "la_vn_land",
+    "vn_la_land",
+    "la_ch_land",
+    "ch_la_land",
+    "la_kh_land",
+    "kh_la_land",
+    "kr_la_sea",
+    "kr_la_air",
+    "la_kr_air_exp",
+    "la_th_land",
+    "th_la_land"
+  ],
+  "la_kh_base_replaced": true,
+  "kh_la_base_received": true,
+  "kh_la_base_path": "BASE_EXCEL_TEMPLATES/kh_la_land/KH_LA_LAND_2026_V00_SHIPMENTS.xlsx",
+  "supersedes_previous_zip": true
+}
