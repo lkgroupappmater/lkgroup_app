@@ -82,7 +82,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                '관리자·직원 전용',
+                '관리자·직원·협력/파트너사 전용',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -98,7 +98,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                 const Center(child: CircularProgressIndicator())
               else if (_templates.isNotEmpty)
                 DropdownButtonFormField<ExcelTemplateBatch>(
-                  value: _selected,
+                  initialValue: _selected,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: '운송 경로 / 연도 / 항차',

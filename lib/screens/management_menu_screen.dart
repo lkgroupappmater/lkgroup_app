@@ -26,38 +26,42 @@ class ManagementMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <Map<String, Object?>>[
-      {
-        'label': '선적 일정 관리',
-        'icon': Icons.calendar_month,
-        'page': ScheduleManagementScreen(user: user),
-      },
-      {
-        'label': '공지사항 관리',
-        'icon': Icons.campaign_outlined,
-        'page': NoticeManagementScreen(user: user),
-      },
-      {
-        'label': '화물 종합 관리',
-        'icon': Icons.inventory_2_outlined,
-        'action': onOpenCargoManagement,
-      },
-    ];
+    final items = <Map<String, Object?>>[];
 
     if (_isAdmin || _isStaff) {
       items.addAll([
         {
-          'label': '엑셀 화물 업로드',
-          'icon': Icons.upload_file_outlined,
-          'page': const ExcelUploadScreen(),
+          'label': '선적 일정 관리',
+          'icon': Icons.calendar_month,
+          'page': ScheduleManagementScreen(user: user),
         },
         {
-          'label': '엑셀 화물 다운로드',
-          'icon': Icons.download_outlined,
-          'page': const ExcelExportScreen(),
+          'label': '공지 및 안내 관리',
+          'icon': Icons.campaign_outlined,
+          'page': NoticeManagementScreen(user: user),
         },
       ]);
     }
+
+    items.add({
+      'label': '화물 종합 관리',
+      'icon': Icons.inventory_2_outlined,
+      'action': onOpenCargoManagement,
+    });
+
+    // 엑셀 업로드/다운로드: 총괄, 직원, 협력/파트너사
+    items.addAll([
+      {
+        'label': '엑셀 화물 업로드',
+        'icon': Icons.upload_file_outlined,
+        'page': const ExcelUploadScreen(),
+      },
+      {
+        'label': '엑셀 화물 다운로드',
+        'icon': Icons.download_outlined,
+        'page': const ExcelExportScreen(),
+      },
+    ]);
 
     if (_isAdmin) {
       items.addAll([
@@ -67,10 +71,15 @@ class ManagementMenuScreen extends StatelessWidget {
           'page': const MemberManagementScreen(),
         },
         {
-          'label': '변경 승인 관리',
+          'label': '화물 내용 변경 승인 관리',
           'icon': Icons.fact_check_outlined,
           'page': const ChangeApprovalScreen(),
         },
+      ]);
+    }
+
+    if (_isAdmin || _isStaff) {
+      items.addAll([
         {
           'label': '견적 요청 관리',
           'icon': Icons.request_quote_outlined,

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
@@ -46,7 +48,7 @@ class ExcelImportService {
     Uint8List bytes, {
     required String fileName,
   }) async {
-    final workbook = Excel.decodeBytes(bytes);
+    final workbook = Excel.decodeBytes(_parserCompatibleBytes(bytes));
     final meta = _parseFileMeta(fileName);
     if (meta == null) {
       throw StateError(
@@ -135,6 +137,66 @@ class ExcelImportService {
           ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
           : '화물 데이터를 반영하고, 같은 항차의 원본 Excel 템플릿도 안전하게 저장했습니다.',
     );
+  }
+
+  Uint8List _parserCompatibleBytes(Uint8List originalBytes) {
+    // Some real LK Group workbooks contain a <numFmt> record whose ID is in
+    // Excel's built-in range (<164). Excel itself accepts these files, while
+    // package:excel 4.0.6 throws before any cargo values can be read.
+    //
+    // IMPORTANT: this rebuilt XLSX exists only in memory for parsing.
+    // The exact original bytes are still uploaded to template Storage and are
+    // never rewritten by this compatibility step.
+    final archive = ZipDecoder().decodeBytes(originalBytes, verify: false);
+    final styles = archive.findFile('xl/styles.xml');
+    if (styles == null) return originalBytes;
+
+    final styleBytes = styles.content as List<int>;
+    final xml = utf8.decode(styleBytes, allowMalformed: true);
+    final numFmtPattern = RegExp(
+      r'<numFmt\b[^>]*\bnumFmtId="(\d+)"[^>]*(?:/>|>[\s\S]*?</numFmt>)',
+      caseSensitive: false,
+    );
+
+    var changed = false;
+    var sanitized = xml.replaceAllMapped(numFmtPattern, (match) {
+      final id = int.tryParse(match.group(1) ?? '');
+      if (id != null && id < 164) {
+        changed = true;
+        return '';
+      }
+      return match.group(0) ?? '';
+    });
+
+    // package:excel 4.0.6 does not provide every Excel built-in accounting
+    // format (notably 41/42 and related 37-44) in its internal numFmt map.
+    // If an xf references one of those IDs, parsing aborts with
+    // "missing numFmt for 41". For import purposes these cells only need their
+    // raw numeric value, so rewrite those accounting-format references to
+    // General (0) in the temporary parser copy only.
+    final unsupportedBuiltInAccounting = RegExp(
+      r'numFmtId="(3[7-9]|4[0-4])"',
+      caseSensitive: false,
+    );
+    sanitized = sanitized.replaceAllMapped(unsupportedBuiltInAccounting, (match) {
+      changed = true;
+      return 'numFmtId="0"';
+    });
+
+    if (!changed) return originalBytes;
+
+    final rebuilt = Archive();
+    for (final file in archive.files) {
+      if (!file.isFile) continue;
+      final content = file.name == 'xl/styles.xml'
+          ? utf8.encode(sanitized)
+          : (file.content as List<int>);
+      rebuilt.addFile(ArchiveFile(file.name, content.length, content));
+    }
+
+    final encoded = ZipEncoder().encode(rebuilt);
+    if (encoded == null) return originalBytes;
+    return Uint8List.fromList(encoded);
   }
 
   Future<void> _saveWorkbookTemplate({

@@ -132,7 +132,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('화물 정보 변경 승인 요청 관리'),
+          title: const Text('화물 내용 변경 승인 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
         ),
@@ -147,7 +147,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                     if (_requests.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(child: Text('대기 중인 변경 승인 요청이 없습니다.')),
+                        child: Center(child: Text('대기 중인 화물 내용 변경 승인 요청이 없습니다.')),
                       )
                     else ...[
                       CheckboxListTile(

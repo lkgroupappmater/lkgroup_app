@@ -50,7 +50,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _message('공지사항 조회 실패: $e');
+      _message('공지 및 안내 조회 실패: $e');
     }
   }
 
@@ -58,7 +58,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('공지사항 삭제 확인'),
+        title: const Text('공지 및 안내 삭제 확인'),
         content: const Text(
           '삭제하면 홈 화면에서는 즉시 보이지 않습니다.\n'
           '삭제된 자료는 30일 동안 임시 보관 후 완전히 삭제됩니다.',
@@ -94,7 +94,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     if (ok != true) return;
     try {
       await ContentService.hardDeleteNotice(_text(row, 'id'));
-      _message('공지사항을 완전히 삭제했습니다.');
+      _message('공지 및 안내를 완전히 삭제했습니다.');
       await _load();
     } catch (e) {
       _message('바로 삭제 실패: $e');
@@ -121,7 +121,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? '공지사항 추가' : '공지사항 편집'),
+          title: Text(existing == null ? '공지 및 안내 추가' : '공지 및 안내 편집'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -201,7 +201,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     if (!widget.user.role.canEditNotices) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('공지사항 관리'),
+          title: const Text('공지 및 안내 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
         ),
@@ -211,7 +211,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('공지사항 목록 관리'),
+        title: const Text('공지 및 안내 목록 관리'),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
       ),
@@ -219,7 +219,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showEditor(),
         icon: const Icon(Icons.add),
-        label: const Text('공지 추가'),
+        label: const Text('공지 및 안내 추가'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -229,7 +229,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   if (_items.isEmpty)
-                    const Card(child: ListTile(title: Text('등록된 공지사항이 없습니다.'))),
+                    const Card(child: ListTile(title: Text('등록된 공지 및 안내가 없습니다.'))),
                   ..._items.map((row) {
                     final pending = _text(row, 'deletion_status') == 'pending';
                     return Card(

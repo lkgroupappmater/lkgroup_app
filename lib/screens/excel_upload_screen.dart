@@ -41,7 +41,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('관리자·직원 전용',
+              const Text('관리자·직원·협력/파트너사 전용',
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

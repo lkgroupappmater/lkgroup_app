@@ -263,8 +263,8 @@ Deno.serve(async (req) => {
     .eq('id', authData.user.id)
     .maybeSingle();
   if (profileError) return json(500, { error: profileError.message });
-  if (!profile || !['admin', 'staff'].includes(profile.role)) {
-    return json(403, { error: '관리자·직원 권한이 필요합니다.' });
+  if (!profile || !['admin', 'staff', 'partner'].includes(profile.role)) {
+    return json(403, { error: '관리자·직원·협력/파트너사 권한이 필요합니다.' });
   }
 
   try {
