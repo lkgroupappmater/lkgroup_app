@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
 import '../services/shipment_service.dart';
 import '../services/unknown_recipient_service.dart';
@@ -54,14 +55,19 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }
   }
 
-  Map<String, TextEditingController> _editControllersFor(Map<String, dynamic> r) {
+  Map<String, TextEditingController> _editControllersFor(
+    Map<String, dynamic> r,
+  ) {
     final id = (r['request_id'] as num).toInt();
     return _controllers.putIfAbsent(id, () {
       String value(String key) => '${r[key] ?? ''}';
       return {
-        'invoice_number': TextEditingController(text: value('invoice_number')),
-        'consignee_name': TextEditingController(text: value('consignee_name')),
-        'consignee_phone': TextEditingController(text: value('consignee_phone')),
+        'invoice_number':
+            TextEditingController(text: value('invoice_number')),
+        'consignee_name':
+            TextEditingController(text: value('consignee_name')),
+        'consignee_phone':
+            TextEditingController(text: value('consignee_phone')),
         'notes': TextEditingController(text: value('notes')),
         'weight_kg': TextEditingController(text: value('weight_kg')),
         'length_cm': TextEditingController(text: value('length_cm')),
@@ -74,15 +80,20 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   Map<String, dynamic> _adminChanges(Map<String, dynamic> r) {
     final c = _editControllersFor(r);
     final changes = <String, dynamic>{};
+
     void addText(String key) {
       final text = c[key]!.text.trim();
       if (text != '${r[key] ?? ''}'.trim()) changes[key] = text;
     }
+
     void addNum(String key) {
       final text = c[key]!.text.trim();
       final old = '${r[key] ?? ''}'.trim();
-      if (text != old) changes[key] = text.isEmpty ? null : num.tryParse(text);
+      if (text != old) {
+        changes[key] = text.isEmpty ? null : num.tryParse(text);
+      }
     }
+
     addText('invoice_number');
     addText('consignee_name');
     addText('consignee_phone');
@@ -97,18 +108,21 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   Future<void> _review(Map<String, dynamic> r, String action) async {
     final id = (r['request_id'] as num).toInt();
     try {
-      final adminChanges = action == 'modified_approve' ? _adminChanges(r) : <String, dynamic>{};
+      final adminChanges =
+          action == 'modified_approve' ? _adminChanges(r) : <String, dynamic>{};
       await ShipmentService.instance.reviewChangeRequest(
         requestId: id,
         action: action,
         adminChanges: adminChanges,
       );
       if (!mounted) return;
-      _message(action == 'reject'
-          ? '거절되었습니다.'
-          : action == 'modified_approve'
-              ? '수정 후 승인되었습니다.'
-              : '승인되었습니다.');
+      _message(
+        action == 'reject'
+            ? '거절되었습니다.'
+            : action == 'modified_approve'
+                ? '수정 후 승인되었습니다.'
+                : '승인되었습니다.',
+      );
       await _load();
     } catch (error) {
       _message('처리 실패: $error');
@@ -157,14 +171,130 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         action: action,
       );
       if (!mounted) return;
-      _message(approve
-          ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.'
-          : '수취인 불명 화물 확인 요청을 거절했습니다.');
+      _message(
+        approve
+            ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.'
+            : '수취인 불명 화물 확인 요청을 거절했습니다.',
+      );
       await _load();
     } catch (error) {
       _message('수취인 불명 화물 요청 처리 실패: $error');
     }
   }
+
+  Future<void> _bulk(String action) async {
+    final ids = _checked.toList();
+    for (final id in ids) {
+      final r = _requests.firstWhere(
+        (item) => (item['request_id'] as num).toInt() == id,
+      );
+      await ShipmentService.instance.reviewChangeRequest(
+        requestId: id,
+        action: action,
+      );
+    }
+    if (!mounted) return;
+    _message(
+      action == 'reject'
+          ? '체크된 요청을 거절했습니다.'
+          : '체크된 요청을 승인했습니다.',
+    );
+    await _load();
+  }
+
+  void _message(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          title: const Text('화물 내용 변경 승인 관리'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.white,
+        ),
+        backgroundColor: AppColors.background,
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (_unknownClaims.isNotEmpty) ...[
+                      const Text(
+                        '수취인 불명 화물 확인 요청',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._unknownClaims.map(_unknownClaimCard),
+                      const SizedBox(height: 14),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_requests.isEmpty && _unknownClaims.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: Text(
+                            '대기 중인 화물 내용 변경 승인 요청이 없습니다.',
+                          ),
+                        ),
+                      ),
+                    if (_requests.isNotEmpty) ...[
+                      CheckboxListTile(
+                        value: _checked.length == _requests.length,
+                        onChanged: (v) => setState(() {
+                          if (v == true) {
+                            _checked.addAll(
+                              _requests.map(
+                                (r) => (r['request_id'] as num).toInt(),
+                              ),
+                            );
+                          } else {
+                            _checked.clear();
+                          }
+                        }),
+                        title: const Text(
+                          '전체 선택',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      ..._requests.map(_requestCard),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _checked.isEmpty
+                                  ? null
+                                  : () => _bulk('reject'),
+                              child: const Text('체크된 요청 전체 거절'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: _checked.isEmpty
+                                  ? null
+                                  : () => _bulk('approve'),
+                              child: const Text('체크된 요청 전체 승인'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+      );
 
   Widget _unknownClaimCard(Map<String, dynamic> claim) {
     return Card(
@@ -247,103 +377,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       ),
     );
   }
-  Future<void> _bulk(String action) async {
-    final ids = _checked.toList();
-    for (final id in ids) {
-      final r = _requests.firstWhere((item) => (item['request_id'] as num).toInt() == id);
-      await ShipmentService.instance.reviewChangeRequest(
-        requestId: id,
-        action: action,
-      );
-    }
-    if (!mounted) return;
-    _message(action == 'reject' ? '체크된 요청을 거절했습니다.' : '체크된 요청을 승인했습니다.');
-    await _load();
-  }
-
-  void _message(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('화물 내용 변경 승인 관리'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-        ),
-        backgroundColor: AppColors.background,
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_unknownClaims.isNotEmpty) ...[
-                      const Text(
-                        '수취인 불명 화물 확인 요청',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ..._unknownClaims.map(_unknownClaimCard),
-                      const SizedBox(height: 14),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                    ],
-                    if (_requests.isEmpty && _unknownClaims.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(child: Text('대기 중인 화물 내용 변경 승인 요청이 없습니다.')),
-                      )
-                    if (_requests.isNotEmpty) ...[
-                      CheckboxListTile(
-                        value: _checked.length == _requests.length,
-                        onChanged: (v) => setState(() {
-                          if (v == true) {
-                            _checked.addAll(_requests.map(
-                                (r) => (r['request_id'] as num).toInt()));
-                          } else {
-                            _checked.clear();
-                          }
-                        }),
-                        title: const Text('전체 선택',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                      ..._requests.map(_requestCard),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _checked.isEmpty ? null : () => _bulk('reject'),
-                              child: const Text('체크된 요청 전체 거절'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: _checked.isEmpty ? null : () => _bulk('approve'),
-                              child: const Text('체크된 요청 전체 승인'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-      );
 
   Widget _requestCard(Map<String, dynamic> r) {
     final id = (r['request_id'] as num).toInt();
     final editing = _editing.contains(id);
-    final requested = Map<String, dynamic>.from(r['requested_changes'] ?? const {});
+    final requested =
+        Map<String, dynamic>.from(r['requested_changes'] ?? const {});
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -354,8 +393,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               children: [
                 Checkbox(
                   value: _checked.contains(id),
-                  onChanged: (v) => setState(() =>
-                      v == true ? _checked.add(id) : _checked.remove(id)),
+                  onChanged: (v) => setState(
+                    () => v == true
+                        ? _checked.add(id)
+                        : _checked.remove(id),
+                  ),
                 ),
                 Expanded(
                   child: Text(
@@ -369,8 +411,10 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               ],
             ),
             Text(
-              '${r['route'] ?? ''} · ${r['shipment_year'] ?? ''}년 · ${r['voyage'] ?? ''}항차\n'
-              '요청인: ${r['requester_name'] ?? ''} (${r['requester_email'] ?? ''})',
+              '${r['route'] ?? ''} · ${r['shipment_year'] ?? ''}년 · '
+              '${r['voyage'] ?? ''}항차\n'
+              '요청인: ${r['requester_name'] ?? ''} '
+              '(${r['requester_email'] ?? ''})',
             ),
             if (r['data_locked'] == true) ...[
               const SizedBox(height: 8),
@@ -389,11 +433,17 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            const Text('요청 내용', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              '요청 내용',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             Text(_changesText(requested)),
             if (editing) ...[
               const Divider(height: 22),
-              const Text('관리자 수정', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                '관리자 수정',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               ..._editorFields(r),
               const SizedBox(height: 8),
@@ -403,11 +453,13 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                   spacing: 8,
                   children: [
                     OutlinedButton(
-                      onPressed: () => setState(() => _editing.remove(id)),
+                      onPressed: () =>
+                          setState(() => _editing.remove(id)),
                       child: const Text('취소'),
                     ),
                     FilledButton(
-                      onPressed: () => _review(r, 'modified_approve'),
+                      onPressed: () =>
+                          _review(r, 'modified_approve'),
                       child: const Text('수정 후 승인'),
                     ),
                   ],
@@ -442,7 +494,13 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   List<Widget> _editorFields(Map<String, dynamic> r) {
     final c = _editControllersFor(r);
-    Widget field(String key, String label, {bool number = false, int maxLines = 1}) =>
+
+    Widget field(
+      String key,
+      String label, {
+      bool number = false,
+      int maxLines = 1,
+    }) =>
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: TextField(
@@ -458,21 +516,34 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
             ),
           ),
         );
+
     return [
       field('invoice_number', '송장번호'),
       field('consignee_name', '이름/라오스 수령인'),
       field('consignee_phone', '연락처'),
       field('notes', '기타 내용', maxLines: 2),
-      Row(children: [
-        Expanded(child: field('weight_kg', '무게(kg)', number: true)),
-        const SizedBox(width: 8),
-        Expanded(child: field('length_cm', '가로(cm)', number: true)),
-      ]),
-      Row(children: [
-        Expanded(child: field('width_cm', '세로(cm)', number: true)),
-        const SizedBox(width: 8),
-        Expanded(child: field('height_cm', '높이(cm)', number: true)),
-      ]),
+      Row(
+        children: [
+          Expanded(
+            child: field('weight_kg', '무게(kg)', number: true),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: field('length_cm', '가로(cm)', number: true),
+          ),
+        ],
+      ),
+      Row(
+        children: [
+          Expanded(
+            child: field('width_cm', '세로(cm)', number: true),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: field('height_cm', '높이(cm)', number: true),
+          ),
+        ],
+      ),
     ];
   }
 
@@ -493,6 +564,3 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
-
-
-
