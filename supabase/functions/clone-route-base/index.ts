@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     step = 'load-source-base-template';
     const { data: sourceBaseRows, error: sourceBaseError } = await admin
       .from('shipment_excel_base_templates')
-      .select('route_key,route_label,storage_path')
+      .select('route_key,route_label,file_name,storage_path')
       .eq('route_key', sourceRouteKey)
       .limit(1);
     if (sourceBaseError) throw sourceBaseError;
@@ -368,6 +368,7 @@ Deno.serve(async (req) => {
     step = 'zip-new-xlsx';
     const encoded = zipSync(files, { level: 6 });
     const year =
+      String(sourceBase.file_name ?? '').match(/20\d{2}/)?.[0] ??
       String(sourceBase.storage_path ?? '').match(/20\d{2}/)?.[0] ??
       String(new Date().getFullYear());
     const filePrefix =
@@ -402,6 +403,7 @@ Deno.serve(async (req) => {
         .from('shipment_excel_base_templates')
         .update({
           route_label: String(target.display_name),
+          file_name: fileName,
           storage_path: storagePath,
         })
         .eq('route_key', routeKey);
@@ -412,6 +414,7 @@ Deno.serve(async (req) => {
         .insert({
           route_key: routeKey,
           route_label: String(target.display_name),
+          file_name: fileName,
           storage_path: storagePath,
         });
       if (insertError) throw insertError;
