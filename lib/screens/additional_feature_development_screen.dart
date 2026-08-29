@@ -631,6 +631,7 @@ class _RouteDefinitionEditorScreenState
     final routeKey = (_isCreate || _isDraft)
         ? _baseRouteKey
         : '${widget.route?['route_key'] ?? ''}';
+
     if (routeKey == null || routeKey.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -641,8 +642,9 @@ class _RouteDefinitionEditorScreenState
     final remark = _remarkController.text.trim();
 
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -650,38 +652,41 @@ class _RouteDefinitionEditorScreenState
               '명세서 BASE 전체 미리보기',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              '입력 중인 문서 타이틀 / 영수번호 Prefix / Remark가 아래 BASE 미리보기에 즉시 반영됩니다.',
-              style: TextStyle(fontSize: 11, color: Colors.black54),
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: AspectRatio(
-                aspectRatio: 1.55,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Stack(
+            const SizedBox(height: 6),
+
+            // statement_forms PNG는 원본 linked-image 캡처 특성상 위쪽에
+            // 큰 흰 여백이 포함되어 있다.
+            // 여기서는 파일 자체를 수정하지 않고, bottom 기준 cover crop으로
+            // 실제 명세서 영역만 카드 폭에 크게 보여준다.
+            AspectRatio(
+              aspectRatio: 1.78,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return ClipRect(
+                    child: Stack(
                       fit: StackFit.expand,
                       children: [
                         Image.asset(
                           'assets/statement_forms/$formKey.png',
-                          fit: BoxFit.contain,
-                          alignment: Alignment.topCenter,
-                          errorBuilder: (_, __, ___) => const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text(
-                              '선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.bottomCenter,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                '선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.',
+                              ),
                             ),
                           ),
                         ),
+
+                        // 문서 타이틀: 실제 명세서 상단 중앙 제목 영역에 표시.
                         if (documentTitle.isNotEmpty)
                           Positioned(
-                            left: constraints.maxWidth * .20,
-                            right: constraints.maxWidth * .20,
-                            top: constraints.maxHeight * .012,
-                            height: constraints.maxHeight * .065,
+                            left: constraints.maxWidth * .18,
+                            right: constraints.maxWidth * .18,
+                            top: constraints.maxHeight * .015,
+                            height: constraints.maxHeight * .115,
                             child: Container(
                               color: Colors.white,
                               alignment: Alignment.center,
@@ -690,19 +695,22 @@ class _RouteDefinitionEditorScreenState
                                 child: Text(
                                   '$documentTitle xxth 거래 명세서',
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
                                     color: Colors.black,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
                                   ),
                                 ),
                               ),
                             ),
                           ),
+
+                        // 영수번호 Prefix: 실제 문서 우측 상단 번호칸.
                         if (receiptPrefix.isNotEmpty)
                           Positioned(
-                            right: constraints.maxWidth * .018,
-                            top: constraints.maxHeight * .105,
-                            width: constraints.maxWidth * .14,
-                            height: constraints.maxHeight * .045,
+                            right: constraints.maxWidth * .010,
+                            top: constraints.maxHeight * .018,
+                            width: constraints.maxWidth * .145,
+                            height: constraints.maxHeight * .095,
                             child: Container(
                               color: Colors.white,
                               alignment: Alignment.center,
@@ -711,41 +719,43 @@ class _RouteDefinitionEditorScreenState
                                 child: Text(
                                   receiptPrefix,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
                                     color: Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ),
                             ),
                           ),
+
                         if (remark.isNotEmpty)
                           Positioned(
-                            left: constraints.maxWidth * .08,
-                            right: constraints.maxWidth * .08,
-                            bottom: constraints.maxHeight * .035,
-                            height: constraints.maxHeight * .05,
+                            left: constraints.maxWidth * .055,
+                            right: constraints.maxWidth * .055,
+                            bottom: constraints.maxHeight * .020,
+                            height: constraints.maxHeight * .065,
                             child: Container(
                               color: Colors.white,
                               alignment: Alignment.centerLeft,
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
                                 child: Text(
                                   'Remark : $remark',
                                   style: const TextStyle(
-                                    fontSize: 11,
                                     color: Colors.black,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ),
                             ),
                           ),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -1252,5 +1262,6 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
+
 
 
