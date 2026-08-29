@@ -13,12 +13,17 @@ class ExcelImportResult {
     required this.inserted,
     required this.skipped,
     required this.customerRules,
+    this.customerRulesWaitingForPhone = 0,
     this.message = '',
   });
 
   final int inserted;
+  // Box No.가 없어서 화물로 처리하지 않은 요약/합계/안내 등의 비화물 행.
   final int skipped;
+  // 이름+전화번호가 모두 있어 실제 적용 가능한 고객 할인규칙.
   final int customerRules;
+  // 이름/할인율은 있으나 전화번호가 없어 안전상 적용 대기 중인 규칙.
+  final int customerRulesWaitingForPhone;
   final String message;
 }
 
@@ -111,7 +116,7 @@ class ExcelImportService {
     _applyCalculatedZones(rows, routeKey: routeKey);
 
     final inserted = await ShipmentService.instance.upsertFromRows(rows);
-    final customerRules =
+    final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
 
     if (SupabaseConfig.isConfigured) {
@@ -131,7 +136,8 @@ class ExcelImportService {
     return ExcelImportResult(
       inserted: inserted,
       skipped: skipped,
-      customerRules: customerRules,
+      customerRules: customerRuleResult.applied,
+      customerRulesWaitingForPhone: customerRuleResult.waitingForPhone,
       message: noCargoSheet
           ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
           : '화물 데이터를 반영하고, 같은 항차의 원본 Excel 템플릿도 안전하게 저장했습니다.',
@@ -381,27 +387,39 @@ class ExcelImportService {
     }
   }
 
-  Future<int> _importCustomerDiscountRules(
+  Future<({int applied, int waitingForPhone})> _importCustomerDiscountRules(
     Map<String, List<List<String>>> workbook, {
     required String routeKey,
   }) async {
-    if (!SupabaseConfig.isConfigured) return 0;
+    if (!SupabaseConfig.isConfigured) {
+      return (applied: 0, waitingForPhone: 0);
+    }
     final sheet = workbook['Row data'];
-    if (sheet == null || sheet.isEmpty) return 0;
+    if (sheet == null || sheet.isEmpty) {
+      return (applied: 0, waitingForPhone: 0);
+    }
 
     final rules = <Map<String, dynamic>>[];
+    var applied = 0;
+    var waitingForPhone = 0;
+
     for (var r = 0; r < sheet.length; r++) {
       final row = sheet[r];
       for (var c = 0; c < row.length; c++) {
         final value = row[c].trim();
-        if (value != '이름') continue;
+        if (!_isCustomerNameHeader(value)) continue;
 
-        // Excel의 할인 목록은 "이름 ... 할인율" 형태이므로 오른쪽 4칸 안에서 할인율 열을 찾습니다.
+        // 각 할인 목록은 "이름 ... 할인율" 구조입니다.
+        // 전화번호/연락처 열은 차후 추가되더라도 같은 목록 안에서 자동 인식합니다.
         var discountOffset = -1;
-        for (var offset = 1; offset <= 4 && c + offset < row.length; offset++) {
-          if (row[c + offset].trim() == '할인율') {
+        var phoneOffset = -1;
+        for (var offset = 1; offset <= 6 && c + offset < row.length; offset++) {
+          final header = row[c + offset].trim();
+          if (discountOffset < 0 && _isDiscountHeader(header)) {
             discountOffset = offset;
-            break;
+          }
+          if (phoneOffset < 0 && _isPhoneHeader(header)) {
+            phoneOffset = offset;
           }
         }
         if (discountOffset < 0) continue;
@@ -409,29 +427,83 @@ class ExcelImportService {
         for (var rr = r + 1; rr < sheet.length; rr++) {
           final dataRow = sheet[rr];
           if (c >= dataRow.length) break;
+
           final name = dataRow[c].trim();
           if (name.isEmpty) break;
+
           final discountCell = c + discountOffset < dataRow.length
               ? dataRow[c + discountOffset].trim()
               : '';
           final discount = _toPercent(discountCell);
           if (discount == null) continue;
+
+          final phone = phoneOffset >= 0 && c + phoneOffset < dataRow.length
+              ? dataRow[c + phoneOffset].trim()
+              : '';
+          final normalizedPhone = _digits(phone);
+          final ready = normalizedPhone.isNotEmpty;
+
           rules.add({
             'customer_name': name,
+            'phone': normalizedPhone,
             'route_key': routeKey,
             'discount_percent': discount,
-            'active': true,
+            // 동명이인/오적용 방지: 전화번호가 없는 규칙은 저장하되 적용하지 않습니다.
+            'active': ready,
           });
+
+          if (ready) {
+            applied++;
+          } else {
+            waitingForPhone++;
+          }
         }
       }
     }
 
-    if (rules.isEmpty) return 0;
+    if (rules.isEmpty) {
+      return (applied: 0, waitingForPhone: 0);
+    }
+
     await SupabaseService.client
         .from('customer_rate_overrides')
-        .upsert(rules, onConflict: 'customer_name,route_key');
-    return rules.length;
+        .upsert(rules, onConflict: 'customer_name,phone,route_key');
+
+    return (applied: applied, waitingForPhone: waitingForPhone);
   }
+
+  static bool _isCustomerNameHeader(String value) {
+    final key = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    return key == '이름' ||
+        key == '성명' ||
+        key == '고객명' ||
+        key == '수령인' ||
+        key == 'name' ||
+        key == 'customername';
+  }
+
+  static bool _isDiscountHeader(String value) {
+    final key = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    return key == '할인율' ||
+        key == '할인' ||
+        key == 'discountrate' ||
+        key == 'discount';
+  }
+
+  static bool _isPhoneHeader(String value) {
+    final key = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    return key == '전화번호' ||
+        key == '연락처' ||
+        key == '휴대폰' ||
+        key == '휴대전화' ||
+        key == 'phone' ||
+        key == 'phonenumber' ||
+        key == 'tel' ||
+        key == 'mobile';
+  }
+
+  static String _digits(String value) =>
+      value.replaceAll(RegExp(r'[^0-9]'), '');
 
   static (String, int, String)? _parseFileMeta(String fileName) {
     final match = RegExp(

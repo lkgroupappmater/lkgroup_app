@@ -7,7 +7,6 @@ class FreightLineResult {
   const FreightLineResult({
     required this.shipmentId,
     required this.boxNumber,
-    required this.invoiceNumber,
     required this.route,
     required this.actualWeight,
     required this.volumeWeight,
@@ -18,7 +17,6 @@ class FreightLineResult {
 
   final String shipmentId;
   final String boxNumber;
-  final String invoiceNumber;
   final String route;
   final double actualWeight;
   final double volumeWeight;
@@ -88,7 +86,6 @@ class FreightService {
       lines.add(FreightLineResult(
         shipmentId: '${row['id'] ?? ''}',
         boxNumber: '${row['box_number'] ?? ''}',
-        invoiceNumber: '${row['invoice_number'] ?? ''}',
         route: routeLabel,
         actualWeight: actual,
         volumeWeight: volume,
@@ -135,19 +132,26 @@ class FreightService {
     required String name,
     required String phone,
   }) async {
-    if (!SupabaseConfig.isConfigured || name.trim().isEmpty) return null;
-    var query = SupabaseService.client
+    final normalizedPhone = _digits(phone);
+    // 동명이인/오적용 방지: 고객별 할인은 이름과 전화번호가 모두 있어야 조회합니다.
+    if (!SupabaseConfig.isConfigured ||
+        name.trim().isEmpty ||
+        normalizedPhone.isEmpty) {
+      return null;
+    }
+
+    final rows = await SupabaseService.client
         .from('customer_rate_overrides')
         .select()
         .eq('active', true)
-        .ilike('customer_name', name.trim());
-    final rows = await query.limit(30);
+        .ilike('customer_name', name.trim())
+        .eq('phone', normalizedPhone)
+        .limit(30);
+
     for (final raw in rows) {
       final row = Map<String, dynamic>.from(raw);
       final route = '${row['route_key'] ?? ''}';
-      final savedPhone = _digits('${row['phone'] ?? ''}');
       if (route != 'all' && route != routeKey) continue;
-      if (savedPhone.isNotEmpty && _digits(phone) != savedPhone) continue;
       return row;
     }
     return null;

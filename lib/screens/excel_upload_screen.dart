@@ -18,8 +18,11 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
     try {
       final result = await ExcelImportService.instance.pickAndImport();
       if (mounted) {
+        final discountText = result.customerRulesWaitingForPhone > 0
+            ? '고객 할인규칙 적용: ${result.customerRules}건 · 전화번호 대기: ${result.customerRulesWaitingForPhone}건'
+            : '고객 할인규칙 적용: ${result.customerRules}건';
         setState(() => _message =
-            '${result.message}\n화물 반영: ${result.inserted}건 · 제외: ${result.skipped}건 · 고객 할인규칙: ${result.customerRules}건');
+            '${result.message}\n화물 반영: ${result.inserted}건 · 비화물 행: ${result.skipped}건\n$discountText');
       }
     } catch (error) {
       if (mounted) setState(() => _message = '업로드 실패: $error');
@@ -48,7 +51,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                       color: AppColors.primary)),
               const SizedBox(height: 10),
               const Text(
-                '현재 Excel 컬럼을 그대로 인식합니다: No., 송장 번호, 발신인, 수신인, 전화번호, 내용물, 포장형태, 수량, 중량(KGS), L, w, H, 영수 번호, 구획, 비고.\n송장번호가 없어도 Box No.와 실제 자료가 있으면 등록됩니다.',
+                '현재 Excel 컬럼을 그대로 인식합니다: No., 송장 번호, 발신인, 수신인, 전화번호, 내용물, 포장형태, 수량, 중량(KGS), L, w, H, 영수 번호, 구획, 비고.\n송장번호가 없어도 Box No.와 실제 자료가 있으면 등록됩니다.\n비화물 행은 Box No.가 없는 합계/요약/안내 행이며 화물 DB에는 등록하지 않습니다.',
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
