@@ -243,9 +243,8 @@ Deno.serve(async (req) => {
 
     const { data: sourceBase, error: sourceBaseError } = await admin
       .from('shipment_excel_base_templates')
-      .select('route_key,route_label,file_name,storage_path,active')
+      .select('route_key,route_label,storage_path')
       .eq('route_key', sourceRouteKey)
-      .eq('active', true)
       .maybeSingle();
     if (sourceBaseError) throw sourceBaseError;
     if (!sourceBase) {
@@ -359,7 +358,7 @@ Deno.serve(async (req) => {
 
     const encoded = zipSync(files, { level: 6 });
     const year =
-      String(sourceBase.file_name ?? '').match(/20\d{2}/)?.[0] ??
+      String(sourceBase.storage_path ?? '').match(/20\d{2}/)?.[0] ??
       String(new Date().getFullYear());
     const filePrefix =
       safePathPart(String(target.file_prefix ?? '').trim()) ||
@@ -390,9 +389,7 @@ Deno.serve(async (req) => {
         .from('shipment_excel_base_templates')
         .update({
           route_label: String(target.display_name),
-          file_name: fileName,
           storage_path: storagePath,
-          active: true,
         })
         .eq('route_key', routeKey);
       if (updateError) throw updateError;
@@ -402,9 +399,7 @@ Deno.serve(async (req) => {
         .insert({
           route_key: routeKey,
           route_label: String(target.display_name),
-          file_name: fileName,
           storage_path: storagePath,
-          active: true,
         });
       if (insertError) throw insertError;
     }
