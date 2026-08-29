@@ -79,7 +79,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   Future<void> _loadUnknownRecipientCargo() async {
     final user = widget.currentUser;
-    if (!widget.isLoggedIn || user == null || user.role != UserRole.member) {
+    if (!widget.isLoggedIn || user == null) {
       if (mounted) {
         setState(() => _unknownRecipientRows = const []);
       }
@@ -102,6 +102,37 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     }
   }
 
+  void _showUnknownCargoGuide() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '수취인 불명 화물 보관·처분 상세 안내',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '• 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 '
+          '보관료등 기타 추가 비용이 발생 할 수 있습니다.\n\n'
+          '• 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, '
+          '특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
   Future<void> _claimUnknownCargo(Map<String, dynamic> row) async {
     final user = widget.currentUser;
     if (user == null || user.role != UserRole.member) return;
@@ -207,9 +238,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   Widget _unknownRecipientSection() {
-    if (widget.currentUser?.role != UserRole.member) {
+    if (!widget.isLoggedIn || widget.currentUser == null) {
       return const SizedBox.shrink();
     }
+    final canClaim = widget.currentUser?.role == UserRole.member;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,11 +249,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 8),
-        const Row(
+        Row(
           children: [
-            Icon(Icons.help_outline, color: AppColors.navyPrimary),
-            SizedBox(width: 7),
-            Expanded(
+            const Icon(Icons.help_outline, color: AppColors.navyPrimary),
+            const SizedBox(width: 7),
+            const Expanded(
               child: Text(
                 '수취인 불명 / 데이터 불문명 화물',
                 style: TextStyle(
@@ -231,12 +263,26 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 ),
               ),
             ),
+            TextButton(
+              onPressed: _showUnknownCargoGuide,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+              ),
+              child: const Text(
+                '상세 안내',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
         const Text(
-          '수취인을 특정할 수 없는 화물만 모든 일반 회원에게 제한된 정보로 표시됩니다. '
-          '본인 화물이 확인되면 해당 카드를 눌러 정정 요청해 주세요.',
+          '수취인을 특정할 수 없는 화물은 로그인한 가입자에게 제한된 정보로 표시됩니다. '
+          '일반 회원은 본인 화물이 확인되면 해당 카드를 눌러 정정 요청할 수 있습니다.',
           style: TextStyle(
             fontSize: 11,
             color: AppColors.textSecondary,
@@ -261,10 +307,32 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         else
           ..._unknownRecipientRows.map((row) {
             final pending = row['claim_pending'] == true;
+            final createdAt =
+                DateTime.tryParse('${row['created_at'] ?? ''}')?.toLocal();
+            final ageDays = createdAt == null
+                ? 0
+                : DateTime.now().difference(createdAt).inDays;
+            final Color? warningBorder = ageDays >= 30
+                ? Colors.red
+                : ageDays >= 14
+                    ? Colors.orange
+                    : null;
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
+              shape: warningBorder == null
+                  ? null
+                  : RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: warningBorder,
+                        width: 2.2,
+                      ),
+                    ),
               child: InkWell(
-                onTap: pending ? null : () => _claimUnknownCargo(row),
+                onTap: canClaim && !pending
+                    ? () => _claimUnknownCargo(row)
+                    : null,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -305,7 +373,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                         '연락처',
                         '${row['consignee_phone'] ?? ''}',
                       ),
-                      if (!pending) ...[
+                      if (canClaim && !pending) ...[
                         const SizedBox(height: 8),
                         const Align(
                           alignment: Alignment.centerRight,
@@ -715,4 +783,5 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
 
