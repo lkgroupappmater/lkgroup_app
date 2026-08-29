@@ -63,7 +63,15 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     setState(() { _exporting = true; _message = '원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...'; });
     try {
       final result = await ExcelExportService.instance.exportAndSave(selected);
-      if (mounted) setState(() => _message = '${result.message}\n파일: ${result.fileName}');
+      if (!mounted) return;
+      setState(() {
+        if (result.saved) {
+          _message = '${result.message}\n파일: ${result.fileName}'
+              '${result.savedLocation.isEmpty ? '' : '\n저장 위치: ${result.savedLocation}'}';
+        } else {
+          _message = result.message;
+        }
+      });
     } catch (error) {
       if (mounted) setState(() => _message = '다운로드 실패: $error');
     } finally {
@@ -114,7 +122,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
         FilledButton.icon(
           onPressed: _selected == null || _exporting ? null : _export,
           icon: const Icon(Icons.download_outlined),
-          label: Text(_exporting ? 'Excel 생성 중...' : '최신 Excel 생성 및 저장'),
+          label: Text(_exporting ? 'Excel 생성 중...' : 'Excel 다운로드 및 저장 위치 선택'),
         ),
         const SizedBox(height: 18),
         Text(_message, style: const TextStyle(color: AppColors.textSecondary)),

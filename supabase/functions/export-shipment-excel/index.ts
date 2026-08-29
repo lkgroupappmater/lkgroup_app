@@ -99,10 +99,18 @@ function findHeaderRow(sheetXml: string, strings: string[]): number {
       values.push(cellText(cellMatch[0], strings).trim());
     }
     const joined = values.join('|').toLowerCase();
-    if (
-      (joined.includes('box no') || joined.includes('박스')) &&
-      (joined.includes('송장') || joined.includes('수령') || joined.includes('수신'))
-    ) return row;
+    const hasBoxHeader =
+      joined.includes('box no') ||
+      joined.includes('박스') ||
+      values.some((value) => {
+        const normalized = value.trim().toLowerCase().replaceAll(' ', '');
+        return normalized === 'no.' || normalized === 'no' || normalized === '번호';
+      });
+    const hasCargoColumns =
+      joined.includes('송장') &&
+      (joined.includes('수신') || joined.includes('수령') || joined.includes('전화번호'));
+
+    if (hasBoxHeader && hasCargoColumns) return row;
   }
   return -1;
 }

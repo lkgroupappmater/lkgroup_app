@@ -36,11 +36,13 @@ class ExcelExportResult {
   const ExcelExportResult({
     required this.saved,
     required this.fileName,
+    this.savedLocation = '',
     this.message = '',
   });
 
   final bool saved;
   final String fileName;
+  final String savedLocation;
   final String message;
 }
 
@@ -149,20 +151,29 @@ class ExcelExportService {
         .from('shipment-excel-exports')
         .download(exportPath);
 
-    final saved = await FilePicker.saveFile(
-      dialogTitle: '최신 화물 Excel 저장',
+    final saveUri = await FilePicker.saveFile(
+      dialogTitle: 'Excel 저장 위치 선택',
       fileName: fileName,
       bytes: bytes,
+      mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       type: FileType.custom,
       allowedExtensions: const ['xlsx'],
     );
 
+    if (saveUri == null) {
+      return ExcelExportResult(
+        saved: false,
+        fileName: fileName,
+        message: '휴대폰 파일 저장을 취소했습니다.',
+      );
+    }
+
     return ExcelExportResult(
-      saved: saved != null,
+      saved: true,
       fileName: fileName,
-      message: saved == null
-          ? '저장을 취소했습니다.'
-          : '선택한 운송 경로/연도/항차의 DB 자료로 Excel을 생성했습니다.',
+      savedLocation: saveUri.toString(),
+      message: '선택한 위치에 Excel 파일을 저장했습니다.',
     );
   }
 }
