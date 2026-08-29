@@ -58,6 +58,48 @@ class _AdditionalFeatureDevelopmentScreenState
     );
   }
 
+  Future<void> _deleteDraftFromList(Map<String, dynamic> route) async {
+    final key = '${route['route_key'] ?? ''}';
+    final name = '${route['display_name'] ?? ''}';
+    if (key.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('운송 경로 삭제'),
+            content: Text(
+              '${name.isEmpty ? key : name}\n\n'
+              '삭제하면 즉시 적용 대기 목록과 기존 메뉴/기능에서 사라집니다.\n'
+              '30일 동안 삭제 대기 상태로 보관된 뒤 자동으로 완전히 삭제됩니다.\n\n'
+              '즉시 완전 삭제 기능은 없습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    try {
+      await RouteDevelopmentService.instance.deleteRoute(key);
+      if (!mounted) return;
+      _message('삭제 요청이 완료되었습니다. 30일 후 자동으로 완전히 삭제됩니다.');
+      await _load();
+    } catch (error) {
+      if (mounted) _message('운송 경로 삭제 실패: $error');
+    }
+  }
+
   Future<void> _openDraft(Map<String, dynamic> route) async {
     await Navigator.push<void>(
       context,
@@ -194,9 +236,26 @@ class _AdditionalFeatureDevelopmentScreenState
                               : '내용 저장 완료 · 아직 미적용\nBASE: $base',
                         ),
                         isThreeLine: base.isNotEmpty,
-                        trailing: FilledButton(
-                          onPressed: () => _openDraft(route),
-                          child: const Text('계속 작업'),
+                        trailing: SizedBox(
+                          width: 176,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () => _openDraft(route),
+                                  child: const Text('계속 작업'),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: '삭제',
+                                color: Colors.red,
+                                onPressed: () => _deleteDraftFromList(route),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
