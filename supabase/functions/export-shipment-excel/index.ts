@@ -30,6 +30,17 @@ function rowOf(ref: string): number {
   return Number(ref.match(/\d+$/)?.[0] ?? 0);
 }
 
+
+function columnIndex(column: string): number {
+  let value = 0;
+  for (const ch of column.toUpperCase()) {
+    const code = ch.charCodeAt(0);
+    if (code < 65 || code > 90) continue;
+    value = value * 26 + (code - 64);
+  }
+  return value;
+}
+
 function sharedStrings(files: Record<string, Uint8Array>): string[] {
   const data = files['xl/sharedStrings.xml'];
   if (!data) return [];
@@ -272,6 +283,23 @@ function updateCell(
   }
 
   if (existing) return rowXml.replace(cellRe, replacement);
+
+  // OOXML에서는 row 안의 <c> 셀이 열 순서대로 있어야 합니다.
+  // 기존 템플릿 행이 A/B/O처럼 일부 셀만 가진 경우,
+  // C~N을 row 끝에 단순 append하면 A,B,O,C,D... 순서가 되어
+  // Excel이 "읽을 수 없는 내용"으로 판단하고 셀 정보를 복구/삭제합니다.
+  const targetIndex = columnIndex(column);
+  const cellMatches = [...rowXml.matchAll(
+    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+  )];
+
+  for (const match of cellMatches) {
+    const existingColumn = match[1];
+    if (columnIndex(existingColumn) > targetIndex && match.index != null) {
+      const at = match.index;
+      return `${rowXml.substring(0, at)}${replacement}${rowXml.substring(at)}`;
+    }
+  }
 
   const close = rowXml.lastIndexOf('</row>');
   return close >= 0
