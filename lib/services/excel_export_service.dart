@@ -51,12 +51,11 @@ class ExcelExportService {
   Future<List<ExcelExportBatch>> listBatches() async {
     if (!SupabaseConfig.isConfigured) return const [];
 
-    final shipmentRows = await SupabaseService.client
-        .from('shipments')
-        .select('route,shipment_year,voyage')
-        .not('shipment_year', 'is', null)
-        .neq('voyage', '')
-        .order('shipment_year', ascending: false);
+    final shipmentRowsRaw = await SupabaseService.client.rpc(
+      'list_shipment_export_batches',
+    );
+    final shipmentRows =
+        List<Map<String, dynamic>>.from(shipmentRowsRaw as List);
 
     final voyageTemplates = await SupabaseService.client
         .from('shipment_excel_templates')

@@ -52,12 +52,12 @@ class ManagementMenuScreen extends StatelessWidget {
     // 엑셀 업로드/다운로드: 총괄, 직원, 협력/파트너사
     items.addAll([
       {
-        'label': '엑셀 화물 업로드',
+        'label': '화물 데이타 엑셀 업로드',
         'icon': Icons.upload_file_outlined,
         'page': const ExcelUploadScreen(),
       },
       {
-        'label': '엑셀 화물 다운로드',
+        'label': '화물 데이타 엑셀 다운로드',
         'icon': Icons.download_outlined,
         'page': const ExcelExportScreen(),
       },

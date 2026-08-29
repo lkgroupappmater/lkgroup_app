@@ -1,0 +1,92 @@
+diff --git a/lib/screens/cargo_management_screen.dart b/lib/screens/cargo_management_screen.dart
+--- a/lib/screens/cargo_management_screen.dart
++++ b/lib/screens/cargo_management_screen.dart
+@@ -4,6 +4,7 @@
+ import '../core/route_catalog.dart';
+ import '../models/app_user.dart';
+ import '../services/shipment_service.dart';
++import 'shipment_manual_add_screen.dart';
+ import 'notice_management_screen.dart';
+ import 'schedule_management_screen.dart';
+ import 'excel_upload_screen.dart';
+@@ -549,29 +550,45 @@
+             ],
+             const SizedBox(height: 10),
+-            SizedBox(
+-              height: 46,
+-              child: ElevatedButton.icon(
+-                onPressed: _busy ? null : _search,
+-                icon: const Icon(Icons.search),
+-                label: Text(_busy ? '검색 중...' : '화물 검색'),
+-                style: ElevatedButton.styleFrom(
+-                  backgroundColor: AppColors.primary,
+-                  foregroundColor: Colors.white,
++            if (_isManager)
++              Row(
++                children: [
++                  Expanded(
++                    child: SizedBox(
++                      height: 46,
++                      child: ElevatedButton.icon(
++                        onPressed: _busy ? null : _search,
++                        icon: const Icon(Icons.search),
++                        label: Text(_busy ? '검색 중...' : '화물 검색'),
++                        style: ElevatedButton.styleFrom(
++                          backgroundColor: AppColors.primary,
++                          foregroundColor: Colors.white,
++                        ),
++                      ),
++                    ),
++                  ),
++                  const SizedBox(width: 8),
++                  Expanded(
++                    child: SizedBox(
++                      height: 46,
++                      child: OutlinedButton.icon(
++                        onPressed: _busy || _year == '전체' || _voyage == '전체'
++                            ? null
++                            : () async {
++                                final year = int.tryParse(
++                                  _year.replaceAll(RegExp(r'[^0-9]'), ''),
++                                );
++                                if (year == null) return;
++                                final added = await Navigator.push<bool>(
++                                  context,
++                                  MaterialPageRoute(
++                                    builder: (_) => ShipmentManualAddScreen(
++                                      route: _route, year: year, voyage: _voyage,
++                                    ),
++                                  ),
++                                );
++                                if (added == true && mounted) await _search();
++                              },
++                        icon: const Icon(Icons.add_box_outlined),
++                        label: const Text('화물 추가 입력'),
++                      ),
++                    ),
++                  ),
++                ],
++              )
++            else
++              SizedBox(
++                height: 46,
++                child: ElevatedButton.icon(
++                  onPressed: _busy ? null : _search,
++                  icon: const Icon(Icons.search),
++                  label: Text(_busy ? '검색 중...' : '화물 검색'),
++                  style: ElevatedButton.styleFrom(
++                    backgroundColor: AppColors.primary,
++                    foregroundColor: Colors.white,
++                  ),
+                 ),
+               ),
+-            ),
+-            if (_isAdmin) ...[
+-              const SizedBox(height: 10),
+-              OutlinedButton.icon(
+-                onPressed: _busy ? null : _showAddShipmentRowDialog,
+-                icon: const Icon(Icons.add_box_outlined),
+-                label: const Text('박스 추가 (행 추가)'),
+-              ),
+-            ],
+             if (_searched) ...[
