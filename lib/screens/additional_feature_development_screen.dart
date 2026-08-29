@@ -659,7 +659,7 @@ class _RouteDefinitionEditorScreenState
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
-                aspectRatio: 1.42,
+                aspectRatio: 1.55,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return Stack(
@@ -1252,4 +1252,5 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
+
 

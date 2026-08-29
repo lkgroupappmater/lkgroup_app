@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -504,15 +504,16 @@ class _QuotationFormPainter extends CustomPainter {
   }
 
   void _paintRouteHeader(Canvas canvas) {
-    // 기존 BASE의 레이아웃만 사용하고 노선 고유 타이틀은 현재 경로명으로 다시 표시.
+    // BASE는 레이아웃만 사용하고 문서용 타이틀은 DB document_title 기준으로 표시.
     final h = template.height.toDouble();
-    final titleRect = Rect.fromLTRB(_w * .22, h * .012, _w * .78, h * .09);
+    final documentTitle = RouteCatalog.documentTitleFor(routeLabel);
+    final titleRect = Rect.fromLTRB(_w * .19, h * .018, _w * .81, h * .108);
     _clear(canvas, titleRect);
     _text(
       canvas,
-      '${routeLabel} 견적서',
+      '$documentTitle xxth 견적서',
       titleRect,
-      30,
+      48,
       bold: true,
     );
 
@@ -750,3 +751,4 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+

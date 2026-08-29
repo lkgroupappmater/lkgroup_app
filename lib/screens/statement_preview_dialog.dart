@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -452,18 +452,20 @@ class _StatementPainter extends CustomPainter {
   }
 
   void _paintRouteTitle(Canvas canvas, double w, double h) {
-    final rect = Rect.fromLTRB(w * .20, h * .01, w * .80, h * .075);
+    final documentTitle = RouteCatalog.documentTitleFor(routeLabel);
+    // statement PNG는 상단에 원본 링크 이미지 여백이 있으므로 실제 문서 타이틀 위치에 덮어씀.
+    final rect = Rect.fromLTRB(w * .18, h * .388, w * .82, h * .447);
     canvas.drawRect(
       rect,
       Paint()..color = Colors.white,
     );
     final painter = TextPainter(
       text: TextSpan(
-        text: '$routeLabel 거래 명세서',
+        text: '$documentTitle xxth 거래 명세서',
         style: TextStyle(
           color: Colors.black,
           fontFamily: 'NotoSansKR',
-          fontSize: w * .028,
+          fontSize: w * .030,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -508,3 +510,4 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
