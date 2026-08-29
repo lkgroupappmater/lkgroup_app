@@ -36,6 +36,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   bool _saving = false;
 
   String get _routeKey => RouteCatalog.keyFor(widget.routeLabel).toLowerCase();
+  String get _formRouteKey =>
+      RouteCatalog.formRouteKeyFor(widget.routeLabel).toLowerCase();
 
   @override
   void initState() {
@@ -52,7 +54,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   Future<void> _load() async {
     try {
       final data =
-          await rootBundle.load('assets/statement_forms/$_routeKey.png');
+          await rootBundle.load('assets/statement_forms/$_formRouteKey.png');
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
       codec.dispose();
@@ -92,7 +94,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     }
   }
 
-  int get _baseRows => _routeKey == 'kr_la_sea' || _routeKey == 'kr_la_air' ? 10 : 5;
+  int get _baseRows =>
+      _formRouteKey == 'kr_la_sea' || _formRouteKey == 'kr_la_air' ? 10 : 5;
   int get _detailRows => _rows.length > _baseRows ? _rows.length + 1 : _baseRows;
 
   Size _logicalSize(ui.Image image) {
@@ -471,4 +474,5 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 

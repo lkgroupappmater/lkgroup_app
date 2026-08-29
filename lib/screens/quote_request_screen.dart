@@ -11,7 +11,7 @@ import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
 import 'quotation_preview_dialog.dart';
 
-final List<String> _transportRoutes = RouteCatalog.routes;
+List<String> get _transportRoutes => RouteCatalog.routes;
 
 class _BoxEntry {
   String weight = '';
@@ -1131,5 +1131,7 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
+
+
 
 

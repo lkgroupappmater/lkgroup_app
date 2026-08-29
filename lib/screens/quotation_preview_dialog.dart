@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -54,7 +54,10 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   late final DateTime _issuedAt;
 
   String get _routeKey => RouteCatalog.keyFor(widget.routeLabel);
-  _RouteFormConfig get _config => _RouteFormConfig.forKey(_routeKey);
+  String get _formRouteKey =>
+      RouteCatalog.formRouteKeyFor(widget.routeLabel);
+  _RouteFormConfig get _config =>
+      _RouteFormConfig.forKey(_formRouteKey);
 
   @override
   void initState() {
@@ -71,7 +74,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   Future<void> _loadTemplate() async {
     try {
-      final path = 'assets/quotation_forms/${_routeKey.toLowerCase()}.png';
+      final path = 'assets/quotation_forms/${_formRouteKey.toLowerCase()}.png';
       final data = await rootBundle.load(path);
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
@@ -723,3 +726,4 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+

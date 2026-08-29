@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/route_catalog.dart';
 import '../services/route_development_service.dart';
 
 class AdditionalFeatureDevelopmentScreen extends StatefulWidget {
@@ -172,10 +173,12 @@ class _RouteDefinitionEditorScreenState
   late final TextEditingController _addressController;
   late final TextEditingController _boxPrefixController;
   late final TextEditingController _receiptPrefixController;
+  late final TextEditingController _filePrefixController;
   late final TextEditingController _factorController;
   late final TextEditingController _minimumController;
 
   List<Map<String, dynamic>> _tiers = [];
+  List<Map<String, String>> _templateOverrides = [];
   String? _baseRouteKey;
   bool _savedDraft = false;
   bool _busy = false;
@@ -203,6 +206,19 @@ class _RouteDefinitionEditorScreenState
         TextEditingController(text: '${route['box_prefix'] ?? ''}');
     _receiptPrefixController =
         TextEditingController(text: '${route['receipt_prefix'] ?? ''}');
+    _filePrefixController =
+        TextEditingController(text: '${route['file_prefix'] ?? ''}');
+    final rawOverrides = route['template_overrides'];
+    if (rawOverrides is List) {
+      _templateOverrides = rawOverrides
+          .whereType<Map>()
+          .map((item) => <String, String>{
+                'sheet_name': '${item['sheet_name'] ?? ''}',
+                'cell_ref': '${item['cell_ref'] ?? ''}',
+                'value': '${item['value'] ?? ''}',
+              })
+          .toList();
+    }
     _factorController = TextEditingController(
       text: '${route['volumetric_factor'] ?? 0.00022}',
     );
@@ -224,6 +240,7 @@ class _RouteDefinitionEditorScreenState
     _addressController.dispose();
     _boxPrefixController.dispose();
     _receiptPrefixController.dispose();
+    _filePrefixController.dispose();
     _factorController.dispose();
     _minimumController.dispose();
     super.dispose();
@@ -285,6 +302,8 @@ class _RouteDefinitionEditorScreenState
       _addressController.text = '${route['address'] ?? ''}';
       _boxPrefixController.text = '${route['box_prefix'] ?? ''}';
       _receiptPrefixController.text = '${route['receipt_prefix'] ?? ''}';
+      _filePrefixController.text = '${route['file_prefix'] ?? ''}';
+      _templateOverrides = [];
       _factorController.text = '${route['volumetric_factor'] ?? 0.00022}';
       _minimumController.text = '${route['minimum_charge'] ?? 0}';
     });
@@ -303,6 +322,145 @@ class _RouteDefinitionEditorScreenState
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _basePreview() {
+    final routeKey = _isCreate
+        ? _baseRouteKey
+        : '${widget.route?['route_key'] ?? ''}';
+    if (routeKey == null || routeKey.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final formKey = RouteCatalog.formRouteKeyFor(routeKey);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '명세서 BASE 전체 미리보기',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/statement_forms/$formKey.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _templateOverrideEditor() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'BASE Excel 셀 직접 수정 (고급)',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          setState(() {
+                            _templateOverrides.add({
+                              'sheet_name': '',
+                              'cell_ref': '',
+                              'value': '',
+                            });
+                          });
+                        },
+                  icon: const Icon(Icons.add),
+                  label: const Text('셀 추가'),
+                ),
+              ],
+            ),
+            const Text(
+              '명세서 전체 미리보기와 별도로, 원본 XLSX의 특정 시트/셀 값을 직접 지정할 수 있습니다. '
+              '예: 시트 이름(LTxx-xx), C1, 표시할 값',
+              style: TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+            const SizedBox(height: 6),
+            ...List.generate(_templateOverrides.length, (index) {
+              final item = _templateOverrides[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextFormField(
+                        initialValue: item['sheet_name'],
+                        decoration: const InputDecoration(
+                          labelText: '시트 이름',
+                          isDense: true,
+                        ),
+                        onChanged: (v) => item['sheet_name'] = v,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        initialValue: item['cell_ref'],
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: '셀',
+                          hintText: 'C1',
+                          isDense: true,
+                        ),
+                        onChanged: (v) => item['cell_ref'] = v.toUpperCase(),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 5,
+                      child: TextFormField(
+                        initialValue: item['value'],
+                        decoration: const InputDecoration(
+                          labelText: '값',
+                          isDense: true,
+                        ),
+                        onChanged: (v) => item['value'] = v,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '삭제',
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              setState(
+                                () => _templateOverrides.removeAt(index),
+                              );
+                            },
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -355,6 +513,12 @@ class _RouteDefinitionEditorScreenState
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _field(_filePrefixController, 'Excel 파일 Prefix (예: LA_MY_LAND)'),
+          const SizedBox(height: 8),
+          _basePreview(),
+          const SizedBox(height: 12),
+          _templateOverrideEditor(),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -544,9 +708,15 @@ class _RouteDefinitionEditorScreenState
           address: _addressController.text.trim(),
           boxPrefix: _boxPrefixController.text.trim(),
           receiptPrefix: _receiptPrefixController.text.trim(),
+          filePrefix: _filePrefixController.text.trim(),
           volumetricFactor: volumetricFactor,
           minimumCharge: minimumCharge,
           tiers: _tierData(),
+          templateOverrides: _templateOverrides
+              .where((e) =>
+                  (e['sheet_name'] ?? '').trim().isNotEmpty &&
+                  (e['cell_ref'] ?? '').trim().isNotEmpty)
+              .toList(growable: false),
         );
         if (!mounted) return;
         setState(() {
@@ -563,9 +733,15 @@ class _RouteDefinitionEditorScreenState
           address: _addressController.text.trim(),
           boxPrefix: _boxPrefixController.text.trim(),
           receiptPrefix: _receiptPrefixController.text.trim(),
+          filePrefix: _filePrefixController.text.trim(),
           volumetricFactor: volumetricFactor,
           minimumCharge: minimumCharge,
           tiers: _tierData(),
+          templateOverrides: _templateOverrides
+              .where((e) =>
+                  (e['sheet_name'] ?? '').trim().isNotEmpty &&
+                  (e['cell_ref'] ?? '').trim().isNotEmpty)
+              .toList(growable: false),
         );
         if (mounted) Navigator.pop(context);
       }

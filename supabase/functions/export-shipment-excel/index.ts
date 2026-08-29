@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
 const corsHeaders = {
@@ -395,8 +395,9 @@ function normalizePhone(value: unknown): string {
 function assignReceiptNumbers(
   shipments: Record<string, unknown>[],
   routeKey: string,
+  runtimeReceiptPrefix = '',
 ): Record<string, unknown>[] {
-  const prefix = routeReceiptPrefix(routeKey);
+  const prefix = runtimeReceiptPrefix.trim() || routeReceiptPrefix(routeKey);
   if (!prefix) return shipments;
 
   // 이름 + 전화번호가 같으면 같은 영수번호를 사용합니다.
@@ -588,7 +589,14 @@ Deno.serve(async (req) => {
     const shipmentYear = Number(body.shipment_year);
     const voyage = String(body.voyage ?? '').trim();
 
-    if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
+    const { data: routeDefinition, error: routeDefinitionError } = await admin
+      .from('route_definitions')
+      .select('display_name,file_prefix,receipt_prefix,base_route_key')
+      .eq('route_key', routeKey)
+      .maybeSingle();
+    if (routeDefinitionError) throw routeDefinitionError;
+
+if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       return json(400, { error: '운송 경로/연도/항차 값이 올바르지 않습니다.' });
     }
 
@@ -650,6 +658,7 @@ Deno.serve(async (req) => {
     const enrichedShipments = assignReceiptNumbers(
       (shipments ?? []) as Record<string, unknown>[],
       routeKey,
+      String(routeDefinition?.receipt_prefix ?? ''),
     ).map((shipment) => {
       if (
         routeKey === 'kr_la_air' &&
@@ -697,7 +706,10 @@ Deno.serve(async (req) => {
       la_kh_land: 'LA_KH_LAND',
       kh_la_land: 'KH_LA_LAND',
     };
-    const prefix = filePrefixes[routeKey] ?? routeKey.toUpperCase();
+    const prefix =
+      String(routeDefinition?.file_prefix ?? '').trim() ||
+      filePrefixes[routeKey] ||
+      routeKey.toUpperCase();
     const voyageToken = voyage.toUpperCase().startsWith('V')
       ? voyage.toUpperCase()
       : `V${voyage}`;
@@ -817,3 +829,4 @@ Deno.serve(async (req) => {
     return json(500, { error: message });
   }
 });
+
