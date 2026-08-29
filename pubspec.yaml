@@ -34,10 +34,12 @@ flutter:
   assets:
     - assets/images/company_logo_transparent.png
     - assets/quotation_forms/
+    - assets/statement_forms/
     - assets/images/company_logo.png
 
   fonts:
     - family: NotoSansKR
       fonts:
         - asset: assets/fonts/NotoSansKR-Regular.otf
+
 

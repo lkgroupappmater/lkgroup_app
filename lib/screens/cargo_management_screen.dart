@@ -12,6 +12,7 @@ import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
 import 'change_approval_screen.dart';
 import 'quote_request_management_screen.dart';
+import 'statement_preview_dialog.dart';
 
 class CargoManagementScreen extends StatefulWidget {
   const CargoManagementScreen({
@@ -275,6 +276,50 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     return changes;
   }
 
+  Future<void> _showStatement() async {
+    if (_isPartner) {
+      _message('협력/파트너 계정은 명세서를 조회할 수 없습니다.');
+      return;
+    }
+    if (_selectedIds.isEmpty) {
+      _message('명세서를 확인할 화물을 선택해 주세요.');
+      return;
+    }
+
+    final selected = _results
+        .where((row) => _selectedIds.contains('${row['id']}'))
+        .toList(growable: false);
+    if (selected.isEmpty) return;
+
+    final receipt = '${selected.first['receipt_number'] ?? ''}'.trim();
+    if (receipt.isEmpty) {
+      _message('선택한 화물에 영수번호가 없습니다.');
+      return;
+    }
+    if (selected.any((row) =>
+        '${row['receipt_number'] ?? ''}'.trim() != receipt)) {
+      _message('명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.');
+      return;
+    }
+
+    final route = '${selected.first['route'] ?? ''}';
+    final year = (selected.first['shipment_year'] as num?)?.toInt();
+    final voyage = '${selected.first['voyage'] ?? ''}';
+    if (route.isEmpty || year == null || voyage.isEmpty) {
+      _message('명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => StatementPreviewDialog(
+        routeLabel: route,
+        year: year,
+        voyage: voyage,
+        receiptNumber: receipt,
+      ),
+    );
+  }
   Future<void> _save() async {
     if (_selectedIds.isEmpty) return;
     final changes = _canSaveDirectly ? _managerChanges() : _memberChanges();
@@ -887,7 +932,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 onPressed: _busy ? null : _save,
                 icon: const Icon(Icons.save),
                 label: Text(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청'),
-              ),
+              ),              const SizedBox(height: 8),
+              if (!_isPartner)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _showStatement,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('명세서 보기'),
+                ),
             ],
             if (_isManager) ...[
               const SizedBox(height: 24),
@@ -1136,4 +1187,5 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
