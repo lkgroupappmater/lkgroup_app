@@ -112,6 +112,17 @@ class ExcelImportService {
     final customerRules =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
 
+    if (SupabaseConfig.isConfigured) {
+      await _saveWorkbookTemplate(
+        bytes: bytes,
+        fileName: fileName,
+        routeKey: routeKey,
+        routeLabel: routeLabel,
+        year: year,
+        voyage: voyage,
+      );
+    }
+
     final noCargoSheet = rows.isEmpty &&
         !workbook.tables.keys.any((name) => name.trim() == '물품 입고 내역');
 
@@ -120,9 +131,41 @@ class ExcelImportService {
       skipped: skipped,
       customerRules: customerRules,
       message: noCargoSheet
-          ? '운임/거래명세서 템플릿은 확인했지만 "물품 입고 내역" 시트가 없어 화물 행은 등록하지 않았습니다.'
-          : '현재 사용 중인 "물품 입고 내역" 형식으로 화물 데이터를 반영했습니다.',
+          ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
+          : '화물 데이터를 반영하고, 같은 항차의 원본 Excel 템플릿도 안전하게 저장했습니다.',
     );
+  }
+
+  Future<void> _saveWorkbookTemplate({
+    required Uint8List bytes,
+    required String fileName,
+    required String routeKey,
+    required String routeLabel,
+    required int year,
+    required String voyage,
+  }) async {
+    final path = '$routeKey/$year/V$voyage/$fileName';
+    final storage = SupabaseService.client.storage.from('shipment-excel-templates');
+
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: const FileOptions(
+        upsert: true,
+        contentType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ),
+    );
+
+    await SupabaseService.client.from('shipment_excel_templates').upsert({
+      'route_key': routeKey,
+      'route_label': routeLabel,
+      'shipment_year': year,
+      'voyage': voyage,
+      'file_name': fileName,
+      'storage_path': path,
+      'uploaded_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'route_key,shipment_year,voyage');
   }
 
   void _applyCalculatedZones(

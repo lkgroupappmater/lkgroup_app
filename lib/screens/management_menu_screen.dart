@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import 'change_approval_screen.dart';
+import 'excel_export_screen.dart';
 import 'excel_upload_screen.dart';
 import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
@@ -44,11 +45,18 @@ class ManagementMenuScreen extends StatelessWidget {
     ];
 
     if (_isAdmin || _isStaff) {
-      items.add({
-        'label': '엑셀 화물 업로드',
-        'icon': Icons.upload_file_outlined,
-        'page': const ExcelUploadScreen(),
-      });
+      items.addAll([
+        {
+          'label': '엑셀 화물 업로드',
+          'icon': Icons.upload_file_outlined,
+          'page': const ExcelUploadScreen(),
+        },
+        {
+          'label': '엑셀 화물 다운로드',
+          'icon': Icons.download_outlined,
+          'page': const ExcelExportScreen(),
+        },
+      ]);
     }
 
     if (_isAdmin) {
