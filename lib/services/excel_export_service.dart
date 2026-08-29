@@ -51,11 +51,12 @@ class ExcelExportService {
   Future<List<ExcelExportBatch>> listBatches() async {
     if (!SupabaseConfig.isConfigured) return const [];
 
-    final shipmentRowsRaw = await SupabaseService.client.rpc(
-      'list_shipment_export_batches',
-    );
-    final shipmentRows =
-        List<Map<String, dynamic>>.from(shipmentRowsRaw as List);
+    final shipmentRows = await SupabaseService.client
+        .from('shipments')
+        .select('route,shipment_year,voyage')
+        .not('shipment_year', 'is', null)
+        .neq('voyage', '')
+        .order('shipment_year', ascending: false);
 
     final voyageTemplates = await SupabaseService.client
         .from('shipment_excel_templates')
@@ -128,7 +129,13 @@ class ExcelExportService {
     );
 
     if (response.status < 200 || response.status >= 300) {
-      throw StateError('Excel 생성 실패 (${response.status}): ${response.data}');
+      String detail = '${response.data}';
+      try {
+        if (response.data is Map && (response.data as Map)['error'] != null) {
+          detail = '${(response.data as Map)['error']}';
+        }
+      } catch (_) {}
+      throw StateError('Excel 생성 실패 (${response.status}): $detail');
     }
 
     final data = Map<String, dynamic>.from(response.data as Map);

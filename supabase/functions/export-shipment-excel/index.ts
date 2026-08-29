@@ -409,8 +409,23 @@ Deno.serve(async (req) => {
       template_source: templateSource,
     });
   } catch (error) {
-    return json(500, {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    let message = 'Unknown export error';
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (error && typeof error === 'object') {
+      const value = error as Record<string, unknown>;
+      message = String(
+        value.message ??
+        value.error_description ??
+        value.details ??
+        value.hint ??
+        JSON.stringify(value),
+      );
+    } else {
+      message = String(error);
+    }
+
+    console.error('export-shipment-excel failed:', error);
+    return json(500, { error: message });
   }
 });
