@@ -290,26 +290,45 @@ class _AdditionalFeatureDevelopmentScreenState
                         ),
                         isThreeLine: base.isNotEmpty,
                         trailing: SizedBox(
-                          width: 118,
+                          width: 104,
+                          height: 64,
                           child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
                                 width: double.infinity,
+                                height: 30,
                                 child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
                                   onPressed: () => _openDraft(route),
-                                  child: const Text('계속 작업'),
+                                  child: const Text(
+                                    '계속 작업',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               SizedBox(
                                 width: double.infinity,
+                                height: 30,
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.red,
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   onPressed: () => _deleteDraftFromList(route),
-                                  child: const Text('삭제'),
+                                  child: const Text(
+                                    '삭제',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                 ),
                               ),
                             ],
