@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
 import '../services/route_development_service.dart';
@@ -586,10 +586,12 @@ class _RouteDefinitionEditorScreenState
     TextEditingController controller,
     String label, {
     TextInputType? keyboardType,
+    bool livePreview = false,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      onChanged: livePreview ? (_) => setState(() {}) : null,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -632,7 +634,12 @@ class _RouteDefinitionEditorScreenState
     if (routeKey == null || routeKey.isEmpty) {
       return const SizedBox.shrink();
     }
+
     final formKey = RouteCatalog.formRouteKeyFor(routeKey);
+    final documentTitle = _documentTitleController.text.trim();
+    final receiptPrefix = _receiptPrefixController.text.trim();
+    final remark = _remarkController.text.trim();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -643,15 +650,101 @@ class _RouteDefinitionEditorScreenState
               '명세서 BASE 전체 미리보기',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              '입력 중인 문서 타이틀 / 영수번호 Prefix / Remark가 아래 BASE 미리보기에 즉시 반영됩니다.',
+              style: TextStyle(fontSize: 11, color: Colors.black54),
+            ),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/statement_forms/$formKey.png',
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.'),
+              child: AspectRatio(
+                aspectRatio: 1.42,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          'assets/statement_forms/$formKey.png',
+                          fit: BoxFit.contain,
+                          alignment: Alignment.topCenter,
+                          errorBuilder: (_, __, ___) => const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              '선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.',
+                            ),
+                          ),
+                        ),
+                        if (documentTitle.isNotEmpty)
+                          Positioned(
+                            left: constraints.maxWidth * .20,
+                            right: constraints.maxWidth * .20,
+                            top: constraints.maxHeight * .012,
+                            height: constraints.maxHeight * .065,
+                            child: Container(
+                              color: Colors.white,
+                              alignment: Alignment.center,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '$documentTitle xxth 거래 명세서',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (receiptPrefix.isNotEmpty)
+                          Positioned(
+                            right: constraints.maxWidth * .018,
+                            top: constraints.maxHeight * .105,
+                            width: constraints.maxWidth * .14,
+                            height: constraints.maxHeight * .045,
+                            child: Container(
+                              color: Colors.white,
+                              alignment: Alignment.center,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  receiptPrefix,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (remark.isNotEmpty)
+                          Positioned(
+                            left: constraints.maxWidth * .08,
+                            right: constraints.maxWidth * .08,
+                            bottom: constraints.maxHeight * .035,
+                            height: constraints.maxHeight * .05,
+                            child: Container(
+                              color: Colors.white,
+                              alignment: Alignment.centerLeft,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Remark : $remark',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -660,7 +753,6 @@ class _RouteDefinitionEditorScreenState
       ),
     );
   }
-
   Widget _templateOverrideEditor() {
     return Card(
       child: Padding(
@@ -813,14 +905,14 @@ class _RouteDefinitionEditorScreenState
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _field(_receiptPrefixController, '영수번호 Prefix'),
+                child: _field(_receiptPrefixController, '영수번호 Prefix', livePreview: true),
               ),
             ],
           ),
           const SizedBox(height: 8),
           _field(_filePrefixController, 'Excel 파일 Prefix (예: LA_MY_LAND)'),
           const SizedBox(height: 8),
-          _field(_remarkController, 'Remark'),
+          _field(_remarkController, 'Remark', livePreview: true),
           const SizedBox(height: 8),
           _basePreview(),
           const SizedBox(height: 12),
@@ -1160,3 +1252,4 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
+

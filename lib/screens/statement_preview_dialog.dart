@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -34,6 +34,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   String? _arrivalDate;
   bool _loading = true;
   bool _saving = false;
+
   String get _formRouteKey =>
       RouteCatalog.formRouteKeyFor(widget.routeLabel).toLowerCase();
 
@@ -105,10 +106,10 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   _StatementPainter _painter(ui.Image image) => _StatementPainter(
         template: image,
         routeLabel: widget.routeLabel,
-        rows: widget.rows,
-        freight: widget.freight,
+        rows: _rows,
+        freight: _freight!,
         receiptNumber: widget.receiptNumber,
-        arrivalDate: widget.arrivalDate,
+        arrivalDate: _arrivalDate,
         baseRows: _baseRows,
         detailRows: _detailRows,
       );
@@ -303,6 +304,7 @@ class _StatementPainter extends CustomPainter {
   final String? arrivalDate;
   final int baseRows;
   final int detailRows;
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = template.width.toDouble();
@@ -413,16 +415,6 @@ class _StatementPainter extends CustomPainter {
       }
     }
 
-    final routeRemark = RouteCatalog.remarkFor(routeLabel);
-    if (routeRemark.isNotEmpty) {
-      _text(
-        canvas,
-        'Remark: $routeRemark',
-        Offset(w * .03, h * .58 + extra),
-        w * .62,
-        fontSize: w * .010,
-      );
-    }
     final shift = extra;
     final totalY = h * .53 + shift;
     _text(
@@ -459,31 +451,19 @@ class _StatementPainter extends CustomPainter {
     );
   }
 
-
   void _paintRouteTitle(Canvas canvas, double w, double h) {
-    final rect = Rect.fromLTRB(
-      w * .245,
-      h * .012,
-      w * .755,
-      h * .080,
-    );
+    final rect = Rect.fromLTRB(w * .20, h * .01, w * .80, h * .075);
     canvas.drawRect(
-      Rect.fromLTRB(
-        rect.left + 1,
-        rect.top + 1,
-        rect.right - 1,
-        rect.bottom - 1,
-      ),
+      rect,
       Paint()..color = Colors.white,
     );
-
     final painter = TextPainter(
       text: TextSpan(
-        text: '${RouteCatalog.documentTitleFor(routeLabel)} xxth 거래 명세서',
+        text: '$routeLabel 거래 명세서',
         style: TextStyle(
           color: Colors.black,
           fontFamily: 'NotoSansKR',
-          fontSize: w * .030,
+          fontSize: w * .028,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -492,7 +472,6 @@ class _StatementPainter extends CustomPainter {
       maxLines: 1,
       ellipsis: '…',
     )..layout(maxWidth: rect.width);
-
     painter.paint(
       canvas,
       Offset(
@@ -501,6 +480,7 @@ class _StatementPainter extends CustomPainter {
       ),
     );
   }
+
   void _text(
     Canvas canvas,
     String text,
@@ -528,9 +508,3 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
-
-
-
-
-
-
