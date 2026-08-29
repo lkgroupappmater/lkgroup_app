@@ -174,7 +174,6 @@ class _RouteDefinitionEditorScreenState
   late final TextEditingController _boxPrefixController;
   late final TextEditingController _receiptPrefixController;
   late final TextEditingController _filePrefixController;
-  late final TextEditingController _factorController;
   late final TextEditingController _minimumController;
 
   List<Map<String, dynamic>> _tiers = [];
@@ -220,9 +219,6 @@ class _RouteDefinitionEditorScreenState
               })
           .toList();
     }
-    _factorController = TextEditingController(
-      text: '${route['volumetric_factor'] ?? 0.00022}',
-    );
     _minimumController = TextEditingController(
       text: '${route['minimum_charge'] ?? 0}',
     );
@@ -242,7 +238,6 @@ class _RouteDefinitionEditorScreenState
     _boxPrefixController.dispose();
     _receiptPrefixController.dispose();
     _filePrefixController.dispose();
-    _factorController.dispose();
     _minimumController.dispose();
     super.dispose();
   }
@@ -305,7 +300,6 @@ class _RouteDefinitionEditorScreenState
       _receiptPrefixController.text = '${route['receipt_prefix'] ?? ''}';
       _filePrefixController.text = '${route['file_prefix'] ?? ''}';
       _templateOverrides = [];
-      _factorController.text = '${route['volumetric_factor'] ?? 0.00022}';
       _minimumController.text = '${route['minimum_charge'] ?? 0}';
     });
 
@@ -521,26 +515,11 @@ class _RouteDefinitionEditorScreenState
           const SizedBox(height: 12),
           _templateOverrideEditor(),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _field(
-                  _factorController,
-                  '부피중량 계수',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _field(
-                  _minimumController,
-                  '최소 운임 USD',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-            ],
+          _field(
+            _minimumController,
+            '최소 운임 USD',
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 16),
           Row(
@@ -698,8 +677,7 @@ class _RouteDefinitionEditorScreenState
 
     setState(() => _busy = true);
     try {
-      final volumetricFactor =
-          double.tryParse(_factorController.text.trim()) ?? 0.00022;
+      const volumetricFactor = 0.00022;
       final minimumCharge =
           double.tryParse(_minimumController.text.trim()) ?? 0;
 
