@@ -3,37 +3,32 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 
 import '../config/supabase_config.dart';
+import '../core/route_catalog.dart';
 import 'supabase_service.dart';
 
-class ExcelTemplateBatch {
-  const ExcelTemplateBatch({
+class ExcelExportBatch {
+  const ExcelExportBatch({
     required this.routeKey,
     required this.routeLabel,
     required this.year,
     required this.voyage,
-    required this.fileName,
-    required this.uploadedAt,
+    this.hasVoyageTemplate = false,
+    this.hasBaseTemplate = false,
   });
 
   final String routeKey;
   final String routeLabel;
   final int year;
   final String voyage;
-  final String fileName;
-  final DateTime? uploadedAt;
+  final bool hasVoyageTemplate;
+  final bool hasBaseTemplate;
 
-  String get displayLabel =>
-      '$routeLabel · $year · V$voyage · $fileName';
+  String get displayLabel => '$routeLabel · $year · V$voyage';
 
-  factory ExcelTemplateBatch.fromJson(Map<String, dynamic> json) {
-    return ExcelTemplateBatch(
-      routeKey: '${json['route_key'] ?? ''}',
-      routeLabel: '${json['route_label'] ?? ''}',
-      year: (json['shipment_year'] as num?)?.toInt() ?? 0,
-      voyage: '${json['voyage'] ?? ''}',
-      fileName: '${json['file_name'] ?? ''}',
-      uploadedAt: DateTime.tryParse('${json['uploaded_at'] ?? ''}'),
-    );
+  String get templateLabel {
+    if (hasVoyageTemplate) return '항차별 변경 폼';
+    if (hasBaseTemplate) return '기본 폼';
+    return '기본 폼 없음';
   }
 }
 
@@ -53,27 +48,74 @@ class ExcelExportService {
   ExcelExportService._();
   static final ExcelExportService instance = ExcelExportService._();
 
-  Future<List<ExcelTemplateBatch>> listTemplates() async {
+  Future<List<ExcelExportBatch>> listBatches() async {
     if (!SupabaseConfig.isConfigured) return const [];
-    final rows = await SupabaseService.client
-        .from('shipment_excel_templates')
-        .select(
-          'route_key,route_label,shipment_year,voyage,file_name,uploaded_at',
-        )
-        .order('shipment_year', ascending: false)
-        .order('voyage', ascending: false);
 
-    return List<Map<String, dynamic>>.from(rows)
-        .map(ExcelTemplateBatch.fromJson)
-        .toList(growable: false);
+    final shipmentRows = await SupabaseService.client
+        .from('shipments')
+        .select('route,shipment_year,voyage')
+        .not('shipment_year', 'is', null)
+        .neq('voyage', '')
+        .order('shipment_year', ascending: false);
+
+    final voyageTemplates = await SupabaseService.client
+        .from('shipment_excel_templates')
+        .select('route_key,shipment_year,voyage');
+
+    final baseTemplates = await SupabaseService.client
+        .from('shipment_excel_base_templates')
+        .select('route_key')
+        .eq('active', true);
+
+    final voyageKeys = <String>{
+      for (final raw in voyageTemplates)
+        '${raw['route_key']}|${raw['shipment_year']}|${raw['voyage']}',
+    };
+    final baseKeys = <String>{
+      for (final raw in baseTemplates) '${raw['route_key']}',
+    };
+
+    final dedup = <String, ExcelExportBatch>{};
+    for (final raw in shipmentRows) {
+      final routeLabel = '${raw['route'] ?? ''}'.trim();
+      final year = (raw['shipment_year'] as num?)?.toInt();
+      final voyage = '${raw['voyage'] ?? ''}'.trim();
+      if (routeLabel.isEmpty || year == null || voyage.isEmpty) continue;
+
+      final routeKey = RouteCatalog.keyFor(routeLabel);
+      final key = '$routeKey|$year|$voyage';
+      dedup[key] = ExcelExportBatch(
+        routeKey: routeKey,
+        routeLabel: routeLabel,
+        year: year,
+        voyage: voyage,
+        hasVoyageTemplate: voyageKeys.contains(key),
+        hasBaseTemplate: baseKeys.contains(routeKey),
+      );
+    }
+
+    final result = dedup.values.toList();
+    result.sort((a, b) {
+      final yearCompare = b.year.compareTo(a.year);
+      if (yearCompare != 0) return yearCompare;
+      final routeCompare = a.routeLabel.compareTo(b.routeLabel);
+      if (routeCompare != 0) return routeCompare;
+      return b.voyage.compareTo(a.voyage);
+    });
+    return result;
   }
 
-  Future<ExcelExportResult> exportAndSave(ExcelTemplateBatch batch) async {
+  Future<ExcelExportResult> exportAndSave(ExcelExportBatch batch) async {
     if (!SupabaseConfig.isConfigured) {
       return const ExcelExportResult(
         saved: false,
         fileName: '',
         message: 'Supabase 설정을 확인해 주세요.',
+      );
+    }
+    if (!batch.hasVoyageTemplate && !batch.hasBaseTemplate) {
+      throw StateError(
+        '${batch.routeLabel} 기본 Excel 폼이 DB에 등록되어 있지 않습니다.',
       );
     }
 
@@ -92,9 +134,9 @@ class ExcelExportService {
 
     final data = Map<String, dynamic>.from(response.data as Map);
     final exportPath = '${data['storage_path'] ?? ''}';
-    final fileName = '${data['file_name'] ?? batch.fileName}';
-    if (exportPath.isEmpty) {
-      throw StateError('생성된 Excel 저장 위치를 받지 못했습니다.');
+    final fileName = '${data['file_name'] ?? ''}';
+    if (exportPath.isEmpty || fileName.isEmpty) {
+      throw StateError('생성된 Excel 정보를 받지 못했습니다.');
     }
 
     final Uint8List bytes = await SupabaseService.client.storage
@@ -114,7 +156,7 @@ class ExcelExportService {
       fileName: fileName,
       message: saved == null
           ? '저장을 취소했습니다.'
-          : '현재 DB 자료를 원본 Excel 템플릿에 반영하여 저장했습니다.',
+          : '선택한 운송 경로/연도/항차의 DB 자료로 Excel을 생성했습니다.',
     );
   }
 }

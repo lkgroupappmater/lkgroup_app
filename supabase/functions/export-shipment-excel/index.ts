@@ -277,7 +277,7 @@ Deno.serve(async (req) => {
       return json(400, { error: '운송 경로/연도/항차 값이 올바르지 않습니다.' });
     }
 
-    const { data: template, error: templateError } = await admin
+    const { data: voyageTemplate, error: voyageTemplateError } = await admin
       .from('shipment_excel_templates')
       .select('route_key,route_label,shipment_year,voyage,file_name,storage_path')
       .eq('route_key', routeKey)
@@ -285,9 +285,30 @@ Deno.serve(async (req) => {
       .eq('voyage', voyage)
       .maybeSingle();
 
-    if (templateError) throw templateError;
+    if (voyageTemplateError) throw voyageTemplateError;
+
+    let template = voyageTemplate;
+    let templateSource = 'voyage';
+
     if (!template) {
-      return json(404, { error: '해당 항차의 업로드 원본 Excel 템플릿이 없습니다.' });
+      const { data: baseTemplate, error: baseTemplateError } = await admin
+        .from('shipment_excel_base_templates')
+        .select('route_key,route_label,file_name,storage_path')
+        .eq('route_key', routeKey)
+        .eq('active', true)
+        .maybeSingle();
+      if (baseTemplateError) throw baseTemplateError;
+      if (!baseTemplate) {
+        return json(404, {
+          error: '해당 운송 경로의 기본 Excel 폼과 항차별 변경 폼이 모두 없습니다.',
+        });
+      }
+      template = {
+        ...baseTemplate,
+        shipment_year: shipmentYear,
+        voyage,
+      };
+      templateSource = 'base';
     }
 
     const { data: templateBlob, error: downloadError } = await admin.storage
@@ -309,6 +330,26 @@ Deno.serve(async (req) => {
       .order('id', { ascending: true });
 
     if (shipmentError) throw shipmentError;
+
+    const filePrefixes: Record<string, string> = {
+      kr_la_sea: 'KR_LA_SEA',
+      kr_la_air: 'KR_LA_AIR',
+      la_kr_air_exp: 'LA_KR_AIR_EXP',
+      la_th_land: 'LA_TH_LAND',
+      th_la_land: 'TH_LA_LAND',
+      la_vn_land: 'LA_VN_LAND',
+      vn_la_land: 'VN_LA_LAND',
+      la_ch_land: 'LA_CH_LAND',
+      ch_la_land: 'CH_LA_LAND',
+      la_kh_land: 'LA_KH_LAND',
+      kh_la_land: 'KH_LA_LAND',
+    };
+    const prefix = filePrefixes[routeKey] ?? routeKey.toUpperCase();
+    const voyageToken = voyage.toUpperCase().startsWith('V')
+      ? voyage.toUpperCase()
+      : `V${voyage}`;
+    const outputFileName =
+      `${prefix}_${shipmentYear}_${voyageToken}_SHIPMENTS.xlsx`;
 
     const original = new Uint8Array(await templateBlob.arrayBuffer());
     const files = unzipSync(original);
@@ -348,7 +389,7 @@ Deno.serve(async (req) => {
     const encoded = zipSync(files, { level: 6 });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const exportPath =
-      `${routeKey}/${shipmentYear}/V${voyage}/${stamp}_${template.file_name}`;
+      `${routeKey}/${shipmentYear}/${voyageToken}/${stamp}_${outputFileName}`;
 
     const { error: uploadError } = await admin.storage
       .from('shipment-excel-exports')
@@ -361,10 +402,11 @@ Deno.serve(async (req) => {
 
     return json(200, {
       ok: true,
-      file_name: template.file_name,
+      file_name: outputFileName,
       storage_path: exportPath,
       shipment_count: shipments?.length ?? 0,
-      mode: 'archive-preserving-cargo-list-v1',
+      mode: 'archive-preserving-cargo-list-v2',
+      template_source: templateSource,
     });
   } catch (error) {
     return json(500, {

@@ -14,8 +14,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   bool _loading = true;
   bool _exporting = false;
   String _message = '';
-  List<ExcelTemplateBatch> _templates = const [];
-  ExcelTemplateBatch? _selected;
+  List<ExcelExportBatch> _batches = const [];
+  ExcelExportBatch? _selected;
 
   @override
   void initState() {
@@ -29,14 +29,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       _message = '';
     });
     try {
-      final templates = await ExcelExportService.instance.listTemplates();
+      final batches = await ExcelExportService.instance.listBatches();
       if (!mounted) return;
       setState(() {
-        _templates = templates;
-        _selected = templates.isEmpty ? null : templates.first;
-        _message = templates.isEmpty
-            ? '먼저 해당 항차의 실제 Excel 파일을 "엑셀 화물 업로드"에서 한 번 업로드해 주세요.'
-            : '다운로드할 항차를 선택해 주세요.';
+        _batches = batches;
+        _selected = batches.isEmpty ? null : batches.first;
+        _message = batches.isEmpty
+            ? 'DB에 운송 경로/연도/항차가 지정된 화물 자료가 없습니다.'
+            : 'DB의 운송 경로/연도/항차를 선택해 주세요. 항차별 변경 폼이 있으면 우선 적용하고, 없으면 기본 폼을 사용합니다.';
       });
     } catch (error) {
       if (mounted) setState(() => _message = '목록 불러오기 실패: $error');
@@ -91,25 +91,25 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                '업로드했던 실제 Excel 파일을 원본 템플릿으로 보관하고, 다운로드 시점의 최신 화물 DB 자료를 복사본에 반영합니다.\n원본 파일 자체는 덮어쓰지 않습니다.',
+                'DB에 저장된 화물의 운송 경로/연도/항차를 선택해 Excel을 생성합니다.\n항차별 변경 폼이 있으면 그 폼을 우선 사용하고, 없으면 운송 경로별 기본 폼을 사용합니다.',
               ),
               const SizedBox(height: 20),
               if (_loading)
                 const Center(child: CircularProgressIndicator())
-              else if (_templates.isNotEmpty)
-                DropdownButtonFormField<ExcelTemplateBatch>(
+              else if (_batches.isNotEmpty)
+                DropdownButtonFormField<ExcelExportBatch>(
                   initialValue: _selected,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: '운송 경로 / 연도 / 항차',
                     border: OutlineInputBorder(),
                   ),
-                  items: _templates
+                  items: _batches
                       .map(
                         (e) => DropdownMenuItem(
                           value: e,
                           child: Text(
-                            e.displayLabel,
+                            '${e.displayLabel} · ${e.templateLabel}',
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -141,7 +141,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                '현재 단계에서는 실제 "물품 입고 내역" 시트의 화물 행만 DB 최신값으로 교체합니다. 다른 시트, 셀 서식, 수식, 병합, 그림, 인쇄설정은 새로 만들지 않고 원본 XLSX 내부 파일을 그대로 보존합니다.',
+                '기본 폼과 항차별 변경 폼은 DB(Storage)에 보관합니다. 현재 자동 데이터 반영은 "물품 입고 내역" 형식부터 지원하며, 다른 노선 원장/거래명세서 자동 반영은 노선별 구조를 검증하면서 이어서 적용합니다.',
                 style: TextStyle(fontSize: 12),
               ),
             ],
