@@ -52,9 +52,9 @@ class RouteCatalog {
     'kh_la_land': 'KH_LA_LAND',
   };
 
-
   // 실제 운송 Excel 양식의 박스/영수 번호 표기 규칙.
-  // 값 자체를 임의 생성하지 않고, 화면 입력 시 해당 노선의 표기 접두어/예시를 고정 안내합니다.
+  // 2026 Cambodia 양방향 신규 BASE 기준:
+  // LA->KH = LCB / LKLCB, KH->LA = CBL / LKCBL.
   static const Map<String, String> _boxPrefixes = {
     'kr_la_sea': 'S',
     'kr_la_air': 'A',
@@ -65,7 +65,8 @@ class RouteCatalog {
     'vn_la_land': 'VL',
     'la_ch_land': 'LC',
     'ch_la_land': 'CL',
-    'la_kh_land': 'LCBL',
+    'la_kh_land': 'LCB',
+    'kh_la_land': 'CBL',
   };
 
   static const Map<String, String> _boxExamples = {
@@ -78,7 +79,8 @@ class RouteCatalog {
     'vn_la_land': 'VL01-01',
     'la_ch_land': 'LC01-01',
     'ch_la_land': 'CL01-01',
-    'la_kh_land': 'LCBL10-01',
+    'la_kh_land': 'LCB10-01',
+    'kh_la_land': 'CBL10-01',
   };
 
   static const Map<String, String> _receiptExamples = {
@@ -91,7 +93,8 @@ class RouteCatalog {
     'vn_la_land': 'LKVL2026xx-xx',
     'la_ch_land': 'LC2026xx-xx',
     'ch_la_land': 'LKCL2026xx-xx',
-    'la_kh_land': 'LKLCBL 2026xx-xx',
+    'la_kh_land': 'LKLCB 2026xx-xx',
+    'kh_la_land': 'LKCBL 2026xx-xx',
   };
 
   static String boxPrefixFor(String label) => _boxPrefixes[keyFor(label)] ?? '';

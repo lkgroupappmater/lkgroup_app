@@ -176,6 +176,21 @@ class QuoteFreightCalculator {
         _RateTier(20, 6.9),
       ],
     ),
+    // 2026 신규 KH -> LA BASE 실제 운임표 기준.
+    'kh_la_land': const _RouteTariff(
+      sourceFile: 'KH_LA_LAND_2026_V00_SHIPMENTS.xlsx',
+      minimumCharge: 22.5,
+      tiers: [
+        _RateTier(0, 22.5),
+        _RateTier(2, 14.3),
+        _RateTier(3, 11.5),
+        _RateTier(4, 10.2),
+        _RateTier(6, 8.8),
+        _RateTier(10, 7.7),
+        _RateTier(15, 7.1),
+        _RateTier(20, 6.9),
+      ],
+    ),
   };
 
   static bool supportsRoute(String routeLabel) =>
