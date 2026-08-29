@@ -1,4 +1,4 @@
-import '../config/supabase_config.dart';
+﻿import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import '../models/shipment.dart';
 import '../data/mock_data.dart';
@@ -68,10 +68,11 @@ class ShipmentService {
   Future<int> upsertFromRows(List<Map<String, dynamic>> rows) async {
     if (!SupabaseConfig.isConfigured || rows.isEmpty) return 0;
     final payload = rows.map(_shipmentPayload).toList();
-    await SupabaseService.client
-        .from('shipments')
-        .upsert(payload, onConflict: 'import_key');
-    return payload.length;
+    final result = await SupabaseService.client.rpc(
+      'manager_upsert_unlocked_shipments',
+      params: {'p_rows': payload},
+    );
+    return (result as num?)?.toInt() ?? 0;
   }
 
   Future<void> updateRow(String id, Map<String, dynamic> changes) async {
@@ -168,10 +169,36 @@ class ShipmentService {
 
   Future<List<Map<String, dynamic>>> getPendingChangeRequests() async {
     if (!SupabaseConfig.isConfigured) return const [];
-    final rows = await SupabaseService.client.rpc(
+    final raw = await SupabaseService.client.rpc(
       'get_pending_shipment_change_requests',
     );
-    return List<Map<String, dynamic>>.from(rows as List);
+    final rows = List<Map<String, dynamic>>.from(raw as List);
+
+    for (final request in rows) {
+      try {
+        final route = '\';
+        final year = (request['shipment_year'] as num?)?.toInt();
+        final voyage = '\';
+        final box = '\';
+        if (route.isEmpty || year == null || voyage.isEmpty || box.isEmpty) {
+          continue;
+        }
+        final matches = await SupabaseService.client
+            .from('shipments')
+            .select('data_locked')
+            .eq('route', route)
+            .eq('shipment_year', year)
+            .eq('voyage', voyage)
+            .eq('box_number', box)
+            .limit(1);
+        if (matches.isNotEmpty) {
+          request['data_locked'] = matches.first['data_locked'] == true;
+        }
+      } catch (_) {
+        // 잠금 표시 보강 실패가 기존 승인 요청 조회 자체를 막으면 안 됩니다.
+      }
+    }
+    return rows;
   }
 
   Future<void> reviewChangeRequest({
@@ -319,3 +346,4 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
+

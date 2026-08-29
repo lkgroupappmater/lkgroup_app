@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../services/shipment_service.dart';
 
@@ -220,6 +220,22 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               '${r['route'] ?? ''} · ${r['shipment_year'] ?? ''}년 · ${r['voyage'] ?? ''}항차\n'
               '요청인: ${r['requester_name'] ?? ''} (${r['requester_email'] ?? ''})',
             ),
+            if (r['data_locked'] == true) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(Icons.lock, size: 16, color: Colors.redAccent),
+                  SizedBox(width: 5),
+                  Text(
+                    '데이터 수정 잠금된 화물',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             const Text('요청 내용', style: TextStyle(fontWeight: FontWeight.bold)),
             Text(_changesText(requested)),
@@ -325,3 +341,4 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
+

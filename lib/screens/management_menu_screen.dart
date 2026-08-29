@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import 'change_approval_screen.dart';
 import 'excel_export_screen.dart';
+import 'excel_bulk_management_screen.dart';
 import 'excel_upload_screen.dart';
 import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
@@ -74,6 +75,11 @@ class ManagementMenuScreen extends StatelessWidget {
           'label': '화물 내용 변경 승인 관리',
           'icon': Icons.fact_check_outlined,
           'page': const ChangeApprovalScreen(),
+        },        {
+          'label': '엑셀 데이타 일괄 관리
+(편집 잠금/해제, 구획 및 영수 번호 관리)',
+          'icon': Icons.table_view_outlined,
+          'page': const ExcelBulkManagementScreen(),
         },
       ]);
     }
@@ -169,3 +175,4 @@ class ManagementMenuScreen extends StatelessWidget {
     );
   }
 }
+

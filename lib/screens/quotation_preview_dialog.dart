@@ -48,15 +48,13 @@ class QuotationPreviewDialog extends StatefulWidget {
 }
 
 class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
-  final GlobalKey _captureKey = GlobalKey();
-
   ui.Image? _templateImage;
   bool _loading = true;
   bool _saving = false;
   late final DateTime _issuedAt;
 
   String get _routeKey => RouteCatalog.keyFor(widget.routeLabel);
-  bool get _isKrLaSea => _routeKey == 'kr_la_sea';
+  _RouteFormConfig get _config => _RouteFormConfig.forKey(_routeKey);
 
   @override
   void initState() {
@@ -73,9 +71,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   Future<void> _loadTemplate() async {
     try {
-      final path = _isKrLaSea
-          ? 'assets/quotation_forms/kr_la_sea.png'
-          : 'assets/quotation_forms/${_routeKey.toLowerCase()}.png';
+      final path = 'assets/quotation_forms/${_routeKey.toLowerCase()}.png';
       final data = await rootBundle.load(path);
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
@@ -97,64 +93,86 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     }
   }
 
-  String _two(int v) => v.toString().padLeft(2, '0');
+  int get _detailRows {
+    final base = _config.baseRows;
+    return widget.boxes.length > base ? widget.boxes.length + 1 : base;
+  }
 
+  Size _logicalSize(ui.Image image) {
+    final extra = (_detailRows - _config.baseRows) * _config.rowHeight;
+    return Size(image.width.toDouble(), image.height.toDouble() + extra);
+  }
+
+  Widget _preview(ui.Image image) {
+    final logical = _logicalSize(image);
+    final screenWidth = MediaQuery.sizeOf(context).width - 28;
+    final previewWidth = screenWidth.clamp(320.0, 760.0);
+    final previewHeight = previewWidth * logical.height / logical.width;
+
+    return SizedBox(
+      width: previewWidth,
+      height: previewHeight,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: logical.width,
+          height: logical.height,
+          child: CustomPaint(
+            painter: _QuotationFormPainter(
+              template: image,
+              boxes: widget.boxes,
+              result: widget.result,
+              rates: widget.rates,
+              issuedAt: _issuedAt,
+              config: _config,
+              detailRows: _detailRows,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<Uint8List> _renderHighResolutionPng() async {
     final image = _templateImage;
     if (image == null) throw StateError('견적서 원본 폼을 불러오지 못했습니다.');
 
+    final logical = _logicalSize(image);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    const exportScale = 1.75;
+    canvas.scale(exportScale, exportScale);
 
-    late final Size logicalSize;
-    if (_isKrLaSea) {
-      final detailRows = widget.boxes.length > 10 ? widget.boxes.length + 1 : 10;
-      final extraRows = detailRows - 10;
-      logicalSize = Size(2292, 1526.0 + (extraRows * 32.0));
+    _QuotationFormPainter(
+      template: image,
+      boxes: widget.boxes,
+      result: widget.result,
+      rates: widget.rates,
+      issuedAt: _issuedAt,
+      config: _config,
+      detailRows: _detailRows,
+    ).paint(canvas, logical);
 
-      const exportScale = 1.75;
-      canvas.scale(exportScale, exportScale);
-      _KrLaSeaQuotationPainter(
-        template: image,
-        boxes: widget.boxes,
-        result: widget.result,
-        rates: widget.rates,
-        issuedAt: _issuedAt,
-        detailRows: detailRows,
-      ).paint(canvas, logicalSize);
-
-      final picture = recorder.endRecording();
-      final rendered = await picture.toImage(
-        (logicalSize.width * exportScale).round(),
-        (logicalSize.height * exportScale).round(),
-      );
-      picture.dispose();
-      final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
-      rendered.dispose();
-      if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
-      return byteData.buffer.asUint8List();
-    }
-
-    logicalSize = Size(image.width.toDouble(), image.height.toDouble());
-    canvas.drawImage(image, Offset.zero, Paint()..filterQuality = FilterQuality.high);
     final picture = recorder.endRecording();
     final rendered = await picture.toImage(
-      logicalSize.width.round(),
-      logicalSize.height.round(),
+      (logical.width * exportScale).round(),
+      (logical.height * exportScale).round(),
     );
     picture.dispose();
+
     final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
     rendered.dispose();
     if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
     return byteData.buffer.asUint8List();
   }
 
+  String _two(int v) => v.toString().padLeft(2, '0');
+
   Future<void> _savePng() async {
     setState(() => _saving = true);
     try {
-      final Uint8List bytes = await _renderHighResolutionPng();
-
+      final bytes = await _renderHighResolutionPng();
       final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
       final fileName =
           '${prefix.isEmpty ? 'QUOTATION' : prefix}_QUOTATION_${_issuedAt.year}${_two(_issuedAt.month)}${_two(_issuedAt.day)}.png';
@@ -167,7 +185,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         type: FileType.custom,
         allowedExtensions: const ['png'],
       );
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -188,7 +205,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   @override
   Widget build(BuildContext context) {
     final image = _templateImage;
-
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -231,19 +247,9 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                               style: TextStyle(color: Colors.white),
                             ),
                           )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              final preview = _buildPreviewSurface(image);
-                              return Container(
-                                width: constraints.maxWidth,
-                                height: constraints.maxHeight,
-                                color: const Color(0xFF202124),
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Center(child: preview),
-                                ),
-                              );
-                            },
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(8),
+                            child: Center(child: _preview(image)),
                           ),
               ),
             ),
@@ -280,67 +286,143 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       ),
     );
   }
+}
 
-  Widget _buildPreviewSurface(ui.Image image) {
-    if (_isKrLaSea) {
-      final detailRows = widget.boxes.length > 10 ? widget.boxes.length + 1 : 10;
-      final extraRows = detailRows - 10;
-      final formHeight = 1526.0 + (extraRows * 32.0);
+class _RouteFormConfig {
+  const _RouteFormConfig({
+    required this.key,
+    required this.baseRows,
+    required this.bodyTop,
+    required this.bodyBottom,
+    required this.totalTop,
+    required this.amountStartTop,
+    this.dateRect = const Rect.fromLTRB(520, 154, 1102, 187),
+  });
 
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = MediaQuery.sizeOf(context).width - 28;
-          final previewWidth = screenWidth.clamp(320.0, 760.0);
-          final previewHeight = previewWidth * formHeight / 2292.0;
-          return SizedBox(
-            width: previewWidth,
-            height: previewHeight,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                width: 2292,
-                height: formHeight,
-                child: CustomPaint(
-                  painter: _KrLaSeaQuotationPainter(
-                    template: image,
-                    boxes: widget.boxes,
-                    result: widget.result,
-                    rates: widget.rates,
-                    issuedAt: _issuedAt,
-                    detailRows: detailRows,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      );
+  final String key;
+  final int baseRows;
+  final double bodyTop;
+  final double bodyBottom;
+  final double totalTop;
+  final double amountStartTop;
+  final Rect dateRect;
+
+  double get rowHeight => (bodyBottom - bodyTop) / baseRows;
+
+  static _RouteFormConfig forKey(String key) {
+    // 실제 각 노선 Quotation 연결 그림을 기준으로 잡은 표 영역.
+    switch (key) {
+      case 'kr_la_sea':
+        return const _RouteFormConfig(
+          key: 'kr_la_sea',
+          baseRows: 10,
+          bodyTop: 293,
+          bodyBottom: 613,
+          totalTop: 613,
+          amountStartTop: 645,
+        );
+      case 'kr_la_air':
+        return const _RouteFormConfig(
+          key: 'kr_la_air',
+          baseRows: 10,
+          bodyTop: 288,
+          bodyBottom: 608,
+          totalTop: 608,
+          amountStartTop: 640,
+        );
+      case 'la_kr_air_exp':
+        return const _RouteFormConfig(
+          key: 'la_kr_air_exp',
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
+        );
+      case 'la_th_land':
+        return const _RouteFormConfig(
+          key: 'la_th_land',
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
+        );
+      case 'th_la_land':
+        return const _RouteFormConfig(
+          key: 'th_la_land',
+          baseRows: 5,
+          bodyTop: 250,
+          bodyBottom: 410,
+          totalTop: 410,
+          amountStartTop: 442,
+          dateRect: Rect.fromLTRB(530, 115, 1095, 148),
+        );
+      case 'la_vn_land':
+      case 'vn_la_land':
+        return _RouteFormConfig(
+          key: key,
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+          dateRect: const Rect.fromLTRB(530, 112, 1095, 145),
+        );
+      case 'la_ch_land':
+        return const _RouteFormConfig(
+          key: 'la_ch_land',
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
+        );
+      case 'ch_la_land':
+        return const _RouteFormConfig(
+          key: 'ch_la_land',
+          baseRows: 5,
+          bodyTop: 255,
+          bodyBottom: 415,
+          totalTop: 415,
+          amountStartTop: 447,
+          dateRect: Rect.fromLTRB(530, 120, 1095, 153),
+        );
+      case 'la_kh_land':
+      case 'kh_la_land':
+        return _RouteFormConfig(
+          key: key,
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+          dateRect: const Rect.fromLTRB(530, 112, 1095, 145),
+        );
+      default:
+        return _RouteFormConfig(
+          key: key,
+          baseRows: 5,
+          bodyTop: 245,
+          bodyBottom: 405,
+          totalTop: 405,
+          amountStartTop: 437,
+        );
     }
-
-    final screenWidth = MediaQuery.sizeOf(context).width - 28;
-    final previewWidth = screenWidth.clamp(320.0, 760.0);
-    final previewHeight =
-        previewWidth * image.height.toDouble() / image.width.toDouble();
-    return SizedBox(
-      width: previewWidth,
-      height: previewHeight,
-      child: RawImage(
-        image: image,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.medium,
-      ),
-    );
   }
 }
 
-class _KrLaSeaQuotationPainter extends CustomPainter {
-  const _KrLaSeaQuotationPainter({
+class _QuotationFormPainter extends CustomPainter {
+  const _QuotationFormPainter({
     required this.template,
     required this.boxes,
     required this.result,
     required this.rates,
     required this.issuedAt,
+    required this.config,
     required this.detailRows,
   });
 
@@ -349,307 +431,267 @@ class _KrLaSeaQuotationPainter extends CustomPainter {
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
   final DateTime issuedAt;
+  final _RouteFormConfig config;
   final int detailRows;
 
-  static const double sourceWidth = 2292;
-  static const double sourceHeight = 1526;
-
-  // 실제 Excel 연결 그림에서 측정한 상세 행 영역.
-  static const double bodyTop = 293;
-  static const double originalBodyBottom = 613;
-  static const double rowHeight = 32;
-
-  static const List<double> xs = <double>[
-    24, 159, 362, 426, 519, 698, 942, 1023, 1104, 1185,
-    1372, 1620, 1856, 2045, 2267,
+  static const List<double> xRatio = <double>[
+    0.0105, 0.0694, 0.1580, 0.1859, 0.2264, 0.3045, 0.4110,
+    0.4464, 0.4817, 0.5170, 0.5986, 0.7068, 0.8098, 0.8922, 0.9891,
   ];
 
-  double get extraHeight => (detailRows - 10) * rowHeight;
-  double yShift(double sourceY) =>
-      sourceY >= originalBodyBottom ? sourceY + extraHeight : sourceY;
+  double get _w => template.width.toDouble();
+  double get _extraHeight => (detailRows - config.baseRows) * config.rowHeight;
+
+  List<double> get xs => xRatio.map((v) => v * _w).toList(growable: false);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..filterQuality = FilterQuality.high;
+    final originalH = template.height.toDouble();
 
-    if (extraHeight <= 0) {
-      canvas.drawImageRect(
-        template,
-        Rect.fromLTWH(0, 0, sourceWidth, sourceHeight),
-        Rect.fromLTWH(0, 0, sourceWidth, sourceHeight),
-        paint,
-      );
+    if (_extraHeight <= 0) {
+      canvas.drawImage(template, Offset.zero, paint);
     } else {
-      // 상단: 기존 상세 10행 마지막까지 그대로.
       canvas.drawImageRect(
         template,
-        const Rect.fromLTWH(0, 0, sourceWidth, originalBodyBottom),
-        const Rect.fromLTWH(0, 0, sourceWidth, originalBodyBottom),
+        Rect.fromLTWH(0, 0, _w, config.bodyBottom),
+        Rect.fromLTWH(0, 0, _w, config.bodyBottom),
         paint,
       );
 
-      // 추가 행: 원본 폼과 동일한 흰 배경 + 셀 경계선.
-      final extraRect = Rect.fromLTWH(
-        24,
-        originalBodyBottom,
-        2267 - 24,
-        extraHeight,
+      // 추가 행은 원본 Excel 폼의 마지막 빈 상세행을 그대로 반복 복사.
+      final rowH = config.rowHeight;
+      final left = xs.first;
+      final right = xs.last;
+      final sourceBlankRow = Rect.fromLTRB(
+        left,
+        config.bodyBottom - rowH,
+        right,
+        config.bodyBottom,
       );
-      canvas.drawRect(extraRect, Paint()..color = Colors.white);
-
-      final linePaint = Paint()
-        ..color = const Color(0xFF5F6368)
-        ..strokeWidth = 1;
-      for (final x in xs) {
-        canvas.drawLine(
-          Offset(x, originalBodyBottom),
-          Offset(x, originalBodyBottom + extraHeight),
-          linePaint,
+      for (var i = 0; i < detailRows - config.baseRows; i++) {
+        final top = config.bodyBottom + (i * rowH);
+        canvas.drawImageRect(
+          template,
+          sourceBlankRow,
+          Rect.fromLTRB(left, top, right, top + rowH),
+          paint,
         );
       }
-      for (var i = 0; i <= detailRows - 10; i++) {
-        final y = originalBodyBottom + (i * rowHeight);
-        canvas.drawLine(Offset(24, y), Offset(2267, y), linePaint);
-      }
 
-      // 하단(합계/Remark/QR/서명 등)을 추가된 행만큼 아래로 이동.
+      // 합계 / Remark / QR / 송금 / 도장 / 서명 영역은 원래 크기 그대로 아래로 이동.
       canvas.drawImageRect(
         template,
-        const Rect.fromLTWH(
-          0,
-          originalBodyBottom,
-          sourceWidth,
-          sourceHeight - originalBodyBottom,
-        ),
+        Rect.fromLTWH(0, config.bodyBottom, _w, originalH - config.bodyBottom),
         Rect.fromLTWH(
           0,
-          originalBodyBottom + extraHeight,
-          sourceWidth,
-          sourceHeight - originalBodyBottom,
+          config.bodyBottom + _extraHeight,
+          _w,
+          originalH - config.bodyBottom,
         ),
         paint,
       );
     }
 
     _paintDate(canvas);
-    _paintDetailRows(canvas);
+    _paintRows(canvas);
     _paintTotals(canvas);
   }
 
   void _paintDate(Canvas canvas) {
-    _clearInterior(canvas, const Rect.fromLTRB(520, 154, 1102, 187));
-    _text(
-      canvas,
-      _date(issuedAt),
-      const Rect.fromLTRB(520, 154, 1102, 187),
-      fontSize: 19,
-      bold: true,
-    );
+    final r = config.dateRect;
+    _clear(canvas, r);
+    _text(canvas, _date(issuedAt), r, 18, bold: true);
   }
 
-  void _paintDetailRows(Canvas canvas) {
-    final minimum = 1.5;
-
+  void _paintRows(Canvas canvas) {
+    final xx = xs;
+    final rowH = config.rowHeight;
     for (var i = 0; i < detailRows; i++) {
-      final top = bodyTop + (i * rowHeight);
-      final bottom = top + rowHeight;
+      final top = config.bodyTop + (i * rowH);
+      final bottom = top + rowH;
 
-      // 기존 샘플 값/수식 캐시를 모두 지우고 현재 데이터 기준으로 다시 표시.
-      for (var col = 0; col < xs.length - 1; col++) {
-        _clearInterior(
-          canvas,
-          Rect.fromLTRB(xs[col], top, xs[col + 1], bottom),
-        );
+      for (var c = 0; c < xx.length - 1; c++) {
+        _clear(canvas, Rect.fromLTRB(xx[c], top, xx[c + 1], bottom));
       }
 
       _text(
         canvas,
         '${i + 1}',
-        Rect.fromLTRB(xs[0], top, xs[1], bottom),
-        fontSize: 17,
+        Rect.fromLTRB(xx[0], top, xx[1], bottom),
+        15,
         bold: true,
       );
 
       if (i >= boxes.length) continue;
       final b = boxes[i];
       final line = b.result;
-      final rate = line.ratePerKg;
-
-      final actualAmount = _minimumCharge(line.actualWeightKg * rate, minimum);
-      final volumeAmount = _minimumCharge(line.volumeWeightKg * rate, minimum);
+      final qty = b.quantity < 1 ? 1 : b.quantity;
+      final unitVol = line.volumeWeightKg / qty;
+      final minimum = line.ratePerKg;
+      final actualFee = _minCharge(line.actualWeightKg * line.ratePerKg, minimum);
+      final volumeFee = _minCharge(line.volumeWeightKg * line.ratePerKg, minimum);
 
       final values = <String>[
         'BOX',
-        _num(rate),
-        '${b.quantity}',
+        _num(line.ratePerKg),
+        '$qty',
         _num(b.weightKg),
         _num(line.actualWeightKg),
         _num(b.lengthCm),
         _num(b.widthCm),
         _num(b.heightCm),
-        _num(line.volumeWeightKg / (b.quantity < 1 ? 1 : b.quantity)),
+        _num(unitVol),
         _num(line.volumeWeightKg),
-        _num(actualAmount),
-        _num(volumeAmount),
+        _num(actualFee),
+        _num(volumeFee),
         _num(line.amountUsd),
       ];
 
-      // No. 이후 13개 표시 컬럼.
-      for (var col = 1; col < xs.length - 1; col++) {
+      for (var c = 1; c < xx.length - 1; c++) {
         _text(
           canvas,
-          values[col - 1],
-          Rect.fromLTRB(xs[col], top, xs[col + 1], bottom),
-          fontSize: 15,
-          bold: col >= 11,
+          values[c - 1],
+          Rect.fromLTRB(xx[c], top, xx[c + 1], bottom),
+          c >= 11 ? 14 : 13,
+          bold: c >= 11,
         );
       }
     }
   }
 
   void _paintTotals(Canvas canvas) {
-    final shift = extraHeight;
-    final totalTop = 613 + shift;
-    final totalBottom = 645 + shift;
+    final xx = xs;
+    final top = config.totalTop + _extraHeight;
+    final bottom = top + config.rowHeight;
 
-    // 합계행의 기존 샘플 값을 제거.
-    for (var col = 0; col < xs.length - 1; col++) {
-      _clearInterior(
-        canvas,
-        Rect.fromLTRB(xs[col], totalTop, xs[col + 1], totalBottom),
-      );
+    for (var c = 0; c < xx.length - 1; c++) {
+      _clear(canvas, Rect.fromLTRB(xx[c], top, xx[c + 1], bottom));
     }
 
-    // 합계 라벨은 A:B를 합친 것처럼 보이도록 중앙 표시.
     _text(
       canvas,
       '합 계',
-      Rect.fromLTRB(24, totalTop, 362, totalBottom),
-      fontSize: 17,
+      Rect.fromLTRB(xx[0], top, xx[2], bottom),
+      15,
       bold: true,
     );
 
-    final totalQty = boxes.fold<int>(0, (s, b) => s + b.quantity);
-    final totalActual =
-        boxes.fold<double>(0, (s, b) => s + b.result.actualWeightKg);
-    final totalVolume =
-        boxes.fold<double>(0, (s, b) => s + b.result.volumeWeightKg);
+    final qty = boxes.fold<int>(0, (s, b) => s + b.quantity);
+    final actual = boxes.fold<double>(0, (s, b) => s + b.result.actualWeightKg);
+    final volume = boxes.fold<double>(0, (s, b) => s + b.result.volumeWeightKg);
 
-    _text(
-      canvas,
-      '$totalQty',
-      Rect.fromLTRB(426, totalTop, 519, totalBottom),
-      fontSize: 17,
-      bold: true,
-    );
-    _text(
-      canvas,
-      _num(totalActual),
-      Rect.fromLTRB(698, totalTop, 942, totalBottom),
-      fontSize: 17,
-      bold: true,
-    );
-    _text(
-      canvas,
-      _num(totalVolume),
-      Rect.fromLTRB(1372, totalTop, 1620, totalBottom),
-      fontSize: 17,
-      bold: true,
-    );
+    _text(canvas, '$qty', Rect.fromLTRB(xx[3], top, xx[4], bottom), 15, bold: true);
+    _text(canvas, _num(actual), Rect.fromLTRB(xx[5], top, xx[6], bottom), 15, bold: true);
+    _text(canvas, _num(volume), Rect.fromLTRB(xx[10], top, xx[11], bottom), 15, bold: true);
 
-    // 우측 운임 합계 / 할인 / 특별할인 / VAT.
-    _replaceAmountCell(canvas, 645 + shift, 687 + shift, '\$ ${_money(result.totalUsd, 2)}');
-    _replaceAmountCell(canvas, 687 + shift, 729 + shift, '\$ -');
-    _replaceAmountCell(canvas, 729 + shift, 771 + shift, '\$ -');
-    _replaceAmountCell(canvas, 771 + shift, 813 + shift, '\$ -');
+    final amountTop = config.amountStartTop + _extraHeight;
+    final amountH = 42.0;
+    _amount(canvas, amountTop, amountTop + amountH, '\$ ${_money(result.totalUsd, 2)}');
+    _amount(canvas, amountTop + amountH, amountTop + amountH * 2, '\$ -');
+    _amount(canvas, amountTop + amountH * 2, amountTop + amountH * 3, '\$ -');
+    _amount(canvas, amountTop + amountH * 3, amountTop + amountH * 4, '\$ -');
 
     final kip = result.totalUsd * rates.appliedKip;
     final thb = result.totalUsd * rates.appliedThb;
     final krw = result.totalUsd * rates.appliedKrw;
 
-    _replaceAmountCell(canvas, 813 + shift, 855 + shift, '\$ ${_money(result.totalUsd, 2)}',
-        color: const Color(0xFF0070C0));
-    _replaceAmountCell(canvas, 855 + shift, 897 + shift, '₭ ${_money(kip, 0)}',
-        color: const Color(0xFF0070C0));
-    _replaceAmountCell(canvas, 897 + shift, 939 + shift, '฿ ${_money(thb, 0)}',
-        color: const Color(0xFF0070C0));
-    _replaceAmountCell(canvas, 939 + shift, 981 + shift, '₩ ${_money(krw, 0)}',
-        color: const Color(0xFF0070C0));
-  }
-
-  void _replaceAmountCell(
-    Canvas canvas,
-    double top,
-    double bottom,
-    String value, {
-    Color color = Colors.black,
-  }) {
-    const left = 2045.0;
-    const right = 2267.0;
-    _clearInterior(canvas, Rect.fromLTRB(left, top, right, bottom));
-    _text(
+    _amount(
       canvas,
-      value,
-      Rect.fromLTRB(left, top, right, bottom),
-      fontSize: 18,
-      bold: true,
-      color: color,
-      align: TextAlign.right,
-      paddingRight: 14,
+      amountTop + amountH * 4,
+      amountTop + amountH * 5,
+      '\$ ${_money(result.totalUsd, 2)}',
+      color: const Color(0xFF0070C0),
+    );
+    _amount(
+      canvas,
+      amountTop + amountH * 5,
+      amountTop + amountH * 6,
+      '₭ ${_money(kip, 0)}',
+      color: const Color(0xFF0070C0),
+    );
+    _amount(
+      canvas,
+      amountTop + amountH * 6,
+      amountTop + amountH * 7,
+      '฿ ${_money(thb, 0)}',
+      color: const Color(0xFF0070C0),
+    );
+    _amount(
+      canvas,
+      amountTop + amountH * 7,
+      amountTop + amountH * 8,
+      '₩ ${_money(krw, 0)}',
+      color: const Color(0xFF0070C0),
     );
   }
 
-  double _minimumCharge(double amount, double minimum) {
+  void _amount(Canvas canvas, double top, double bottom, String value,
+      {Color color = Colors.black}) {
+    final left = _w * 0.8922;
+    final right = _w * 0.9891;
+    final rect = Rect.fromLTRB(left, top, right, bottom);
+    _clear(canvas, rect);
+    _text(
+      canvas,
+      value,
+      rect,
+      16,
+      bold: true,
+      color: color,
+      align: TextAlign.right,
+      rightPadding: 12,
+    );
+  }
+
+  double _minCharge(double amount, double minimum) {
     if (amount <= 0) return 0;
     return amount < minimum ? minimum : amount;
   }
 
-  void _clearInterior(Canvas canvas, Rect rect) {
-    final inner = Rect.fromLTRB(
-      rect.left + 1.5,
-      rect.top + 1.5,
-      rect.right - 1.5,
-      rect.bottom - 1.5,
+  void _clear(Canvas canvas, Rect rect) {
+    canvas.drawRect(
+      Rect.fromLTRB(
+        rect.left + 1.2,
+        rect.top + 1.2,
+        rect.right - 1.2,
+        rect.bottom - 1.2,
+      ),
+      Paint()..color = Colors.white,
     );
-    canvas.drawRect(inner, Paint()..color = Colors.white);
   }
 
   void _text(
     Canvas canvas,
     String value,
-    Rect rect, {
-    double fontSize = 15,
+    Rect rect,
+    double fontSize, {
     bool bold = false,
     Color color = Colors.black,
     TextAlign align = TextAlign.center,
-    double paddingRight = 0,
+    double rightPadding = 0,
   }) {
-    final painter = TextPainter(
+    final tp = TextPainter(
       text: TextSpan(
         text: value,
         style: TextStyle(
           fontFamily: 'NotoSansKR',
           fontSize: fontSize,
+          height: 1,
           fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
           color: color,
-          height: 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
       textAlign: align,
       maxLines: 1,
-    )..layout(maxWidth: rect.width - paddingRight - 4);
+    )..layout(maxWidth: rect.width - rightPadding - 4);
 
-    double dx;
-    if (align == TextAlign.right) {
-      dx = rect.right - painter.width - paddingRight;
-    } else if (align == TextAlign.left) {
-      dx = rect.left + 4;
-    } else {
-      dx = rect.left + (rect.width - painter.width) / 2;
-    }
-    final dy = rect.top + (rect.height - painter.height) / 2;
-    painter.paint(canvas, Offset(dx, dy));
+    final dx = align == TextAlign.right
+        ? rect.right - tp.width - rightPadding
+        : rect.left + (rect.width - tp.width) / 2;
+    final dy = rect.top + (rect.height - tp.height) / 2;
+    tp.paint(canvas, Offset(dx, dy));
   }
 
   String _date(DateTime d) =>
@@ -679,12 +721,5 @@ class _KrLaSeaQuotationPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _KrLaSeaQuotationPainter oldDelegate) {
-    return oldDelegate.template != template ||
-        oldDelegate.boxes != boxes ||
-        oldDelegate.result != result ||
-        oldDelegate.rates != rates ||
-        oldDelegate.detailRows != detailRows ||
-        oldDelegate.issuedAt != issuedAt;
-  }
+  bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
