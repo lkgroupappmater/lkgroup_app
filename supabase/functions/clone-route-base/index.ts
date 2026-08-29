@@ -281,7 +281,7 @@ Deno.serve(async (req) => {
         xml = setCellInSheet(
           xml,
           'C1',
-          `${String(target.display_name).trim()} 거래 명세서`,
+          `${String(target.document_title ?? target.display_name).trim()} xxth 거래 명세서`,
         );
         files[path] = strToU8(xml);
       }
@@ -290,6 +290,7 @@ Deno.serve(async (req) => {
     // 2) 원본 내부에 기존 metadata 문자열이 있으면 새 metadata로 치환.
     const replacements: Array<[string, string]> = [
       [String(sourceDefinition?.display_name ?? ''), String(target.display_name ?? '')],
+      [String(sourceDefinition?.document_title ?? ''), String(target.document_title ?? '')],
       [String(sourceDefinition?.company_name ?? ''), String(target.company_name ?? '')],
       [String(sourceDefinition?.phone ?? ''), String(target.phone ?? '')],
       [String(sourceDefinition?.address ?? ''), String(target.address ?? '')],

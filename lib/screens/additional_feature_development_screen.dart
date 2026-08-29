@@ -653,13 +653,10 @@ class _RouteDefinitionEditorScreenState
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
-
-            // statement_forms PNG는 원본 linked-image 캡처 특성상 위쪽에
-            // 큰 흰 여백이 포함되어 있다.
-            // 여기서는 파일 자체를 수정하지 않고, bottom 기준 cover crop으로
-            // 실제 명세서 영역만 카드 폭에 크게 보여준다.
             AspectRatio(
-              aspectRatio: 1.78,
+              // statement_forms PNG 실제 문서 영역:
+              // 1488px × 약 761px (y≈671~1432)
+              aspectRatio: 1488 / 761,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return ClipRect(
@@ -680,60 +677,63 @@ class _RouteDefinitionEditorScreenState
                           ),
                         ),
 
-                        // 문서 타이틀: 실제 명세서 상단 중앙 제목 영역에 표시.
-                        if (documentTitle.isNotEmpty)
-                          Positioned(
-                            left: constraints.maxWidth * .18,
-                            right: constraints.maxWidth * .18,
-                            top: constraints.maxHeight * .015,
-                            height: constraints.maxHeight * .115,
-                            child: Container(
-                              color: Colors.white,
-                              alignment: Alignment.center,
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '$documentTitle xxth 거래 명세서',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                  ),
+                        // 선택 BASE에 이미 들어 있던 제목/이전 overlay가 다시 보이지 않도록
+                        // 제목 영역 전체를 한 번 깨끗하게 지운 뒤 현재 document_title만 그린다.
+                        Positioned(
+                          left: constraints.maxWidth * .155,
+                          right: constraints.maxWidth * .165,
+                          top: 0,
+                          height: constraints.maxHeight * .155,
+                          child: Container(
+                            color: Colors.white,
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                documentTitle.isEmpty
+                                    ? '운송 경로 타이틀 xxth 거래 명세서'
+                                    : '$documentTitle xxth 거래 명세서',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
                                 ),
                               ),
                             ),
                           ),
+                        ),
 
-                        // 영수번호 Prefix: 실제 문서 우측 상단 번호칸.
-                        if (receiptPrefix.isNotEmpty)
-                          Positioned(
-                            right: constraints.maxWidth * .010,
-                            top: constraints.maxHeight * .018,
-                            width: constraints.maxWidth * .145,
-                            height: constraints.maxHeight * .095,
-                            child: Container(
-                              color: Colors.white,
-                              alignment: Alignment.center,
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  receiptPrefix,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                  ),
+                        // 우측 번호칸은 제목 마스크와 별도로 현재 Prefix만 표시.
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          width: constraints.maxWidth * .165,
+                          height: constraints.maxHeight * .155,
+                          child: Container(
+                            color: const Color(0xFFE6F2FB),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                receiptPrefix,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
                                 ),
                               ),
                             ),
                           ),
+                        ),
 
                         if (remark.isNotEmpty)
                           Positioned(
                             left: constraints.maxWidth * .055,
-                            right: constraints.maxWidth * .055,
-                            bottom: constraints.maxHeight * .020,
-                            height: constraints.maxHeight * .065,
+                            right: constraints.maxWidth * .245,
+                            top: constraints.maxHeight * .395,
+                            height: constraints.maxHeight * .13,
                             child: Container(
                               color: Colors.white,
                               alignment: Alignment.centerLeft,
@@ -1262,6 +1262,8 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
+
+
 
 
 

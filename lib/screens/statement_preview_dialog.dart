@@ -454,7 +454,7 @@ class _StatementPainter extends CustomPainter {
   void _paintRouteTitle(Canvas canvas, double w, double h) {
     final documentTitle = RouteCatalog.documentTitleFor(routeLabel);
     // statement PNG는 상단에 원본 링크 이미지 여백이 있으므로 실제 문서 타이틀 위치에 덮어씀.
-    final rect = Rect.fromLTRB(w * .18, h * .388, w * .82, h * .447);
+    final rect = Rect.fromLTRB(w * .19, h * .472, w * .81, h * .525);
     canvas.drawRect(
       rect,
       Paint()..color = Colors.white,
@@ -510,4 +510,5 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
