@@ -204,7 +204,16 @@ class RouteDevelopmentService {
       if (details is Map) {
         final step = '${details['step'] ?? 'unknown'}';
         final message = '${details['error'] ?? details}';
-        throw StateError('BASE Excel 생성 실패 [$step]: $message');
+        final code = '${details['code'] ?? ''}'.trim();
+        final hint = '${details['hint'] ?? ''}'.trim();
+        final suffix = [
+          if (code.isNotEmpty) 'code=$code',
+          if (hint.isNotEmpty) 'hint=$hint',
+        ].join(', ');
+        throw StateError(
+          'BASE Excel 생성 실패 [$step]: $message'
+          '${suffix.isEmpty ? '' : ' ($suffix)'}',
+        );
       }
       throw StateError('BASE Excel 생성 실패: $details');
     }

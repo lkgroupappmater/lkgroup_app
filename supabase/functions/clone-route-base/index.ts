@@ -219,13 +219,12 @@ Deno.serve(async (req) => {
     if (!routeKey) return json(400, { error: 'route_key가 필요합니다.' });
 
     step = 'load-route-definition';
-    const { data: target, error: targetError } = await admin
+    const { data: targetRows, error: targetError } = await admin
       .from('route_definitions')
-      .select(
-        'route_key,display_name,status,base_route_key,file_prefix,company_name,phone,address,template_overrides',
-      )
+      .select('*')
       .eq('route_key', routeKey)
-      .maybeSingle();
+      .limit(1);
+    const target = targetRows?.[0] ?? null;
     if (targetError) throw targetError;
     if (!target) throw new Error('운송 경로 정의를 찾을 수 없습니다.');
 
@@ -238,11 +237,14 @@ Deno.serve(async (req) => {
     }
 
     step = 'load-source-route-definition';
-    const { data: sourceDefinition } = await admin
-      .from('route_definitions')
-      .select('route_key,display_name,file_prefix,company_name,phone,address')
-      .eq('route_key', sourceRouteKey)
-      .maybeSingle();
+    const { data: sourceDefinitionRows, error: sourceDefinitionError } =
+      await admin
+        .from('route_definitions')
+        .select('*')
+        .eq('route_key', sourceRouteKey)
+        .limit(1);
+    if (sourceDefinitionError) throw sourceDefinitionError;
+    const sourceDefinition = sourceDefinitionRows?.[0] ?? null;
 
     step = 'load-source-base-template';
     const { data: sourceBaseRows, error: sourceBaseError } = await admin
@@ -425,15 +427,29 @@ Deno.serve(async (req) => {
       override_count: overrides.length,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const details =
+    const raw =
       typeof error === 'object' && error !== null
-        ? JSON.stringify(error)
-        : String(error);
-    console.error('clone-route-base failed:', { step, message, error });
+        ? (error as Record<string, unknown>)
+        : null;
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(raw?.message ?? raw?.error ?? error);
+    const details = raw ? JSON.stringify(raw) : String(error);
+    const code = String(raw?.code ?? '');
+    const hint = String(raw?.hint ?? '');
+    console.error('clone-route-base failed:', {
+      step,
+      message,
+      code,
+      hint,
+      error,
+    });
     return json(500, {
       error: message,
       step,
+      code,
+      hint,
       details,
     });
   }
