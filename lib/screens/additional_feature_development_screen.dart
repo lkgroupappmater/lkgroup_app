@@ -180,6 +180,7 @@ class _RouteDefinitionEditorScreenState
   List<Map<String, dynamic>> _tiers = [];
   List<Map<String, String>> _templateOverrides = [];
   String? _baseRouteKey;
+  String? _draftRouteKey;
   bool _savedDraft = false;
   bool _busy = false;
 
@@ -681,7 +682,11 @@ class _RouteDefinitionEditorScreenState
 
       setState(() => _busy = true);
       try {
-        await RouteDevelopmentService.instance.applyDraft(_baseRouteKey!);
+        final draftKey = _draftRouteKey;
+        if (draftKey == null || draftKey.isEmpty) {
+          throw StateError('저장된 신규 경로 Draft를 찾을 수 없습니다.');
+        }
+        await RouteDevelopmentService.instance.applyDraft(draftKey);
         if (mounted) Navigator.pop(context);
       } catch (error) {
         if (mounted) _message('신규 운송 경로 적용 실패: $error');
@@ -720,7 +725,9 @@ class _RouteDefinitionEditorScreenState
         );
         if (!mounted) return;
         setState(() {
-          _baseRouteKey = draftKey;
+          // Dropdown의 value는 계속 사용자가 선택한 ACTIVE 기반 BASE를 유지합니다.
+          // 신규 draft key는 별도로 보관해야 Dropdown items와 충돌하지 않습니다.
+          _draftRouteKey = draftKey;
           _savedDraft = true;
         });
         _message('내용을 저장했습니다. 아직 실제 신규 경로에는 적용되지 않았습니다.');
