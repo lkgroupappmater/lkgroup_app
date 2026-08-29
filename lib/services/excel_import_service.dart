@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
-import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../core/route_catalog.dart';
@@ -48,7 +47,7 @@ class ExcelImportService {
     Uint8List bytes, {
     required String fileName,
   }) async {
-    final workbook = Excel.decodeBytes(_parserCompatibleBytes(bytes));
+    final workbook = _readRawWorkbook(bytes);
     final meta = _parseFileMeta(fileName);
     if (meta == null) {
       throw StateError(
@@ -64,48 +63,48 @@ class ExcelImportService {
     final rows = <Map<String, dynamic>>[];
     var skipped = 0;
 
-    for (final entry in workbook.tables.entries) {
-      final name = entry.key.trim();
-      final sheet = entry.value;
-      if (name != '물품 입고 내역') continue;
-      final headerIndex = _findHeaderRow(sheet.rows);
-      if (headerIndex < 0) continue;
+    final cargoRows = workbook['물품 입고 내역'];
+    if (cargoRows != null) {
+      final headerIndex = _findHeaderRow(cargoRows);
+      if (headerIndex >= 0) {
+        final headers =
+            cargoRows[headerIndex].map(_normalise).toList(growable: false);
 
-      final headers = sheet.rows[headerIndex].map(_cellText).map(_normalise).toList();
+        for (final row in cargoRows.skip(headerIndex + 1)) {
+          final map = <String, dynamic>{};
+          for (var i = 0; i < headers.length && i < row.length; i++) {
+            if (headers[i].isNotEmpty) map[headers[i]] = row[i].trim();
+          }
 
-      for (final row in sheet.rows.skip(headerIndex + 1)) {
-        final map = <String, dynamic>{};
-        for (var i = 0; i < headers.length && i < row.length; i++) {
-          if (headers[i].isNotEmpty) map[headers[i]] = _cellText(row[i]).trim();
+          final box = '${map['box_number'] ?? ''}'.trim();
+          if (box.isEmpty) {
+            if (row.any((cell) => cell.trim().isNotEmpty)) skipped++;
+            continue;
+          }
+
+          // 미사용 예약행(S001 등)만 있는 빈 행은 업로드하지 않습니다.
+          final hasBusinessData = [
+            map['invoice_number'],
+            map['sender_name'],
+            map['consignee_name'],
+            map['consignee_phone'],
+            map['contents'],
+            map['receipt_number'],
+            map['weight_kg'],
+          ].any((v) => '${v ?? ''}'.trim().isNotEmpty);
+          if (!hasBusinessData) continue;
+
+          rows.add({
+            ...map,
+            'route': routeLabel,
+            'shipment_year': year,
+            'voyage': voyage,
+            'import_key': '$routeLabel|$year|$voyage|$box',
+            if (routeKey == 'kr_la_air' &&
+                '${map['unloading_zone'] ?? ''}'.trim().isEmpty)
+              'unloading_zone': '102',
+          });
         }
-
-        final box = '${map['box_number'] ?? ''}'.trim();
-        if (box.isEmpty) {
-          if (row.any((cell) => _cellText(cell).trim().isNotEmpty)) skipped++;
-          continue;
-        }
-
-        // 미사용 예약행(S001 등)만 있는 빈 행은 업로드하지 않습니다.
-        final hasBusinessData = [
-          map['invoice_number'],
-          map['sender_name'],
-          map['consignee_name'],
-          map['consignee_phone'],
-          map['contents'],
-          map['receipt_number'],
-          map['weight_kg'],
-        ].any((v) => '${v ?? ''}'.trim().isNotEmpty);
-        if (!hasBusinessData) continue;
-
-        rows.add({
-          ...map,
-          'route': routeLabel,
-          'shipment_year': year,
-          'voyage': voyage,
-          'import_key': '$routeLabel|$year|$voyage|$box',
-          if (routeKey == 'kr_la_air' && '${map['unloading_zone'] ?? ''}'.trim().isEmpty)
-            'unloading_zone': '102',
-        });
       }
     }
 
@@ -126,8 +125,8 @@ class ExcelImportService {
       );
     }
 
-    final noCargoSheet = rows.isEmpty &&
-        !workbook.tables.keys.any((name) => name.trim() == '물품 입고 내역');
+    final noCargoSheet =
+        rows.isEmpty && !workbook.keys.any((name) => name.trim() == '물품 입고 내역');
 
     return ExcelImportResult(
       inserted: inserted,
@@ -139,64 +138,177 @@ class ExcelImportService {
     );
   }
 
-  Uint8List _parserCompatibleBytes(Uint8List originalBytes) {
-    // Some real LK Group workbooks contain a <numFmt> record whose ID is in
-    // Excel's built-in range (<164). Excel itself accepts these files, while
-    // package:excel 4.0.6 throws before any cargo values can be read.
-    //
-    // IMPORTANT: this rebuilt XLSX exists only in memory for parsing.
-    // The exact original bytes are still uploaded to template Storage and are
-    // never rewritten by this compatibility step.
-    final archive = ZipDecoder().decodeBytes(originalBytes, verify: false);
-    final styles = archive.findFile('xl/styles.xml');
-    if (styles == null) return originalBytes;
-
-    final styleBytes = styles.content as List<int>;
-    final xml = utf8.decode(styleBytes, allowMalformed: true);
-    final numFmtPattern = RegExp(
-      r'<numFmt\b[^>]*\bnumFmtId="(\d+)"[^>]*(?:/>|>[\s\S]*?</numFmt>)',
-      caseSensitive: false,
-    );
-
-    var changed = false;
-    var sanitized = xml.replaceAllMapped(numFmtPattern, (match) {
-      final id = int.tryParse(match.group(1) ?? '');
-      if (id != null && id < 164) {
-        changed = true;
-        return '';
-      }
-      return match.group(0) ?? '';
-    });
-
-    // package:excel 4.0.6 does not provide every Excel built-in accounting
-    // format (notably 41/42 and related 37-44) in its internal numFmt map.
-    // If an xf references one of those IDs, parsing aborts with
-    // "missing numFmt for 41". For import purposes these cells only need their
-    // raw numeric value, so rewrite those accounting-format references to
-    // General (0) in the temporary parser copy only.
-    final unsupportedBuiltInAccounting = RegExp(
-      r'numFmtId="(3[7-9]|4[0-4])"',
-      caseSensitive: false,
-    );
-    sanitized = sanitized.replaceAllMapped(unsupportedBuiltInAccounting, (match) {
-      changed = true;
-      return 'numFmtId="0"';
-    });
-
-    if (!changed) return originalBytes;
-
-    final rebuilt = Archive();
+  Map<String, List<List<String>>> _readRawWorkbook(Uint8List bytes) {
+    final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+    final files = <String, List<int>>{};
     for (final file in archive.files) {
-      if (!file.isFile) continue;
-      final content = file.name == 'xl/styles.xml'
-          ? utf8.encode(sanitized)
-          : (file.content as List<int>);
-      rebuilt.addFile(ArchiveFile(file.name, content.length, content));
+      if (file.isFile) {
+        files[file.name] = List<int>.from(file.content as List<int>);
+      }
     }
 
-    final encoded = ZipEncoder().encode(rebuilt);
-    if (encoded == null) return originalBytes;
-    return Uint8List.fromList(encoded);
+    final workbookBytes = files['xl/workbook.xml'];
+    final relsBytes = files['xl/_rels/workbook.xml.rels'];
+    if (workbookBytes == null || relsBytes == null) {
+      throw const FormatException('Excel workbook 구조를 찾지 못했습니다.');
+    }
+
+    final workbookXml = utf8.decode(workbookBytes, allowMalformed: true);
+    final relsXml = utf8.decode(relsBytes, allowMalformed: true);
+    final sharedStrings = _readSharedStrings(files['xl/sharedStrings.xml']);
+
+    final relationships = <String, String>{};
+    final relPattern = RegExp(
+      r'<Relationship\b[^>]*\bId="([^"]+)"[^>]*\bTarget="([^"]+)"[^>]*/?>',
+      caseSensitive: false,
+    );
+    for (final match in relPattern.allMatches(relsXml)) {
+      relationships[match.group(1)!] = match.group(2)!;
+    }
+
+    final result = <String, List<List<String>>>{};
+    final sheetPattern = RegExp(
+      r'<sheet\b[^>]*\bname="([^"]+)"[^>]*\br:id="([^"]+)"[^>]*/?>',
+      caseSensitive: false,
+    );
+
+    for (final match in sheetPattern.allMatches(workbookXml)) {
+      final name = _xmlDecode(match.group(1) ?? '').trim();
+      final relId = match.group(2) ?? '';
+      final rawTarget = relationships[relId];
+      if (rawTarget == null || rawTarget.isEmpty) continue;
+
+      var target = rawTarget.replaceAll(r'\', '/');
+      while (target.startsWith('../')) {
+        target = target.substring(3);
+      }
+      if (target.startsWith('/')) target = target.substring(1);
+      final path = target.startsWith('xl/') ? target : 'xl/$target';
+      final sheetBytes = files[path];
+      if (sheetBytes == null) continue;
+
+      result[name] = _readWorksheetRows(
+        utf8.decode(sheetBytes, allowMalformed: true),
+        sharedStrings,
+      );
+    }
+
+    return result;
+  }
+
+  List<String> _readSharedStrings(List<int>? bytes) {
+    if (bytes == null) return const [];
+    final xml = utf8.decode(bytes, allowMalformed: true);
+    final values = <String>[];
+
+    final siPattern = RegExp(
+      r'<si\b[^>]*>([\s\S]*?)</si>',
+      caseSensitive: false,
+    );
+    final textPattern = RegExp(
+      r'<t(?:\s[^>]*)?>([\s\S]*?)</t>',
+      caseSensitive: false,
+    );
+
+    for (final si in siPattern.allMatches(xml)) {
+      final body = si.group(1) ?? '';
+      final text = textPattern
+          .allMatches(body)
+          .map((match) => _xmlDecode(match.group(1) ?? ''))
+          .join();
+      values.add(text);
+    }
+    return values;
+  }
+
+  List<List<String>> _readWorksheetRows(
+    String xml,
+    List<String> sharedStrings,
+  ) {
+    final rows = <List<String>>[];
+    final rowPattern = RegExp(
+      r'<row\b[^>]*>([\s\S]*?)</row>',
+      caseSensitive: false,
+    );
+    final cellPattern = RegExp(
+      r'<c\b([^>]*)>([\s\S]*?)</c>|<c\b([^>]*)/>',
+      caseSensitive: false,
+    );
+
+    for (final rowMatch in rowPattern.allMatches(xml)) {
+      final rowXml = rowMatch.group(1) ?? '';
+      final values = <String>[];
+
+      for (final cellMatch in cellPattern.allMatches(rowXml)) {
+        final attrs = cellMatch.group(1) ?? cellMatch.group(3) ?? '';
+        final body = cellMatch.group(2) ?? '';
+        final ref = RegExp(r'\br="([A-Z]+)\d+"', caseSensitive: false)
+            .firstMatch(attrs)
+            ?.group(1)
+            ?.toUpperCase();
+        if (ref == null) continue;
+
+        final columnIndex = _columnIndex(ref);
+        while (values.length <= columnIndex) {
+          values.add('');
+        }
+
+        final type = RegExp(r'\bt="([^"]+)"', caseSensitive: false)
+                .firstMatch(attrs)
+                ?.group(1) ??
+            '';
+        String value;
+
+        if (type == 'inlineStr') {
+          final texts = RegExp(
+            r'<t(?:\s[^>]*)?>([\s\S]*?)</t>',
+            caseSensitive: false,
+          ).allMatches(body);
+          value =
+              texts.map((m) => _xmlDecode(m.group(1) ?? '')).join();
+        } else {
+          final raw = RegExp(
+                r'<v>([\s\S]*?)</v>',
+                caseSensitive: false,
+              ).firstMatch(body)?.group(1) ??
+              '';
+          if (type == 's') {
+            final index = int.tryParse(raw.trim());
+            value = index != null &&
+                    index >= 0 &&
+                    index < sharedStrings.length
+                ? sharedStrings[index]
+                : '';
+          } else if (type == 'str') {
+            value = _xmlDecode(raw);
+          } else {
+            value = raw.trim();
+          }
+        }
+
+        values[columnIndex] = value;
+      }
+      rows.add(values);
+    }
+
+    return rows;
+  }
+
+  int _columnIndex(String letters) {
+    var result = 0;
+    for (final unit in letters.codeUnits) {
+      result = result * 26 + (unit - 64);
+    }
+    return result - 1;
+  }
+
+  String _xmlDecode(String value) {
+    return value
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAll('&amp;', '&');
   }
 
   Future<void> _saveWorkbookTemplate({
@@ -270,37 +382,37 @@ class ExcelImportService {
   }
 
   Future<int> _importCustomerDiscountRules(
-    Excel workbook, {
+    Map<String, List<List<String>>> workbook, {
     required String routeKey,
   }) async {
     if (!SupabaseConfig.isConfigured) return 0;
-    final sheet = workbook.tables['Row data'];
-    if (sheet == null || sheet.rows.isEmpty) return 0;
+    final sheet = workbook['Row data'];
+    if (sheet == null || sheet.isEmpty) return 0;
 
     final rules = <Map<String, dynamic>>[];
-    for (var r = 0; r < sheet.rows.length; r++) {
-      final row = sheet.rows[r];
+    for (var r = 0; r < sheet.length; r++) {
+      final row = sheet[r];
       for (var c = 0; c < row.length; c++) {
-        final value = _cellText(row[c]).trim();
+        final value = row[c].trim();
         if (value != '이름') continue;
 
         // Excel의 할인 목록은 "이름 ... 할인율" 형태이므로 오른쪽 4칸 안에서 할인율 열을 찾습니다.
         var discountOffset = -1;
         for (var offset = 1; offset <= 4 && c + offset < row.length; offset++) {
-          if (_cellText(row[c + offset]).trim() == '할인율') {
+          if (row[c + offset].trim() == '할인율') {
             discountOffset = offset;
             break;
           }
         }
         if (discountOffset < 0) continue;
 
-        for (var rr = r + 1; rr < sheet.rows.length; rr++) {
-          final dataRow = sheet.rows[rr];
+        for (var rr = r + 1; rr < sheet.length; rr++) {
+          final dataRow = sheet[rr];
           if (c >= dataRow.length) break;
-          final name = _cellText(dataRow[c]).trim();
+          final name = dataRow[c].trim();
           if (name.isEmpty) break;
           final discountCell = c + discountOffset < dataRow.length
-              ? _cellText(dataRow[c + discountOffset]).trim()
+              ? dataRow[c + discountOffset].trim()
               : '';
           final discount = _toPercent(discountCell);
           if (discount == null) continue;
@@ -333,18 +445,17 @@ class ExcelImportService {
     return (key, int.parse(match.group(2)!), match.group(3)!);
   }
 
-  static int _findHeaderRow(List<List<Data?>> rows) {
+  static int _findHeaderRow(List<List<String>> rows) {
     for (var r = 0; r < rows.length && r < 20; r++) {
-      final values = rows[r].map(_cellText).map(_normalise).toList();
+      final values = rows[r].map(_normalise).toList();
       if (values.contains('box_number') &&
-          (values.contains('consignee_name') || values.contains('invoice_number'))) {
+          (values.contains('consignee_name') ||
+              values.contains('invoice_number'))) {
         return r;
       }
     }
     return -1;
   }
-
-  static String _cellText(dynamic cell) => cell?.value?.toString() ?? '';
 
   static double? _toPercent(String value) {
     final cleaned = value.replaceAll('%', '').trim();
