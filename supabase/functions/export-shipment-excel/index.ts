@@ -613,6 +613,7 @@ Deno.serve(async (req) => {
       .eq('route', template.route_label)
       .eq('shipment_year', shipmentYear)
       .eq('voyage', voyage)
+      .is('deletion_requested_at', null)
       .order('box_number', { ascending: true })
       .order('id', { ascending: true });
 
