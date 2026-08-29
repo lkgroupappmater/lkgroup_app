@@ -5,6 +5,7 @@ import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/freight_service.dart';
 import '../services/shipment_service.dart';
+import '../services/shipment_filter_options_service.dart';
 import '../services/unknown_recipient_service.dart';
 
 class ShipmentSearchBody extends StatefulWidget {
@@ -39,18 +40,56 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   List<Map<String, dynamic>> _results = [];
   List<Map<String, dynamic>> _unknownRecipientRows = const [];
+  List<ShipmentBatchOption> _filterBatches = const [];
   bool _loadingUnknownRecipients = false;
   bool _searched = false;
   final Set<String> _selectedIds = <String>{};
 
   bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
   bool get _showZone => widget.currentUser?.role == UserRole.admin || widget.currentUser?.role == UserRole.staff;
+  List<String> get _availableYears {
+    final route = routeLabels[_selectedRoute];
+    final years =
+        ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, route);
+    return <String>['전체', ...years.map((e) => '$e년')];
+  }
+
+  List<String> get _availableVoyages {
+    final route = routeLabels[_selectedRoute];
+    final year =
+        int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (year == null) return const <String>['전체'];
+    final voyages = ShipmentFilterOptionsService.instance
+        .voyagesFor(_filterBatches, route, year);
+    return <String>[
+      '전체',
+      ...voyages.map(
+        (e) => e.endsWith('항차') ? e : '${e}항차',
+      ),
+    ];
+  }
+
+  Future<void> _loadFilterBatches() async {
+    if (!widget.isLoggedIn || widget.currentUser == null) return;
+    try {
+      final rows = await ShipmentFilterOptionsService.instance.listBatches();
+      if (!mounted) return;
+      setState(() {
+        _filterBatches = rows;
+        if (!_availableYears.contains(_year)) _year = '전체';
+        if (!_availableVoyages.contains(_voyage)) _voyage = '전체';
+      });
+    } catch (_) {
+      // 조회 필터 목록 실패가 기존 화물 조회 자체를 막지 않도록 합니다.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _prefillMemberFields();
     _loadUnknownRecipientCargo();
+    _loadFilterBatches();
   }
 
   @override
@@ -59,6 +98,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     if (oldWidget.currentUser?.id != widget.currentUser?.id) {
       _prefillMemberFields();
     _loadUnknownRecipientCargo();
+      _loadFilterBatches();
     }
   }
 
@@ -515,7 +555,13 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               ),
             ),
             onChanged: (value) {
-              if (value != null) setState(() => _selectedRoute = value);
+              if (value != null) {
+                setState(() {
+                  _selectedRoute = value;
+                  _year = '전체';
+                  _voyage = '전체';
+                });
+              }
             },
           ),
           const SizedBox(height: 10),
@@ -525,11 +571,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 child: DropdownButtonFormField<String>(
                   value: _year,
                   decoration: _dropDecoration('년도', Icons.calendar_today),
-                  items: const ['전체', '2026년', '2027년', '2028년']
+                  items: _availableYears
                       .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                       .toList(),
                   onChanged: (v) {
-                    if (v != null) setState(() => _year = v);
+                    if (v != null) {
+                      setState(() {
+                        _year = v;
+                        _voyage = '전체';
+                      });
+                    }
                   },
                 ),
               ),
@@ -539,13 +590,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   value: _voyage,
                   decoration: _dropDecoration(
                       '항차', Icons.confirmation_number_outlined),
-                  items: <String>[
-                    '전체',
-                    ...List.generate(
-                      30,
-                      (i) => '${(i + 1).toString().padLeft(2, '0')}항차',
-                    ),
-                  ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                  items: _availableVoyages
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
                   onChanged: (v) {
                     if (v != null) setState(() => _voyage = v);
                   },
@@ -783,5 +830,6 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
 
 

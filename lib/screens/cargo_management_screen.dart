@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/shipment_service.dart';
+import '../services/shipment_filter_options_service.dart';
 import 'shipment_manual_add_screen.dart';
 import 'notice_management_screen.dart';
 import 'schedule_management_screen.dart';
@@ -50,6 +51,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   String _voyage = '전체';
   List<Map<String, dynamic>> _results = const [];
   List<Map<String, dynamic>> _pendingDeletions = const [];
+  List<ShipmentBatchOption> _filterBatches = const [];
   final Set<String> _selectedIds = <String>{};
   bool _searched = false;
   bool _busy = false;
@@ -64,11 +66,45 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   bool get _isPartner => widget.user.role == UserRole.partner;
   bool get _isManager => _isAdmin || _isStaff || _isPartner;
   bool get _canSaveDirectly => _isManager;
+  List<String> get _availableYears {
+    final years =
+        ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, _route);
+    return <String>['전체', ...years.map((e) => '$e년')];
+  }
+
+  List<String> get _availableVoyages {
+    final year =
+        int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (year == null) return const <String>['전체'];
+    final voyages = ShipmentFilterOptionsService.instance
+        .voyagesFor(_filterBatches, _route, year);
+    return <String>[
+      '전체',
+      ...voyages.map(
+        (e) => e.endsWith('항차') ? e : '${e}항차',
+      ),
+    ];
+  }
+
+  Future<void> _loadFilterBatches() async {
+    try {
+      final rows = await ShipmentFilterOptionsService.instance.listBatches();
+      if (!mounted) return;
+      setState(() {
+        _filterBatches = rows;
+        if (!_availableYears.contains(_year)) _year = '전체';
+        if (!_availableVoyages.contains(_voyage)) _voyage = '전체';
+      });
+    } catch (_) {
+      // 공통 조회 옵션 실패가 기존 화물 관리 기능을 막지 않도록 합니다.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _selectedIds.addAll(widget.initialSelectedIds);
+    _loadFilterBatches();
     if (widget.initialSelectedIds.isNotEmpty) _loadSelected();
     if (_isManager) _loadPendingDeletions();
   }
@@ -722,6 +758,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 if (value != null) {
                   setState(() {
                     _route = value;
+                    _year = '전체';
+                    _voyage = '전체';
                     _boxNumberController.clear();
                   });
                 }
@@ -734,11 +772,16 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _year,
                     decoration: _decoration('년도', Icons.calendar_today),
-                    items: const ['전체', '2026년', '2027년', '2028년']
+                    items: _availableYears
                         .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                         .toList(),
                     onChanged: (v) {
-                      if (v != null) setState(() => _year = v);
+                      if (v != null) {
+                        setState(() {
+                          _year = v;
+                          _voyage = '전체';
+                        });
+                      }
                     },
                   ),
                 ),
@@ -747,13 +790,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _voyage,
                     decoration: _decoration('항차', Icons.confirmation_number_outlined),
-                    items: <String>[
-                      '전체',
-                      ...List.generate(
-                        30,
-                        (i) => '${(i + 1).toString().padLeft(2, '0')}항차',
-                      ),
-                    ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                    items: _availableVoyages
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) setState(() => _voyage = v);
                     },
@@ -1187,5 +1226,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
