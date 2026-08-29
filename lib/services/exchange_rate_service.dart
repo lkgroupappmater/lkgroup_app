@@ -59,6 +59,9 @@ class ExchangeRateService {
     required double baseKip,
     required double baseThb,
     required double baseKrw,
+    required double kipAdjustment,
+    required double thbAdjustment,
+    required double krwAdjustment,
   }) async {
     if (!SupabaseConfig.isConfigured) return;
     await SupabaseService.client.from('exchange_rate_settings').upsert({
@@ -66,9 +69,9 @@ class ExchangeRateService {
       'base_kip': baseKip,
       'base_thb': baseThb,
       'base_krw': baseKrw,
-      'kip_adjustment': 2000,
-      'thb_adjustment': 1.5,
-      'krw_adjustment': 40,
+      'kip_adjustment': kipAdjustment,
+      'thb_adjustment': thbAdjustment,
+      'krw_adjustment': krwAdjustment,
       'updated_at': DateTime.now().toIso8601String(),
     });
   }

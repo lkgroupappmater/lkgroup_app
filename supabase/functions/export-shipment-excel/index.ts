@@ -131,6 +131,97 @@ function blankCell(ref: string, style: string): string {
   return `<c r="${ref}"${style}></c>`;
 }
 
+function updateCellPreservingFormula(
+  rowXml: string,
+  rowNumber: number,
+  column: string,
+  value: unknown,
+  kind: 'text' | 'number' | 'date',
+): string {
+  const ref = `${column}${rowNumber}`;
+  const cellRe = new RegExp(
+    `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>|<c\\b([^>]*)r="${ref}"([^>]*)\\/>`,
+  );
+  const existing = rowXml.match(cellRe);
+  if (existing) {
+    const body = existing[3] ?? '';
+    if (/<f\b/.test(body)) return rowXml;
+  }
+  return updateCell(rowXml, rowNumber, column, value, kind);
+}
+
+function setNumericCellInSheet(
+  sheetXml: string,
+  ref: string,
+  value: number,
+): string {
+  const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
+  const column = ref.match(/^[A-Z]+/)?.[0] ?? '';
+  if (!rowNumber || !column) return sheetXml;
+
+  const rowRe = new RegExp(
+    `<row\\b[^>]*r="${rowNumber}"[^>]*>[\\s\\S]*?<\\/row>`,
+  );
+  const rowMatch = sheetXml.match(rowRe);
+  if (!rowMatch) return sheetXml;
+
+  const rowXml = rowMatch[0];
+  const updated = updateCell(rowXml, rowNumber, column, value, 'number');
+  return sheetXml.replace(rowXml, updated);
+}
+
+function updateExchangeRates(
+  files: Record<string, Uint8Array>,
+  rates: {
+    baseKip: number;
+    baseThb: number;
+    baseKrw: number;
+    kipAdjustment: number;
+    thbAdjustment: number;
+    krwAdjustment: number;
+  },
+): void {
+  const path = workbookSheetPath(files, 'Row data');
+  if (!path || !files[path]) return;
+
+  let xml = strFromU8(files[path]);
+  const strings = sharedStrings(files);
+
+  const labels: Array<{ row: number; text: string }> = [];
+  for (const rowMatch of xml.matchAll(
+    /<row\b[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g,
+  )) {
+    const row = Number(rowMatch[1]);
+    if (row > 8) break;
+    const values: string[] = [];
+    for (const cellMatch of rowMatch[2].matchAll(
+      /<c\b[^>]*r="([A-Z]+\d+)"[^>]*>[\s\S]*?<\/c>/g,
+    )) {
+      values.push(cellText(cellMatch[0], strings).trim());
+    }
+    labels.push({ row, text: values.join('|') });
+  }
+
+  const usesCurrencyLabels = labels.some((v) => v.text.includes('USD-KIP'));
+  if (usesCurrencyLabels) {
+    xml = setNumericCellInSheet(xml, 'C3', rates.baseKip);
+    xml = setNumericCellInSheet(xml, 'D3', rates.kipAdjustment);
+    xml = setNumericCellInSheet(xml, 'C4', rates.baseThb);
+    xml = setNumericCellInSheet(xml, 'D4', rates.thbAdjustment);
+    xml = setNumericCellInSheet(xml, 'C5', rates.baseKrw);
+    xml = setNumericCellInSheet(xml, 'D5', rates.krwAdjustment);
+  } else {
+    xml = setNumericCellInSheet(xml, 'B3', rates.baseKip);
+    xml = setNumericCellInSheet(xml, 'C3', rates.kipAdjustment);
+    xml = setNumericCellInSheet(xml, 'B4', rates.baseThb);
+    xml = setNumericCellInSheet(xml, 'C4', rates.thbAdjustment);
+    xml = setNumericCellInSheet(xml, 'B5', rates.baseKrw);
+    xml = setNumericCellInSheet(xml, 'C5', rates.krwAdjustment);
+  }
+
+  files[path] = strToU8(xml);
+}
+
 function excelDateSerial(value: unknown): number | null {
   const text = String(value ?? '').trim();
   if (!text) return null;
@@ -228,7 +319,7 @@ function updateCargoSheet(
     let rowXml = candidate.xml;
 
     for (const [column, key, kind] of mapping) {
-      rowXml = updateCell(
+      rowXml = updateCellPreservingFormula(
         rowXml,
         candidate.number,
         column,
@@ -339,6 +430,15 @@ Deno.serve(async (req) => {
 
     if (shipmentError) throw shipmentError;
 
+    const { data: exchangeRateRows, error: exchangeRateError } = await admin
+      .from('exchange_rate_settings')
+      .select('base_kip,base_thb,base_krw,kip_adjustment,thb_adjustment,krw_adjustment')
+      .eq('id', 1)
+      .limit(1);
+    if (exchangeRateError) throw exchangeRateError;
+
+    const exchangeRate = exchangeRateRows?.[0] ?? null;
+
     const filePrefixes: Record<string, string> = {
       kr_la_sea: 'KR_LA_SEA',
       kr_la_air: 'KR_LA_AIR',
@@ -378,6 +478,17 @@ Deno.serve(async (req) => {
         (shipments ?? []) as Record<string, unknown>[],
       ),
     );
+
+    if (exchangeRate) {
+      updateExchangeRates(files, {
+        baseKip: Number(exchangeRate.base_kip ?? 0),
+        baseThb: Number(exchangeRate.base_thb ?? 0),
+        baseKrw: Number(exchangeRate.base_krw ?? 0),
+        kipAdjustment: Number(exchangeRate.kip_adjustment ?? 2000),
+        thbAdjustment: Number(exchangeRate.thb_adjustment ?? 1.5),
+        krwAdjustment: Number(exchangeRate.krw_adjustment ?? 40),
+      });
+    }
 
     // Excel에서 수식을 다시 계산하도록 calc mode만 지정합니다.
     let workbookXml = strFromU8(files['xl/workbook.xml']);
