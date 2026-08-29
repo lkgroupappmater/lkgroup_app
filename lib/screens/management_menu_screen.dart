@@ -3,6 +3,7 @@
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import 'change_approval_screen.dart';
+import 'additional_feature_development_screen.dart';
 import 'excel_export_screen.dart';
 import 'excel_bulk_management_screen.dart';
 import 'excel_upload_screen.dart';
@@ -66,6 +67,11 @@ class ManagementMenuScreen extends StatelessWidget {
 
     if (_isAdmin) {
       items.addAll([
+        {
+          'label': '추가 기능 개발',
+          'icon': Icons.developer_mode_outlined,
+          'page': const AdditionalFeatureDevelopmentScreen(),
+        },
         {
           'label': '회원 종합 관리',
           'icon': Icons.people_alt_outlined,
@@ -175,5 +181,6 @@ class ManagementMenuScreen extends StatelessWidget {
     );
   }
 }
+
 
 

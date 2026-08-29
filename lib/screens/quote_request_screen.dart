@@ -151,7 +151,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     }
 
     try {
-      final result = QuoteFreightCalculator.calculate(
+      final result = await QuoteFreightCalculator.calculate(
         routeLabel: _selectedRoute,
         boxes: selected,
         movingCargo: _movingCargo,
@@ -1131,4 +1131,5 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
+
 
