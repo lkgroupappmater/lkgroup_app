@@ -52,8 +52,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   bool _loading = true;
   bool _saving = false;
   late final DateTime _issuedAt;
-
-  String get _routeKey => RouteCatalog.keyFor(widget.routeLabel);
   String get _formRouteKey =>
       RouteCatalog.formRouteKeyFor(widget.routeLabel);
   _RouteFormConfig get _config =>
@@ -123,14 +121,15 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
           height: logical.height,
           child: CustomPaint(
             painter: _QuotationFormPainter(
-              template: image,
-              boxes: widget.boxes,
-              result: widget.result,
-              rates: widget.rates,
-              issuedAt: _issuedAt,
-              config: _config,
-              detailRows: _detailRows,
-            ),
+      routeLabel: widget.routeLabel,
+      template: image,
+      boxes: widget.boxes,
+      result: widget.result,
+      rates: widget.rates,
+      issuedAt: _issuedAt,
+      config: _config,
+      detailRows: _detailRows,
+    ),
           ),
         ),
       ),
@@ -148,6 +147,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     canvas.scale(exportScale, exportScale);
 
     _QuotationFormPainter(
+      routeLabel: widget.routeLabel,
       template: image,
       boxes: widget.boxes,
       result: widget.result,
@@ -420,6 +420,7 @@ class _RouteFormConfig {
 
 class _QuotationFormPainter extends CustomPainter {
   const _QuotationFormPainter({
+    required this.routeLabel,
     required this.template,
     required this.boxes,
     required this.result,
@@ -429,6 +430,7 @@ class _QuotationFormPainter extends CustomPainter {
     required this.detailRows,
   });
 
+  final String routeLabel;
   final ui.Image template;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
@@ -436,7 +438,6 @@ class _QuotationFormPainter extends CustomPainter {
   final DateTime issuedAt;
   final _RouteFormConfig config;
   final int detailRows;
-
   static const List<double> xRatio = <double>[
     0.0105, 0.0694, 0.1580, 0.1859, 0.2264, 0.3045, 0.4110,
     0.4464, 0.4817, 0.5170, 0.5986, 0.7068, 0.8098, 0.8922, 0.9891,
@@ -496,11 +497,65 @@ class _QuotationFormPainter extends CustomPainter {
       );
     }
 
+    _paintRouteHeader(canvas);
     _paintDate(canvas);
     _paintRows(canvas);
     _paintTotals(canvas);
   }
 
+
+  void _paintRouteHeader(Canvas canvas) {
+    // 선택한 BASE 이미지는 레이아웃만 상속하고,
+    // 운송 경로 고유 타이틀/Prefix는 현재 DB 경로 값으로 다시 그립니다.
+    final titleRect = Rect.fromLTRB(
+      _w * .245,
+      template.height * .018,
+      _w * .705,
+      template.height * .095,
+    );
+    _clear(canvas, titleRect);
+    _text(
+      canvas,
+      '${RouteCatalog.documentTitleFor(routeLabel)} 견적서',
+      titleRect,
+      34,
+      bold: true,
+    );
+
+    final remark = RouteCatalog.remarkFor(routeLabel);
+    if (remark.isNotEmpty) {
+      final remarkRect = Rect.fromLTRB(
+        _w * .025,
+        template.height * .875 + _extraHeight,
+        _w * .72,
+        template.height * .915 + _extraHeight,
+      );
+      _clear(canvas, remarkRect);
+      _text(
+        canvas,
+        'Remark: $remark',
+        remarkRect,
+        20,
+      );
+    }
+    final receipt = RouteCatalog.receiptExampleFor(routeLabel);
+    if (receipt.isNotEmpty) {
+      final receiptRect = Rect.fromLTRB(
+        _w * .895,
+        template.height * .100,
+        _w * .988,
+        template.height * .145,
+      );
+      _clear(canvas, receiptRect);
+      _text(
+        canvas,
+        receipt,
+        receiptRect,
+        23,
+        bold: true,
+      );
+    }
+  }
   void _paintDate(Canvas canvas) {
     final r = config.dateRect;
     _clear(canvas, r);
@@ -726,4 +781,8 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+
+
+
+
 

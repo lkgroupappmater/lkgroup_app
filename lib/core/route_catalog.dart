@@ -11,6 +11,8 @@ class RouteDefinition {
     required this.filePrefix,
     required this.boxPrefix,
     required this.receiptPrefix,
+    this.documentTitle = '',
+    this.remark = '',
     this.baseRouteKey = '',
     this.status = 'active',
   });
@@ -20,6 +22,8 @@ class RouteDefinition {
   final String filePrefix;
   final String boxPrefix;
   final String receiptPrefix;
+  final String documentTitle;
+  final String remark;
   final String baseRouteKey;
   final String status;
 
@@ -30,6 +34,8 @@ class RouteDefinition {
       filePrefix: '${row['file_prefix'] ?? ''}'.trim(),
       boxPrefix: '${row['box_prefix'] ?? ''}'.trim(),
       receiptPrefix: '${row['receipt_prefix'] ?? ''}'.trim(),
+      documentTitle: '${row['document_title'] ?? ''}'.trim(),
+      remark: '${row['remark'] ?? ''}'.trim(),
       baseRouteKey: '${row['base_route_key'] ?? ''}'.trim(),
       status: '${row['status'] ?? 'active'}'.trim(),
     );
@@ -196,6 +202,15 @@ class RouteCatalog {
   /// 신규 운송 경로는 선택한 기존 BASE의 번들 명세서/가견적 폼을 재사용합니다.
   static String formRouteKeyFor(String labelOrKey) =>
       baseRouteKeyFor(labelOrKey);
+
+  static String documentTitleFor(String labelOrKey) {
+    final definition = definitionForKey(keyFor(labelOrKey));
+    final title = definition?.documentTitle.trim() ?? '';
+    return title.isEmpty ? (definition?.displayName ?? labelOrKey) : title;
+  }
+
+  static String remarkFor(String labelOrKey) =>
+      definitionForKey(keyFor(labelOrKey))?.remark.trim() ?? '';
 
   static String boxExampleFor(String labelOrKey) {
     final key = keyFor(labelOrKey);

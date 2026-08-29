@@ -43,6 +43,8 @@ class RouteDevelopmentService {
     required String boxPrefix,
     required String receiptPrefix,
     required String filePrefix,
+    required String documentTitle,
+    required String remark,
     required double minimumCharge,
     required List<Map<String, double>> tiers,
     required List<Map<String, String>> templateOverrides,
@@ -65,6 +67,8 @@ class RouteDevelopmentService {
     await _saveExtension(
       key: key,
       filePrefix: filePrefix,
+      documentTitle: documentTitle,
+      remark: remark,
       templateOverrides: templateOverrides,
     );
   }
@@ -78,6 +82,8 @@ class RouteDevelopmentService {
     required String boxPrefix,
     required String receiptPrefix,
     required String filePrefix,
+    required String documentTitle,
+    required String remark,
     required double volumetricFactor,
     required double minimumCharge,
     required List<Map<String, double>> tiers,
@@ -102,6 +108,8 @@ class RouteDevelopmentService {
     await _saveExtension(
       key: key,
       filePrefix: filePrefix,
+      documentTitle: documentTitle,
+      remark: remark,
       templateOverrides: templateOverrides,
     );
 
@@ -118,6 +126,8 @@ class RouteDevelopmentService {
     required String boxPrefix,
     required String receiptPrefix,
     required String filePrefix,
+    required String documentTitle,
+    required String remark,
     required double volumetricFactor,
     required double minimumCharge,
     required List<Map<String, double>> tiers,
@@ -143,6 +153,8 @@ class RouteDevelopmentService {
     await _saveExtension(
       key: key,
       filePrefix: filePrefix,
+      documentTitle: documentTitle,
+      remark: remark,
       templateOverrides: templateOverrides,
     );
     return key;
@@ -178,6 +190,8 @@ class RouteDevelopmentService {
   Future<void> _saveExtension({
     required String key,
     required String filePrefix,
+    required String documentTitle,
+    required String remark,
     required List<Map<String, String>> templateOverrides,
   }) async {
     await SupabaseService.client.rpc(
@@ -185,6 +199,8 @@ class RouteDevelopmentService {
       params: {
         'p_route_key': key,
         'p_file_prefix': filePrefix,
+        'p_document_title': documentTitle,
+        'p_remark': remark,
         'p_template_overrides': templateOverrides,
       },
     );

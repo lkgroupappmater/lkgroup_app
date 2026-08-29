@@ -414,6 +414,8 @@ class RouteDefinitionEditorScreen extends StatefulWidget {
 class _RouteDefinitionEditorScreenState
     extends State<RouteDefinitionEditorScreen> {
   late final TextEditingController _titleController;
+  late final TextEditingController _documentTitleController;
+  late final TextEditingController _remarkController;
   late final TextEditingController _companyController;
   late final TextEditingController _phoneController;
   late final TextEditingController _addressController;
@@ -443,6 +445,10 @@ class _RouteDefinitionEditorScreenState
 
     _titleController =
         TextEditingController(text: '${route['display_name'] ?? ''}');
+    _documentTitleController =
+        TextEditingController(text: '${route['document_title'] ?? ''}');
+    _remarkController =
+        TextEditingController(text: '${route['remark'] ?? ''}');
     _companyController =
         TextEditingController(text: '${route['company_name'] ?? ''}');
     _phoneController =
@@ -484,6 +490,8 @@ class _RouteDefinitionEditorScreenState
   @override
   void dispose() {
     _titleController.dispose();
+    _documentTitleController.dispose();
+    _remarkController.dispose();
     _companyController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -562,6 +570,8 @@ class _RouteDefinitionEditorScreenState
       _companyController.text = '${route['company_name'] ?? ''}';
       _phoneController.text = '${route['phone'] ?? ''}';
       _addressController.text = '${route['address'] ?? ''}';
+      _documentTitleController.clear();
+      _remarkController.clear();
       _boxPrefixController.text = '${route['box_prefix'] ?? ''}';
       _receiptPrefixController.text = '${route['receipt_prefix'] ?? ''}';
       _filePrefixController.text = '${route['file_prefix'] ?? ''}';
@@ -583,6 +593,34 @@ class _RouteDefinitionEditorScreenState
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _documentTitlePreview() {
+    final title = _documentTitleController.text.trim();
+    final base = title.isEmpty ? '운송 경로 타이틀' : title;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '문서 타이틀 미리보기',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text('$base xxth 거래 명세서'),
+            const SizedBox(height: 3),
+            Text('$base xxth 견적서'),
+            const SizedBox(height: 4),
+            const Text(
+              '※ xxth / 거래 명세서 / 견적서 문구는 고정이며 수정되지 않습니다.',
+              style: TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -755,18 +793,23 @@ class _RouteDefinitionEditorScreenState
             ),
             const SizedBox(height: 10),
           ],
-          _field(_titleController, '운송 경로 타이틀'),
+          _field(_titleController, '운송 경로명 (메뉴 표시)'),
           const SizedBox(height: 8),
-          _field(_companyController, '회사명'),
+          TextField(
+            controller: _documentTitleController,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: '운송 경로 타이틀 (예: Kor-Lao Sea)',
+              border: OutlineInputBorder(),
+            ),
+          ),
           const SizedBox(height: 8),
-          _field(_phoneController, '전화번호'),
-          const SizedBox(height: 8),
-          _field(_addressController, '주소'),
+          _documentTitlePreview(),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: _field(_boxPrefixController, '박스 Prefix'),
+                child: _field(_boxPrefixController, '박스 번호 Prefix'),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -776,6 +819,8 @@ class _RouteDefinitionEditorScreenState
           ),
           const SizedBox(height: 8),
           _field(_filePrefixController, 'Excel 파일 Prefix (예: LA_MY_LAND)'),
+          const SizedBox(height: 8),
+          _field(_remarkController, 'Remark'),
           const SizedBox(height: 8),
           _basePreview(),
           const SizedBox(height: 12),
@@ -934,6 +979,8 @@ class _RouteDefinitionEditorScreenState
         boxPrefix: _boxPrefixController.text.trim(),
         receiptPrefix: _receiptPrefixController.text.trim(),
         filePrefix: _filePrefixController.text.trim(),
+        documentTitle: _documentTitleController.text.trim(),
+        remark: _remarkController.text.trim(),
         minimumCharge: minimumCharge,
         tiers: _tierData(),
         templateOverrides: _templateOverrides
@@ -1000,9 +1047,10 @@ class _RouteDefinitionEditorScreenState
 
   Future<void> _save() async {
     if (_titleController.text.trim().isEmpty ||
+        _documentTitleController.text.trim().isEmpty ||
         _tiers.isEmpty ||
         (_isCreate && _baseRouteKey == null)) {
-      _message('운송 경로, 기반 BASE, 단가를 확인해 주세요.');
+      _message('운송 경로명, 운송 경로 타이틀, 기반 BASE, 단가를 확인해 주세요.');
       return;
     }
 
@@ -1063,6 +1111,8 @@ class _RouteDefinitionEditorScreenState
           boxPrefix: _boxPrefixController.text.trim(),
           receiptPrefix: _receiptPrefixController.text.trim(),
           filePrefix: _filePrefixController.text.trim(),
+          documentTitle: _documentTitleController.text.trim(),
+          remark: _remarkController.text.trim(),
           volumetricFactor: volumetricFactor,
           minimumCharge: minimumCharge,
           tiers: _tierData(),
@@ -1090,6 +1140,8 @@ class _RouteDefinitionEditorScreenState
           boxPrefix: _boxPrefixController.text.trim(),
           receiptPrefix: _receiptPrefixController.text.trim(),
           filePrefix: _filePrefixController.text.trim(),
+          documentTitle: _documentTitleController.text.trim(),
+          remark: _remarkController.text.trim(),
           volumetricFactor: volumetricFactor,
           minimumCharge: minimumCharge,
           tiers: _tierData(),

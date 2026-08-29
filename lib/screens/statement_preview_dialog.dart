@@ -34,8 +34,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   String? _arrivalDate;
   bool _loading = true;
   bool _saving = false;
-
-  String get _routeKey => RouteCatalog.keyFor(widget.routeLabel).toLowerCase();
   String get _formRouteKey =>
       RouteCatalog.formRouteKeyFor(widget.routeLabel).toLowerCase();
 
@@ -106,10 +104,11 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   _StatementPainter _painter(ui.Image image) => _StatementPainter(
         template: image,
-        rows: _rows,
-        freight: _freight!,
+        routeLabel: widget.routeLabel,
+        rows: widget.rows,
+        freight: widget.freight,
         receiptNumber: widget.receiptNumber,
-        arrivalDate: _arrivalDate,
+        arrivalDate: widget.arrivalDate,
         baseRows: _baseRows,
         detailRows: _detailRows,
       );
@@ -287,6 +286,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 class _StatementPainter extends CustomPainter {
   const _StatementPainter({
     required this.template,
+    required this.routeLabel,
     required this.rows,
     required this.freight,
     required this.receiptNumber,
@@ -296,13 +296,13 @@ class _StatementPainter extends CustomPainter {
   });
 
   final ui.Image template;
+  final String routeLabel;
   final List<Map<String, dynamic>> rows;
   final FreightCalculation freight;
   final String receiptNumber;
   final String? arrivalDate;
   final int baseRows;
   final int detailRows;
-
   @override
   void paint(Canvas canvas, Size size) {
     final w = template.width.toDouble();
@@ -338,6 +338,8 @@ class _StatementPainter extends CustomPainter {
         p,
       );
     }
+
+    _paintRouteTitle(canvas, w, h);
 
     // 기존 샘플 값만 흰색으로 지우고 실제 DB 값을 오버레이.
     final white = Paint()..color = Colors.white;
@@ -411,6 +413,16 @@ class _StatementPainter extends CustomPainter {
       }
     }
 
+    final routeRemark = RouteCatalog.remarkFor(routeLabel);
+    if (routeRemark.isNotEmpty) {
+      _text(
+        canvas,
+        'Remark: $routeRemark',
+        Offset(w * .03, h * .58 + extra),
+        w * .62,
+        fontSize: w * .010,
+      );
+    }
     final shift = extra;
     final totalY = h * .53 + shift;
     _text(
@@ -447,6 +459,48 @@ class _StatementPainter extends CustomPainter {
     );
   }
 
+
+  void _paintRouteTitle(Canvas canvas, double w, double h) {
+    final rect = Rect.fromLTRB(
+      w * .245,
+      h * .012,
+      w * .755,
+      h * .080,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(
+        rect.left + 1,
+        rect.top + 1,
+        rect.right - 1,
+        rect.bottom - 1,
+      ),
+      Paint()..color = Colors.white,
+    );
+
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '${RouteCatalog.documentTitleFor(routeLabel)} xxth 거래 명세서',
+        style: TextStyle(
+          color: Colors.black,
+          fontFamily: 'NotoSansKR',
+          fontSize: w * .030,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: rect.width);
+
+    painter.paint(
+      canvas,
+      Offset(
+        rect.left + (rect.width - painter.width) / 2,
+        rect.top + (rect.height - painter.height) / 2,
+      ),
+    );
+  }
   void _text(
     Canvas canvas,
     String text,
@@ -474,5 +528,9 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
+
+
+
 
 
