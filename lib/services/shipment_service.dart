@@ -190,6 +190,45 @@ class ShipmentService {
     );
   }
 
+
+  Future<void> requestShipmentDeletion(String shipmentId) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId);
+    if (id == null) return;
+    await SupabaseService.client.rpc(
+      'manager_request_shipment_deletion',
+      params: {'p_shipment_id': id},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingShipmentDeletions() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final rows = await SupabaseService.client.rpc(
+      'manager_list_pending_shipment_deletions',
+    );
+    return List<Map<String, dynamic>>.from(rows as List);
+  }
+
+  Future<void> cancelShipmentDeletion(String shipmentId) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId);
+    if (id == null) return;
+    await SupabaseService.client.rpc(
+      'manager_cancel_shipment_deletion',
+      params: {'p_shipment_id': id},
+    );
+  }
+
+  Future<void> deleteShipmentNow(String shipmentId) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId);
+    if (id == null) return;
+    await SupabaseService.client.rpc(
+      'manager_delete_shipment_now',
+      params: {'p_shipment_id': id},
+    );
+  }
+
   Future<Shipment?> findByTrackingNumber(String trackingNumber) async {
     if (!SupabaseConfig.isConfigured) {
       return MockShipments.findByTracking(trackingNumber);

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -48,6 +48,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   String _year = '전체';
   String _voyage = '전체';
   List<Map<String, dynamic>> _results = const [];
+  List<Map<String, dynamic>> _pendingDeletions = const [];
   final Set<String> _selectedIds = <String>{};
   bool _searched = false;
   bool _busy = false;
@@ -68,6 +69,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     super.initState();
     _selectedIds.addAll(widget.initialSelectedIds);
     if (widget.initialSelectedIds.isNotEmpty) _loadSelected();
+    if (_isManager) _loadPendingDeletions();
   }
 
   @override
@@ -317,6 +319,155 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
+  Future<void> _loadPendingDeletions() async {
+    if (!_isManager) return;
+    try {
+      final rows =
+          await ShipmentService.instance.getPendingShipmentDeletions();
+      if (!mounted) return;
+      setState(() => _pendingDeletions = rows);
+    } catch (error) {
+      _message('화물 삭제 대기 목록 불러오기 실패: $error');
+    }
+  }
+
+  Future<void> _requestDeletion(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    final box = '${item['box_number'] ?? ''}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('화물 삭제'),
+        content: Text(
+          '$box 화물을 삭제 대기로 이동하시겠습니까?\n\n'
+          '삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('삭제 대기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.requestShipmentDeletion(id);
+      _selectedIds.remove(id);
+      setState(() {
+        _results = _results
+            .where((row) => '${row['id']}' != id)
+            .toList(growable: false);
+      });
+      await _loadPendingDeletions();
+      _message('$box 화물을 삭제 대기로 이동했습니다.');
+    } catch (error) {
+      _message('화물 삭제 대기 처리 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cancelDeletion(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.cancelShipmentDeletion(id);
+      await _loadPendingDeletions();
+      _message('화물 삭제를 취소했습니다.');
+      if (_searched) await _search();
+    } catch (error) {
+      _message('삭제 취소 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteNow(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    final box = '${item['box_number'] ?? ''}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('화물 바로 삭제'),
+        content: Text(
+          '$box 화물을 바로 삭제하시겠습니까?\n\n'
+          '바로 삭제 후에는 앱에서 복구할 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('바로 삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.deleteShipmentNow(id);
+      await _loadPendingDeletions();
+      _message('$box 화물을 바로 삭제했습니다.');
+    } catch (error) {
+      _message('화물 바로 삭제 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _pendingDeletionCard(Map<String, dynamic> item) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '박스번호 ${item['box_number'] ?? ''}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.navyPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _infoRow('운송 경로', '${item['route'] ?? ''}'),
+              _infoRow('년도', '${item['shipment_year'] ?? ''}'),
+              _infoRow('항차', _voyageLabel(item['voyage'])),
+              _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
+              _infoRow('이름', '${item['consignee_name'] ?? ''}'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed:
+                          _busy ? null : () => _cancelDeletion(item),
+                      child: const Text('삭제 취소'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _busy ? null : () => _deleteNow(item),
+                      child: const Text('바로 삭제'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
   Future<void> _reloadCurrentRows() async {
     if (_selectedIds.isEmpty) return;
     final rows = await ShipmentService.instance.getRowsByIds(_selectedIds.toList());
@@ -738,6 +889,24 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 label: Text(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청'),
               ),
             ],
+            if (_isManager) ...[
+              const SizedBox(height: 24),
+              const Text(
+                '화물 삭제 대기',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (_pendingDeletions.isEmpty)
+                const Text(
+                  '삭제 대기 중인 화물이 없습니다.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                )
+              else
+                ..._pendingDeletions.map(_pendingDeletionCard),
+            ],
           ],
         ),
       );
@@ -919,6 +1088,18 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     _infoRow('영수증 번호', '${item['receipt_number'] ?? ''}'),
                     if (_isAdmin || _isStaff)
                       _infoRow('구획 (Zone)', '${item['unloading_zone'] ?? ''}'),
+                    if (_isManager) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed:
+                              _busy ? null : () => _requestDeletion(item),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('삭제'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -955,3 +1136,4 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+

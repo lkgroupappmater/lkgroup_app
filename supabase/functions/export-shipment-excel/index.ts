@@ -344,6 +344,183 @@ function updateCargoSheet(
   return output;
 }
 
+function routeReceiptPrefix(routeKey: string): string {
+  const map: Record<string, string> = {
+    kr_la_sea: 'LKS',
+    kr_la_air: 'LKA',
+    la_kr_air_exp: 'LKB',
+    la_th_land: 'LKLT',
+    th_la_land: 'LKTL',
+    la_vn_land: 'LKLV',
+    vn_la_land: 'LKVL',
+    la_ch_land: 'LC',
+    ch_la_land: 'LKCL',
+    la_kh_land: 'LKLCBL',
+  };
+  return map[routeKey] ?? '';
+}
+
+function normalizePhone(value: unknown): string {
+  return String(value ?? '').replace(/\s+/g, '').replace(/-/g, '');
+}
+
+function assignReceiptNumbers(
+  shipments: Record<string, unknown>[],
+  routeKey: string,
+): Record<string, unknown>[] {
+  const prefix = routeReceiptPrefix(routeKey);
+  if (!prefix) return shipments;
+
+  // 이름 + 전화번호가 같으면 같은 영수번호를 사용합니다.
+  const groupToReceipt = new Map<string, string>();
+  let next = 1;
+
+  // 기존 영수번호가 있으면 우선 그대로 유지하고 다음 번호 계산.
+  for (const shipment of shipments) {
+    const existing = String(shipment.receipt_number ?? '').trim();
+    if (existing) {
+      const m = existing.match(/(\d+)\s*$/);
+      if (m) next = Math.max(next, Number(m[1]) + 1);
+      const key = `${String(shipment.consignee_name ?? '').trim().toLowerCase()}|${normalizePhone(shipment.consignee_phone)}`;
+      if (key !== '|') groupToReceipt.set(key, existing);
+    }
+  }
+
+  return shipments.map((shipment) => {
+    const existing = String(shipment.receipt_number ?? '').trim();
+    if (existing) return shipment;
+
+    const name = String(shipment.consignee_name ?? '').trim();
+    const phone = normalizePhone(shipment.consignee_phone);
+    const key = `${name.toLowerCase()}|${phone}`;
+    if (key === '|') return shipment;
+
+    let receipt = groupToReceipt.get(key);
+    if (!receipt) {
+      if (routeKey === 'kr_la_sea' || routeKey === 'kr_la_air') {
+        receipt = `${prefix} ${String(next).padStart(2, '0')}`;
+      } else {
+        receipt = `${prefix}${String(next).padStart(2, '0')}`;
+      }
+      groupToReceipt.set(key, receipt);
+      next += 1;
+    }
+
+    return { ...shipment, receipt_number: receipt };
+  });
+}
+
+function setStringCellInSheet(sheetXml: string, ref: string, value: string): string {
+  const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
+  const column = ref.match(/^[A-Z]+/)?.[0] ?? '';
+  if (!rowNumber || !column) return sheetXml;
+  const rowRe = new RegExp(
+    `<row\\b[^>]*r="${rowNumber}"[^>]*>[\\s\\S]*?<\\/row>`,
+  );
+  const rowMatch = sheetXml.match(rowRe);
+  if (!rowMatch) return sheetXml;
+  const rowXml = rowMatch[0];
+  const updated = updateCell(rowXml, rowNumber, column, value, 'text');
+  return sheetXml.replace(rowXml, updated);
+}
+
+function seedCustomerListFromShipments(
+  files: Record<string, Uint8Array>,
+  shipments: Record<string, unknown>[],
+): void {
+  const path = workbookSheetPath(files, '고객 리스트');
+  if (!path || !files[path]) return;
+
+  let xml = strFromU8(files[path]);
+
+  // A열에 이미 영수번호가 준비되어 있는 템플릿 구조를 그대로 사용합니다.
+  // 해당 영수번호 행의 B열(이름)을 직접 넣어 수식 재계산 전에도 즉시 보이게 하고,
+  // C열 구획은 기존 수식/값을 보존합니다.
+  const byReceipt = new Map<string, Record<string, unknown>>();
+  for (const shipment of shipments) {
+    const receipt = String(shipment.receipt_number ?? '').trim();
+    if (receipt && !byReceipt.has(receipt)) byReceipt.set(receipt, shipment);
+  }
+
+  for (const rowMatch of xml.matchAll(
+    /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
+  )) {
+    const rowNumber = Number(rowMatch[1]);
+    if (rowNumber < 4) continue;
+    const rowXml = rowMatch[0];
+    const aRe = new RegExp(`<c\\b[^>]*r="A${rowNumber}"[^>]*>[\\s\\S]*?<\\/c>`);
+    const aMatch = rowXml.match(aRe);
+    if (!aMatch) continue;
+    const receipt = cellText(aMatch[0], sharedStrings(files)).trim();
+    if (!receipt) continue;
+    const shipment = byReceipt.get(receipt);
+    if (!shipment) continue;
+    const name = String(shipment.consignee_name ?? '').trim();
+    if (name) xml = setStringCellInSheet(xml, `B${rowNumber}`, name);
+  }
+
+  files[path] = strToU8(xml);
+}
+
+function setCachedFormulaValue(
+  sheetXml: string,
+  ref: string,
+  value: string | number,
+  numeric: boolean,
+): string {
+  const cellRe = new RegExp(
+    `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>`,
+  );
+  const match = sheetXml.match(cellRe);
+  if (!match) return sheetXml;
+  const body = match[3] ?? '';
+  if (!/<f\b/.test(body)) return sheetXml;
+
+  const newBody = /<v>[\s\S]*?<\/v>/.test(body)
+    ? body.replace(/<v>[\s\S]*?<\/v>/, `<v>${numeric ? Number(value) : escXml(value)}</v>`)
+    : `${body}<v>${numeric ? Number(value) : escXml(value)}</v>`;
+  return sheetXml.replace(match[0], `<c${match[1]}r="${ref}"${match[2]}>${newBody}</c>`);
+}
+
+function refreshReceiptSheetCaches(
+  files: Record<string, Uint8Array>,
+  shipments: Record<string, unknown>[],
+): void {
+  // Excel/모바일 미리보기에서 재계산 전에도 핵심 값이 보이도록
+  // 기존 수식은 유지하고 cached value만 갱신합니다.
+  const groups = new Map<string, Record<string, unknown>[]>();
+  for (const shipment of shipments) {
+    const receipt = String(shipment.receipt_number ?? '').trim();
+    if (!receipt) continue;
+    const list = groups.get(receipt) ?? [];
+    list.push(shipment);
+    groups.set(receipt, list);
+  }
+
+  for (const [receipt, rows] of groups) {
+    const path = workbookSheetPath(files, receipt);
+    if (!path || !files[path]) continue;
+    let xml = strFromU8(files[path]);
+
+    const first = rows[0];
+    // 고객명 표시 셀 계열은 템플릿마다 수식 위치가 달라질 수 있으므로
+    // 물품 행의 VLOOKUP/INDEX 공식 cached values만 보강합니다.
+    for (let i = 0; i < rows.length; i++) {
+      const r = 6 + i;
+      const shipment = rows[i];
+      if (i === 0) {
+        xml = setCachedFormulaValue(xml, 'L4', String(first.consignee_phone ?? ''), false);
+      }
+      xml = setCachedFormulaValue(xml, `B${r}`, String(shipment.box_number ?? ''), false);
+      xml = setCachedFormulaValue(xml, `D${r}`, Number(shipment.weight_kg ?? 0), true);
+      xml = setCachedFormulaValue(xml, `E${r}`, Number(shipment.length_cm ?? 0), true);
+      xml = setCachedFormulaValue(xml, `F${r}`, Number(shipment.width_cm ?? 0), true);
+      xml = setCachedFormulaValue(xml, `G${r}`, Number(shipment.height_cm ?? 0), true);
+    }
+    files[path] = strToU8(xml);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -441,6 +618,26 @@ Deno.serve(async (req) => {
 
     if (shipmentError) throw shipmentError;
 
+    const enrichedShipments = assignReceiptNumbers(
+      (shipments ?? []) as Record<string, unknown>[],
+      routeKey,
+    );
+
+    // 새로 자동 부여된 영수번호는 DB에도 저장하여 다음 조회/다운로드와 앱 화면이 동일하게 유지됩니다.
+    for (const shipment of enrichedShipments) {
+      const id = Number(shipment.id);
+      const receipt = String(shipment.receipt_number ?? '').trim();
+      const original = (shipments ?? []).find((row) => Number(row.id) === id);
+      const originalReceipt = String(original?.receipt_number ?? '').trim();
+      if (id && receipt && !originalReceipt) {
+        const { error: receiptUpdateError } = await admin
+          .from('shipments')
+          .update({ receipt_number: receipt })
+          .eq('id', id);
+        if (receiptUpdateError) throw receiptUpdateError;
+      }
+    }
+
     const { data: exchangeRateRows, error: exchangeRateError } = await admin
       .from('exchange_rate_settings')
       .select('base_kip,base_thb,base_krw,kip_adjustment,thb_adjustment,krw_adjustment')
@@ -486,7 +683,7 @@ Deno.serve(async (req) => {
       updateCargoSheet(
         sheetXml,
         strings,
-        (shipments ?? []) as Record<string, unknown>[],
+        enrichedShipments,
       ),
     );
 
@@ -500,6 +697,9 @@ Deno.serve(async (req) => {
         krwAdjustment: Number(exchangeRate.krw_adjustment ?? 40),
       });
     }
+
+    seedCustomerListFromShipments(files, enrichedShipments);
+    refreshReceiptSheetCaches(files, enrichedShipments);
 
     // Excel에서 수식을 다시 계산하도록 calc mode만 지정합니다.
     let workbookXml = strFromU8(files['xl/workbook.xml']);
