@@ -176,10 +176,10 @@ class ShipmentService {
 
     for (final request in rows) {
       try {
-        final route = '\';
+        final route = '${request['route'] ?? ''}';
         final year = (request['shipment_year'] as num?)?.toInt();
-        final voyage = '\';
-        final box = '\';
+        final voyage = '${request['voyage'] ?? ''}';
+        final box = '${request['box_number'] ?? ''}';
         if (route.isEmpty || year == null || voyage.isEmpty || box.isEmpty) {
           continue;
         }
@@ -346,4 +346,5 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
+
 

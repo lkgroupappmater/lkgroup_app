@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../services/shipment_service.dart';
+import '../services/unknown_recipient_service.dart';
 
 class ChangeApprovalScreen extends StatefulWidget {
   const ChangeApprovalScreen({super.key});
@@ -11,6 +12,7 @@ class ChangeApprovalScreen extends StatefulWidget {
 
 class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   List<Map<String, dynamic>> _requests = const [];
+  List<Map<String, dynamic>> _unknownClaims = const [];
   final Set<int> _checked = <int>{};
   final Set<int> _editing = <int>{};
   final Map<int, Map<String, TextEditingController>> _controllers = {};
@@ -36,9 +38,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     setState(() => _loading = true);
     try {
       final rows = await ShipmentService.instance.getPendingChangeRequests();
+      final unknownClaims =
+          await UnknownRecipientService.instance.listPendingClaimsForAdmin();
       if (!mounted) return;
       setState(() {
         _requests = rows;
+        _unknownClaims = unknownClaims;
         _checked.clear();
         _editing.clear();
       });
@@ -110,6 +115,138 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }
   }
 
+  Future<void> _reviewUnknownClaim(
+    Map<String, dynamic> claim,
+    String action,
+  ) async {
+    final id = (claim['claim_id'] as num).toInt();
+    final approve = action == 'approve';
+
+    if (approve) {
+      final ok = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('수취인 불명 화물 확인 승인'),
+              content: Text(
+                '이 요청을 승인하면:\n'
+                '이름: 수취인 불명 / ${claim['claimant_name'] ?? ''}\n'
+                '연락처: ${claim['claimant_phone'] ?? ''}\n'
+                '영수번호: 해당 항차 마지막 영수번호 다음 번호\n\n'
+                '으로 반영됩니다.'
+                '${claim['data_locked'] == true ? '\n\n데이터 잠금은 승인 후에도 유지됩니다.' : ''}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('확인 및 승인'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!ok) return;
+    }
+
+    try {
+      await UnknownRecipientService.instance.reviewClaim(
+        claimId: id,
+        action: action,
+      );
+      if (!mounted) return;
+      _message(approve
+          ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.'
+          : '수취인 불명 화물 확인 요청을 거절했습니다.');
+      await _load();
+    } catch (error) {
+      _message('수취인 불명 화물 요청 처리 실패: $error');
+    }
+  }
+
+  Widget _unknownClaimCard(Map<String, dynamic> claim) {
+    return Card(
+      color: const Color(0xFFFFFBF2),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.help_outline, color: Colors.orange),
+                SizedBox(width: 6),
+                Text(
+                  '수취인 불명 · 본인 화물 확인 요청',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${claim['box_number'] ?? ''} · ${claim['invoice_number'] ?? ''}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            Text(
+              '${claim['route'] ?? ''} · ${claim['shipment_year'] ?? ''}년 · '
+              '${claim['voyage'] ?? ''}항차',
+            ),
+            const SizedBox(height: 6),
+            Text('현재 이름: ${claim['current_unknown_name'] ?? ''}'),
+            Text('현재 연락처: ${claim['current_unknown_phone'] ?? ''}'),
+            const Divider(height: 20),
+            Text(
+              '요청 회원: ${claim['claimant_name'] ?? ''} '
+              '(${claim['requester_email'] ?? ''})',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text('요청 연락처: ${claim['claimant_phone'] ?? ''}'),
+            if ('${claim['note'] ?? ''}'.trim().isNotEmpty)
+              Text('확인 참고 내용: ${claim['note']}'),
+            if (claim['data_locked'] == true) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(Icons.lock, size: 16, color: Colors.redAccent),
+                  SizedBox(width: 5),
+                  Text(
+                    '데이터 수정 잠금된 화물',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => _reviewUnknownClaim(claim, 'reject'),
+                  child: const Text('거절'),
+                ),
+                const SizedBox(width: 6),
+                FilledButton(
+                  onPressed: () => _reviewUnknownClaim(claim, 'approve'),
+                  child: const Text('본인 화물 확인 승인'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Future<void> _bulk(String action) async {
     final ids = _checked.toList();
     for (final id in ids) {
@@ -144,12 +281,27 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (_requests.isEmpty)
+                    if (_unknownClaims.isNotEmpty) ...[
+                      const Text(
+                        '수취인 불명 화물 확인 요청',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._unknownClaims.map(_unknownClaimCard),
+                      const SizedBox(height: 14),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_requests.isEmpty && _unknownClaims.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
                         child: Center(child: Text('대기 중인 화물 내용 변경 승인 요청이 없습니다.')),
                       )
-                    else ...[
+                    if (_requests.isNotEmpty) ...[
                       CheckboxListTile(
                         value: _checked.length == _requests.length,
                         onChanged: (v) => setState(() {
@@ -341,4 +493,6 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
+
+
 

@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/freight_service.dart';
 import '../services/shipment_service.dart';
+import '../services/unknown_recipient_service.dart';
 
 class ShipmentSearchBody extends StatefulWidget {
   const ShipmentSearchBody({
@@ -37,6 +38,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   final _phoneCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _results = [];
+  List<Map<String, dynamic>> _unknownRecipientRows = const [];
+  bool _loadingUnknownRecipients = false;
   bool _searched = false;
   final Set<String> _selectedIds = <String>{};
 
@@ -47,6 +50,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   void initState() {
     super.initState();
     _prefillMemberFields();
+    _loadUnknownRecipientCargo();
   }
 
   @override
@@ -54,6 +58,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentUser?.id != widget.currentUser?.id) {
       _prefillMemberFields();
+    _loadUnknownRecipientCargo();
     }
   }
 
@@ -72,6 +77,257 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     super.dispose();
   }
 
+  Future<void> _loadUnknownRecipientCargo() async {
+    final user = widget.currentUser;
+    if (!widget.isLoggedIn || user == null || user.role != UserRole.member) {
+      if (mounted) {
+        setState(() => _unknownRecipientRows = const []);
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _loadingUnknownRecipients = true);
+    try {
+      final rows =
+          await UnknownRecipientService.instance.listVisibleUnknownCargo();
+      if (!mounted) return;
+      setState(() => _unknownRecipientRows = rows);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('수취인 불명 화물 조회 실패: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingUnknownRecipients = false);
+    }
+  }
+
+  Future<void> _claimUnknownCargo(Map<String, dynamic> row) async {
+    final user = widget.currentUser;
+    if (user == null || user.role != UserRole.member) return;
+
+    final name = TextEditingController(text: user.name);
+    final phone = TextEditingController(text: user.phone);
+    final note = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('본인 화물 확인 및 정정 요청'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
+                    '${_voyageLabel(row['voyage'])}\n'
+                    '박스번호 ${row['box_number'] ?? ''}\n'
+                    '송장번호 ${row['invoice_number'] ?? ''}',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                      labelText: '본인 이름',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: '본인 연락처',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: note,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: '확인 참고 내용 (선택)',
+                      hintText: '물품 내용, 발송인 등 관리자 확인에 도움이 되는 내용을 입력해 주세요.',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '요청 승인 후 이름은 "수취인 불명 / 고객 이름" 형태로 기록되며, '
+                    '영수번호는 해당 항차의 마지막 영수번호 다음 번호로 자동 부여됩니다.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('본인 화물 확인 및 정정 요청'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirmed) {
+      try {
+        await UnknownRecipientService.instance.createClaim(
+          shipmentId: '${row['id']}',
+          claimantName: name.text,
+          claimantPhone: phone.text,
+          note: note.text,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.'),
+          ),
+        );
+        await _loadUnknownRecipientCargo();
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('본인 화물 확인 요청 실패: $error')),
+        );
+      }
+    }
+
+    name.dispose();
+    phone.dispose();
+    note.dispose();
+  }
+
+  Widget _unknownRecipientSection() {
+    if (widget.currentUser?.role != UserRole.member) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        const Row(
+          children: [
+            Icon(Icons.help_outline, color: AppColors.navyPrimary),
+            SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                '수취인 불명 / 데이터 불문명 화물',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navyPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '수취인을 특정할 수 없는 화물만 모든 일반 회원에게 제한된 정보로 표시됩니다. '
+          '본인 화물이 확인되면 해당 카드를 눌러 정정 요청해 주세요.',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_loadingUnknownRecipients)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_unknownRecipientRows.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              '현재 확인이 필요한 수취인 불명 화물이 없습니다.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          )
+        else
+          ..._unknownRecipientRows.map((row) {
+            final pending = row['claim_pending'] == true;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: pending ? null : () => _claimUnknownCargo(row),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '박스번호 ${row['box_number'] ?? ''}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.navyPrimary,
+                              ),
+                            ),
+                          ),
+                          if (pending)
+                            const Text(
+                              '확인 요청 대기',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _row('운송 경로', '${row['route'] ?? ''}'),
+                      _row('년도', '${row['shipment_year'] ?? ''}'),
+                      _row('항차', _voyageLabel(row['voyage'])),
+                      _row('송장번호', '${row['invoice_number'] ?? ''}'),
+                      _row(
+                        '수취인',
+                        '${row['consignee_name'] ?? '수취인 불명'}',
+                      ),
+                      _row(
+                        '연락처',
+                        '${row['consignee_phone'] ?? ''}',
+                      ),
+                      if (!pending) ...[
+                        const SizedBox(height: 8),
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '카드를 눌러 본인 화물 확인 요청',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
   Future<void> _search() async {
     try {
       final dbRows = await ShipmentService.instance.searchRows(
@@ -302,7 +558,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 '일반 회원은 송장번호 뒤 4자리 이상, 정확한 이름 또는 연락처 뒤 8자리 기준으로 조회됩니다.',
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
-            ),
+            ),          _unknownRecipientSection(),
         ],
       ),
     );
@@ -459,3 +715,4 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+

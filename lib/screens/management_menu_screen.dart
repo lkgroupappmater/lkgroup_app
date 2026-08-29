@@ -75,9 +75,9 @@ class ManagementMenuScreen extends StatelessWidget {
           'label': '화물 내용 변경 승인 관리',
           'icon': Icons.fact_check_outlined,
           'page': const ChangeApprovalScreen(),
-        },        {
-          'label': '엑셀 데이타 일괄 관리
-(편집 잠금/해제, 구획 및 영수 번호 관리)',
+        },
+        {
+          'label': '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)',
           'icon': Icons.table_view_outlined,
           'page': const ExcelBulkManagementScreen(),
         },
@@ -175,4 +175,5 @@ class ManagementMenuScreen extends StatelessWidget {
     );
   }
 }
+
 
