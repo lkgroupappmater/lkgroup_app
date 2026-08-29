@@ -291,13 +291,13 @@ class _AdditionalFeatureDevelopmentScreenState
                         isThreeLine: base.isNotEmpty,
                         trailing: SizedBox(
                           width: 104,
-                          height: 64,
+                          height: 56,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
                                 width: double.infinity,
-                                height: 30,
+                                height: 26,
                                 child: FilledButton(
                                   style: FilledButton.styleFrom(
                                     padding: EdgeInsets.zero,
@@ -315,7 +315,7 @@ class _AdditionalFeatureDevelopmentScreenState
                               const SizedBox(height: 4),
                               SizedBox(
                                 width: double.infinity,
-                                height: 30,
+                                height: 26,
                                 child: OutlinedButton(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.red,
