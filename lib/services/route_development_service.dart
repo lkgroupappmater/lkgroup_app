@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/route_catalog.dart';
 import 'route_catalog_service.dart';
 import 'supabase_service.dart';
@@ -190,17 +191,22 @@ class RouteDevelopmentService {
   }
 
   Future<void> _cloneBase(String key) async {
-    final response = await SupabaseService.client.functions.invoke(
-      'clone-route-base',
-      body: {'route_key': key},
-    );
-    if (response.status < 200 || response.status >= 300) {
-      String detail = '${response.data}';
-      if (response.data is Map &&
-          (response.data as Map)['error'] != null) {
-        detail = '${(response.data as Map)['error']}';
+    try {
+      final response = await SupabaseService.client.functions.invoke(
+        'clone-route-base',
+        body: {'route_key': key},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        throw StateError('BASE Excel 생성/갱신 실패: ${response.data}');
       }
-      throw StateError('BASE Excel 생성/갱신 실패: $detail');
+    } on FunctionException catch (error) {
+      final details = error.details;
+      if (details is Map) {
+        final step = '${details['step'] ?? 'unknown'}';
+        final message = '${details['error'] ?? details}';
+        throw StateError('BASE Excel 생성 실패 [$step]: $message');
+      }
+      throw StateError('BASE Excel 생성 실패: $details');
     }
   }
 

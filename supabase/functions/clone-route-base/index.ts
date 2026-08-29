@@ -212,11 +212,13 @@ Deno.serve(async (req) => {
     return json(403, { error: '총괄 관리자 전용 기능입니다.' });
   }
 
+  let step = 'request';
   try {
     const body = await req.json();
     const routeKey = String(body.route_key ?? '').trim();
     if (!routeKey) return json(400, { error: 'route_key가 필요합니다.' });
 
+    step = 'load-route-definition';
     const { data: target, error: targetError } = await admin
       .from('route_definitions')
       .select(
@@ -235,22 +237,26 @@ Deno.serve(async (req) => {
       throw new Error('기반 BASE 운송 경로가 없습니다.');
     }
 
+    step = 'load-source-route-definition';
     const { data: sourceDefinition } = await admin
       .from('route_definitions')
       .select('route_key,display_name,file_prefix,company_name,phone,address')
       .eq('route_key', sourceRouteKey)
       .maybeSingle();
 
-    const { data: sourceBase, error: sourceBaseError } = await admin
+    step = 'load-source-base-template';
+    const { data: sourceBaseRows, error: sourceBaseError } = await admin
       .from('shipment_excel_base_templates')
       .select('route_key,route_label,storage_path')
       .eq('route_key', sourceRouteKey)
-      .maybeSingle();
+      .limit(1);
     if (sourceBaseError) throw sourceBaseError;
+    const sourceBase = sourceBaseRows?.[0] ?? null;
     if (!sourceBase) {
       throw new Error('선택한 기반 운송 경로의 BASE Excel을 찾을 수 없습니다.');
     }
 
+    step = 'download-source-xlsx';
     const { data: blob, error: downloadError } = await admin.storage
       .from('shipment-excel-templates')
       .download(sourceBase.storage_path);
@@ -258,6 +264,7 @@ Deno.serve(async (req) => {
       throw downloadError ?? new Error('기반 BASE Excel 다운로드 실패');
     }
 
+    step = 'unzip-source-xlsx';
     const original = new Uint8Array(await blob.arrayBuffer());
     const files = unzipSync(original);
     const sheets = workbookSheets(files);
@@ -356,6 +363,7 @@ Deno.serve(async (req) => {
     }
     files['xl/workbook.xml'] = strToU8(workbook);
 
+    step = 'zip-new-xlsx';
     const encoded = zipSync(files, { level: 6 });
     const year =
       String(sourceBase.storage_path ?? '').match(/20\d{2}/)?.[0] ??
@@ -368,6 +376,7 @@ Deno.serve(async (req) => {
     const storagePath =
       `base/${safePathPart(routeKey)}/${stamp}_${fileName}`;
 
+    step = 'upload-new-xlsx';
     const { error: uploadError } = await admin.storage
       .from('shipment-excel-templates')
       .upload(storagePath, encoded, {
@@ -377,12 +386,14 @@ Deno.serve(async (req) => {
       });
     if (uploadError) throw uploadError;
 
-    const { data: existing, error: existingError } = await admin
+    step = 'register-base-template';
+    const { data: existingRows, error: existingError } = await admin
       .from('shipment_excel_base_templates')
       .select('route_key')
       .eq('route_key', routeKey)
-      .maybeSingle();
+      .limit(1);
     if (existingError) throw existingError;
+    const existing = existingRows?.[0] ?? null;
 
     if (existing) {
       const { error: updateError } = await admin
@@ -415,7 +426,15 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('clone-route-base failed:', error);
-    return json(500, { error: message });
+    const details =
+      typeof error === 'object' && error !== null
+        ? JSON.stringify(error)
+        : String(error);
+    console.error('clone-route-base failed:', { step, message, error });
+    return json(500, {
+      error: message,
+      step,
+      details,
+    });
   }
 });
