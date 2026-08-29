@@ -158,6 +158,14 @@ class RouteDevelopmentService {
   }
 
 
+  Future<void> restoreRoute(String key) async {
+    await SupabaseService.client.rpc(
+      'admin_restore_deleted_route',
+      params: {'p_route_key': key},
+    );
+    await RouteCatalogService.instance.refresh();
+  }
+
   Future<void> deleteRoute(String key) async {
     await SupabaseService.client.rpc(
       'admin_soft_delete_route',

@@ -52,10 +52,63 @@ class _AdditionalFeatureDevelopmentScreenState
       .where((row) => '${row['status']}' == 'draft')
       .toList(growable: false);
 
+  List<Map<String, dynamic>> get _deletedRoutes => _routes
+      .where((row) => '${row['status']}' == 'deleted')
+      .toList(growable: false);
+
+  int _daysRemaining(Map<String, dynamic> route) {
+    final raw = '${route['purge_after'] ?? ''}'.trim();
+    final purgeAt = DateTime.tryParse(raw)?.toLocal();
+    if (purgeAt == null) return 30;
+    final now = DateTime.now();
+    if (!purgeAt.isAfter(now)) return 0;
+    final hours = purgeAt.difference(now).inHours;
+    return (hours / 24).ceil().clamp(0, 30);
+  }
+
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text)),
     );
+  }
+
+  Future<void> _restoreDeletedRoute(Map<String, dynamic> route) async {
+    final key = '${route['route_key'] ?? ''}';
+    final name = '${route['display_name'] ?? ''}';
+    if (key.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('운송 경로 삭제 취소'),
+            content: Text(
+              '${name.isEmpty ? key : name}\n\n'
+              '이 운송 경로의 삭제 대기를 취소하고 이전 상태로 복구합니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('아니오'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('삭제 취소'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    try {
+      await RouteDevelopmentService.instance.restoreRoute(key);
+      if (!mounted) return;
+      _message('삭제 대기를 취소하고 운송 경로를 복구했습니다.');
+      await _load();
+    } catch (error) {
+      if (mounted) _message('운송 경로 복구 실패: $error');
+    }
   }
 
   Future<void> _deleteDraftFromList(Map<String, dynamic> route) async {
@@ -237,24 +290,79 @@ class _AdditionalFeatureDevelopmentScreenState
                         ),
                         isThreeLine: base.isNotEmpty,
                         trailing: SizedBox(
-                          width: 176,
-                          child: Row(
+                          width: 118,
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Expanded(
+                              SizedBox(
+                                width: double.infinity,
                                 child: FilledButton(
                                   onPressed: () => _openDraft(route),
                                   child: const Text('계속 작업'),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              IconButton(
-                                tooltip: '삭제',
-                                color: Colors.red,
-                                onPressed: () => _deleteDraftFromList(route),
-                                icon: const Icon(Icons.delete_outline),
+                              const SizedBox(height: 6),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
+                                  onPressed: () => _deleteDraftFromList(route),
+                                  child: const Text('삭제'),
+                                ),
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+                if (_deletedRoutes.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const Text(
+                    '삭제 대기중',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '삭제된 운송 경로는 30일 동안 보관되며, 기간 내 삭제 취소가 가능합니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._deletedRoutes.map((route) {
+                    final name = '${route['display_name'] ?? ''}';
+                    final key = '${route['route_key'] ?? ''}';
+                    final days = _daysRemaining(route);
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                        ),
+                        title: Text(
+                          name.isEmpty ? key : name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          days <= 0
+                              ? '완전 삭제 처리 대기중'
+                              : '완전 삭제까지 $days일 남음',
+                        ),
+                        trailing: SizedBox(
+                          width: 118,
+                          child: OutlinedButton(
+                            onPressed: () => _restoreDeletedRoute(route),
+                            child: const Text('삭제 취소'),
                           ),
                         ),
                       ),
