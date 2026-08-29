@@ -19,9 +19,6 @@ class ShipmentService {
     return rows.map((row) => Shipment.fromJson(_normaliseRow(row))).toList();
   }
 
-  /// Search is intentionally routed through a SECURITY DEFINER RPC.
-  /// It applies different partial-match rules for member vs manager roles
-  /// without opening the full shipments table through RLS.
   Future<List<Map<String, dynamic>>> searchRows({
     String route = '전체',
     String boxNumber = '',
@@ -34,34 +31,45 @@ class ShipmentService {
   }) async {
     if (!SupabaseConfig.isConfigured || currentUser == null) return const [];
 
-    final parsedYear = int.tryParse(year.replaceAll(RegExp(r'[^0-9]'), ''));
-    final voyageValue = voyage == '전체'
-        ? ''
-        : voyage.replaceAll('항차', '').trim();
+    var query = SupabaseService.client.from('shipments').select();
 
-    final rows = await SupabaseService.client.rpc(
-      'search_shipments_for_current_user',
-      params: {
-        'p_route': route == '전체' ? '' : route,
-        'p_year': year == '전체' ? null : parsedYear,
-        'p_voyage': voyageValue,
-        'p_box_number': boxNumber.trim(),
-        'p_invoice': invoice.trim(),
-        'p_recipient': recipient.trim(),
-        'p_phone': phone.trim(),
-      },
-    );
-    return List<Map<String, dynamic>>.from(rows as List);
+    if (route != '전체' && route.isNotEmpty) query = query.eq('route', route);
+    if (year.isNotEmpty) {
+      final parsedYear = int.tryParse(
+        year.replaceAll(RegExp(r'[^0-9]'), ''),
+      );
+      if (parsedYear != null) {
+        query = query.eq('shipment_year', parsedYear);
+      }
+    }
+    if (voyage.isNotEmpty) query = query.eq('voyage', voyage.replaceAll('항차', '').trim());
+
+    if (currentUser.role.canSeeAllShipments) {
+      if (boxNumber.isNotEmpty) {
+        query = query.ilike('box_number', '%${_escape(boxNumber)}%');
+      }
+      if (recipient.isNotEmpty) {
+        query = query.ilike('consignee_name', '%${_escape(recipient)}%');
+      }
+      if (phone.isNotEmpty) {
+        query = query.ilike('consignee_phone', '%${_escape(phone)}%');
+      }
+    }
+
+    if (invoice.isNotEmpty) {
+      query = query.ilike('invoice_number', '%${_escape(invoice)}%');
+    }
+
+    final rows = await query.order('received_at', ascending: false).limit(300);
+    return List<Map<String, dynamic>>.from(rows);
   }
 
   Future<List<Map<String, dynamic>>> getRowsByIds(List<String> ids) async {
     if (!SupabaseConfig.isConfigured || ids.isEmpty) return const [];
-    final numericIds = ids.map(int.tryParse).whereType<int>().toList();
-    if (numericIds.isEmpty) return const [];
     final rows = await SupabaseService.client
         .from('shipments')
         .select()
-        .inFilter('id', numericIds);
+        .inFilter('id', ids.map(int.tryParse).whereType<int>().toList());
     return List<Map<String, dynamic>>.from(rows);
   }
 
@@ -75,125 +83,12 @@ class ShipmentService {
   }
 
   Future<void> updateRow(String id, Map<String, dynamic> changes) async {
-    if (!SupabaseConfig.isConfigured || changes.isEmpty) return;
+    if (!SupabaseConfig.isConfigured) return;
     await SupabaseService.client.from('shipments').update(changes).eq('id', id);
   }
 
-  Future<void> adminUpdateBoxNumber({
-    required String shipmentId,
-    required String boxNumber,
-  }) async {
-    if (!SupabaseConfig.isConfigured) return;
-    final id = int.tryParse(shipmentId);
-    if (id == null) return;
-    await SupabaseService.client.rpc(
-      'admin_update_shipment_box_number',
-      params: {'p_shipment_id': id, 'p_box_number': boxNumber.trim()},
-    );
-  }
-
-  Future<String> getNextBoxNumber({
-    required String route,
-    required int year,
-    required String voyage,
-    required String prefix,
-  }) async {
-    if (!SupabaseConfig.isConfigured) return '${prefix}001';
-    final value = await SupabaseService.client.rpc(
-      'admin_next_box_number',
-      params: {
-        'p_route': route,
-        'p_year': year,
-        'p_voyage': voyage.replaceAll('항차', '').trim(),
-        'p_prefix': prefix,
-      },
-    );
-    return '${value ?? '${prefix}001'}';
-  }
-
-  Future<Map<String, dynamic>> adminAddShipmentRow({
-    required String route,
-    required int year,
-    required String voyage,
-    required String boxNumber,
-    required String invoiceNumber,
-    required String consigneeName,
-    required String consigneePhone,
-    String notes = '',
-    String unloadingZone = '',
-    num? weightKg,
-    num? lengthCm,
-    num? widthCm,
-    num? heightCm,
-  }) async {
-    if (!SupabaseConfig.isConfigured) return const {};
-    final row = await SupabaseService.client.rpc(
-      'admin_add_shipment_row',
-      params: {
-        'p_route': route,
-        'p_year': year,
-        'p_voyage': voyage.replaceAll('항차', '').trim(),
-        'p_box_number': boxNumber.trim(),
-        'p_invoice_number': invoiceNumber.trim(),
-        'p_consignee_name': consigneeName.trim(),
-        'p_consignee_phone': consigneePhone.trim(),
-        'p_notes': notes.trim(),
-        'p_unloading_zone': unloadingZone.trim(),
-        'p_weight_kg': weightKg,
-        'p_length_cm': lengthCm,
-        'p_width_cm': widthCm,
-        'p_height_cm': heightCm,
-      },
-    );
-    return Map<String, dynamic>.from(row as Map);
-  }
-
-  Future<void> requestChanges({
-    required List<String> shipmentIds,
-    required Map<String, dynamic> changes,
-  }) async {
-    if (!SupabaseConfig.isConfigured || shipmentIds.isEmpty || changes.isEmpty) {
-      return;
-    }
-    final ids = shipmentIds.map(int.tryParse).whereType<int>().toList();
-    if (ids.isEmpty) return;
-    await SupabaseService.client.rpc(
-      'create_shipment_change_requests',
-      params: {
-        'p_shipment_ids': ids,
-        'p_changes': changes,
-      },
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getPendingChangeRequests() async {
-    if (!SupabaseConfig.isConfigured) return const [];
-    final rows = await SupabaseService.client.rpc(
-      'get_pending_shipment_change_requests',
-    );
-    return List<Map<String, dynamic>>.from(rows as List);
-  }
-
-  Future<void> reviewChangeRequest({
-    required int requestId,
-    required String action,
-    Map<String, dynamic> adminChanges = const {},
-  }) async {
-    if (!SupabaseConfig.isConfigured) return;
-    await SupabaseService.client.rpc(
-      'review_shipment_change_request',
-      params: {
-        'p_request_id': requestId,
-        'p_action': action,
-        'p_admin_changes': adminChanges,
-      },
-    );
-  }
-
   Future<Shipment?> findByTrackingNumber(String trackingNumber) async {
-    if (!SupabaseConfig.isConfigured) {
-      return MockShipments.findByTracking(trackingNumber);
-    }
+    if (!SupabaseConfig.isConfigured) return MockShipments.findByTracking(trackingNumber);
     final rows = await SupabaseService.client
         .from('shipments')
         .select()
@@ -221,14 +116,8 @@ class ShipmentService {
 
   static Map<String, dynamic> _shipmentPayload(Map<String, dynamic> row) {
     final route = '${row['route'] ?? ''}';
-    final year = int.tryParse(
-      '${row['shipment_year'] ?? row['year'] ?? ''}'
-          .replaceAll(RegExp(r'[^0-9]'), ''),
-    );
-    final voyage = '${row['voyage'] ?? ''}'
-        .replaceAll('항차', '')
-        .trim()
-        .padLeft(2, '0');
+    final year = int.tryParse('${row['shipment_year'] ?? row['year'] ?? ''}'.replaceAll(RegExp(r'[^0-9]'), ''));
+    final voyage = '${row['voyage'] ?? ''}'.replaceAll('항차', '').trim().padLeft(2, '0');
     final box = '${row['box_number'] ?? row['boxNo'] ?? ''}'.trim();
 
     return {

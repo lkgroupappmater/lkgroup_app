@@ -125,73 +125,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         if (widget.initialSelectedIds.isEmpty) _selectedIds.clear();
       });
       _syncEditControllers();
-
-      if (_isManager && rows.isEmpty) {
-        final add = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            content: const Text(
-              '검색 하신 화물 데이타가 없습니다. 화물을 추가 하시겠습니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('화물 추가 입력'),
-              ),
-            ],
-          ),
-        );
-        if (add == true && mounted) {
-          await _openManualAdd(
-            route: _route,
-            year: _year,
-            voyage: _voyage,
-            invoice: _invoiceController.text.trim(),
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
-          );
-        }
-      }
     } catch (error) {
       _message('화물 검색 실패: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _openManualAdd({
-    String? route,
-    String? year,
-    String? voyage,
-    String invoice = '',
-    String name = '',
-    String phone = '',
-  }) async {
-    final parsedYear = year == null || year == '전체'
-        ? null
-        : int.tryParse(year.replaceAll(RegExp(r'[^0-9]'), ''));
-    final selectedVoyage =
-        voyage == null || voyage == '전체' ? null : voyage;
-
-    final added = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ShipmentManualAddScreen(
-          initialRoute: route,
-          initialYear: parsedYear,
-          initialVoyage: selectedVoyage,
-          initialInvoice: invoice,
-          initialName: name,
-          initialPhone: phone,
-        ),
-      ),
-    );
-    if (added == true && mounted) {
-      await _search();
     }
   }
 
@@ -638,7 +575,25 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     child: SizedBox(
                       height: 46,
                       child: OutlinedButton.icon(
-                        onPressed: _busy ? null : () => _openManualAdd(),
+                        onPressed: _busy || _year == '전체' || _voyage == '전체'
+                            ? null
+                            : () async {
+                                final year = int.tryParse(
+                                  _year.replaceAll(RegExp(r'[^0-9]'), ''),
+                                );
+                                if (year == null) return;
+                                final added = await Navigator.push<bool>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ShipmentManualAddScreen(
+                                      route: _route,
+                                      year: year,
+                                      voyage: _voyage,
+                                    ),
+                                  ),
+                                );
+                                if (added == true && mounted) await _search();
+                              },
                         icon: const Icon(Icons.add_box_outlined),
                         label: const Text('화물 추가 입력'),
                       ),
