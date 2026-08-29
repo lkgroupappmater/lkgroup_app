@@ -622,7 +622,15 @@ Deno.serve(async (req) => {
     const enrichedShipments = assignReceiptNumbers(
       (shipments ?? []) as Record<string, unknown>[],
       routeKey,
-    );
+    ).map((shipment) => {
+      if (
+        routeKey === 'kr_la_air' &&
+        String(shipment.unloading_zone ?? '').trim() === ''
+      ) {
+        return { ...shipment, unloading_zone: '102' };
+      }
+      return shipment;
+    });
 
     // 새로 자동 부여된 영수번호는 DB에도 저장하여 다음 조회/다운로드와 앱 화면이 동일하게 유지됩니다.
     for (const shipment of enrichedShipments) {
@@ -699,15 +707,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    seedCustomerListFromShipments(files, enrichedShipments);
-    refreshReceiptSheetCaches(files, enrichedShipments);
+    // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
+    // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
+    delete files['xl/calcChain.xml'];
 
-    // Excel에서 수식을 다시 계산하도록 calc mode만 지정합니다.
+    const relsPath = 'xl/_rels/workbook.xml.rels';
+    if (files[relsPath]) {
+      let relsXml = strFromU8(files[relsPath]);
+      relsXml = relsXml.replace(
+        /<Relationship\b[^>]*Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/calcChain"[^>]*\/>/g,
+        '',
+      );
+      files[relsPath] = strToU8(relsXml);
+    }
+
+    const contentTypesPath = '[Content_Types].xml';
+    if (files[contentTypesPath]) {
+      let contentTypesXml = strFromU8(files[contentTypesPath]);
+      contentTypesXml = contentTypesXml.replace(
+        /<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g,
+        '',
+      );
+      files[contentTypesPath] = strToU8(contentTypesXml);
+    }
+
+    // Excel에서 기존 VLOOKUP/INDEX/MATCH 수식을 다시 계산하도록 지정합니다.
     let workbookXml = strFromU8(files['xl/workbook.xml']);
     if (/<calcPr\b/.test(workbookXml)) {
       workbookXml = workbookXml.replace(
-        /<calcPr\b([^>]*)\/>/,
-        '<calcPr$1 calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>',
+        /<calcPr\b[^>]*\/>/,
+        '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>',
       );
     } else {
       workbookXml = workbookXml.replace(
