@@ -33,6 +33,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
   final _invoice = TextEditingController();
   final _name = TextEditingController();
   final _phone = TextEditingController();
+  final _quantity = TextEditingController(text: '1');
+  final _weight = TextEditingController();
+  final _length = TextEditingController();
+  final _width = TextEditingController();
+  final _height = TextEditingController();
   final _notes = TextEditingController();
 
   String? _route;
@@ -80,6 +85,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     _invoice.dispose();
     _name.dispose();
     _phone.dispose();
+    _quantity.dispose();
+    _weight.dispose();
+    _length.dispose();
+    _width.dispose();
+    _height.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -154,6 +164,14 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     if (picked != null) setState(() => _receivedAt = picked);
   }
 
+  int? _int(TextEditingController controller) =>
+      int.tryParse(controller.text.replaceAll(',', '').trim());
+
+  double? _double(TextEditingController controller) {
+    final text = controller.text.replaceAll(',', '').trim();
+    return text.isEmpty ? null : double.tryParse(text);
+  }
+
   Future<void> _save() async {
     if (!_routeReady) {
       _message('운송 경로, 년도, 항차를 모두 선택해 주세요.');
@@ -166,6 +184,25 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     }
     if (_boxDuplicate) {
       _message('같은 운송 경로/년도/항차에 이미 존재하는 박스번호입니다.');
+      return;
+    }
+
+    final quantity = _int(_quantity);
+    if (quantity == null || quantity <= 0) {
+      _message('박스 개수(수량)는 1 이상의 숫자로 입력해 주세요.');
+      return;
+    }
+
+    final weight = _double(_weight);
+    final length = _double(_length);
+    final width = _double(_width);
+    final height = _double(_height);
+
+    if ((_weight.text.trim().isNotEmpty && weight == null) ||
+        (_length.text.trim().isNotEmpty && length == null) ||
+        (_width.text.trim().isNotEmpty && width == null) ||
+        (_height.text.trim().isNotEmpty && height == null)) {
+      _message('중량과 크기(L/W/H)는 숫자로 입력해 주세요.');
       return;
     }
 
@@ -183,6 +220,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
           'p_consignee_phone': _phone.text.trim(),
           'p_received_at': _receivedAt?.toIso8601String(),
           'p_notes': _notes.text.trim(),
+          'p_quantity': quantity,
+          'p_weight_kg': weight,
+          'p_length_cm': length,
+          'p_width_cm': width,
+          'p_height_cm': height,
         },
       );
       if (!mounted) return;
@@ -330,6 +372,58 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               controller: _phone,
               keyboardType: TextInputType.phone,
               decoration: _decoration('연락처', Icons.phone_outlined),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _quantity,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: _decoration('박스 개수/수량', Icons.numbers_outlined),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _weight,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: _decoration('중량', Icons.scale_outlined).copyWith(
+                suffixText: 'kg',
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _length,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _decoration('L', Icons.straighten).copyWith(
+                      suffixText: 'cm',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _width,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _decoration('W', Icons.straighten).copyWith(
+                      suffixText: 'cm',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _height,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _decoration('H', Icons.height).copyWith(
+                      suffixText: 'cm',
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             InkWell(

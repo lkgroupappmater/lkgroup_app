@@ -143,10 +143,21 @@ function updateCellPreservingFormula(
     `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>|<c\\b([^>]*)r="${ref}"([^>]*)\\/>`,
   );
   const existing = rowXml.match(cellRe);
+
+  // 원본 Excel의 수식 셀은 절대 지우거나 값 셀로 바꾸지 않습니다.
   if (existing) {
     const body = existing[3] ?? '';
     if (/<f\b/.test(body)) return rowXml;
   }
+
+  // DB 값이 비어 있으면 원본 템플릿의 기본값/수식/구획값을 그대로 유지합니다.
+  // 예: KR-LA AIR O열의 102, SEA O열의 고객리스트 연동 수식.
+  const empty =
+    value == null ||
+    String(value).trim() === '' ||
+    (kind === 'number' && !Number.isFinite(Number(value)));
+  if (empty) return rowXml;
+
   return updateCell(rowXml, rowNumber, column, value, kind);
 }
 
@@ -313,9 +324,9 @@ function updateCargoSheet(
   ];
 
   let output = sheetXml;
-  for (let i = 0; i < candidateRows.length; i++) {
+  for (let i = 0; i < shipments.length; i++) {
     const candidate = candidateRows[i];
-    const shipment = i < shipments.length ? shipments[i] : {};
+    const shipment = shipments[i];
     let rowXml = candidate.xml;
 
     for (const [column, key, kind] of mapping) {
@@ -323,7 +334,7 @@ function updateCargoSheet(
         rowXml,
         candidate.number,
         column,
-        shipment[key] ?? '',
+        shipment[key],
         kind,
       );
     }
