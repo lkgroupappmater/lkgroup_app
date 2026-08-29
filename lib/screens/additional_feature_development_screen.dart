@@ -48,10 +48,28 @@ class _AdditionalFeatureDevelopmentScreenState
       .where((row) => '${row['status']}' == 'active')
       .toList(growable: false);
 
+  List<Map<String, dynamic>> get _draftRoutes => _routes
+      .where((row) => '${row['status']}' == 'draft')
+      .toList(growable: false);
+
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text)),
     );
+  }
+
+  Future<void> _openDraft(Map<String, dynamic> route) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RouteDefinitionEditorScreen(
+          route: route,
+          allRoutes: _routes,
+          existingDraft: true,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _openEditor({required bool create}) async {
@@ -144,6 +162,46 @@ class _AdditionalFeatureDevelopmentScreenState
                     ),
                   ),
                 ),
+                if (_draftRoutes.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    '신규 운송 경로 적용 대기',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._draftRoutes.map((route) {
+                    final name = '${route['display_name'] ?? ''}';
+                    final key = '${route['route_key'] ?? ''}';
+                    final base = '${route['base_route_key'] ?? ''}';
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.pending_actions_outlined,
+                          color: Colors.orange,
+                        ),
+                        title: Text(
+                          name.isEmpty ? key : name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          base.isEmpty
+                              ? '내용 저장 완료 · 아직 미적용'
+                              : '내용 저장 완료 · 아직 미적용\nBASE: $base',
+                        ),
+                        isThreeLine: base.isNotEmpty,
+                        trailing: FilledButton(
+                          onPressed: () => _openDraft(route),
+                          child: const Text('계속 작업'),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
               ],
             ),
     );
@@ -155,10 +213,12 @@ class RouteDefinitionEditorScreen extends StatefulWidget {
     super.key,
     this.route,
     required this.allRoutes,
+    this.existingDraft = false,
   });
 
   final Map<String, dynamic>? route;
   final List<Map<String, dynamic>> allRoutes;
+  final bool existingDraft;
 
   @override
   State<RouteDefinitionEditorScreen> createState() =>
@@ -184,6 +244,7 @@ class _RouteDefinitionEditorScreenState
   bool _busy = false;
 
   bool get _isCreate => widget.route == null;
+  bool get _isDraft => widget.existingDraft;
 
   List<Map<String, dynamic>> get _activeRoutes => widget.allRoutes
       .where((row) => '${row['status']}' == 'active')
@@ -223,7 +284,12 @@ class _RouteDefinitionEditorScreenState
       text: '${route['minimum_charge'] ?? 0}',
     );
 
-    if (!_isCreate) {
+    if (_isDraft) {
+      _baseRouteKey = '${route['base_route_key'] ?? ''}';
+      _draftRouteKey = '${route['route_key'] ?? ''}';
+      _savedDraft = true;
+      _loadDraftRates();
+    } else if (!_isCreate) {
       _baseRouteKey = '${route['route_key']}';
       _loadRates();
     }
@@ -240,6 +306,20 @@ class _RouteDefinitionEditorScreenState
     _filePrefixController.dispose();
     _minimumController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraftRates() async {
+    final key = _draftRouteKey;
+    if (key == null || key.isEmpty) return;
+    try {
+      final rows = await RouteDevelopmentService.instance.draftRates(key);
+      if (!mounted) return;
+      setState(() {
+        _tiers = rows.map(Map<String, dynamic>.from).toList();
+      });
+    } catch (error) {
+      if (mounted) _message('Draft 단가 조회 실패: $error');
+    }
   }
 
   Future<void> _loadRates() async {
@@ -322,7 +402,7 @@ class _RouteDefinitionEditorScreenState
   }
 
   Widget _basePreview() {
-    final routeKey = _isCreate
+    final routeKey = (_isCreate || _isDraft)
         ? _baseRouteKey
         : '${widget.route?['route_key'] ?? ''}';
     if (routeKey == null || routeKey.isEmpty) {
@@ -464,12 +544,12 @@ class _RouteDefinitionEditorScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isCreate ? '신규 운송 경로' : '운송 경로 편집'),
+        title: Text(_isDraft ? '신규 운송 경로 적용 대기' : (_isCreate ? '신규 운송 경로' : '운송 경로 편집')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
-          if (_isCreate) ...[
+          if (_isCreate || _isDraft) ...[
             DropdownButtonFormField<String>(
               initialValue: _baseRouteKey,
               isExpanded: true,
@@ -485,7 +565,7 @@ class _RouteDefinitionEditorScreenState
                     ),
                   )
                   .toList(),
-              onChanged: _busy ? null : _selectBaseRoute,
+              onChanged: (_busy || _isDraft) ? null : _selectBaseRoute,
             ),
             const SizedBox(height: 10),
           ],
@@ -622,6 +702,14 @@ class _RouteDefinitionEditorScreenState
               ),
             ],
           ),
+          if (_isDraft) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _saveDraftChanges,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('내용 수정 저장'),
+            ),
+          ],
           if (!_isCreate || _savedDraft) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(
@@ -636,6 +724,44 @@ class _RouteDefinitionEditorScreenState
         ],
       ),
     );
+  }
+
+  Future<void> _saveDraftChanges() async {
+    final draftKey = _draftRouteKey;
+    if (draftKey == null || draftKey.isEmpty) return;
+    if (_titleController.text.trim().isEmpty || _tiers.isEmpty) {
+      _message('운송 경로와 단가를 확인해 주세요.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final minimumCharge =
+          double.tryParse(_minimumController.text.trim()) ?? 0;
+
+      await RouteDevelopmentService.instance.updateDraft(
+        key: draftKey,
+        label: _titleController.text.trim(),
+        company: _companyController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        boxPrefix: _boxPrefixController.text.trim(),
+        receiptPrefix: _receiptPrefixController.text.trim(),
+        filePrefix: _filePrefixController.text.trim(),
+        minimumCharge: minimumCharge,
+        tiers: _tierData(),
+        templateOverrides: _templateOverrides
+            .where((e) =>
+                (e['sheet_name'] ?? '').trim().isNotEmpty &&
+                (e['cell_ref'] ?? '').trim().isNotEmpty)
+            .toList(growable: false),
+      );
+      if (mounted) _message('적용 대기 내용을 수정 저장했습니다.');
+    } catch (error) {
+      if (mounted) _message('Draft 수정 저장 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _deleteRoute() async {

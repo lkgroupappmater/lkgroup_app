@@ -24,6 +24,50 @@ class RouteDevelopmentService {
     return rows.map(Map<String, dynamic>.from).toList(growable: false);
   }
 
+  Future<List<Map<String, dynamic>>> draftRates(String key) async {
+    final rows = await SupabaseService.client
+        .from('freight_rate_tiers')
+        .select()
+        .eq('route_key', key)
+        .order('min_weight_kg');
+    return rows.map(Map<String, dynamic>.from).toList(growable: false);
+  }
+
+  Future<void> updateDraft({
+    required String key,
+    required String label,
+    required String company,
+    required String phone,
+    required String address,
+    required String boxPrefix,
+    required String receiptPrefix,
+    required String filePrefix,
+    required double minimumCharge,
+    required List<Map<String, double>> tiers,
+    required List<Map<String, String>> templateOverrides,
+  }) async {
+    await SupabaseService.client.rpc(
+      'admin_update_route_draft',
+      params: {
+        'p_route_key': key,
+        'p_label': label,
+        'p_company_name': company,
+        'p_phone': phone,
+        'p_address': address,
+        'p_box_prefix': boxPrefix,
+        'p_receipt_prefix': receiptPrefix,
+        'p_minimum_charge': minimumCharge,
+        'p_tiers': tiers,
+      },
+    );
+
+    await _saveExtension(
+      key: key,
+      filePrefix: filePrefix,
+      templateOverrides: templateOverrides,
+    );
+  }
+
   Future<void> saveExisting({
     required String key,
     required String label,
