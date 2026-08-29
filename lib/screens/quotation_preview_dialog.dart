@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../core/route_catalog.dart';
@@ -50,7 +49,6 @@ class QuotationPreviewDialog extends StatefulWidget {
 
 class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   final GlobalKey _captureKey = GlobalKey();
-  final TransformationController _transform = TransformationController();
 
   ui.Image? _templateImage;
   bool _loading = true;
@@ -69,7 +67,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   @override
   void dispose() {
-    _transform.dispose();
     _templateImage?.dispose();
     super.dispose();
   }
@@ -102,30 +99,61 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   String _two(int v) => v.toString().padLeft(2, '0');
 
-  void _zoom(double factor) {
-    final current = _transform.value.getMaxScaleOnAxis();
-    final target = (current * factor).clamp(0.45, 5.0);
-    _transform.value = Matrix4.identity()..scale(target);
-  }
 
-  void _resetZoom() {
-    _transform.value = Matrix4.identity();
+  Future<Uint8List> _renderHighResolutionPng() async {
+    final image = _templateImage;
+    if (image == null) throw StateError('견적서 원본 폼을 불러오지 못했습니다.');
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    late final Size logicalSize;
+    if (_isKrLaSea) {
+      final detailRows = widget.boxes.length > 10 ? widget.boxes.length + 1 : 10;
+      final extraRows = detailRows - 10;
+      logicalSize = Size(2292, 1526.0 + (extraRows * 32.0));
+
+      const exportScale = 1.75;
+      canvas.scale(exportScale, exportScale);
+      _KrLaSeaQuotationPainter(
+        template: image,
+        boxes: widget.boxes,
+        result: widget.result,
+        rates: widget.rates,
+        issuedAt: _issuedAt,
+        detailRows: detailRows,
+      ).paint(canvas, logicalSize);
+
+      final picture = recorder.endRecording();
+      final rendered = await picture.toImage(
+        (logicalSize.width * exportScale).round(),
+        (logicalSize.height * exportScale).round(),
+      );
+      picture.dispose();
+      final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
+      rendered.dispose();
+      if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
+      return byteData.buffer.asUint8List();
+    }
+
+    logicalSize = Size(image.width.toDouble(), image.height.toDouble());
+    canvas.drawImage(image, Offset.zero, Paint()..filterQuality = FilterQuality.high);
+    final picture = recorder.endRecording();
+    final rendered = await picture.toImage(
+      logicalSize.width.round(),
+      logicalSize.height.round(),
+    );
+    picture.dispose();
+    final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
+    rendered.dispose();
+    if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
+    return byteData.buffer.asUint8List();
   }
 
   Future<void> _savePng() async {
     setState(() => _saving = true);
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 80));
-      final boundary =
-          _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw StateError('견적서 이미지를 생성하지 못했습니다.');
-
-      // 원본 폼이 이미 2292px 폭입니다. 1.5배로 저장하여 프린트 여유 해상도를 확보합니다.
-      final image = await boundary.toImage(pixelRatio: 1.5);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
-      final Uint8List bytes = byteData.buffer.asUint8List();
+      final Uint8List bytes = await _renderHighResolutionPng();
 
       final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
       final fileName =
@@ -144,7 +172,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            uri == null ? '이미지 저장을 취소했습니다.' : '데이터가 반영된 견적서 이미지를 저장했습니다.',
+            uri == null ? '이미지 저장을 취소했습니다.' : '고화질 견적서 이미지를 저장했습니다.',
           ),
         ),
       );
@@ -183,21 +211,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                     ),
                   ),
                   IconButton(
-                    tooltip: '축소',
-                    onPressed: () => _zoom(0.8),
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  IconButton(
-                    tooltip: '원래 크기',
-                    onPressed: _resetZoom,
-                    icon: const Icon(Icons.fit_screen_outlined),
-                  ),
-                  IconButton(
-                    tooltip: '확대',
-                    onPressed: () => _zoom(1.25),
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  IconButton(
                     tooltip: '닫기',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
@@ -220,19 +233,14 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                           )
                         : LayoutBuilder(
                             builder: (context, constraints) {
-                              final surface = _buildSurface(image);
-                              return InteractiveViewer(
-                                transformationController: _transform,
-                                panEnabled: true,
-                                scaleEnabled: true,
-                                minScale: 0.45,
-                                maxScale: 5.0,
-                                boundaryMargin: const EdgeInsets.all(300),
-                                clipBehavior: Clip.none,
-                                child: SizedBox(
-                                  width: constraints.maxWidth,
-                                  height: constraints.maxHeight,
-                                  child: Center(child: surface),
+                              final preview = _buildPreviewSurface(image);
+                              return Container(
+                                width: constraints.maxWidth,
+                                height: constraints.maxHeight,
+                                color: const Color(0xFF202124),
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Center(child: preview),
                                 ),
                               );
                             },
@@ -261,7 +269,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.download_outlined),
-                      label: const Text('데이터 반영 이미지 저장'),
+                      label: const Text('고화질 이미지 저장'),
                     ),
                   ),
                 ],
@@ -273,36 +281,54 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     );
   }
 
-  Widget _buildSurface(ui.Image image) {
-    // 1차 완성형 검증 노선: 한국 -> 라오스 해상.
+  Widget _buildPreviewSurface(ui.Image image) {
     if (_isKrLaSea) {
       final detailRows = widget.boxes.length > 10 ? widget.boxes.length + 1 : 10;
       final extraRows = detailRows - 10;
-      final height = 1526.0 + (extraRows * 32.0);
+      final formHeight = 1526.0 + (extraRows * 32.0);
 
-      return RepaintBoundary(
-        key: _captureKey,
-        child: CustomPaint(
-          size: Size(2292, height),
-          painter: _KrLaSeaQuotationPainter(
-            template: image,
-            boxes: widget.boxes,
-            result: widget.result,
-            rates: widget.rates,
-            issuedAt: _issuedAt,
-            detailRows: detailRows,
-          ),
-        ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.sizeOf(context).width - 28;
+          final previewWidth = screenWidth.clamp(320.0, 760.0);
+          final previewHeight = previewWidth * formHeight / 2292.0;
+          return SizedBox(
+            width: previewWidth,
+            height: previewHeight,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: 2292,
+                height: formHeight,
+                child: CustomPaint(
+                  painter: _KrLaSeaQuotationPainter(
+                    template: image,
+                    boxes: widget.boxes,
+                    result: widget.result,
+                    rates: widget.rates,
+                    issuedAt: _issuedAt,
+                    detailRows: detailRows,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
 
-    // 다른 노선은 다음 확장 단계 전까지 기존 실제 Excel 폼 이미지만 유지.
-    return RepaintBoundary(
-      key: _captureKey,
+    final screenWidth = MediaQuery.sizeOf(context).width - 28;
+    final previewWidth = screenWidth.clamp(320.0, 760.0);
+    final previewHeight =
+        previewWidth * image.height.toDouble() / image.width.toDouble();
+    return SizedBox(
+      width: previewWidth,
+      height: previewHeight,
       child: RawImage(
         image: image,
         fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
+        filterQuality: FilterQuality.medium,
       ),
     );
   }
