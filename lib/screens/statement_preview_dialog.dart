@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../core/money_format.dart';
 import '../core/route_catalog.dart';
+import '../core/document_text_catalog.dart';
 import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
@@ -511,15 +512,15 @@ class _DigitalStatementPainter extends CustomPainter {
     }
 
     final sumTop = summaryY + rowH + 10;
+    final docText = DocumentTextCatalog.statement(routeLabel, DateTime.now());
     final leftW = w * .70;
     _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 160), const Color(0xFFFBFCFD));
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
-    _text(c, RouteCatalog.remarkFor(routeLabel).isEmpty
-        ? '운임은 DB 공통 운임정책 및 실제/용적 중 큰 청구중량 기준으로 계산됩니다.'
-        : RouteCatalog.remarkFor(routeLabel),
-        Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112), 14);
+    _text(c, docText.remark,
+        Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
+        docText.remarkFontSize, maxLines: 6, lineHeight: 1.16);
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
@@ -609,15 +610,7 @@ class _DigitalStatementPainter extends CustomPainter {
     );
 
     final noteTop = payTop + 150;
-    _text(
-      c,
-      '* 입·출고지를 떠나기 전 고객님 운임 물품 및 개수 확인 부탁드립니다.  '
-      '* 물품 출고 후 1주 후부터 보관료가 발생할 수 있습니다.  '
-      '* 이용해 주셔서 감사합니다.',
-      Rect.fromLTWH(15, noteTop, w - 30, 42),
-      13,
-      center: true,
-    );
+    _text(c, '', Rect.fromLTWH(15, noteTop, w - 30, 42), 1);
 
     final signTop = noteTop + 46;
     final signW = w * .26;
@@ -627,14 +620,11 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
     _imageContain(c, stamp, Rect.fromLTWH(8, signTop + 4, signW - 16, signH - 8));
-    final routeNotice = RouteCatalog.keyFor(routeLabel) == 'kr_la_sea'
-        ? '* 운임은 USD 기준입니다.  * 입·출고지를 떠나기 전 고객님 운임 물품 및 개수 확인 부탁드립니다.  * 물품 출고 후 1주 후부터 보관료가 발생할 수 있습니다.  * 이용해 주셔서 감사합니다.'
-        : RouteCatalog.remarkFor(routeLabel);
     _text(
       c,
-      routeNotice.isEmpty ? '* 입·출고지를 떠나기 전 운임 물품 및 개수 확인 부탁드립니다.  * 물품 출고 후 보관료가 발생할 수 있습니다.  * 이용해 주셔서 감사합니다.' : routeNotice,
+      docText.footerText,
       Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
-      13,
+      docText.footerFontSize,
       center: true,
     );
     _text(c, '고객사 서명', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
@@ -781,3 +771,106 @@ class _DigitalStatementPainter extends CustomPainter {
 
 
 
+
+class StatementRenderRequest {
+  const StatementRenderRequest({
+    required this.routeLabel,
+    required this.year,
+    required this.voyage,
+    required this.receiptNumber,
+  });
+
+  final String routeLabel;
+  final int year;
+  final String voyage;
+  final String receiptNumber;
+}
+
+class StatementDocumentRenderer {
+  StatementDocumentRenderer._();
+
+  static Future<ui.Image> _asset(String path) async {
+    final data = await rootBundle.load(path);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
+
+  static Future<Uint8List> _renderOne(
+    StatementRenderRequest request,
+    List<ui.Image> assets,
+  ) async {
+    final rows = await StatementService.instance.rowsForReceipt(
+      route: request.routeLabel,
+      year: request.year,
+      voyage: request.voyage,
+      receiptNumber: request.receiptNumber,
+    );
+    if (rows.isEmpty) {
+      throw StateError('${request.receiptNumber}: 명세서 데이터가 없습니다.');
+    }
+    final freight = await FreightService.instance.calculate(rows);
+    final arrival = await StatementService.instance.arrivalDate(
+      route: request.routeLabel,
+      year: request.year,
+      voyage: request.voyage,
+    );
+    final visibleRows = rows.length + 1 < 10 ? 10 : rows.length + 1;
+    final docHeight = 1120.0 + (visibleRows - 10) * 32;
+    const docWidth = 1800.0;
+    const scale = 1.35;
+
+    final painter = _DigitalStatementPainter(
+      routeLabel: request.routeLabel,
+      rows: rows,
+      freight: freight,
+      receiptNumber: request.receiptNumber,
+      arrivalDate: arrival,
+      logo: assets[0],
+      qrUsd: assets[1],
+      qrKip: assets[2],
+      qrThb: assets[3],
+      stamp: assets[4],
+      bankStrip: assets[5],
+    );
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(scale);
+    painter.paint(canvas, Size(docWidth, docHeight));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(
+      (docWidth * scale).round(),
+      (docHeight * scale).round(),
+    );
+    picture.dispose();
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (data == null) throw StateError('명세서 PNG 생성 실패');
+    return data.buffer.asUint8List();
+  }
+
+  static Future<Uint8List> renderBatchPdf(
+    List<StatementRenderRequest> requests,
+  ) async {
+    if (requests.isEmpty) throw ArgumentError('출력할 명세서가 없습니다.');
+    final assets = await Future.wait<ui.Image>([
+      _asset('assets/images/company_logo_transparent.png'),
+      _asset('assets/images/payment_qr_usd.png'),
+      _asset('assets/images/payment_qr_kip.png'),
+      _asset('assets/images/payment_qr_thb.png'),
+      _asset('assets/images/company_stamp.png'),
+      _asset('assets/images/bank_accounts_strip.png'),
+    ]);
+    try {
+      final pages = <Uint8List>[];
+      for (final request in requests) {
+        pages.add(await _renderOne(request, assets));
+      }
+      return DocumentPdfExport.batchStatements(pages);
+    } finally {
+      for (final image in assets) {
+        image.dispose();
+      }
+    }
+  }
+}

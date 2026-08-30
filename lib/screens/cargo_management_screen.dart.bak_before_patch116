@@ -16,7 +16,6 @@ import 'member_management_screen.dart';
 import 'change_approval_screen.dart';
 import 'quote_request_management_screen.dart';
 import 'statement_preview_dialog.dart';
-import 'batch_statement_pdf_dialog.dart';
 
 class CargoManagementScreen extends StatefulWidget {
   const CargoManagementScreen({
@@ -356,31 +355,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         voyage: voyage,
         receiptNumber: receipt,
       ),
-    );
-  }
-
-  Future<void> _showBatchStatementPdf({
-    List<Map<String, dynamic>>? scopeRows,
-  }) async {
-    if (_isPartner) {
-      _message('협력/파트너 계정은 명세서를 출력할 수 없습니다.');
-      return;
-    }
-    if (_selectedIds.isEmpty) {
-      _message('PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.');
-      return;
-    }
-    final source = scopeRows ?? _results;
-    final selected = source
-        .where((row) => _selectedIds.contains('${row['id']}'))
-        .toList(growable: false);
-    if (selected.isEmpty) {
-      _message('이 항차에서 체크된 화물이 없습니다.');
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (_) => BatchStatementPdfDialog(selectedRows: selected),
     );
   }
   Future<void> _save() async {
@@ -1038,9 +1012,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ),              const SizedBox(height: 8),
               if (!_isPartner)
                 OutlinedButton.icon(
-                  onPressed: _busy ? null : _showBatchStatementPdf,
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: const Text('체크 명세서 PDF'),
+                  onPressed: _busy ? null : _showStatement,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('명세서 보기'),
                 ),
             ],
             if (_isManager) ...[
@@ -1514,8 +1488,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     ),
                   if (!_isPartner)
                     IconButton(
-                      tooltip: '체크 명세서 PDF 저장',
-                      onPressed: _busy ? null : () => _showBatchStatementPdf(scopeRows: rows),
+                      tooltip: '명세서 보기',
+                      onPressed: _busy ? null : () => _showGroupStatement(rows),
                       icon: const Icon(Icons.receipt_long_outlined, size: 19),
                     ),
                 ],
@@ -1771,7 +1745,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
-
 
 
 

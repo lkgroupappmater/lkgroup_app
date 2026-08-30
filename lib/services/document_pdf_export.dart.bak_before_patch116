@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -128,42 +128,4 @@ class DocumentPdfExport {
     return pdf.save();
   }
 
-
-  static Future<Uint8List> batchStatements(
-    List<Uint8List> pngPages,
-  ) async {
-    final pdf = pw.Document();
-    for (final bytes in pngPages) {
-      final image = pw.MemoryImage(bytes);
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-          build: (_) => pw.Column(
-            children: [
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-              pw.Container(
-                height: 24,
-                alignment: pw.Alignment.center,
-                child: pw.Container(height: .6, color: PdfColors.grey600),
-              ),
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return pdf.save();
-  }
 }
-
