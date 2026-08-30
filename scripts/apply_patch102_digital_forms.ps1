@@ -12,7 +12,8 @@ if ($t -notmatch '(?m)^\s*pdf:\s*\^') {
 foreach ($asset in @(
   'assets/images/payment_qr_usd.png',
   'assets/images/payment_qr_kip.png',
-  'assets/images/payment_qr_thb.png'
+  'assets/images/payment_qr_thb.png',
+  'assets/images/company_stamp.png'
 )) {
   if ($t -notmatch [regex]::Escape("- $asset")) {
     $needle = "    - assets/images/company_logo.png"

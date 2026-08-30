@@ -66,13 +66,14 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   ui.Image? _qrUsd;
   ui.Image? _qrKip;
   ui.Image? _qrThb;
+  ui.Image? _stamp;
   bool _loading = true;
   bool _saving = false;
   late final DateTime _issuedAt;
 
-  static const double _docWidth = 1540;
+  static const double _docWidth = 1800;
   int get _visibleRows => widget.boxes.length < 10 ? 10 : widget.boxes.length;
-  double get _docHeight => 959 + (_visibleRows - 10) * 28;
+  double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
   void initState() {
@@ -87,6 +88,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     _qrUsd?.dispose();
     _qrKip?.dispose();
     _qrThb?.dispose();
+    _stamp?.dispose();
     super.dispose();
   }
 
@@ -105,6 +107,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         _assetImage('assets/images/payment_qr_usd.png'),
         _assetImage('assets/images/payment_qr_kip.png'),
         _assetImage('assets/images/payment_qr_thb.png'),
+        _assetImage('assets/images/company_stamp.png'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -112,6 +115,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         _qrUsd = assets[1];
         _qrKip = assets[2];
         _qrThb = assets[3];
+        _stamp = assets[4];
         _loading = false;
       });
     } catch (e) {
@@ -132,6 +136,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
         qrThb: _qrThb!,
+        stamp: _stamp!,
       );
 
   String _two(int v) => v.toString().padLeft(2, '0');
@@ -215,7 +220,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _logo != null;
+    final ready = !_loading && _logo != null && _stamp != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -336,6 +341,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     required this.qrUsd,
     required this.qrKip,
     required this.qrThb,
+    required this.stamp,
   });
 
   final String routeLabel;
@@ -347,45 +353,52 @@ class _DigitalQuotationPainter extends CustomPainter {
   final ui.Image qrUsd;
   final ui.Image qrKip;
   final ui.Image qrThb;
+  final ui.Image stamp;
 
   static const ink = Color(0xFF182433);
-  static const line = Color(0xFF8B97A3);
-  static const paleBlue = Color(0xFFEAF3FA);
-  static const actualColor = Color(0xFFFFF2CC);
-  static const volumeColor = Color(0xFFE2F0D9);
-  static const appliedColor = Color(0xFFD9EAF7);
-  static const totalColor = Color(0xFFFFF49A);
+  static const line = Color(0xFF687A8C);
+  static const paleBlue = Color(0xFFD9EAF7);
+  static const actualColor = Color(0xFFFFE49A);
+  static const volumeColor = Color(0xFFCFE8BD);
+  static const appliedColor = Color(0xFFBFDDF1);
+  static const totalColor = Color(0xFFFFE86A);
 
   @override
   void paint(Canvas c, Size size) {
     final w = size.width;
     final h = size.height;
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
-    _image(c, logo, Rect.fromLTWH(18, 12, 120, 68));
+    _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 가견적서',
         Rect.fromLTWH(180, 16, 1000, 58), 39, bold: true, center: true);
     _labelValue(c, '구획(Zone)', '-', Rect.fromLTWH(w - 300, 8, 282, 72));
 
     final infoTop = 90.0;
     _box(c, Rect.fromLTWH(0, infoTop, w, 72), paleBlue.withOpacity(.38));
-    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 4, w * .49, 28));
+    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 2, w * .49, 22));
+    _kv(c, '회사주소', 'Vientiane Capital, Lao PDR', Rect.fromLTWH(8, infoTop + 24, w * .49, 22));
+    _kv(c, '전화번호', '+856 (0)20 5559 8916', Rect.fromLTWH(8, infoTop + 46, w * .49, 22));
     _kv(c, '견적일',
         '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}',
-        Rect.fromLTWH(8, infoTop + 34, w * .49, 28));
+        Rect.fromLTWH(w * .5, infoTop + 50, w * .49, 20));
     _kv(c, '고객명/회사명', '-', Rect.fromLTWH(w * .5, infoTop + 4, w * .49, 28));
     _kv(c, '연락처', '-', Rect.fromLTWH(w * .5, infoTop + 34, w * .49, 28));
 
     const tableTop = 170.0;
-    const headerH = 36.0;
-    const rowH = 28.0;
+    const headerH = 42.0;
+    const rowH = 32.0;
     final rowCount = boxes.length < 10 ? 10 : boxes.length;
-    final cols = <double>[0, 65, 190, 280, 430, 580, 730, 875, 1040, 1230, 1540];
+    final cols = <double>[
+      0, 105, 220, 300, 420, 550, 650, 750, 850, 980, 1110, 1245, 1380, 1515, 1800
+    ];
     final headers = <String>[
-      'No.', '종류', '수량', '실제중량(kg)', '용적중량(kg)', '운임적용중량(kg)',
-      '단가', '청구운임', '규격(cm)', '비고'
+      '박스번호', '단가', '수량', '실제중량(kg)', '실제중량 합산(kg)',
+      'L', 'W', 'H', '용적중량(kg)', '용적중량 합산(kg)',
+      '실제중량 운임', '용적중량 운임', '청구중량 운임', '비고'
     ];
     final fills = <Color?>[
-      null, null, null, actualColor, volumeColor, appliedColor, null, paleBlue, null, null
+      null, null, null, actualColor, actualColor, null, null, null,
+      volumeColor, volumeColor, actualColor, volumeColor, appliedColor, null
     ];
 
     for (var i = 0; i < headers.length; i++) {
@@ -405,54 +418,74 @@ class _DigitalQuotationPainter extends CustomPainter {
 
       for (var col = 0; col < headers.length; col++) {
         Color fill = Colors.white;
-        if (has && col == 3 && actualWins) fill = actualColor;
-        if (has && col == 4 && volumeWins) fill = volumeColor;
-        if (has && col == 5) fill = appliedColor;
+        if (has && (col == 3 || col == 4 || col == 10) && actualWins) fill = actualColor;
+        if (has && (col == 8 || col == 9 || col == 11) && volumeWins) fill = volumeColor;
+        if (has && col == 12) fill = appliedColor;
         _box(c, Rect.fromLTRB(cols[col], y, cols[col + 1], y + rowH), fill);
       }
       if (!has || b == null) continue;
 
+      final qty = b.quantity < 1 ? 1 : b.quantity;
+      final unitActual = b.result.actualWeightKg / qty;
+      final unitVolume = b.result.volumeWeightKg / qty;
+      final actualFreight = b.result.actualWeightKg * b.result.ratePerKg;
+      final volumeFreight = b.result.volumeWeightKg * b.result.ratePerKg;
       final values = <String>[
-        '${i + 1}',
-        '화물',
-        '${b.quantity}',
-        _fmtWeight(b.result.actualWeightKg),
-        _fmtWeight(b.result.volumeWeightKg),
-        _fmtWeight(b.result.chargeableWeightKg),
+        'Q${i + 1}',
         '\$${b.result.ratePerKg.toStringAsFixed(2)}',
+        '$qty',
+        _fmtWeight(unitActual),
+        _fmtWeight(b.result.actualWeightKg),
+        _fmtWeight(b.lengthCm),
+        _fmtWeight(b.widthCm),
+        _fmtWeight(b.heightCm),
+        _fmtWeight(unitVolume),
+        _fmtWeight(b.result.volumeWeightKg),
+        MoneyFormat.usd(actualFreight),
+        MoneyFormat.usd(volumeFreight),
         MoneyFormat.usd(b.result.amountUsd),
-        '${_fmtWeight(b.lengthCm)}×${_fmtWeight(b.widthCm)}×${_fmtWeight(b.heightCm)}',
         actualWins ? '실중량 적용' : '용적 적용',
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col] + 3, y + 2, cols[col + 1] - 3, y + rowH - 2),
-            col == 7 ? 14 : 13,
-            bold: col == 5 || col == 7,
+            col >= 10 && col <= 12 ? 16 : 15,
+            bold: col == 4 || col == 9 || col == 12,
             center: true);
       }
     }
 
     final sumTop = tableTop + headerH + rowCount * rowH + 8;
     final leftW = w * .70;
-    _box(c, Rect.fromLTWH(0, sumTop, leftW, 120), const Color(0xFFFBFCFD));
-    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW - 20, 24),
+    _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 120), const Color(0xFFFBFCFD));
+    _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 120), const Color(0xFFF3F8FC));
+    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
     _text(
       c,
       '본 가견적은 입력된 중량/규격을 기준으로 한 예상 운임입니다. '
       '실제 입고 후 실측 중량·용적중량 중 큰 값을 운임 적용중량으로 사용하며, '
       '최종 청구금액은 실제 측정 결과에 따라 달라질 수 있습니다.',
-      Rect.fromLTWH(10, sumTop + 35, leftW - 20, 76),
+      Rect.fromLTWH(10, sumTop + 35, leftW * .58 - 20, 76),
       14,
     );
 
+    _text(c, 'Inland delivery/시내·지방 배송',
+        Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
+        18, bold: true);
+    _text(c, '배송비/선불·착불/배송업체 등 추후 입력',
+        Rect.fromLTWH(leftW * .58 + 14, sumTop + 38, leftW * .42 - 24, 65),
+        15);
+
     final totalX = leftW + 6;
     final totalW = w - totalX;
-    _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 120), totalColor);
-    _text(c, '가견적 총액', Rect.fromLTWH(totalX + 8, sumTop + 8, totalW - 16, 24),
-        18, bold: true, center: true);
     final usd = result.totalUsd;
+    _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 120), totalColor);
+    _text(c, '운임 총합  ${MoneyFormat.usd(usd)}    할인  -    특별할인  -    세금계산서(VAT)  -',
+        Rect.fromLTWH(totalX + 10, sumTop + 5, totalW - 20, 26),
+        16, bold: true);
+    _text(c, '가견적 총액', Rect.fromLTWH(totalX + 8, sumTop + 31, totalW - 16, 24),
+        18, bold: true, center: true);
     final money = <String>[
       'USD  ${MoneyFormat.usd(usd)}',
       'KIP  ${MoneyFormat.kip(usd * rates.appliedKip)}',
@@ -461,17 +494,20 @@ class _DigitalQuotationPainter extends CustomPainter {
     ];
     for (var i = 0; i < money.length; i++) {
       _text(c, money[i],
-          Rect.fromLTWH(totalX + 15, sumTop + 34 + i * 20, totalW - 30, 20),
+          Rect.fromLTWH(totalX + 15, sumTop + 55 + i * 16, totalW - 30, 20),
           17, bold: true, center: true);
     }
 
     final payTop = sumTop + 132;
     _payment(c, qrUsd, 'BCEL (USD)', '(SungHo Park)\n010-12-01-\n017655-60-001',
-        Rect.fromLTWH(6, payTop, w * .31, 145));
+        Rect.fromLTWH(6, payTop, w * .235, 145));
     _payment(c, qrKip, 'BCEL (KIP)', '(SungHo Park)\n013-12-00-\n017655-60-001',
-        Rect.fromLTWH(w * .335, payTop, w * .31, 145));
+        Rect.fromLTWH(w * .25, payTop, w * .235, 145));
     _payment(c, qrThb, 'BCEL (Baht)', '(SungHo Park)\n010-12-02-\n017655-60-001',
-        Rect.fromLTWH(w * .665, payTop, w * .31, 145));
+        Rect.fromLTWH(w * .50, payTop, w * .235, 145));
+
+    _payment(c, qrUsd, '한국 계좌 (KRW)', '은행/계좌 정보\n추후 확정 기입',
+        Rect.fromLTWH(w * .75, payTop, w * .235, 145));
 
     final noteTop = payTop + 150;
     _text(
@@ -487,7 +523,8 @@ class _DigitalQuotationPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(0, signTop, w * .48, h - signTop - 2), Colors.white);
     _box(c, Rect.fromLTWH(w * .52, signTop, w * .48, h - signTop - 2), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, w * .42, 30),
-        18, bold: true);
+        20, bold: true);
+    _imageContain(c, stamp, Rect.fromLTWH(w * .29, signTop + 10, 125, 95));
     _text(c, '고객사 확인', Rect.fromLTWH(w * .54, signTop + 14, w * .42, 30),
         18, bold: true);
   }
@@ -523,6 +560,23 @@ class _DigitalQuotationPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
+  }
+
+  void _imageContain(Canvas c, ui.Image image, Rect box) {
+    final ratio = image.width / image.height;
+    var dw = box.width;
+    var dh = dw / ratio;
+    if (dh > box.height) {
+      dh = box.height;
+      dw = dh * ratio;
+    }
+    final dst = Rect.fromLTWH(
+      box.left + (box.width - dw) / 2,
+      box.top + (box.height - dh) / 2,
+      dw,
+      dh,
+    );
+    _image(c, image, dst);
   }
 
   void _image(Canvas c, ui.Image image, Rect dst) {

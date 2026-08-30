@@ -49,12 +49,13 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   ui.Image? _qrUsd;
   ui.Image? _qrKip;
   ui.Image? _qrThb;
+  ui.Image? _stamp;
   bool _loading = true;
   bool _saving = false;
 
-  static const double _docWidth = 1540;
+  static const double _docWidth = 1800;
   int get _visibleRows => _rows.length < 10 ? 10 : _rows.length;
-  double get _docHeight => 959 + (_visibleRows - 10) * 28;
+  double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
   void initState() {
@@ -68,6 +69,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     _qrUsd?.dispose();
     _qrKip?.dispose();
     _qrThb?.dispose();
+    _stamp?.dispose();
     super.dispose();
   }
 
@@ -86,6 +88,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _assetImage('assets/images/payment_qr_usd.png'),
         _assetImage('assets/images/payment_qr_kip.png'),
         _assetImage('assets/images/payment_qr_thb.png'),
+        _assetImage('assets/images/company_stamp.png'),
       ]);
       final rows = await StatementService.instance.rowsForReceipt(
         route: widget.routeLabel,
@@ -109,6 +112,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _qrUsd = assets[1];
         _qrKip = assets[2];
         _qrThb = assets[3];
+        _stamp = assets[4];
         _rows = rows;
         _freight = freight;
         _arrivalDate = arrival;
@@ -132,6 +136,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
         qrThb: _qrThb!,
+        stamp: _stamp!,
       );
 
   Future<Uint8List> _renderPng() async {
@@ -221,7 +226,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _freight != null && _logo != null;
+    final ready = !_loading && _freight != null && _logo != null && _stamp != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -347,6 +352,7 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.qrUsd,
     required this.qrKip,
     required this.qrThb,
+    required this.stamp,
   });
 
   final String routeLabel;
@@ -358,14 +364,15 @@ class _DigitalStatementPainter extends CustomPainter {
   final ui.Image qrUsd;
   final ui.Image qrKip;
   final ui.Image qrThb;
+  final ui.Image stamp;
 
   static const ink = Color(0xFF182433);
-  static const line = Color(0xFF8B97A3);
-  static const paleBlue = Color(0xFFEAF3FA);
-  static const actualColor = Color(0xFFFFF2CC);
-  static const volumeColor = Color(0xFFE2F0D9);
-  static const appliedColor = Color(0xFFD9EAF7);
-  static const totalColor = Color(0xFFFFF49A);
+  static const line = Color(0xFF687A8C);
+  static const paleBlue = Color(0xFFD9EAF7);
+  static const actualColor = Color(0xFFFFE49A);
+  static const volumeColor = Color(0xFFCFE8BD);
+  static const appliedColor = Color(0xFFBFDDF1);
+  static const totalColor = Color(0xFFFFE86A);
 
   @override
   void paint(Canvas c, Size size) {
@@ -377,7 +384,7 @@ class _DigitalStatementPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
-    _image(c, logo, Rect.fromLTWH(18, 12, 120, 68));
+    _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서',
         Rect.fromLTWH(190, 16, 940, 58),
         39,
@@ -390,8 +397,10 @@ class _DigitalStatementPainter extends CustomPainter {
     final half = w * .5;
     _box(c, Rect.fromLTWH(0, infoTop, half, 72), paleBlue.withOpacity(.38));
     _box(c, Rect.fromLTWH(half, infoTop, half, 72), paleBlue.withOpacity(.38));
-    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 4, half - 16, 28));
-    _kv(c, '도착일', arrivalDate ?? '-', Rect.fromLTWH(8, infoTop + 34, half - 16, 28));
+    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 2, half - 16, 24));
+    _kv(c, '회사주소', 'Vientiane Capital, Lao PDR', Rect.fromLTWH(8, infoTop + 25, half - 16, 22));
+    _kv(c, '전화번호', '+856 (0)20 5559 8916', Rect.fromLTWH(8, infoTop + 47, half - 16, 22));
+    
     _kv(c, '고객명/회사명', _s(rows.first['consignee_name']),
         Rect.fromLTWH(half + 8, infoTop + 4, half - 16, 28), emphasize: true);
     _kv(c, '연락처', _s(rows.first['consignee_phone']),
@@ -400,24 +409,20 @@ class _DigitalStatementPainter extends CustomPainter {
         23, bold: true, center: true);
 
     const tableTop = 170.0;
-    const headerH = 36.0;
-    const rowH = 28.0;
+    const headerH = 42.0;
+    const rowH = 32.0;
     final rowCount = rows.length < 10 ? 10 : rows.length;
-    final cols = <double>[0, 60, 190, 275, 425, 575, 725, 875, 1040, 1230, 1540];
+    final cols = <double>[
+      0, 105, 220, 300, 420, 550, 650, 750, 850, 980, 1110, 1245, 1380, 1515, 1800
+    ];
     final headers = <String>[
-      'No.',
-      '박스번호',
-      '수량',
-      '실제중량(kg)',
-      '용적중량(kg)',
-      '운임적용중량(kg)',
-      '단가',
-      '청구운임',
-      '규격(cm)',
-      '비고',
+      '박스번호', '단가', '수량', '실제중량(kg)', '실제중량 합산(kg)',
+      'L', 'W', 'H', '용적중량(kg)', '용적중량 합산(kg)',
+      '실제중량 운임', '용적중량 운임', '청구중량 운임', '비고'
     ];
     final fills = <Color?>[
-      null, null, null, actualColor, volumeColor, appliedColor, null, paleBlue, null, null
+      null, null, null, actualColor, actualColor, null, null, null,
+      volumeColor, volumeColor, actualColor, volumeColor, appliedColor, null
     ];
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
@@ -436,49 +441,67 @@ class _DigitalStatementPainter extends CustomPainter {
 
       for (var col = 0; col < headers.length; col++) {
         Color fill = Colors.white;
-        if (has && col == 3 && actualWins) fill = actualColor;
-        if (has && col == 4 && volumeWins) fill = volumeColor;
-        if (has && col == 5) fill = appliedColor;
+        if (has && (col == 3 || col == 4 || col == 10) && actualWins) fill = actualColor;
+        if (has && (col == 8 || col == 9 || col == 11) && volumeWins) fill = volumeColor;
+        if (has && col == 12) fill = appliedColor;
         _box(c, Rect.fromLTRB(cols[col], y, cols[col + 1], y + rowH), fill);
       }
       if (!has) continue;
-      final dims =
-          '${_s(row['length_cm'])}×${_s(row['width_cm'])}×${_s(row['height_cm'])}';
+      final qty = _d(row['quantity'], 1).clamp(1, 999999).toDouble();
+      final unitActual = f == null ? 0.0 : f.actualWeight / qty;
+      final unitVolume = f == null ? 0.0 : f.volumeWeight / qty;
+      final actualFreight = f == null ? 0.0 : f.actualWeight * f.rate;
+      final volumeFreight = f == null ? 0.0 : f.volumeWeight * f.rate;
       final values = <String>[
-        '${i + 1}',
         _s(row['box_number']),
-        _s(row['quantity']).isEmpty ? '1' : _s(row['quantity']),
-        f == null ? '-' : _fmtWeight(f.actualWeight),
-        f == null ? '-' : _fmtWeight(f.volumeWeight),
-        f == null ? '-' : _fmtWeight(f.chargeableWeight),
         f == null ? '-' : '\$${f.rate.toStringAsFixed(2)}',
+        _s(row['quantity']).isEmpty ? '1' : _s(row['quantity']),
+        f == null ? '-' : _fmtWeight(unitActual),
+        f == null ? '-' : _fmtWeight(f.actualWeight),
+        _s(row['length_cm']),
+        _s(row['width_cm']),
+        _s(row['height_cm']),
+        f == null ? '-' : _fmtWeight(unitVolume),
+        f == null ? '-' : _fmtWeight(f.volumeWeight),
+        f == null ? '-' : MoneyFormat.usd(actualFreight),
+        f == null ? '-' : MoneyFormat.usd(volumeFreight),
         f == null ? '-' : MoneyFormat.usd(f.amountUsd),
-        dims == '××' ? '-' : dims,
         actualWins ? '실중량 적용' : (volumeWins ? '용적 적용' : ''),
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col] + 3, y + 2, cols[col + 1] - 3, y + rowH - 2),
-            col == 7 ? 14 : 13,
-            bold: col == 5 || col == 7,
+            col >= 10 && col <= 12 ? 16 : 15,
+            bold: col == 4 || col == 9 || col == 12,
             center: true);
       }
     }
 
     final sumTop = tableTop + headerH + rowCount * rowH + 8;
     final leftW = w * .70;
-    _box(c, Rect.fromLTWH(0, sumTop, leftW, 120), const Color(0xFFFBFCFD));
-    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW - 20, 24),
+    _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 120), const Color(0xFFFBFCFD));
+    _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 120), const Color(0xFFF3F8FC));
+    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
     _text(c, RouteCatalog.remarkFor(routeLabel).isEmpty
         ? '운임은 DB 공통 운임정책 및 실제/용적 중 큰 청구중량 기준으로 계산됩니다.'
         : RouteCatalog.remarkFor(routeLabel),
-        Rect.fromLTWH(10, sumTop + 35, leftW - 20, 76), 14);
+        Rect.fromLTWH(10, sumTop + 35, leftW * .58 - 20, 76), 14);
+
+    _text(c, 'Inland delivery/시내·지방 배송',
+        Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
+        18, bold: true);
+    _text(c, '배송비/선불·착불/배송업체 등 추후 입력',
+        Rect.fromLTWH(leftW * .58 + 14, sumTop + 38, leftW * .42 - 24, 65),
+        15);
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 120), totalColor);
-    _text(c, '최종 청구 금액', Rect.fromLTWH(totalX + 8, sumTop + 8, totalW - 16, 24),
+    _text(c, '운임 총합  ${MoneyFormat.usd(freight.totalUsd)}    할인  -    특별할인  -    세금계산서(VAT)  -',
+        Rect.fromLTWH(totalX + 10, sumTop + 5, totalW - 20, 26),
+        16, bold: true);
+    _text(c, '최종 청구 금액', Rect.fromLTWH(totalX + 8, sumTop + 31, totalW - 16, 24),
         18, bold: true, center: true);
     final money = <String>[
       'USD  ${MoneyFormat.usd(freight.totalUsd)}',
@@ -488,17 +511,20 @@ class _DigitalStatementPainter extends CustomPainter {
     ];
     for (var i = 0; i < money.length; i++) {
       _text(c, money[i],
-          Rect.fromLTWH(totalX + 15, sumTop + 34 + i * 20, totalW - 30, 20),
-          17, bold: true, center: true);
+          Rect.fromLTWH(totalX + 15, sumTop + 55 + i * 16, totalW - 30, 20),
+          19, bold: true, center: true);
     }
 
     final payTop = sumTop + 132;
     _payment(c, qrUsd, 'BCEL (USD)', '(SungHo Park)\n010-12-01-\n017655-60-001',
-        Rect.fromLTWH(6, payTop, w * .31, 145));
+        Rect.fromLTWH(6, payTop, w * .235, 145));
     _payment(c, qrKip, 'BCEL (KIP)', '(SungHo Park)\n013-12-00-\n017655-60-001',
-        Rect.fromLTWH(w * .335, payTop, w * .31, 145));
+        Rect.fromLTWH(w * .25, payTop, w * .235, 145));
     _payment(c, qrThb, 'BCEL (Baht)', '(SungHo Park)\n010-12-02-\n017655-60-001',
-        Rect.fromLTWH(w * .665, payTop, w * .31, 145));
+        Rect.fromLTWH(w * .50, payTop, w * .235, 145));
+
+    _payment(c, qrUsd, '한국 계좌 (KRW)', '은행/계좌 정보\n추후 확정 기입',
+        Rect.fromLTWH(w * .75, payTop, w * .235, 145));
 
     final noteTop = payTop + 150;
     _text(
@@ -515,7 +541,8 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(0, signTop, w * .48, h - signTop - 2), Colors.white);
     _box(c, Rect.fromLTWH(w * .52, signTop, w * .48, h - signTop - 2), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, w * .42, 30),
-        18, bold: true);
+        20, bold: true);
+    _imageContain(c, stamp, Rect.fromLTWH(w * .29, signTop + 10, 125, 95));
     _text(c, '고객사 서명', Rect.fromLTWH(w * .54, signTop + 14, w * .42, 30),
         18, bold: true);
 
@@ -557,6 +584,23 @@ class _DigitalStatementPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
+  }
+
+  void _imageContain(Canvas c, ui.Image image, Rect box) {
+    final ratio = image.width / image.height;
+    var dw = box.width;
+    var dh = dw / ratio;
+    if (dh > box.height) {
+      dh = box.height;
+      dw = dh * ratio;
+    }
+    final dst = Rect.fromLTWH(
+      box.left + (box.width - dw) / 2,
+      box.top + (box.height - dh) / 2,
+      dw,
+      dh,
+    );
+    _image(c, image, dst);
   }
 
   void _image(Canvas c, ui.Image image, Rect dst) {
