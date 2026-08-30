@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -1504,8 +1504,18 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   Widget _groupShipmentCard(Map<String, dynamic> item) {
     final id = '${item['id']}';
-    final size =
-        '${item['length_cm'] ?? ''} × ${item['width_cm'] ?? ''} × ${item['height_cm'] ?? ''} cm';
+    final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
+    final receivedDate = _dateOnly(item['received_at']);
+    final length = '${item['length_cm'] ?? ''}'.trim();
+    final height = '${item['height_cm'] ?? ''}'.trim();
+    final width = '${item['width_cm'] ?? ''}'.trim();
+    final size = '$length × $height × $width cm';
+    final name = '${item['consignee_name'] ?? ''}'.trim();
+    final company = _companyOf(item);
+    final nameCompany = '$name / ${company.isEmpty ? '-' : company}';
+    final receipt = '${item['receipt_number'] ?? ''}'.trim();
+    final zone = '${item['unloading_zone'] ?? ''}'.trim();
+
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       decoration: BoxDecoration(
@@ -1529,20 +1539,59 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('박스번호 ${item['box_number'] ?? ''}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.navyPrimary)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '박스번호: ${item['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.navyPrimary,
+                            ),
+                          ),
+                        ),
+                        if (_isManager)
+                          TextButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _selectedIds
+                                        ..clear()
+                                        ..add(id);
+                                    });
+                                    await _editCheckedGroup([item]);
+                                  },
+                            icon: const Icon(Icons.edit_outlined, size: 17),
+                            label: const Text('편집'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 5),
+                    _infoRow('운송 경로', '${item['route'] ?? ''}'),
+                    _infoRow(
+                      '년도 / 항차',
+                      '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
+                    ),
                     _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('이름/수령인', '${item['consignee_name'] ?? ''}'),
+                    _infoRow('이름/수령인 & 회사', nameCompany),
                     _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
-                    _infoRow('입고 날짜', '${item['received_at'] ?? ''}'),
-                    _infoRow('무게', '${item['weight_kg'] ?? ''} kg'),
-                    _infoRow('크기', size),
-                    _infoRow('영수증 번호', '${item['receipt_number'] ?? ''}'),
+                    _infoRow(
+                      '무게/크기(L H W)',
+                      '${item['weight_kg'] ?? ''} kg / $size',
+                    ),
                     if (_isAdmin || _isStaff)
-                      _infoRow('구획 (Zone)', '${item['unloading_zone'] ?? ''}'),
+                      _infoRow(
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
+                      )
+                    else
+                      _infoRow('영수증 번호', receipt),
                   ],
                 ),
               ),
@@ -1554,8 +1603,18 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   }
   Widget _shipmentCard(Map<String, dynamic> item) {
     final id = '${item['id']}';
-    final size =
-        '${item['length_cm'] ?? ''} × ${item['width_cm'] ?? ''} × ${item['height_cm'] ?? ''} cm';
+    final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
+    final receivedDate = _dateOnly(item['received_at']);
+    final length = '${item['length_cm'] ?? ''}'.trim();
+    final height = '${item['height_cm'] ?? ''}'.trim();
+    final width = '${item['width_cm'] ?? ''}'.trim();
+    final size = '$length × $height × $width cm';
+    final name = '${item['consignee_name'] ?? ''}'.trim();
+    final company = _companyOf(item);
+    final nameCompany = '$name / ${company.isEmpty ? '-' : company}';
+    final receipt = '${item['receipt_number'] ?? ''}'.trim();
+    final zone = '${item['unloading_zone'] ?? ''}'.trim();
+
     return Card(
       child: InkWell(
         onTap: () => _toggle(id),
@@ -1572,30 +1631,61 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('박스번호 ${item['box_number'] ?? ''}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.navyPrimary)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '박스번호: ${item['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.navyPrimary,
+                            ),
+                          ),
+                        ),
+                        if (_isManager)
+                          TextButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _selectedIds
+                                        ..clear()
+                                        ..add(id);
+                                    });
+                                    await _editCheckedGroup([item]);
+                                  },
+                            icon: const Icon(Icons.edit_outlined, size: 17),
+                            label: const Text('편집'),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 6),
                     _infoRow('운송 경로', '${item['route'] ?? ''}'),
-                    _infoRow('년도', '${item['shipment_year'] ?? ''}'),
-                    _infoRow('항차', _voyageLabel(item['voyage'])),
+                    _infoRow(
+                      '년도 / 항차',
+                      '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
+                    ),
                     _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('이름/수령인', '${item['consignee_name'] ?? ''}'),
+                    _infoRow('이름/수령인 & 회사', nameCompany),
                     _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
-                    _infoRow('입고 날짜', '${item['received_at'] ?? ''}'),
-                    _infoRow('무게', '${item['weight_kg'] ?? ''} kg'),
-                    _infoRow('크기', size),
-                    _infoRow('영수증 번호', '${item['receipt_number'] ?? ''}'),
+                    _infoRow(
+                      '무게/크기(L H W)',
+                      '${item['weight_kg'] ?? ''} kg / $size',
+                    ),
                     if (_isAdmin || _isStaff)
-                      _infoRow('구획 (Zone)', '${item['unloading_zone'] ?? ''}'),
+                      _infoRow(
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
+                      )
+                    else
+                      _infoRow('영수증 번호', receipt),
                     if (_isManager) ...[
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
-                          onPressed:
-                              _busy ? null : () => _requestDeletion(item),
+                          onPressed: _busy ? null : () => _requestDeletion(item),
                           icon: const Icon(Icons.delete_outline),
                           label: const Text('삭제'),
                         ),
@@ -1611,6 +1701,24 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     );
   }
 
+  String _dateOnly(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '-';
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      return text.length >= 10 ? text.substring(0, 10) : text;
+    }
+    final local = parsed.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  String _companyOf(Map<String, dynamic> row) {
+    for (final key in const ['consignee_company', 'company_name', 'company']) {
+      final value = '${row[key] ?? ''}'.trim();
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
   String _voyageLabel(dynamic value) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '';
@@ -1637,6 +1745,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 

@@ -815,50 +815,89 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
   Widget _shipmentCard(Map<String, dynamic> r) {
     final id = '${r['id']}';
-    final size =
-        '${r['length_cm'] ?? ''} × ${r['width_cm'] ?? ''} × ${r['height_cm'] ?? ''} cm';
+    final quantity = int.tryParse('${r['quantity'] ?? ''}') ?? 1;
+    final receivedDate = _dateOnly(r['received_at']);
+    final length = '${r['length_cm'] ?? ''}'.trim();
+    final height = '${r['height_cm'] ?? ''}'.trim();
+    final width = '${r['width_cm'] ?? ''}'.trim();
+    final size = '$length × $height × $width cm';
+    final name = '${r['consignee_name'] ?? ''}'.trim();
+    final company = _companyOf(r);
+    final nameCompany = '$name / ${company.isEmpty ? '-' : company}';
+    final receipt = '${r['receipt_number'] ?? ''}'.trim();
+    final zone = '${r['unloading_zone'] ?? ''}'.trim();
+
     return Card(
       child: InkWell(
         onTap: () => _toggle(id),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _selectedIds.contains(id),
-              onChanged: (_) => _toggle(id),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('박스번호 ${r['box_number'] ?? ''}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.navyPrimary)),
-                  const SizedBox(height: 6),
-                  _row('운송 경로', '${r['route'] ?? ''}'),
-                  _row('년도', '${r['shipment_year'] ?? ''}'),
-                  _row('항차', _voyageLabel(r['voyage'])),
-                  _row('송장번호', '${r['invoice_number'] ?? ''}'),
-                  _row('이름/수령인', '${r['consignee_name'] ?? ''}'),
-                  _row('연락처', '${r['consignee_phone'] ?? ''}'),
-                  _row('입고 날짜', '${r['received_at'] ?? ''}'),
-                  _row('무게', '${r['weight_kg'] ?? ''} kg'),
-                  _row('크기', size),
-                  _row('영수증 번호', '${r['receipt_number'] ?? ''}'),
-                  if (_showZone) _row('구획 (Zone)', '${r['unloading_zone'] ?? ''}'),
-                ],
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _selectedIds.contains(id),
+                onChanged: (_) => _toggle(id),
               ),
-            ),
-          ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '박스번호: ${r['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.navyPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _row('운송 경로', '${r['route'] ?? ''}'),
+                    _row(
+                      '년도 / 항차',
+                      '${r['shipment_year'] ?? ''} / ${_voyageLabel(r['voyage'])}',
+                    ),
+                    _row('송장번호', '${r['invoice_number'] ?? ''}'),
+                    _row('이름/수령인 & 회사', nameCompany),
+                    _row('연락처', '${r['consignee_phone'] ?? ''}'),
+                    _row(
+                      '무게/크기(L H W)',
+                      '${r['weight_kg'] ?? ''} kg / $size',
+                    ),
+                    if (_showZone)
+                      _row(
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
+                      )
+                    else
+                      _row('영수증 번호', receipt),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
+  String _dateOnly(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '-';
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      return text.length >= 10 ? text.substring(0, 10) : text;
+    }
+    final local = parsed.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  String _companyOf(Map<String, dynamic> row) {
+    for (final key in const ['consignee_company', 'company_name', 'company']) {
+      final value = '${row[key] ?? ''}'.trim();
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
   String _voyageLabel(dynamic value) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '';
@@ -964,6 +1003,7 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
 
 
 
