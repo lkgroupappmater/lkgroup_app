@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -113,7 +113,6 @@ class ExcelImportService {
       }
     }
 
-    _applyCalculatedZones(rows, routeKey: routeKey);
 
     final inserted = await ShipmentService.instance.upsertFromRows(rows);
     final customerRuleResult =
@@ -573,3 +572,4 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
+

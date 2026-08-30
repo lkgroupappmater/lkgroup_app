@@ -1049,7 +1049,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final name = TextEditingController();
     final phone = TextEditingController();
     final notes = TextEditingController();
-    final zone = TextEditingController();
     final weight = TextEditingController();
     final length = TextEditingController();
     final width = TextEditingController();
@@ -1071,7 +1070,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               TextField(controller: invoice, decoration: const InputDecoration(labelText: '송장번호')),
               TextField(controller: name, decoration: const InputDecoration(labelText: '이름/라오스 수령인')),
               TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처')),
-              TextField(controller: zone, decoration: const InputDecoration(labelText: '구획 (Zone)')),
               TextField(controller: notes, decoration: const InputDecoration(labelText: '기타 내용')),
               Row(children: [
                 Expanded(child: TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '무게(kg)'))),
@@ -1108,7 +1106,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           consigneeName: name.text,
           consigneePhone: phone.text,
           notes: notes.text,
-          unloadingZone: zone.text,
           weightKg: num.tryParse(weight.text.trim()),
           lengthCm: num.tryParse(length.text.trim()),
           widthCm: num.tryParse(width.text.trim()),
@@ -1127,7 +1124,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     name.dispose();
     phone.dispose();
     notes.dispose();
-    zone.dispose();
     weight.dispose();
     length.dispose();
     width.dispose();
@@ -1226,6 +1222,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 
