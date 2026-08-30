@@ -624,7 +624,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH((signW - 105) / 2, signTop + 34, 105, 64));
+    _imageContain(c, stamp, Rect.fromLTWH(10, signTop + 30, signW - 20, signH - 34));
     final routeNotice = RouteCatalog.keyFor(routeLabel) == 'kr_la_sea'
         ? '* 운임은 USD 기준입니다.  * 입·출고지를 떠나기 전 고객님 운임 물품 및 개수 확인 부탁드립니다.  * 물품 출고 후 1주 후부터 보관료가 발생할 수 있습니다.  * 이용해 주셔서 감사합니다.'
         : RouteCatalog.remarkFor(routeLabel);
@@ -741,5 +741,6 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
 }
+
 
 
