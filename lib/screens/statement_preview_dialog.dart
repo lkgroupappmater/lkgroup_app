@@ -30,12 +30,15 @@ class StatementPreviewDialog extends StatefulWidget {
     required this.year,
     required this.voyage,
     required this.receiptNumber,
+    this.vatApplied = false,
   });
 
   final String routeLabel;
   final int year;
   final String voyage;
   final String receiptNumber;
+  final bool vatApplied;
+  final bool vatApplied;
 
   @override
   State<StatementPreviewDialog> createState() => _StatementPreviewDialogState();
@@ -50,7 +53,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   ui.Image? _qrKip;
   ui.Image? _qrThb;
   ui.Image? _stamp;
-  ui.Image? _bankStrip;
+  ui.Image? _bankStripDefault;
+  ui.Image? _bankStripVat;
   bool _loading = true;
   bool _saving = false;
 
@@ -71,7 +75,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     _qrKip?.dispose();
     _qrThb?.dispose();
     _stamp?.dispose();
-    _bankStrip?.dispose();
+    _bankStripDefault?.dispose();
+    _bankStripVat?.dispose();
     super.dispose();
   }
 
@@ -91,13 +96,15 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _assetImage('assets/images/payment_qr_kip.png'),
         _assetImage('assets/images/payment_qr_thb.png'),
         _assetImage('assets/images/company_stamp.png'),
-        _assetImage('assets/images/bank_accounts_strip.png'),
+        _assetImage('assets/images/bank_accounts_default.png'),
+        _assetImage('assets/images/bank_accounts_vat.png'),
       ]);
       final rows = await StatementService.instance.rowsForReceipt(
         route: widget.routeLabel,
         year: widget.year,
         voyage: widget.voyage,
         receiptNumber: widget.receiptNumber,
+        vatApplied: widget.vatApplied,
       );
       if (rows.isEmpty) {
         throw StateError('명세서에 표시할 화물 데이터가 없습니다.');
@@ -116,7 +123,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _qrKip = assets[2];
         _qrThb = assets[3];
         _stamp = assets[4];
-        _bankStrip = assets[5];
+        _bankStripDefault = assets[5];
+        _bankStripVat = assets[6];
         _rows = rows;
         _freight = freight;
         _arrivalDate = arrival;
@@ -135,13 +143,15 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         rows: _rows,
         freight: _freight!,
         receiptNumber: widget.receiptNumber,
+        vatApplied: widget.vatApplied,
         arrivalDate: _arrivalDate,
         logo: _logo!,
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
         qrThb: _qrThb!,
         stamp: _stamp!,
-        bankStrip: _bankStrip!,
+        bankStripDefault: _bankStripDefault!,
+        bankStripVat: _bankStripVat!,
       );
 
   Future<Uint8List> _renderPng() async {
@@ -231,7 +241,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _freight != null && _logo != null && _stamp != null && _bankStrip != null;
+    final ready = !_loading && _freight != null && _logo != null && _stamp != null && _bankStripDefault != null && _bankStripVat != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -352,26 +362,30 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.rows,
     required this.freight,
     required this.receiptNumber,
+    required this.vatApplied,
     required this.arrivalDate,
     required this.logo,
     required this.qrUsd,
     required this.qrKip,
     required this.qrThb,
     required this.stamp,
-    required this.bankStrip,
+    required this.bankStripDefault,
+    required this.bankStripVat,
   });
 
   final String routeLabel;
   final List<Map<String, dynamic>> rows;
   final FreightCalculation freight;
   final String receiptNumber;
+  final bool vatApplied;
   final String? arrivalDate;
   final ui.Image logo;
   final ui.Image qrUsd;
   final ui.Image qrKip;
   final ui.Image qrThb;
   final ui.Image stamp;
-  final ui.Image bankStrip;
+  final ui.Image bankStripDefault;
+  final ui.Image bankStripVat;
 
   static const ink = Color(0xFF182433);
   static const line = Color(0xFF687A8C);
@@ -393,31 +407,76 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서',
-        Rect.fromLTWH(190, 16, 940, 58),
-        39,
-        bold: true,
-        center: true);
+        Rect.fromLTWH(0, 14, w, 60), 39, bold: true, center: true);
     _labelValue(c, '구획(Zone)', _s(rows.first['zone']),
         Rect.fromLTWH(w - 300, 8, 282, 72), valueSize: 34);
 
     final infoTop = 90.0;
-    const infoH = 106.0;
-    final half = w * .5;
+    const infoH = 108.0;
+    const rowHInfo = infoH / 3;
+    final leftWInfo = w * .56;
+    final rightWInfo = w - leftWInfo;
+
     for (var r = 0; r < 3; r++) {
-      final y = infoTop + r * (infoH / 3);
-      _box(c, Rect.fromLTWH(0, y, half, infoH / 3), paleBlue.withOpacity(.38));
-      _box(c, Rect.fromLTWH(half, y, half, infoH / 3), paleBlue.withOpacity(.38));
+      final y = infoTop + r * rowHInfo;
+      _box(c, Rect.fromLTWH(0, y, leftWInfo, rowHInfo), paleBlue.withOpacity(.38));
+      _box(c, Rect.fromLTWH(leftWInfo, y, rightWInfo, rowHInfo), paleBlue.withOpacity(.38));
     }
-    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 7, half - 16, 28));
-    _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 39, half - 16, 28));
-    _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 71, half - 16, 28));
-    
-    _kv(c, '고객명/회사명', _s(rows.first['consignee_name']),
-        Rect.fromLTWH(half + 8, infoTop + 8, half - 16, 38), emphasize: true);
-    _kv(c, '연락처', _s(rows.first['consignee_phone']),
-        Rect.fromLTWH(half + 8, infoTop + 52, half - 220, 38), emphasize: true);
-    _text(c, receiptNumber, Rect.fromLTWH(w - 220, infoTop + 52, 205, 38),
-        23, bold: true, center: true);
+
+    _infoCell(
+      c,
+      '회사명',
+      '엘케이(LK)무역',
+      Rect.fromLTWH(0, infoTop, leftWInfo, rowHInfo),
+      valueSize: 17,
+      boldValue: true,
+      valueLines: 1,
+    );
+    _infoCell(
+      c,
+      '회사주소',
+      '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목,\n엘케이(LK) 빌딩, 1층 LK Trading',
+      Rect.fromLTWH(0, infoTop + rowHInfo, leftWInfo, rowHInfo),
+      valueSize: 14,
+      valueLines: 2,
+    );
+    _infoCell(
+      c,
+      '전화번호',
+      '+856 20 9112 6780',
+      Rect.fromLTWH(0, infoTop + rowHInfo * 2, leftWInfo, rowHInfo),
+      valueSize: 17,
+      boldValue: true,
+      valueLines: 1,
+    );
+
+    _infoCell(
+      c,
+      '고객명/회사명',
+      _s(rows.first['consignee_name']),
+      Rect.fromLTWH(leftWInfo, infoTop, rightWInfo, rowHInfo),
+      valueSize: 18,
+      boldValue: true,
+      valueLines: 1,
+    );
+    _infoCell(
+      c,
+      '연락처',
+      _s(rows.first['consignee_phone']),
+      Rect.fromLTWH(leftWInfo, infoTop + rowHInfo, rightWInfo, rowHInfo),
+      valueSize: 18,
+      boldValue: true,
+      valueLines: 1,
+    );
+    _infoCell(
+      c,
+      '영수번호',
+      receiptNumber,
+      Rect.fromLTWH(leftWInfo, infoTop + rowHInfo * 2, rightWInfo, rowHInfo),
+      valueSize: 19,
+      boldValue: true,
+      valueLines: 1,
+    );
 
     const tableTop = 205.0;
     const headerH = 42.0;
@@ -519,17 +578,19 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
-    _text(c, RouteCatalog.remarkFor(routeLabel).isEmpty
-        ? '운임은 DB 공통 운임정책 및 실제/용적 중 큰 청구중량 기준으로 계산됩니다.'
-        : RouteCatalog.remarkFor(routeLabel),
-        Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112), 14);
+    final routeRemark = RouteCatalog.remarkFor(routeLabel);
+    _text(
+      c,
+      routeRemark.isEmpty ? '운임은 DB 공통 운임정책 및 실제/용적 중 큰 청구중량 기준으로 계산됩니다.' : routeRemark,
+      Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
+      14,
+      maxLinesOverride: 6,
+    );
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
         18, bold: true);
-    _text(c, '배송비/선불·착불/배송업체 등 추후 입력',
-        Rect.fromLTWH(leftW * .58 + 14, sumTop + 40, leftW * .42 - 24, 105),
-        15);
+
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
@@ -568,7 +629,8 @@ class _DigitalStatementPainter extends CustomPainter {
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
         18, bold: true, center: true);
     final payTop = sumTop + 204;
-    _imageContain(c, bankStrip, Rect.fromLTWH(8, payTop, w - 16, 150));
+    _imageContain(c, vatApplied ? bankStripVat : bankStripDefault,
+        Rect.fromLTWH(8, payTop, w - 16, 150));
 
     final noteTop = payTop + 150;
     _text(
@@ -582,7 +644,7 @@ class _DigitalStatementPainter extends CustomPainter {
     );
 
     final signTop = noteTop + 46;
-    final signW = w * .34;
+    final signW = w * .26;
     final signH = 105.0;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
@@ -607,6 +669,23 @@ class _DigitalStatementPainter extends CustomPainter {
         19, bold: true, center: true);
     _text(c, detail, Rect.fromLTWH(r.left + 132, r.top + 38, r.width - 136, 92),
         16, bold: true);
+  }
+
+  void _infoCell(
+    Canvas c,
+    String label,
+    String value,
+    Rect r, {
+    double valueSize = 16,
+    bool boldValue = false,
+    int valueLines = 2,
+  }) {
+    final labelW = r.width * .22;
+    _text(c, label, Rect.fromLTWH(r.left + 4, r.top + 2, labelW - 8, r.height - 4),
+        14, bold: true, center: true);
+    _text(c, value.isEmpty ? '-' : value,
+        Rect.fromLTWH(r.left + labelW + 4, r.top + 2, r.width - labelW - 8, r.height - 4),
+        valueSize, bold: boldValue, center: true, maxLinesOverride: valueLines);
   }
 
   void _kv(Canvas c, String k, String v, Rect r, {bool emphasize = false}) {
@@ -665,7 +744,7 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false, bool right = false}) {
+      {bool bold = false, bool center = false, bool right = false, int? maxLinesOverride}) {
     final p = TextPainter(
       text: TextSpan(
         text: text,
@@ -679,7 +758,7 @@ class _DigitalStatementPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
       textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
-      maxLines: 3,
+      maxLines: maxLinesOverride ?? 3,
       ellipsis: '…',
     )..layout(maxWidth: r.width);
     final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;

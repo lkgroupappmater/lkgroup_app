@@ -30,7 +30,7 @@ class DocumentPdfExport {
     final pageH = PdfPageFormat.a4.height - 16;
     final projected = pageW * sourceHeight / sourceWidth;
 
-    if (projected <= pageH * .485) {
+    if ((sourceHeight / sourceWidth) <= .75) {
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -83,7 +83,7 @@ class DocumentPdfExport {
     final pageH = PdfPageFormat.a4.height - 12;
     final projected = pageW * sourceHeight / sourceWidth;
 
-    if (projected <= (pageH - 24) / 2) {
+    if ((sourceHeight / sourceWidth) <= .75) {
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
