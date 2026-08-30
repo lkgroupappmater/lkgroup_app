@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
@@ -12,9 +12,6 @@ import 'member_management_screen.dart';
 import 'notice_management_screen.dart';
 import 'quote_request_management_screen.dart';
 import 'schedule_management_screen.dart';
-import 'discount_management_screen.dart';
-import 'local_delivery_management_screen.dart';
-import 'voyage_total_management_screen.dart';
 
 class ManagementMenuScreen extends StatelessWidget {
   const ManagementMenuScreen({
@@ -89,21 +86,6 @@ class ManagementMenuScreen extends StatelessWidget {
           'label': '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)',
           'icon': Icons.table_view_outlined,
           'page': const ExcelBulkManagementScreen(),
-        },
-        {
-          'label': '할인 적용 관리',
-          'icon': Icons.percent_outlined,
-          'page': const DiscountManagementScreen(),
-        },
-        {
-          'label': '시내.지방 배송 관리',
-          'icon': Icons.local_shipping_outlined,
-          'page': const LocalDeliveryManagementScreen(),
-        },
-        {
-          'label': '항차별 총액 관리',
-          'icon': Icons.analytics_outlined,
-          'page': const VoyageTotalManagementScreen(),
         },
       ]);
     }

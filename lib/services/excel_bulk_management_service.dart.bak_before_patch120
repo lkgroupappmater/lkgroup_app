@@ -64,7 +64,6 @@ class ExcelBulkManagementService {
   Future<void> updateRow({
     required String id,
     required String boxNumber,
-    required String senderName,
     required String name,
     required String phone,
     required String receiptNumber,
@@ -79,7 +78,6 @@ class ExcelBulkManagementService {
       params: {
         'p_shipment_id': numericId,
         'p_box_number': boxNumber.trim(),
-        'p_sender_name': senderName.trim(),
         'p_consignee_name': name.trim(),
         'p_consignee_phone': phone.trim(),
         'p_receipt_number': receiptNumber.trim(),

@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -11,7 +11,6 @@ import '../core/document_text_catalog.dart';
 import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
-import '../services/customer_benefit_service.dart';
 
 
 double _d(dynamic value, [double fallback = 0]) =>
@@ -47,7 +46,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   List<Map<String, dynamic>> _rows = const [];
   FreightCalculation? _freight;
   String? _arrivalDate;
-  String _inlandDeliveryText = '';
   ui.Image? _logo;
   ui.Image? _qrUsd;
   ui.Image? _qrKip;
@@ -111,8 +109,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         year: widget.year,
         voyage: widget.voyage,
       );
-      final inland = await CustomerBenefitService.instance
-          .inlandTextForRows(widget.routeLabel, rows);
 
       if (!mounted) return;
       setState(() {
@@ -125,7 +121,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _rows = rows;
         _freight = freight;
         _arrivalDate = arrival;
-        _inlandDeliveryText = inland;
         _loading = false;
       });
     } catch (error) {
@@ -142,7 +137,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         freight: _freight!,
         receiptNumber: widget.receiptNumber,
         arrivalDate: _arrivalDate,
-        inlandDeliveryText: _inlandDeliveryText,
         logo: _logo!,
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
@@ -359,7 +353,6 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.freight,
     required this.receiptNumber,
     required this.arrivalDate,
-    required this.inlandDeliveryText,
     required this.logo,
     required this.qrUsd,
     required this.qrKip,
@@ -373,7 +366,6 @@ class _DigitalStatementPainter extends CustomPainter {
   final FreightCalculation freight;
   final String receiptNumber;
   final String? arrivalDate;
-  final String inlandDeliveryText;
   final ui.Image logo;
   final ui.Image qrUsd;
   final ui.Image qrKip;
@@ -533,14 +525,6 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
         18, bold: true);
-    _text(
-      c,
-      inlandDeliveryText,
-      Rect.fromLTWH(leftW * .58 + 14, sumTop + 38, leftW * .42 - 24, 112),
-      15.5,
-      maxLines: 5,
-      lineHeight: 1.12,
-    );
     
 
     final totalX = leftW + 6;
@@ -548,7 +532,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
-    _text(c, freight.discountTotalUsd > 0 ? '-${MoneyFormat.usd(freight.discountTotalUsd)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
@@ -834,8 +818,6 @@ class StatementDocumentRenderer {
       year: request.year,
       voyage: request.voyage,
     );
-    final inland = await CustomerBenefitService.instance
-        .inlandTextForRows(request.routeLabel, rows);
     final visibleRows = rows.length + 1 < 10 ? 10 : rows.length + 1;
     final docHeight = 1120.0 + (visibleRows - 10) * 32;
     const docWidth = 1800.0;
@@ -847,7 +829,6 @@ class StatementDocumentRenderer {
       freight: freight,
       receiptNumber: request.receiptNumber,
       arrivalDate: arrival,
-      inlandDeliveryText: inland,
       logo: assets[0],
       qrUsd: assets[1],
       qrKip: assets[2],

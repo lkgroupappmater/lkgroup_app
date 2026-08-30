@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -547,7 +547,6 @@ class ExcelImportService {
       '송장_번호': 'invoice_number',
       '송장번호': 'invoice_number',
       '발신인': 'sender_name',
-      '특이사항': 'sender_name',
       '수신인': 'consignee_name',
       '수령인': 'consignee_name',
       '라오스_수령인': 'consignee_name',
