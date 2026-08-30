@@ -9,6 +9,7 @@ import '../core/route_catalog.dart';
 import '../core/money_format.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
+import '../services/document_pdf_export.dart';
 
 class StatementPreviewDialog extends StatefulWidget {
   const StatementPreviewDialog({
@@ -185,6 +186,50 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     }
   }
 
+  Future<void> _savePdf() async {
+    final image = _template;
+    if (image == null || _freight == null) return;
+    setState(() => _saving = true);
+    try {
+      final png = await _renderPng();
+      final logical = _logicalSize(image);
+      final pdf = await DocumentPdfExport.statementTwoUp(
+        png,
+        sourceWidth: logical.width,
+        sourceHeight: logical.height,
+      );
+      final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
+      final safeReceipt = widget.receiptNumber.replaceAll(
+        RegExp(r'[^A-Za-z0-9_-]+'),
+        '_',
+      );
+      final saved = await FilePicker.saveFile(
+        dialogTitle: '명세서 출력용 PDF 저장 위치 선택',
+        fileName:
+            '${prefix.isEmpty ? 'STATEMENT' : prefix}_STATEMENT_$safeReceipt.pdf',
+        bytes: pdf,
+        mimeType: 'application/pdf',
+        type: FileType.custom,
+        allowedExtensions: const ['pdf'],
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved == null ? 'PDF 저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('출력용 PDF 저장 실패: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final image = _template;
@@ -279,19 +324,30 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                       child: const Text('닫기'),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: image == null || _freight == null || _saving
+                          ? null
+                          : _save,
+                      icon: const Icon(Icons.image_outlined, size: 18),
+                      label: const Text('이미지 저장'),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed:
-                          image == null || _freight == null || _saving ? null : _save,
+                      onPressed: image == null || _freight == null || _saving
+                          ? null
+                          : _savePdf,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.download_outlined),
-                      label: const Text('고화질 이미지 저장'),
+                          : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: const Text('출력용 PDF'),
                     ),
                   ),
                 ],
@@ -561,6 +617,7 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
 
 

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../core/route_catalog.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
+import '../services/document_pdf_export.dart';
 
 class QuotationPreviewBox {
   const QuotationPreviewBox({
@@ -220,6 +221,39 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     }
   }
 
+  Future<void> _savePdf() async {
+    setState(() => _saving = true);
+    try {
+      final png = await _renderHighResolutionPng();
+      final pdf = await DocumentPdfExport.quotation(png);
+      final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
+      final fileName =
+          '${prefix.isEmpty ? 'QUOTATION' : prefix}_QUOTATION_${_issuedAt.year}${_two(_issuedAt.month)}${_two(_issuedAt.day)}.pdf';
+
+      final uri = await FilePicker.saveFile(
+        dialogTitle: '견적서 출력용 PDF 저장 위치 선택',
+        fileName: fileName,
+        bytes: pdf,
+        mimeType: 'application/pdf',
+        type: FileType.custom,
+        allowedExtensions: const ['pdf'],
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            uri == null ? 'PDF 저장을 취소했습니다.' : '출력용 견적서 PDF를 저장했습니다.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('견적서 PDF 저장 실패: $error')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final image = _templateImage;
@@ -282,18 +316,26 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                       child: const Text('닫기'),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: image == null || _saving ? null : _savePng,
+                      icon: const Icon(Icons.image_outlined, size: 18),
+                      label: const Text('이미지 저장'),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: image == null || _saving ? null : _savePng,
+                      onPressed: image == null || _saving ? null : _savePdf,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.download_outlined),
-                      label: const Text('고화질 이미지 저장'),
+                          : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: const Text('출력용 PDF'),
                     ),
                   ),
                 ],
@@ -771,6 +813,7 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+
 
 
 
