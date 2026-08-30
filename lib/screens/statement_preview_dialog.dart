@@ -392,7 +392,7 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서',
-        Rect.fromLTWH(0, 14, w, 60),
+        Rect.fromLTWH(0, 12, w, 62),
         39,
         bold: true,
         center: true);
@@ -412,11 +412,10 @@ class _DigitalStatementPainter extends CustomPainter {
     _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 71, half - 16, 28));
     
     _kv(c, '고객명/회사명', _s(rows.first['consignee_name']),
-        Rect.fromLTWH(half + 8, infoTop + 8, half - 16, 38), emphasize: true);
+        Rect.fromLTWH(half + 8, infoTop + 4, half - 16, 28), emphasize: true);
     _kv(c, '연락처', _s(rows.first['consignee_phone']),
-        Rect.fromLTWH(half + 8, infoTop + 52, half - 220, 38), emphasize: true);
-    _text(c, receiptNumber, Rect.fromLTWH(w - 220, infoTop + 52, 205, 38),
-        23, bold: true, center: true);
+        Rect.fromLTWH(half + 8, infoTop + 39, half - 16, 28), emphasize: true);
+    _kv(c, '영수번호', receiptNumber, Rect.fromLTWH(half + 8, infoTop + 74, half - 16, 28), emphasize: true);
 
     const tableTop = 205.0;
     const headerH = 42.0;
@@ -431,13 +430,13 @@ class _DigitalStatementPainter extends CustomPainter {
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, actualColor, null, null, null, null, volumeColor,
       actualColor, volumeColor, appliedColor
     ];
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 15, bold: true, center: true);
+      _text(c, headers[i], r.deflate(3), 16, bold: true, center: true);
     }
 
     final lines = freight.lines;
@@ -483,7 +482,7 @@ class _DigitalStatementPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 17 : 15,
+            col >= 10 && col <= 12 ? 18 : 16,
             bold: col == 4 || col == 9 || col == 12,
             center: col < 10,
             right: col >= 10);
@@ -608,11 +607,23 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   void _kv(Canvas c, String k, String v, Rect r, {bool emphasize = false}) {
-    _text(c, '$k  ', Rect.fromLTWH(r.left, r.top, 145, r.height), 15, bold: true);
-    _text(c, v.isEmpty ? '-' : v,
-        Rect.fromLTWH(r.left + 145, r.top, r.width - 145, r.height),
-        emphasize ? 19 : 16,
-        bold: emphasize);
+    const labelW = 165.0;
+    _text(
+      c,
+      k,
+      Rect.fromLTWH(r.left, r.top, labelW, r.height),
+      16,
+      bold: true,
+      center: true,
+    );
+    _text(
+      c,
+      v.isEmpty ? '-' : v,
+      Rect.fromLTWH(r.left + labelW, r.top, r.width - labelW, r.height),
+      emphasize ? 21 : 19,
+      bold: emphasize,
+      center: true,
+    );
   }
 
   void _labelValue(Canvas c, String label, String value, Rect r,

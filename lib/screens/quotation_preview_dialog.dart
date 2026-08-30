@@ -380,7 +380,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 가견적서',
-        Rect.fromLTWH(180, 16, 1000, 58), 39, bold: true, center: true);
+        Rect.fromLTWH(0, 12, w, 62), 39, bold: true, center: true);
     _labelValue(c, '구획(Zone)', '-', Rect.fromLTWH(w - 300, 8, 282, 72));
 
     final infoTop = 90.0;
@@ -390,14 +390,14 @@ class _DigitalQuotationPainter extends CustomPainter {
       _box(c, Rect.fromLTWH(0, y, w * .5, infoH / 3), paleBlue.withOpacity(.38));
       _box(c, Rect.fromLTWH(w * .5, y, w * .5, infoH / 3), paleBlue.withOpacity(.38));
     }
-    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 2, w * .49, 22));
-    _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 24, w * .49, 22));
-    _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 46, w * .49, 22));
+    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 4, w * .49, 28));
+    _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 39, w * .49, 28));
+    _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 74, w * .49, 28));
     _kv(c, '견적일',
         '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}',
-        Rect.fromLTWH(w * .5, infoTop + 73, w * .49, 26));
-    _kv(c, '고객명/회사명', '-', Rect.fromLTWH(w * .5, infoTop + 7, w * .49, 30));
-    _kv(c, '연락처', '-', Rect.fromLTWH(w * .5, infoTop + 41, w * .49, 30));
+        Rect.fromLTWH(w * .5, infoTop + 74, w * .49, 28));
+    _kv(c, '고객명/회사명', '-', Rect.fromLTWH(w * .5, infoTop + 4, w * .49, 28));
+    _kv(c, '연락처', '-', Rect.fromLTWH(w * .5, infoTop + 39, w * .49, 28));
 
     const tableTop = 205.0;
     const headerH = 42.0;
@@ -412,14 +412,14 @@ class _DigitalQuotationPainter extends CustomPainter {
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, null, null, null, null, null, null,
+      null, null, null, null, null, actualColor, null, null, null, null, volumeColor,
       actualColor, volumeColor, appliedColor
     ];
 
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 15, bold: true, center: true);
+      _text(c, headers[i], r.deflate(3), 16, bold: true, center: true);
     }
 
     for (var i = 0; i < rowCount; i++) {
@@ -466,7 +466,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 17 : 15,
+            col >= 10 && col <= 12 ? 18 : 16,
             bold: col == 4 || col == 9 || col == 12,
             center: col < 10,
             right: col >= 10);
@@ -593,9 +593,23 @@ class _DigitalQuotationPainter extends CustomPainter {
   }
 
   void _kv(Canvas c, String k, String v, Rect r) {
-    _text(c, '$k  ', Rect.fromLTWH(r.left, r.top, 145, r.height), 15, bold: true);
-    _text(c, v, Rect.fromLTWH(r.left + 145, r.top, r.width - 145, r.height),
-        17, bold: v != '-');
+    const labelW = 165.0;
+    _text(
+      c,
+      k,
+      Rect.fromLTWH(r.left, r.top, labelW, r.height),
+      16,
+      bold: true,
+      center: true,
+    );
+    _text(
+      c,
+      v,
+      Rect.fromLTWH(r.left + labelW, r.top, r.width - labelW, r.height),
+      19,
+      bold: v != '-',
+      center: true,
+    );
   }
 
   void _labelValue(Canvas c, String label, String value, Rect r) {
