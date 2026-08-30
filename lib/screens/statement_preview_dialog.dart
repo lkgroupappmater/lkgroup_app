@@ -50,6 +50,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   ui.Image? _qrKip;
   ui.Image? _qrThb;
   ui.Image? _stamp;
+  ui.Image? _bankStrip;
   bool _loading = true;
   bool _saving = false;
 
@@ -70,6 +71,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     _qrKip?.dispose();
     _qrThb?.dispose();
     _stamp?.dispose();
+    _bankStrip?.dispose();
     super.dispose();
   }
 
@@ -89,6 +91,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _assetImage('assets/images/payment_qr_kip.png'),
         _assetImage('assets/images/payment_qr_thb.png'),
         _assetImage('assets/images/company_stamp.png'),
+        _assetImage('assets/images/bank_accounts_strip.png'),
       ]);
       final rows = await StatementService.instance.rowsForReceipt(
         route: widget.routeLabel,
@@ -113,6 +116,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _qrKip = assets[2];
         _qrThb = assets[3];
         _stamp = assets[4];
+        _bankStrip = assets[5];
         _rows = rows;
         _freight = freight;
         _arrivalDate = arrival;
@@ -137,6 +141,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         qrKip: _qrKip!,
         qrThb: _qrThb!,
         stamp: _stamp!,
+        bankStrip: _bankStrip!,
       );
 
   Future<Uint8List> _renderPng() async {
@@ -226,7 +231,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _freight != null && _logo != null && _stamp != null;
+    final ready = !_loading && _freight != null && _logo != null && _stamp != null && _bankStrip != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -353,6 +358,7 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.qrKip,
     required this.qrThb,
     required this.stamp,
+    required this.bankStrip,
   });
 
   final String routeLabel;
@@ -365,6 +371,7 @@ class _DigitalStatementPainter extends CustomPainter {
   final ui.Image qrKip;
   final ui.Image qrThb;
   final ui.Image stamp;
+  final ui.Image bankStrip;
 
   static const ink = Color(0xFF182433);
   static const line = Color(0xFF687A8C);
@@ -396,8 +403,11 @@ class _DigitalStatementPainter extends CustomPainter {
     final infoTop = 90.0;
     const infoH = 106.0;
     final half = w * .5;
-    _box(c, Rect.fromLTWH(0, infoTop, half, infoH), paleBlue.withOpacity(.38));
-    _box(c, Rect.fromLTWH(half, infoTop, half, infoH), paleBlue.withOpacity(.38));
+    for (var r = 0; r < 3; r++) {
+      final y = infoTop + r * (infoH / 3);
+      _box(c, Rect.fromLTWH(0, y, half, infoH / 3), paleBlue.withOpacity(.38));
+      _box(c, Rect.fromLTWH(half, y, half, infoH / 3), paleBlue.withOpacity(.38));
+    }
     _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 7, half - 16, 28));
     _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 39, half - 16, 28));
     _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 71, half - 16, 28));
@@ -414,16 +424,16 @@ class _DigitalStatementPainter extends CustomPainter {
     const rowH = 32.0;
     final rowCount = rows.length < 10 ? 10 : rows.length;
     final cols = <double>[
-      0, 120, 235, 320, 445, 575, 675, 775, 875, 1015, 1155, 1360, 1580, 1800
+      0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
     final headers = <String>[
-      '박스번호', '단가', '수량', '실제중량(kg)', '실제중량 합산(kg)',
+      'No.', '박스번호', '단가', '수량', '실제중량(kg)', '실제중량 합산(kg)',
       'L', 'W', 'H', '용적중량(kg)', '용적중량 합산(kg)',
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, null, null, null,
-      null, null, actualColor, volumeColor, appliedColor
+      null, null, null, null, null, null, null, null, null, null, null,
+      actualColor, volumeColor, appliedColor
     ];
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
@@ -442,11 +452,14 @@ class _DigitalStatementPainter extends CustomPainter {
 
       for (var col = 0; col < headers.length; col++) {
         Color fill = Colors.white;
-        if (has && col == 10 && actualWins) fill = actualColor;
-        if (has && col == 11 && volumeWins) fill = volumeColor;
-        if (has && col == 12) fill = appliedColor;
+        if (has && col == 11 && actualWins) fill = actualColor;
+        if (has && col == 12 && volumeWins) fill = volumeColor;
+        if (has && col == 13) fill = appliedColor;
         _box(c, Rect.fromLTRB(cols[col], y, cols[col + 1], y + rowH), fill);
       }
+      _text(c, '${i + 1}',
+          Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
+          15, bold: true, center: true);
       if (!has) continue;
       final qty = _d(row['quantity'], 1).clamp(1, 999999).toDouble();
       final unitActual = f == null ? 0.0 : f.actualWeight / qty;
@@ -471,27 +484,28 @@ class _DigitalStatementPainter extends CustomPainter {
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
-            Rect.fromLTRB(cols[col] + 3, y + 2, cols[col + 1] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 16 : 15,
+            Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
+            col >= 10 && col <= 12 ? 17 : 15,
             bold: col == 4 || col == 9 || col == 12,
-            center: true);
+            center: col < 10,
+            right: col >= 10);
       }
     }
 
     final summaryY = tableTop + headerH + rowCount * rowH;
     for (var col = 0; col < headers.length; col++) {
       _box(c, Rect.fromLTRB(cols[col], summaryY, cols[col + 1], summaryY + rowH),
-          col >= 10 ? paleBlue : const Color(0xFFF2F5F8));
+          col >= 11 ? paleBlue : const Color(0xFFF2F5F8));
     }
     final totalQty = rows.fold<double>(0, (v, r) => v + _d(r['quantity'], 1));
     final totalActual = freight.lines.fold<double>(0, (v, f) => v + f.actualWeight);
     final totalVolume = freight.lines.fold<double>(0, (v, f) => v + f.volumeWeight);
     final summaryValues = <int, String>{
-      0: '합계',
-      2: _fmtWeight(totalQty),
-      4: _fmtWeight(totalActual),
-      9: _fmtWeight(totalVolume),
-      12: MoneyFormat.usd(freight.totalUsd),
+      1: '합계',
+      3: _fmtWeight(totalQty),
+      5: _fmtWeight(totalActual),
+      10: _fmtWeight(totalVolume),
+      13: MoneyFormat.usd(freight.totalUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -520,38 +534,41 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalX = leftW + 6;
     final totalW = w - totalX;
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
-    _text(c, '운임 총합', Rect.fromLTWH(totalX + 10, sumTop + 5, totalW * .48, 22), 16, bold: true);
-    _text(c, MoneyFormat.usd(freight.totalUsd), Rect.fromLTWH(totalX + totalW * .50, sumTop + 5, totalW * .46, 22), 16, bold: true);
-    _text(c, '할인', Rect.fromLTWH(totalX + 10, sumTop + 27, totalW * .48, 20), 15, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .50, sumTop + 27, totalW * .46, 20), 15, bold: true);
-    _text(c, '특별할인', Rect.fromLTWH(totalX + 10, sumTop + 47, totalW * .48, 20), 15, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .50, sumTop + 47, totalW * .46, 20), 15, bold: true);
-    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 10, sumTop + 67, totalW * .48, 20), 15, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .50, sumTop + 67, totalW * .46, 20), 15, bold: true);
-    _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, sumTop + 88, totalW - 16, 24),
+    final adjH = 25.0;
+    _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
+
+    final finalTop = sumTop + 92;
+    final labelW = totalW * .38;
+    _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
+    _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
+        19, bold: true, center: true);
+    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
+        const Color(0xFFFCE48A));
+    _text(c, 'USD    ' + MoneyFormat.usd(freight.totalUsd),
+        Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
         18, bold: true, center: true);
-    final money = <String>[
-      'USD  ${MoneyFormat.usd(freight.totalUsd)}',
-      'KIP  ${MoneyFormat.kip(freight.totalKip)}',
-      'THB  ${MoneyFormat.thb(freight.totalThb)}',
-      'KRW  ${MoneyFormat.krw(freight.totalKrw)}',
-    ];
-    for (var i = 0; i < money.length; i++) {
-      _text(c, money[i],
-          Rect.fromLTWH(totalX + 15, sumTop + 112 + i * 18, totalW - 30, 20),
-          19, bold: true, center: true);
-    }
-
+    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
+        const Color(0xFFFFC21A));
+    _text(c, 'KIP    ' + MoneyFormat.kip(freight.totalKip),
+        Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
+        18, bold: true, center: true);
+    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
+        const Color(0xFF91D18B));
+    _text(c, 'THB    ' + MoneyFormat.thb(freight.totalThb),
+        Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
+        18, bold: true, center: true);
+    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
+        const Color(0xFF23B6D8));
+    _text(c, 'KRW    ' + MoneyFormat.krw(freight.totalKrw),
+        Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
+        18, bold: true, center: true);
     final payTop = sumTop + 204;
-    _payment(c, qrUsd, 'BCEL (USD)', '(SungHo Park)\n010-12-01-\n017655-60-001',
-        Rect.fromLTWH(6, payTop, w * .235, 145));
-    _payment(c, qrKip, 'BCEL (KIP)', '(SungHo Park)\n013-12-00-\n017655-60-001',
-        Rect.fromLTWH(w * .25, payTop, w * .235, 145));
-    _payment(c, qrThb, 'BCEL (Baht)', '(SungHo Park)\n010-12-02-\n017655-60-001',
-        Rect.fromLTWH(w * .50, payTop, w * .235, 145));
-
-    _payment(c, qrUsd, '한국 계좌 (KRW)', '은행/계좌 정보\n추후 확정 기입',
-        Rect.fromLTWH(w * .75, payTop, w * .235, 145));
+    _imageContain(c, bankStrip, Rect.fromLTWH(8, payTop, w - 16, 150));
 
     final noteTop = payTop + 150;
     _text(
@@ -571,7 +588,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(w * .29, signTop + 10, 125, 95));
+    _imageContain(c, stamp, Rect.fromLTWH(signW - 125, signTop + 8, 110, 90));
     _text(c,
       '* 운임은 USD 기준입니다.\n\n'
       '* 표시 기타 통화는 현재 앱 적용 환율 기준입니다.\n\n'
@@ -648,7 +665,7 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false}) {
+      {bool bold = false, bool center = false, bool right = false}) {
     final p = TextPainter(
       text: TextSpan(
         text: text,
@@ -661,12 +678,12 @@ class _DigitalStatementPainter extends CustomPainter {
         ),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: center ? TextAlign.center : TextAlign.left,
+      textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
       maxLines: 3,
       ellipsis: '…',
     )..layout(maxWidth: r.width);
     final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
-    final x = center ? r.left + (r.width - p.width) / 2 : r.left;
+    final x = center ? r.left + (r.width - p.width) / 2 : (right ? r.right - p.width : r.left);
     p.paint(c, Offset(x, y));
   }
 

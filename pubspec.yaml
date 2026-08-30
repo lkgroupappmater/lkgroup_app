@@ -1,4 +1,4 @@
-﻿name: lkgroup_app
+name: lkgroup_app
 
 description: CargoFlow 무역·운송 관리 앱
 
@@ -37,6 +37,7 @@ flutter:
     - assets/quotation_forms/
     - assets/statement_forms/
     - assets/images/company_logo.png
+    - assets/images/bank_accounts_strip.png
     - assets/images/company_stamp.png
     - assets/images/payment_qr_thb.png
     - assets/images/payment_qr_kip.png
