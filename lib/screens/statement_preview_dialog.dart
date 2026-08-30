@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/route_catalog.dart';
+import '../core/money_format.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
 
@@ -368,7 +369,11 @@ class _StatementPainter extends CustomPainter {
       );
     }
 
-    _paintRouteTitle(canvas, w, h);
+    if (RouteCatalog.usesInheritedForm(routeLabel)) {
+      if (RouteCatalog.usesInheritedForm(routeLabel)) {
+      _paintRouteTitle(canvas, w, h);
+    }
+    }
 
     // Excel 원본의 선/색/폰트/셀 서식을 그대로 유지한다.
     // 값이 들어가는 셀의 '안쪽'만 지워서 border는 절대 덮지 않는다.
@@ -402,7 +407,7 @@ class _StatementPainter extends CustomPainter {
     final first = rows.first;
     _text(
       canvas,
-      '${first['consignee_name'] ?? ''}',
+      '${first['consignee_name'] ?? MoneyFormat.number(freight.totalKip)}',
       Offset(w * .72, h * .073),
       w * .14,
       fontSize: w * .014,
@@ -429,15 +434,15 @@ class _StatementPainter extends CustomPainter {
         clearCell(c, cellTop, cellBottom);
       }
       _text(canvas, '${i + 1}', Offset(w * .018, y), w * .04, fontSize: w * .010);
-      _text(canvas, '${r['contents'] ?? ''}', Offset(w * .075, y), w * .11,
+      _text(canvas, '${r['contents'] ?? MoneyFormat.number(freight.totalKip)}', Offset(w * .075, y), w * .11,
           fontSize: w * .009);
       _text(canvas, '${r['quantity'] ?? 1}', Offset(w * .22, y), w * .05,
           fontSize: w * .009);
-      _text(canvas, '${r['weight_kg'] ?? ''}', Offset(w * .29, y), w * .07,
+      _text(canvas, '${r['weight_kg'] ?? MoneyFormat.number(freight.totalKip)}', Offset(w * .29, y), w * .07,
           fontSize: w * .009);
       _text(
         canvas,
-        '${r['length_cm'] ?? ''}×${r['width_cm'] ?? ''}×${r['height_cm'] ?? ''}',
+        '${r['length_cm'] ?? MoneyFormat.number(freight.totalKip)}×${r['width_cm'] ?? MoneyFormat.number(freight.totalKip)}×${r['height_cm'] ?? MoneyFormat.number(freight.totalKip)}',
         Offset(w * .47, y),
         w * .13,
         fontSize: w * .0085,
@@ -556,6 +561,8 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
+
 
 
 

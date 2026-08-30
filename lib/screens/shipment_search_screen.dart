@@ -2,6 +2,7 @@
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../core/money_format.dart';
 import '../models/app_user.dart';
 import '../services/freight_service.dart';
 import '../services/shipment_service.dart';
@@ -963,6 +964,8 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
+
 
 
 

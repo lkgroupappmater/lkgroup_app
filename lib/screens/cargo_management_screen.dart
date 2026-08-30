@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
+import '../core/money_format.dart';
 import '../models/app_user.dart';
 import '../services/shipment_service.dart';
 import '../services/freight_service.dart';
@@ -1631,6 +1632,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
+
 
 
 

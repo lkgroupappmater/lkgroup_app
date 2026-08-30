@@ -1,4 +1,4 @@
-// lib/core/route_catalog.dart
+﻿// lib/core/route_catalog.dart
 /// 앱 전체 공통 운송 경로.
 /// 기존 내장 경로는 안전한 fallback으로 유지하고,
 /// Supabase route_definitions가 준비되면 런타임 목록/Prefix/BASE 상속 정보를 사용합니다.
@@ -202,6 +202,12 @@ class RouteCatalog {
   /// 신규 운송 경로는 선택한 기존 BASE의 번들 명세서/가견적 폼을 재사용합니다.
   static String formRouteKeyFor(String labelOrKey) =>
       baseRouteKeyFor(labelOrKey);
+  /// 기존 내장/실제 경로는 자기 Excel form 제목을 그대로 사용하고,
+  /// 신규 동적 경로가 다른 BASE form을 상속하는 경우에만 최소 title overlay를 허용합니다.
+  static bool usesInheritedForm(String labelOrKey) {
+    final key = keyFor(labelOrKey);
+    return baseRouteKeyFor(labelOrKey) != key;
+  }
 
   static String documentTitleFor(String labelOrKey) {
     final definition = definitionForKey(keyFor(labelOrKey));
@@ -281,3 +287,5 @@ class RouteCatalog {
       }[label] ??
       label;
 }
+
+

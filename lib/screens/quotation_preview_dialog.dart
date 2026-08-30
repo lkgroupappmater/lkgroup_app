@@ -105,11 +105,9 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   Rect _documentRect(ui.Image image) {
     final logical = _logicalSize(image);
-    // 기존 Excel 연결 그림의 바깥쪽 캡처 여백만 제거합니다.
-    // 문서 내부 셀/QR/도장/Remark 영역은 건드리지 않습니다.
-    final x = image.width * .0105;
-    final y = image.height * .0157;
-    return Rect.fromLTRB(x, y, logical.width - x, logical.height - y);
+    // 실제 Excel PrintArea/Form 경계를 그대로 저장한다.
+    // 앱 Preview 바깥 padding은 저장 PNG에 포함되지 않는다.
+    return Rect.fromLTWH(0, 0, logical.width, logical.height);
   }
   Widget _preview(ui.Image image) {
     final logical = _logicalSize(image);
@@ -515,7 +513,11 @@ class _QuotationFormPainter extends CustomPainter {
       );
     }
 
-    _paintRouteHeader(canvas);
+    if (RouteCatalog.usesInheritedForm(routeLabel)) {
+      if (RouteCatalog.usesInheritedForm(routeLabel)) {
+      _paintRouteHeader(canvas);
+    }
+    }
     _paintDate(canvas);
     _paintRows(canvas);
     _paintTotals(canvas);
@@ -769,6 +771,8 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+
+
 
 
 
