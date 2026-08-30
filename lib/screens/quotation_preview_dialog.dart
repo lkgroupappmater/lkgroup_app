@@ -613,7 +613,9 @@ class _DigitalQuotationPainter extends CustomPainter {
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
     _imageContain(c, stamp, Rect.fromLTWH((signW - 105) / 2, signTop + 34, 105, 64));
-    final routeNotice = RouteCatalog.remarkFor(routeLabel);
+    final routeNotice = RouteCatalog.keyFor(routeLabel) == 'kr_la_sea'
+        ? '* 운임은 USD 기준입니다.  * 입·출고지를 떠나기 전 고객님 운임 물품 및 개수 확인 부탁드립니다.  * 물품 출고 후 1주 후부터 보관료가 발생할 수 있습니다.  * 이용해 주셔서 감사합니다.'
+        : RouteCatalog.remarkFor(routeLabel);
     _text(
       c,
       routeNotice.isEmpty ? '* 가견적은 예상 중량/크기 기준이며 실제 측정 결과에 따라 최종 운임이 달라질 수 있습니다.  * 운임은 USD 기준이며 환율 변동에 따라 기타 통화 금액이 달라질 수 있습니다.' : routeNotice,
