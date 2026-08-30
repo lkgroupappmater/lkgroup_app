@@ -15,10 +15,6 @@ class DiscountRule {
     required this.notes,
     required this.sourceDetail,
     required this.active,
-    this.customerGroupId,
-    this.bulkThreshold,
-    this.bulkDiscountPercent,
-    this.statementMode = 'separate',
   });
 
   final int? id;
@@ -32,13 +28,6 @@ class DiscountRule {
   final String notes;
   final String sourceDetail;
   final bool active;
-  final int? customerGroupId;
-  final int? bulkThreshold;
-  final double? bulkDiscountPercent;
-  final String statementMode;
-
-  bool get hasBulkTier =>
-      bulkThreshold != null && bulkDiscountPercent != null;
 
   factory DiscountRule.fromMap(Map<String, dynamic> map) => DiscountRule(
         id: (map['id'] as num?)?.toInt(),
@@ -55,15 +44,6 @@ class DiscountRule {
         notes: '${map['notes'] ?? ''}'.trim(),
         sourceDetail: '${map['source_detail'] ?? ''}'.trim(),
         active: map['active'] == true,
-        customerGroupId: (map['customer_group_id'] as num?)?.toInt(),
-        bulkThreshold: (map['bulk_threshold'] as num?)?.toInt(),
-        bulkDiscountPercent: map['bulk_discount_percent'] == null
-            ? null
-            : double.tryParse('${map['bulk_discount_percent']}'),
-        statementMode:
-            '${map['statement_mode'] ?? 'separate'}' == 'combined'
-                ? 'combined'
-                : 'separate',
       );
 
   Map<String, dynamic> toMap() => {
@@ -79,11 +59,6 @@ class DiscountRule {
         'active': active &&
             customerName.trim().isNotEmpty &&
             CustomerBenefitService.normalizePhone(phone).isNotEmpty,
-        'customer_group_id': customerGroupId,
-        'bulk_threshold': bulkThreshold,
-        'bulk_discount_percent': bulkDiscountPercent,
-        'statement_mode':
-            statementMode == 'combined' ? 'combined' : 'separate',
       };
 }
 
@@ -148,16 +123,14 @@ class LocalDeliveryRule {
         'alternate_name': alternateName.trim(),
         'company_name': companyName.trim(),
         'phone': CustomerBenefitService.normalizePhone(phone),
-        'phone_display':
-            phoneDisplay.trim().isEmpty ? phone.trim() : phoneDisplay.trim(),
+        'phone_display': phoneDisplay.trim().isEmpty ? phone.trim() : phoneDisplay.trim(),
         'delivery_type': deliveryType == 'city' ? 'city' : 'province',
         'local_company': localCompany.trim(),
         'destination_address': destinationAddress.trim(),
         'paid_by': paidBy.trim(),
         'notes': notes.trim(),
         'active': active &&
-            (customerName.trim().isNotEmpty ||
-                companyName.trim().isNotEmpty) &&
+            (customerName.trim().isNotEmpty || companyName.trim().isNotEmpty) &&
             CustomerBenefitService.normalizePhone(phone).isNotEmpty,
       };
 
@@ -190,7 +163,7 @@ class CustomerBenefitService {
   static String _normalizeName(String value) => value
       .trim()
       .toLowerCase()
-      .replaceAll(RegExp(r'\s+'), ' ');
+      .replaceAll(RegExp(r'\\s+'), ' ');
 
   static bool _phoneMatches(String a, String b) {
     final aa = normalizePhone(a);
@@ -203,83 +176,31 @@ class CustomerBenefitService {
     return false;
   }
 
-  static bool _nameMatches(
-    String shipmentName,
-    Iterable<String> candidates,
-  ) {
+  static bool _nameMatches(String shipmentName, Iterable<String> candidates) {
     final target = _normalizeName(shipmentName);
     if (target.isEmpty) return false;
-    return candidates.any(
-      (value) =>
-          value.trim().isNotEmpty && _normalizeName(value) == target,
-    );
+    return candidates.any((value) =>
+        value.trim().isNotEmpty && _normalizeName(value) == target);
   }
 
   Future<List<DiscountRule>> listDiscountRules() async {
     if (!SupabaseConfig.isConfigured) return const [];
-    try {
-      final raw = await SupabaseService.client
-          .rpc('admin_list_discount_rules_with_identity') as List;
-      return raw
-          .map((e) => DiscountRule.fromMap(
-                Map<String, dynamic>.from(e as Map),
-              ))
-          .toList(growable: false);
-    } catch (_) {
-      final rows = await SupabaseService.client
-          .from('customer_rate_overrides')
-          .select()
-          .order('route_key')
-          .order('group_name')
-          .order('customer_name');
-      return List<Map<String, dynamic>>.from(rows)
-          .map(DiscountRule.fromMap)
-          .toList(growable: false);
-    }
+    final rows = await SupabaseService.client
+        .from('customer_rate_overrides')
+        .select()
+        .order('route_key')
+        .order('group_name')
+        .order('customer_name');
+    return List<Map<String, dynamic>>.from(rows)
+        .map(DiscountRule.fromMap)
+        .toList(growable: false);
   }
 
   Future<void> saveDiscountRule(DiscountRule rule) async {
     if (!SupabaseConfig.isConfigured) return;
-
-    int? customerGroupId = rule.customerGroupId;
-    try {
-      final rawGroup = await SupabaseService.client.rpc(
-        'admin_set_customer_statement_mode',
-        params: {
-          'p_name': rule.customerName.trim(),
-          'p_company': rule.companyName.trim(),
-          'p_phone': rule.phone.trim(),
-          'p_mode':
-              rule.statementMode == 'combined' ? 'combined' : 'separate',
-        },
-      );
-      customerGroupId = (rawGroup as num?)?.toInt() ?? customerGroupId;
-    } catch (_) {
-      // Migration 068 적용 전 DB에서도 기존 저장 흐름은 유지합니다.
-    }
-
-    final data = DiscountRule(
-      id: rule.id,
-      customerName: rule.customerName,
-      companyName: rule.companyName,
-      phone: rule.phone,
-      routeKey: rule.routeKey,
-      groupName: rule.groupName,
-      discountPercent: rule.discountPercent,
-      rateOverride: rule.rateOverride,
-      notes: rule.notes,
-      sourceDetail: rule.sourceDetail,
-      active: rule.active,
-      customerGroupId: customerGroupId,
-      bulkThreshold: rule.bulkThreshold,
-      bulkDiscountPercent: rule.bulkDiscountPercent,
-      statementMode: rule.statementMode,
-    ).toMap();
-
+    final data = rule.toMap();
     if (rule.id == null) {
-      await SupabaseService.client
-          .from('customer_rate_overrides')
-          .insert(data);
+      await SupabaseService.client.from('customer_rate_overrides').insert(data);
     } else {
       await SupabaseService.client
           .from('customer_rate_overrides')
@@ -314,9 +235,7 @@ class CustomerBenefitService {
     if (!SupabaseConfig.isConfigured) return;
     final data = rule.toMap();
     if (rule.id == null) {
-      await SupabaseService.client
-          .from('local_delivery_profiles')
-          .insert(data);
+      await SupabaseService.client.from('local_delivery_profiles').insert(data);
     } else {
       await SupabaseService.client
           .from('local_delivery_profiles')
@@ -340,9 +259,7 @@ class CustomerBenefitService {
     required String name,
     required String phone,
   }) async {
-    if (!SupabaseConfig.isConfigured ||
-        name.trim().isEmpty ||
-        phone.trim().isEmpty) {
+    if (!SupabaseConfig.isConfigured || name.trim().isEmpty || phone.trim().isEmpty) {
       return null;
     }
     final routeKey = RouteCatalog.formRouteKeyFor(routeLabel);
@@ -354,13 +271,9 @@ class CustomerBenefitService {
         .eq('active', true)
         .limit(500);
     for (final raw in rows) {
-      final rule =
-          LocalDeliveryRule.fromMap(Map<String, dynamic>.from(raw));
+      final rule = LocalDeliveryRule.fromMap(Map<String, dynamic>.from(raw));
       if (!_phoneMatches(phone, rule.phone)) continue;
-      if (!_nameMatches(
-        name,
-        [rule.customerName, rule.alternateName, rule.companyName],
-      )) {
+      if (!_nameMatches(name, [rule.customerName, rule.alternateName, rule.companyName])) {
         continue;
       }
       return rule;
@@ -387,7 +300,8 @@ class CustomerBenefitService {
     try {
       await SupabaseService.client.rpc('admin_refresh_shipment_special_notes');
     } catch (_) {
-      // 관리 정보 자체 저장을 특이사항 재계산 실패가 막지 않음.
+      // The management edit itself should remain saved even if an old DB has
+      // not applied migration 065 yet. Migration 065 is still required.
     }
   }
 }

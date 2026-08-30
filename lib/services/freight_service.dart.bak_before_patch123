@@ -20,7 +20,6 @@ class FreightLineResult {
     this.discountAmountUsd = 0,
     this.discountGroup = '',
     this.discountCustomer = '',
-    this.discountCombinedQuantity = 0,
   });
 
   final String shipmentId;
@@ -37,7 +36,6 @@ class FreightLineResult {
   final double discountAmountUsd;
   final String discountGroup;
   final String discountCustomer;
-  final int discountCombinedQuantity;
 }
 
 class FreightCalculation {
@@ -74,7 +72,6 @@ class FreightService {
     final exchange = await ExchangeRateService.instance.fetch();
     final lines = <FreightLineResult>[];
     final policyCache = <String, FreightPolicy>{};
-    final overrideCache = <String, Map<String, dynamic>?>{};
 
     for (final row in shipments) {
       final routeLabel = '${row['route'] ?? ''}';
@@ -82,8 +79,7 @@ class FreightService {
       final policy = policyCache[routeKey] ??=
           await FreightPolicyService.instance.fetch(routeKey);
 
-      final quantity =
-          _d(row['quantity'], 1).clamp(1, 999999).toDouble();
+      final quantity = _d(row['quantity'], 1).clamp(1, 999999).toDouble();
       final actual = _d(row['weight_kg']) * quantity;
       final volume = _d(row['length_cm']) *
           _d(row['width_cm']) *
@@ -95,46 +91,25 @@ class FreightService {
       double rate = policy.rateFor(chargeable);
       final minimum = policy.minimumCharge;
       double grossAmount = chargeable * rate;
-      if (grossAmount > 0 && grossAmount < minimum) {
-        grossAmount = minimum;
-      }
+      if (grossAmount > 0 && grossAmount < minimum) grossAmount = minimum;
 
-      final name = '${row['consignee_name'] ?? ''}';
-      final phone = '${row['consignee_phone'] ?? ''}';
-      final year = _intOrNull(row['shipment_year'] ?? row['year']);
-      final voyage = '${row['voyage'] ?? ''}';
-
-      final cacheKey =
-          '$routeKey|${year ?? ''}|$voyage|${_digits(phone)}|${name.trim().toLowerCase()}';
-      final override = overrideCache.containsKey(cacheKey)
-          ? overrideCache[cacheKey]
-          : await _customerOverride(
-              routeKey: routeKey,
-              year: year,
-              voyage: voyage,
-              name: name,
-              phone: phone,
-            );
-      overrideCache[cacheKey] = override;
-
+      final override = await _customerOverride(
+        routeKey: routeKey,
+        name: '${row['consignee_name'] ?? ''}',
+        phone: '${row['consignee_phone'] ?? ''}',
+      );
       final overrideRate = _nullableD(override?['rate_override']);
       if (overrideRate != null) {
         rate = overrideRate;
         grossAmount = chargeable * rate;
-        if (grossAmount > 0 && grossAmount < minimum) {
-          grossAmount = minimum;
-        }
+        if (grossAmount > 0 && grossAmount < minimum) grossAmount = minimum;
       }
 
-      final discount =
-          _d(override?['discount_percent']).clamp(0, 1).toDouble();
+      final discount = _d(override?['discount_percent']).clamp(0, 1).toDouble();
       final discountAmount = grossAmount * discount;
       final amount = grossAmount - discountAmount;
       final group = '${override?['group_name'] ?? ''}'.trim();
-      final matchedCustomer =
-          '${override?['customer_name'] ?? ''}'.trim();
-      final combinedQuantity =
-          (override?['combined_quantity'] as num?)?.toInt() ?? 0;
+      final matchedCustomer = '${override?['customer_name'] ?? ''}'.trim();
 
       lines.add(
         FreightLineResult(
@@ -152,7 +127,6 @@ class FreightService {
           discountAmountUsd: discountAmount,
           discountGroup: group,
           discountCustomer: matchedCustomer,
-          discountCombinedQuantity: combinedQuantity,
         ),
       );
     }
@@ -161,13 +135,11 @@ class FreightService {
         lines.fold<double>(0, (sum, line) => sum + line.grossAmountUsd);
     final discountTotal =
         lines.fold<double>(0, (sum, line) => sum + line.discountAmountUsd);
-    final totalUsd =
-        lines.fold<double>(0, (sum, line) => sum + line.amountUsd);
+    final totalUsd = lines.fold<double>(0, (sum, line) => sum + line.amountUsd);
     final byGroup = <String, double>{};
     for (final line in lines) {
       if (line.discountAmountUsd <= 0) continue;
-      final key =
-          line.discountGroup.isEmpty ? '기타 할인' : line.discountGroup;
+      final key = line.discountGroup.isEmpty ? '기타 할인' : line.discountGroup;
       byGroup[key] = (byGroup[key] ?? 0) + line.discountAmountUsd;
     }
 
@@ -186,8 +158,6 @@ class FreightService {
 
   Future<Map<String, dynamic>?> _customerOverride({
     required String routeKey,
-    required int? year,
-    required String voyage,
     required String name,
     required String phone,
   }) async {
@@ -196,30 +166,6 @@ class FreightService {
         name.trim().isEmpty ||
         normalizedPhone.isEmpty) {
       return null;
-    }
-
-    // Patch123+: Customer Group의 개인명+회사명 물량을 같은 항차에서 합산해
-    // bulk tier를 결정합니다.
-    try {
-      final raw = await SupabaseService.client.rpc(
-        'resolve_customer_discount_context',
-        params: {
-          'p_route_key': routeKey,
-          'p_year': year,
-          'p_voyage': voyage,
-          'p_name': name.trim(),
-          'p_phone': phone.trim(),
-        },
-      );
-      if (raw is Map) {
-        final mapped = Map<String, dynamic>.from(raw);
-        if (mapped['id'] != null ||
-            mapped['customer_group_id'] != null) {
-          return mapped;
-        }
-      }
-    } catch (_) {
-      // 068 SQL 적용 전에는 기존 할인 매칭으로 안전하게 fallback.
     }
 
     final rows = await SupabaseService.client
@@ -233,15 +179,10 @@ class FreightService {
       final row = Map<String, dynamic>.from(raw);
       final ruleRoute = '${row['route_key'] ?? ''}'.trim();
       if (ruleRoute != 'all' && ruleRoute != routeKey) continue;
-      if (!_phoneMatches(normalizedPhone, '${row['phone'] ?? ''}')) {
-        continue;
-      }
+      if (!_phoneMatches(normalizedPhone, '${row['phone'] ?? ''}')) continue;
       if (!_nameMatches(
         name,
-        [
-          '${row['customer_name'] ?? ''}',
-          '${row['company_name'] ?? ''}',
-        ],
+        ['${row['customer_name'] ?? ''}', '${row['company_name'] ?? ''}'],
       )) {
         continue;
       }
@@ -251,22 +192,12 @@ class FreightService {
     return allRouteMatch;
   }
 
-  static bool _nameMatches(
-    String value,
-    Iterable<String> candidates,
-  ) {
-    final target =
-        value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  static bool _nameMatches(String value, Iterable<String> candidates) {
+    final target = value.trim().toLowerCase().replaceAll(RegExp(r'\\s+'), ' ');
     if (target.isEmpty) return false;
-    return candidates.any(
-      (candidate) =>
-          candidate.trim().isNotEmpty &&
-          candidate
-                  .trim()
-                  .toLowerCase()
-                  .replaceAll(RegExp(r'\s+'), ' ') ==
-              target,
-    );
+    return candidates.any((candidate) =>
+        candidate.trim().isNotEmpty &&
+        candidate.trim().toLowerCase().replaceAll(RegExp(r'\\s+'), ' ') == target);
   }
 
   static bool _phoneMatches(String a, String b) {
@@ -275,21 +206,13 @@ class FreightService {
     if (aa.isEmpty || bb.isEmpty) return false;
     if (aa == bb) return true;
     if (aa.length >= 8 && bb.length >= 8) {
-      return aa.substring(aa.length - 8) ==
-          bb.substring(bb.length - 8);
+      return aa.substring(aa.length - 8) == bb.substring(bb.length - 8);
     }
     return false;
   }
 
   static String _digits(String value) =>
       value.replaceAll(RegExp(r'[^0-9]'), '');
-
-  static int? _intOrNull(dynamic value) {
-    if (value is num) return value.toInt();
-    return int.tryParse(
-      '${value ?? ''}'.replaceAll(RegExp(r'[^0-9]'), ''),
-    );
-  }
 
   static double _d(dynamic value, [double fallback = 0]) =>
       double.tryParse('${value ?? ''}'.trim()) ?? fallback;

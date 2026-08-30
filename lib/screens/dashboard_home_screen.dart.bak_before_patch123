@@ -572,11 +572,23 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           child: const Icon(Icons.phone_rounded, size: 15, color: Colors.white),
         );
       case 'facebook':
-        return Image.asset(
-          'assets/images/facebook_icon.png',
+        return Container(
           width: 24,
           height: 24,
-          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1877F2),
+            shape: BoxShape.circle,
+          ),
+          child: const Text(
+            'f',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              height: 1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         );
       case 'naver':
         return Container(
@@ -750,6 +762,5 @@ class DashboardHomeScreen extends StatelessWidget {
         ),
       );
 }
-
 
 
