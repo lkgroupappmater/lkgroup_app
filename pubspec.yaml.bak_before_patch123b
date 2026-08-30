@@ -1,4 +1,4 @@
-﻿name: lkgroup_app
+name: lkgroup_app
 
 description: CargoFlow Trading and Logistics App
 
@@ -45,10 +45,8 @@ flutter:
     - assets/images/payment_qr_kip.png
     - assets/images/payment_qr_usd.png
     - assets/images/google_maps_icon.png
-    - assets/images/facebook_icon.png
 
   fonts:
     - family: NotoSansKR
       fonts:
         - asset: assets/fonts/NotoSansKR-Regular.otf
-
