@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -275,16 +275,15 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                           )
                         : LayoutBuilder(
                             builder: (context, constraints) {
-                              final width =
-                                  (constraints.maxWidth - 16).clamp(320.0, 900.0);
+                              final width = (constraints.maxWidth - 8).clamp(280.0, 1800.0);
                               final height = width * _docHeight / _docWidth;
                               return InteractiveViewer(
                                 minScale: .7,
                                 maxScale: 4,
                                 constrained: false,
-                                boundaryMargin: const EdgeInsets.all(80),
+                                boundaryMargin: const EdgeInsets.symmetric(horizontal: 12, vertical: 40),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                   child: SizedBox(
                                     width: width,
                                     height: height,
@@ -305,7 +304,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
             ),
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
