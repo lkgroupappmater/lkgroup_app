@@ -512,9 +512,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
         18, bold: true);
-    _text(c, '배송비/선불·착불/배송업체 등 추후 입력',
-        Rect.fromLTWH(leftW * .58 + 14, sumTop + 40, leftW * .42 - 24, 105),
-        15);
+    
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
@@ -554,7 +552,48 @@ class _DigitalQuotationPainter extends CustomPainter {
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
         18, bold: true, center: true);
     final payTop = sumTop + 204;
-    _imageContain(c, bankStrip, Rect.fromLTWH(8, payTop, w - 16, 150));
+    const payGap = 4.0;
+    final payW = (w - payGap * 3) / 4;
+    final payRects = <Rect>[
+      Rect.fromLTWH(0, payTop, payW, 150),
+      Rect.fromLTWH(payW + payGap, payTop, payW, 150),
+      Rect.fromLTWH((payW + payGap) * 2, payTop, payW, 150),
+      Rect.fromLTWH((payW + payGap) * 3, payTop, payW, 150),
+    ];
+
+    for (final r in payRects) {
+      _box(c, r, Colors.white);
+    }
+
+    _payment(
+      c,
+      qrUsd,
+      'BCEL (USD):',
+      '(SungHo Park)\n010-12-01-\n017655-60-001',
+      payRects[0],
+    );
+    _payment(
+      c,
+      qrKip,
+      'BCEL (KIP):',
+      '(SungHo Park)\n013-12-00-\n017655-60-001',
+      payRects[1],
+    );
+    _payment(
+      c,
+      qrThb,
+      'BCEL (Baht):',
+      '(SungHo Park)\n010-12-02-\n017655-60-001',
+      payRects[2],
+    );
+    _text(
+      c,
+      '한국 원화 계좌:\n경남은행\n571-22-0330221\n박성호',
+      payRects[3].deflate(8),
+      18,
+      bold: true,
+      center: true,
+    );
 
     final noteTop = payTop + 150;
     _text(
@@ -567,28 +606,30 @@ class _DigitalQuotationPainter extends CustomPainter {
     );
 
     final signTop = noteTop + 46;
-    final signW = w * .34;
+    final signW = w * .26;
     final signH = 105.0;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH((signW - 110) / 2, signTop + 30, 110, 68));
-    _text(c,
-      '* 운임은 USD 기준입니다.\n\n'
-      '* 표시 기타 통화는 현재 앱 적용 환율 기준입니다.\n\n'
-      '* 실제 입고 후 실측/추가 비용 반영 후 최종 운임이 확정됩니다.',
-      Rect.fromLTWH(signW + 18, signTop + 8, w - signW * 2 - 36, signH - 16),
-      14, center: true);
+    _imageContain(c, stamp, Rect.fromLTWH((signW - 105) / 2, signTop + 34, 105, 64));
+    final routeNotice = RouteCatalog.remarkFor(routeLabel);
+    _text(
+      c,
+      routeNotice.isEmpty ? '* 가견적은 예상 중량/크기 기준이며 실제 측정 결과에 따라 최종 운임이 달라질 수 있습니다.  * 운임은 USD 기준이며 환율 변동에 따라 기타 통화 금액이 달라질 수 있습니다.' : routeNotice,
+      Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
+      13,
+      center: true,
+    );
     _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
         18, bold: true);
   }
 
   void _payment(Canvas c, ui.Image image, String title, String detail, Rect r) {
-    _imageContain(c, image, Rect.fromLTWH(r.left + 8, r.top + 5, 118, 118));
-    _text(c, title, Rect.fromLTWH(r.left + 132, r.top + 8, r.width - 136, 28),
+    _imageContain(c, image, Rect.fromLTWH(r.left + 6, r.top + 6, 132, 132));
+    _text(c, title, Rect.fromLTWH(r.left + 144, r.top + 8, r.width - 150, 30),
         19, bold: true, center: true);
-    _text(c, detail, Rect.fromLTWH(r.left + 132, r.top + 38, r.width - 136, 92),
+    _text(c, detail, Rect.fromLTWH(r.left + 144, r.top + 40, r.width - 150, 98),
         16, bold: true);
   }
 
