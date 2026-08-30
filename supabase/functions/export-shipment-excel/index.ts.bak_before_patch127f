@@ -151,7 +151,7 @@ function updateCellPreservingFormula(
 ): string {
   const ref = `${column}${rowNumber}`;
   const cellRe = new RegExp(
-    `<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`,
+    `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>|<c\\b([^>]*)r="${ref}"([^>]*)\\/>`,
   );
   const existing = rowXml.match(cellRe);
 
@@ -261,11 +261,11 @@ function updateCell(
 ): string {
   const ref = `${column}${rowNumber}`;
   const cellRe = new RegExp(
-    `<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`,
+    `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>|<c\\b([^>]*)r="${ref}"([^>]*)\\/>`,
   );
   const existing = rowXml.match(cellRe);
   const attrs = existing
-    ? `${existing[1] ?? ''}${existing[2] ?? ''}`
+    ? `${existing[1] ?? existing[4] ?? ''}${existing[2] ?? existing[5] ?? ''}`
     : '';
   const styleMatch = attrs.match(/\bs="([^"]+)"/);
   const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
@@ -1039,7 +1039,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
