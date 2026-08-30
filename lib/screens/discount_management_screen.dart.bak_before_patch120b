@@ -57,7 +57,7 @@ class _DiscountManagementScreenState extends State<DiscountManagementScreen> {
     );
     final rate = TextEditingController(text: rule?.rateOverride?.toString() ?? '');
     final notes = TextEditingController(text: rule?.notes ?? '');
-    var routeKey = rule?.routeKey ?? (_route == 'all' ? RouteCatalog.keyFor(RouteCatalog.routes.first) : _route);
+    var routeKey = rule?.routeKey ?? (_route == 'all' ? RouteCatalog.routes.first.key : _route);
     var active = rule?.active ?? true;
 
     final saved = await showDialog<bool>(
@@ -77,7 +77,7 @@ class _DiscountManagementScreenState extends State<DiscountManagementScreen> {
                     decoration: const InputDecoration(labelText: '운송 경로'),
                     items: [
                       const DropdownMenuItem(value: 'all', child: Text('전체 운송 경로')),
-                      ...RouteCatalog.routes.map((e) => DropdownMenuItem(value: RouteCatalog.keyFor(e), child: Text(e))),
+                      ...RouteCatalog.routes.map((e) => DropdownMenuItem(value: e.key, child: Text(e.label))),
                     ],
                     onChanged: (v) => setLocal(() => routeKey = v ?? routeKey),
                   ),
@@ -180,7 +180,7 @@ class _DiscountManagementScreenState extends State<DiscountManagementScreen> {
                           decoration: const InputDecoration(labelText: '운송 경로', border: OutlineInputBorder()),
                           items: [
                             const DropdownMenuItem(value: 'all', child: Text('전체')),
-                            ...RouteCatalog.routes.map((e) => DropdownMenuItem(value: RouteCatalog.keyFor(e), child: Text(e))),
+                            ...RouteCatalog.routes.map((e) => DropdownMenuItem(value: e.key, child: Text(e.label))),
                           ],
                           onChanged: (v) => setState(() => _route = v ?? 'all'),
                         ),
