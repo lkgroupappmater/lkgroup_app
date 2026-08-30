@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -599,9 +599,9 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      '한국 원화 계좌:\n경남은행\n571-22-0330221\n박성호',
+      '한국 원화 계좌:\n경남은행\n571-22-0330221\n(4) 박성호\n(5) 박성호(엘케이무역)',
       payRects[3].deflate(8),
-      18,
+      22,
       bold: true,
       center: true,
     );
@@ -643,9 +643,8 @@ class _DigitalStatementPainter extends CustomPainter {
 
   void _payment(Canvas c, ui.Image image, String title, String detail, Rect r) {
     _imageContain(c, image, Rect.fromLTWH(r.left + 6, r.top + 6, 132, 132));
-    _text(c, title, Rect.fromLTWH(r.left + 144, r.top + 8, r.width - 150, 30),
-        19, bold: true, center: true);
-    _text(c, detail, Rect.fromLTWH(r.left + 144, r.top + 40, r.width - 150, 98),
+    _text(c, title, Rect.fromLTWH(r.left + 144, r.top + 8, r.width - 150, 32), 22, bold: true, center: true);
+    _text(c, detail, Rect.fromLTWH(r.left + 144, r.top + 42, r.width - 150, 96),
         16, bold: true);
   }
 
@@ -742,4 +741,5 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
 }
+
 
