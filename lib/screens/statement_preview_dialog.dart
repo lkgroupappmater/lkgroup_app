@@ -97,6 +97,10 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       _formRouteKey == 'kr_la_sea' || _formRouteKey == 'kr_la_air' ? 10 : 5;
   int get _detailRows => _rows.length > _baseRows ? _rows.length + 1 : _baseRows;
 
+  double _cropRatio() =>
+      _formRouteKey == 'kr_la_sea' || _formRouteKey == 'kr_la_air'
+          ? .402
+          : .468;
   Size _logicalSize(ui.Image image) {
     final rowHeight = image.height * .028;
     final extra = (_detailRows - _baseRows) * rowHeight;
@@ -112,6 +116,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         arrivalDate: _arrivalDate,
         baseRows: _baseRows,
         detailRows: _detailRows,
+        sourceTop: image.height * _cropRatio(),
       );
 
   Future<Uint8List> _renderPng() async {
@@ -518,6 +523,8 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
+
 
 
 
