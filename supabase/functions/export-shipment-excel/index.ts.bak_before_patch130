@@ -351,37 +351,13 @@ function updateCargoSheet(
     ['Q', 'received_at', 'date'],
   ];
 
-  // 박스번호는 현장 입고 순서 기준으로 템플릿에 고정된 슬롯입니다.
-  // DB 데이터가 없는 번호도 "아직 사용하지 않은 번호"로 남겨야 하므로
-  // shipments를 위에서부터 압축해 쓰지 않고 B열의 고정 박스번호와 정확히 매칭합니다.
-  const shipmentByBox = new Map<string, Record<string, unknown>>();
-  for (const shipment of shipments) {
-    const box = String(shipment.box_number ?? '').trim().toUpperCase();
-    if (box) shipmentByBox.set(box, shipment);
-  }
-
   let output = sheetXml;
-  const matchedBoxes = new Set<string>();
-
-  for (const candidate of candidateRows) {
-    const bRe = new RegExp(
-      `<c\\b[^>]*r="B${candidate.number}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
-    );
-    const bMatch = candidate.xml.match(bRe);
-    if (!bMatch) continue;
-
-    const fixedBox = cellText(bMatch[0], strings).trim();
-    if (!fixedBox) continue;
-
-    const shipment = shipmentByBox.get(fixedBox.toUpperCase());
-    if (!shipment) continue;
-
-    matchedBoxes.add(fixedBox.toUpperCase());
+  for (let i = 0; i < shipments.length; i++) {
+    const candidate = candidateRows[i];
+    const shipment = shipments[i];
     let rowXml = candidate.xml;
 
-    // B열은 템플릿 고정 번호이므로 절대 덮어쓰지 않습니다.
     for (const [column, key, kind] of mapping) {
-      if (column === 'B') continue;
       rowXml = updateCellPreservingFormula(
         rowXml,
         candidate.number,
@@ -393,14 +369,6 @@ function updateCargoSheet(
 
     output = output.replace(candidate.xml, rowXml);
   }
-
-  const missing = [...shipmentByBox.keys()].filter((box) => !matchedBoxes.has(box));
-  if (missing.length > 0) {
-    throw new Error(
-      `Excel 템플릿에 없는 박스번호가 있습니다: ${missing.slice(0, 10).join(', ')}`,
-    );
-  }
-
   return output;
 }
 
@@ -439,11 +407,7 @@ function assignReceiptNumbers(
   // 기존 영수번호가 있으면 우선 그대로 유지하고 다음 번호 계산.
   for (const shipment of shipments) {
     const existing = String(shipment.receipt_number ?? '').trim();
-    const hasIdentity =
-      String(shipment.consignee_name ?? '').trim() !== '' &&
-      normalizePhone(shipment.consignee_phone) !== '';
-    const recoverableXx = hasIdentity && /\bXX\s*$/i.test(existing);
-    if (existing && !recoverableXx) {
+    if (existing) {
       const m = existing.match(/(\d+)\s*$/);
       if (m) next = Math.max(next, Number(m[1]) + 1);
       const key = `${String(shipment.consignee_name ?? '').trim().toLowerCase()}|${normalizePhone(shipment.consignee_phone)}`;
@@ -453,11 +417,10 @@ function assignReceiptNumbers(
 
   return shipments.map((shipment) => {
     const existing = String(shipment.receipt_number ?? '').trim();
+    if (existing) return shipment;
+
     const name = String(shipment.consignee_name ?? '').trim();
     const phone = normalizePhone(shipment.consignee_phone);
-    const recoverableXx = name !== '' && phone !== '' && /\bXX\s*$/i.test(existing);
-    if (existing && !recoverableXx) return shipment;
-
     const key = `${name.toLowerCase()}|${phone}`;
     if (key === '|') return shipment;
 
@@ -1004,12 +967,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       const receipt = String(shipment.receipt_number ?? '').trim();
       const original = (shipments ?? []).find((row) => Number(row.id) === id);
       const originalReceipt = String(original?.receipt_number ?? '').trim();
-      const originalWasRecoverableXx =
-        /\bXX\s*$/i.test(originalReceipt) &&
-        String(shipment.consignee_name ?? '').trim() !== '' &&
-        normalizePhone(shipment.consignee_phone) !== '' &&
-        !/\bXX\s*$/i.test(receipt);
-      if (id && receipt && (!originalReceipt || originalWasRecoverableXx)) {
+      if (id && receipt && !originalReceipt) {
         const { error: receiptUpdateError } = await admin
           .from('shipments')
           .update({ receipt_number: receipt })
@@ -1220,7 +1178,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 

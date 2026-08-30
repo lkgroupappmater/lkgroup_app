@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_colors.dart';
@@ -12,7 +12,6 @@ class ShipmentManualAddScreen extends StatefulWidget {
     this.initialRoute,
     this.initialYear,
     this.initialVoyage,
-    this.initialBoxNumber = '',
     this.initialInvoice = '',
     this.initialName = '',
     this.initialPhone = '',
@@ -21,7 +20,6 @@ class ShipmentManualAddScreen extends StatefulWidget {
   final String? initialRoute;
   final int? initialYear;
   final String? initialVoyage;
-  final String initialBoxNumber;
   final String initialInvoice;
   final String initialName;
   final String initialPhone;
@@ -73,17 +71,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     _route = widget.initialRoute;
     _year = widget.initialYear;
     _voyage = widget.initialVoyage;
-    _box.text = widget.initialBoxNumber;
     _invoice.text = widget.initialInvoice;
     _name.text = widget.initialName;
     _phone.text = widget.initialPhone;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_routeReady) return;
-      if (_box.text.trim().isNotEmpty) {
-        _checkDuplicates();
-      } else {
-        _loadNextBoxNumber();
-      }
+      if (_routeReady) _loadNextBoxNumber();
     });
   }
 
@@ -466,4 +458,3 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
         ),
       );
 }
-

@@ -191,7 +191,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             route: _route,
             year: _year,
             voyage: _voyage,
-            boxNumber: _boxNumberController.text.trim(),
             invoice: _invoiceController.text.trim(),
             name: _nameController.text.trim(),
             phone: _phoneController.text.trim(),
@@ -209,7 +208,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     String? route,
     String? year,
     String? voyage,
-    String boxNumber = '',
     String invoice = '',
     String name = '',
     String phone = '',
@@ -227,7 +225,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           initialRoute: route,
           initialYear: parsedYear,
           initialVoyage: selectedVoyage,
-          initialBoxNumber: boxNumber,
           initialInvoice: invoice,
           initialName: name,
           initialPhone: phone,
@@ -1777,7 +1774,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
-
 
 
 
