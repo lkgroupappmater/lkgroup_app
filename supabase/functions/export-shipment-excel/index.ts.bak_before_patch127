@@ -551,46 +551,6 @@ function refreshReceiptSheetCaches(
 }
 
 
-function applySettlementToExistingRowData(
-  files: Record<string, Uint8Array>,
-  snapshot: Record<string, unknown> | null,
-  routeLabel: string,
-  shipmentYear: number,
-  voyage: string,
-): void {
-  if (!snapshot) return;
-
-  const path = workbookSheetPath(files, 'Row data');
-  if (!path || !files[path]) return;
-
-  let xml = strFromU8(files[path]);
-  const voyageLabel = voyage.endsWith('항차') ? voyage : `${voyage}항차`;
-
-  // 기존 LK Excel의 실제 업무용 요약 위치.
-  // 수백 장 명세서의 SUM 결과가 아니라 중앙 FreightService snapshot을 직접 기록합니다.
-  xml = setStringCellInSheet(
-    xml,
-    'B14',
-    `${routeLabel} ${shipmentYear}년 ${voyageLabel}`,
-  );
-  xml = setNumericCellInSheet(
-    xml,
-    'C15',
-    Number(snapshot.total_quantity ?? 0),
-  );
-  xml = setNumericCellInSheet(
-    xml,
-    'C16',
-    Number(snapshot.net_usd ?? 0),
-  );
-  xml = setNumericCellInSheet(
-    xml,
-    'C18',
-    Number(snapshot.discount_usd ?? 0),
-  );
-
-  files[path] = strToU8(xml);
-}
 function appendRowDataSettlementBlock(
   files: Record<string, Uint8Array>,
   snapshot: Record<string, unknown> | null,
@@ -731,7 +691,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const routeKey = String(body.route_key ?? '').trim();
-    const requestedRouteLabel = String(body.route_label ?? '').trim();
     const shipmentYear = Number(body.shipment_year);
     const voyage = String(body.voyage ?? '').trim();
 
@@ -787,16 +746,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       throw downloadError ?? new Error('원본 템플릿 다운로드 실패');
     }
 
-    const shipmentRouteLabel =
-      requestedRouteLabel ||
-      String(routeDefinition?.display_name ?? '').trim() ||
-      String(template.route_label ?? '').trim();
     const { data: shipments, error: shipmentError } = await admin
       .from('shipments')
       .select(
         'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,notes,received_at,created_at',
       )
-      .eq('route', shipmentRouteLabel)
+      .eq('route', template.route_label)
       .eq('shipment_year', shipmentYear)
       .eq('voyage', voyage)
       .is('deletion_requested_at', null)
@@ -900,19 +855,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
         enrichedShipments,
       ),
     );
-    // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
-    seedCustomerListFromShipments(files, enrichedShipments);
-    refreshReceiptSheetCaches(files, enrichedShipments);
-
-    // 템플릿의 xx항차 제목을 실제 선택한 항차로 바꿉니다.
-    let cargoTitleXml = strFromU8(files[targetPath]);
-    const voyageLabel = voyage.endsWith('항차') ? voyage : ${voyage}항차;
-    cargoTitleXml = setStringCellInSheet(
-      cargoTitleXml,
-      'B1',
-      ${shipmentYear}년   물품 입고 내역 (Cargo list),
-    );
-    files[targetPath] = strToU8(cargoTitleXml);
 
     if (exchangeRate) {
       updateExchangeRates(files, {
@@ -925,14 +867,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       });
     }
 
-    // 기존 Row data의 실제 Total / Amount / 총 할인 금액도 같은 snapshot으로 직접 갱신합니다.
-    applySettlementToExistingRowData(
-      files,
-      settlementSnapshot as Record<string, unknown> | null,
-      shipmentRouteLabel,
-      shipmentYear,
-      voyage,
-    );
     // 기존 Row data의 수식/표는 건드리지 않고, 맨 아래에 DB 정산 원본 블록을 추가합니다.
     // 따라서 수백 개 영수증 sheet를 만들지 않아도 영수번호별 실제 금액/할인/총액을
     // Excel 파일 자체에 보관할 수 있습니다.
@@ -1026,6 +960,5 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
