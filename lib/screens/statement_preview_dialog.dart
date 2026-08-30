@@ -294,6 +294,7 @@ class _StatementPainter extends CustomPainter {
     required this.arrivalDate,
     required this.baseRows,
     required this.detailRows,
+    required this.sourceTop,
   });
 
   final ui.Image template;
@@ -517,6 +518,7 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
 
 
