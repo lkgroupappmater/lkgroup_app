@@ -599,12 +599,12 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      '한국 원화 계좌:\n경남은행\n571-22-0330221\n(4) 박성호\n(5) 박성호(엘케이무역)',
+      '한국 원화 계좌:\n경남은행\n571-22-0330221\n박성호',
       payRects[3].deflate(8),
       22,
       bold: true,
       center: true,
-      maxLines: 5,
+      maxLines: 4,
     );
 
     final noteTop = payTop + 150;
@@ -625,7 +625,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(10, signTop + 30, signW - 20, signH - 34));
+    _imageContainTrimmed(c, stamp, Rect.fromLTWH(8, signTop + 27, signW - 16, signH - 29), trimRatio: .18);
     final routeNotice = RouteCatalog.keyFor(routeLabel) == 'kr_la_sea'
         ? '* 운임은 USD 기준입니다.  * 입·출고지를 떠나기 전 고객님 운임 물품 및 개수 확인 부탁드립니다.  * 물품 출고 후 1주 후부터 보관료가 발생할 수 있습니다.  * 이용해 주셔서 감사합니다.'
         : RouteCatalog.remarkFor(routeLabel);
@@ -646,7 +646,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _imageContain(c, image, Rect.fromLTWH(r.left + 6, r.top + 6, 132, 132));
     _text(c, title, Rect.fromLTWH(r.left + 144, r.top + 8, r.width - 150, 32), 22, bold: true, center: true);
     _text(c, detail, Rect.fromLTWH(r.left + 144, r.top + 42, r.width - 150, 96),
-        16, bold: true);
+        22, bold: true, center: true);
   }
 
   void _kv(Canvas c, String k, String v, Rect r, {bool emphasize = false}) {
@@ -690,6 +690,35 @@ class _DigitalStatementPainter extends CustomPainter {
     );
   }
 
+  void _imageContainTrimmed(
+    Canvas c,
+    ui.Image image,
+    Rect box, {
+    double trimRatio = .18,
+  }) {
+    final insetX = image.width * trimRatio;
+    final insetY = image.height * trimRatio;
+    final source = Rect.fromLTRB(
+      insetX,
+      insetY,
+      image.width - insetX,
+      image.height - insetY,
+    );
+    final ratio = source.width / source.height;
+    var dw = box.width;
+    var dh = dw / ratio;
+    if (dh > box.height) {
+      dh = box.height;
+      dw = dh * ratio;
+    }
+    final dst = Rect.fromLTWH(
+      box.left + (box.width - dw) / 2,
+      box.top + (box.height - dh) / 2,
+      dw,
+      dh,
+    );
+    c.drawImageRect(image, source, dst, Paint());
+  }
   void _imageContain(Canvas c, ui.Image image, Rect box) {
     final ratio = image.width / image.height;
     var dw = box.width;
@@ -742,6 +771,7 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
 }
+
 
 
 
