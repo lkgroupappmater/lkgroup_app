@@ -817,9 +817,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final id = '${r['id']}';
     final quantity = int.tryParse('${r['quantity'] ?? ''}') ?? 1;
     final receivedDate = _dateOnly(r['received_at']);
-    final length = _naturalNumber(r['length_cm']);
-    final height = _naturalNumber(r['height_cm']);
-    final width = _naturalNumber(r['width_cm']);
+    final length = '${r['length_cm'] ?? ''}'.trim();
+    final height = '${r['height_cm'] ?? ''}'.trim();
+    final width = '${r['width_cm'] ?? ''}'.trim();
     final size = '$length × $height × $width cm';
     final name = '${r['consignee_name'] ?? ''}'.trim();
     final company = _companyOf(r);
@@ -857,19 +857,19 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                       '${r['shipment_year'] ?? ''} / ${_voyageLabel(r['voyage'])}',
                     ),
                     _row('송장번호', '${r['invoice_number'] ?? ''}'),
-                    _row('수령인 / 회사명', nameCompany),
+                    _row('이름/수령인 & 회사', nameCompany),
                     _row('연락처', '${r['consignee_phone'] ?? ''}'),
                     _row(
-                      '무게 / 크기',
-                      '${_weightOneDecimal(r['weight_kg'])} kg / $size',
+                      '무게/크기(L H W)',
+                      '${r['weight_kg'] ?? ''} kg / $size',
                     ),
                     if (_showZone)
                       _row(
-                        '영수번호 / 구획',
-                        '$receipt / ${zone.isEmpty ? '-' : zone}',
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
                       )
                     else
-                      _row('영수번호', receipt),
+                      _row('영수증 번호', receipt),
                   ],
                 ),
               ),
@@ -880,17 +880,6 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     );
   }
 
-  String _weightOneDecimal(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    final number = double.tryParse(text);
-    return number == null ? (text.isEmpty ? '-' : text) : number.toStringAsFixed(1);
-  }
-
-  String _naturalNumber(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    final number = double.tryParse(text);
-    return number == null ? (text.isEmpty ? '-' : text) : number.round().toString();
-  }
   String _dateOnly(dynamic value) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '-';
@@ -1014,7 +1003,6 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
-
 
 
 

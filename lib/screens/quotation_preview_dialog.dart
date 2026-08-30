@@ -504,11 +504,11 @@ class _DigitalQuotationPainter extends CustomPainter {
         17, bold: true);
     _text(
       c,
-      '본 가견적은 입력된 중량/규격을 기준으로 한 예상 운임입니다. '
-      '실제 입고 후 실측 중량·용적중량 중 큰 값을 운임 적용중량으로 사용하며, '
-      '최종 청구금액은 실제 측정 결과에 따라 달라질 수 있습니다.',
+      docText.remark,
       Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
-      14,
+      docText.remarkFontSize,
+      maxLines: 6,
+      lineHeight: 1.05,
     );
 
     _text(c, 'Inland delivery/시내·지방 배송',
@@ -616,6 +616,8 @@ class _DigitalQuotationPainter extends CustomPainter {
       Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
       docText.footerFontSize,
       center: true,
+      maxLines: 6,
+      lineHeight: 1.05,
     );
     _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
         18, bold: true);
@@ -748,6 +750,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
+
 
 
 

@@ -520,7 +520,7 @@ class _DigitalStatementPainter extends CustomPainter {
         17, bold: true);
     _text(c, docText.remark,
         Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
-        docText.remarkFontSize, maxLines: 6, lineHeight: 1.05);
+        docText.remarkFontSize, maxLines: 6, lineHeight: 1.16);
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
@@ -626,8 +626,6 @@ class _DigitalStatementPainter extends CustomPainter {
       Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
       docText.footerFontSize,
       center: true,
-      maxLines: 6,
-      lineHeight: 1.05,
     );
     _text(c, '고객사 서명', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
         18, bold: true);
@@ -876,4 +874,3 @@ class StatementDocumentRenderer {
     }
   }
 }
-

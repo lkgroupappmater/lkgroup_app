@@ -1,4 +1,4 @@
-﻿import 'route_catalog.dart';
+import 'route_catalog.dart';
 
 class DocumentTextContent {
   const DocumentTextContent({required this.remark, required this.footerLines});
@@ -10,16 +10,16 @@ class DocumentTextContent {
 
   double get footerFontSize {
     final lines = footerLines.length + 1;
-    if (lines >= 5) return 15.5;
-    if (lines == 4) return 16.5;
-    if (lines == 3) return 17.5;
-    return 19.0;
+    if (lines >= 5) return 12.0;
+    if (lines == 4) return 13.0;
+    if (lines == 3) return 14.0;
+    return 15.5;
   }
 
   double get remarkFontSize {
-    if (remark.length > 430) return 17.0;
-    if (remark.length > 300) return 18.0;
-    return 19.0;
+    if (remark.length > 430) return 13.0;
+    if (remark.length > 300) return 14.0;
+    return 15.5;
   }
 }
 
@@ -155,4 +155,3 @@ class DocumentTextCatalog {
     );
   }
 }
-

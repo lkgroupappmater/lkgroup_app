@@ -949,7 +949,15 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ],
                   if (!_isPartner)
                     TextButton.icon(
-                      onPressed: _results.isEmpty ? null : _showBatchStatementPdf,
+                      onPressed: _results.isEmpty
+                          ? null
+                          : () {
+                              if (_selectedIds.isEmpty) {
+                                _message('\uC120\uD0DD\uB41C \uD56D\uCC28\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.');
+                                return;
+                              }
+                              _showStatement();
+                            },
                       icon: const Icon(Icons.receipt_long_outlined, size: 17),
                       label: const Text('명세서 보기'),
                       style: TextButton.styleFrom(
@@ -1506,8 +1514,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     ),
                   if (!_isPartner)
                     IconButton(
-                      tooltip: '명세서 보기',
-                      onPressed: _busy ? null : () => _showGroupStatement(rows),
+                      tooltip: '체크 명세서 PDF 저장',
+                      onPressed: _busy ? null : () => _showBatchStatementPdf(scopeRows: rows),
                       icon: const Icon(Icons.receipt_long_outlined, size: 19),
                     ),
                 ],
@@ -1524,9 +1532,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final id = '${item['id']}';
     final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
     final receivedDate = _dateOnly(item['received_at']);
-    final length = _naturalNumber(item['length_cm']);
-    final height = _naturalNumber(item['height_cm']);
-    final width = _naturalNumber(item['width_cm']);
+    final length = '${item['length_cm'] ?? ''}'.trim();
+    final height = '${item['height_cm'] ?? ''}'.trim();
+    final width = '${item['width_cm'] ?? ''}'.trim();
     final size = '$length × $height × $width cm';
     final name = '${item['consignee_name'] ?? ''}'.trim();
     final company = _companyOf(item);
@@ -1597,19 +1605,19 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
                     ),
                     _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('수령인 / 회사명', nameCompany),
+                    _infoRow('이름/수령인 & 회사', nameCompany),
                     _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
                     _infoRow(
-                      '무게 / 크기',
-                      '${_weightOneDecimal(item['weight_kg'])} kg / $size',
+                      '무게/크기(L H W)',
+                      '${item['weight_kg'] ?? ''} kg / $size',
                     ),
                     if (_isAdmin || _isStaff)
                       _infoRow(
-                        '영수번호 / 구획',
-                        '$receipt / ${zone.isEmpty ? '-' : zone}',
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
                       )
                     else
-                      _infoRow('영수번호', receipt),
+                      _infoRow('영수증 번호', receipt),
                   ],
                 ),
               ),
@@ -1623,9 +1631,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final id = '${item['id']}';
     final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
     final receivedDate = _dateOnly(item['received_at']);
-    final length = _naturalNumber(item['length_cm']);
-    final height = _naturalNumber(item['height_cm']);
-    final width = _naturalNumber(item['width_cm']);
+    final length = '${item['length_cm'] ?? ''}'.trim();
+    final height = '${item['height_cm'] ?? ''}'.trim();
+    final width = '${item['width_cm'] ?? ''}'.trim();
     final size = '$length × $height × $width cm';
     final name = '${item['consignee_name'] ?? ''}'.trim();
     final company = _companyOf(item);
@@ -1685,19 +1693,19 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
                     ),
                     _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('수령인 / 회사명', nameCompany),
+                    _infoRow('이름/수령인 & 회사', nameCompany),
                     _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
                     _infoRow(
-                      '무게 / 크기',
-                      '${_weightOneDecimal(item['weight_kg'])} kg / $size',
+                      '무게/크기(L H W)',
+                      '${item['weight_kg'] ?? ''} kg / $size',
                     ),
                     if (_isAdmin || _isStaff)
                       _infoRow(
-                        '영수번호 / 구획',
-                        '$receipt / ${zone.isEmpty ? '-' : zone}',
+                        '영수증 번호 & 구획 (Zone)',
+                        '$receipt & ${zone.isEmpty ? '-' : zone}',
                       )
                     else
-                      _infoRow('영수번호', receipt),
+                      _infoRow('영수증 번호', receipt),
                     if (_isManager) ...[
                       const SizedBox(height: 8),
                       Align(
@@ -1719,17 +1727,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     );
   }
 
-  String _weightOneDecimal(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    final number = double.tryParse(text);
-    return number == null ? (text.isEmpty ? '-' : text) : number.toStringAsFixed(1);
-  }
-
-  String _naturalNumber(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    final number = double.tryParse(text);
-    return number == null ? (text.isEmpty ? '-' : text) : number.round().toString();
-  }
   String _dateOnly(dynamic value) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '-';
@@ -1774,7 +1771,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
-
 
 
 
