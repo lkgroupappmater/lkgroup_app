@@ -1,14 +1,27 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/money_format.dart';
 import '../core/route_catalog.dart';
+import '../services/document_pdf_export.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
-import '../services/document_pdf_export.dart';
+
+
+double _d(dynamic value, [double fallback = 0]) =>
+    double.tryParse('${value ?? ''}'.trim()) ?? fallback;
+
+String _s(dynamic value) => '${value ?? ''}'.trim();
+
+String _fmtWeight(double v) {
+  if ((v - v.roundToDouble()).abs() < .001) return v.toStringAsFixed(0);
+  return v.toStringAsFixed(2);
+}
+
 
 class QuotationPreviewBox {
   const QuotationPreviewBox({
@@ -49,156 +62,108 @@ class QuotationPreviewDialog extends StatefulWidget {
 }
 
 class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
-  ui.Image? _templateImage;
+  ui.Image? _logo;
+  ui.Image? _qrUsd;
+  ui.Image? _qrKip;
+  ui.Image? _qrThb;
   bool _loading = true;
   bool _saving = false;
   late final DateTime _issuedAt;
 
-  String get _formRouteKey => RouteCatalog.formRouteKeyFor(widget.routeLabel);
-  _RouteFormConfig get _config => _RouteFormConfig.forKey(_formRouteKey);
+  static const double _docWidth = 1540;
+  int get _visibleRows => widget.boxes.length < 10 ? 10 : widget.boxes.length;
+  double get _docHeight => 959 + (_visibleRows - 10) * 28;
 
   @override
   void initState() {
     super.initState();
     _issuedAt = DateTime.now();
-    _loadTemplate();
+    _loadAssets();
   }
 
   @override
   void dispose() {
-    _templateImage?.dispose();
+    _logo?.dispose();
+    _qrUsd?.dispose();
+    _qrKip?.dispose();
+    _qrThb?.dispose();
     super.dispose();
   }
 
-  Future<void> _loadTemplate() async {
+  Future<ui.Image> _assetImage(String path) async {
+    final data = await rootBundle.load(path);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
+
+  Future<void> _loadAssets() async {
     try {
-      final path = 'assets/quotation_forms/${_formRouteKey.toLowerCase()}.png';
-      final data = await rootBundle.load(path);
-      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-      final frame = await codec.getNextFrame();
-      codec.dispose();
-      if (!mounted) {
-        frame.image.dispose();
-        return;
-      }
+      final assets = await Future.wait<ui.Image>([
+        _assetImage('assets/images/company_logo_transparent.png'),
+        _assetImage('assets/images/payment_qr_usd.png'),
+        _assetImage('assets/images/payment_qr_kip.png'),
+        _assetImage('assets/images/payment_qr_thb.png'),
+      ]);
+      if (!mounted) return;
       setState(() {
-        _templateImage = frame.image;
+        _logo = assets[0];
+        _qrUsd = assets[1];
+        _qrKip = assets[2];
+        _qrThb = assets[3];
         _loading = false;
       });
-    } catch (error) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('견적서 원본 폼 로딩 실패: $error')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('견적서 리소스 로딩 실패: $e')));
     }
   }
 
-  int get _detailRows {
-    final base = _config.baseRows;
-    return widget.boxes.length > base ? widget.boxes.length + 1 : base;
-  }
+  _DigitalQuotationPainter get _painter => _DigitalQuotationPainter(
+        routeLabel: widget.routeLabel,
+        boxes: widget.boxes,
+        result: widget.result,
+        rates: widget.rates,
+        issuedAt: _issuedAt,
+        logo: _logo!,
+        qrUsd: _qrUsd!,
+        qrKip: _qrKip!,
+        qrThb: _qrThb!,
+      );
 
-  Size _logicalSize(ui.Image image) {
-    final extra = (_detailRows - _config.baseRows) * _config.rowHeight;
-    return Size(image.width.toDouble(), image.height.toDouble() + extra);
-  }
-
-  Rect _documentRect(ui.Image image) {
-    final logical = _logicalSize(image);
-    // 실제 Excel PrintArea/Form 경계를 그대로 저장한다.
-    // 앱 Preview 바깥 padding은 저장 PNG에 포함되지 않는다.
-    return Rect.fromLTWH(0, 0, logical.width, logical.height);
-  }
-  Widget _preview(ui.Image image) {
-    final logical = _logicalSize(image);
-    final doc = _documentRect(image);
-    final screenWidth = MediaQuery.sizeOf(context).width - 28;
-    final previewWidth = screenWidth.clamp(320.0, 760.0);
-    final previewHeight = previewWidth * doc.height / doc.width;
-
-    return SizedBox(
-      width: previewWidth,
-      height: previewHeight,
-      child: FittedBox(
-        fit: BoxFit.contain,
-        alignment: Alignment.topCenter,
-        child: SizedBox(
-          width: doc.width,
-          height: doc.height,
-          child: ClipRect(
-            child: Transform.translate(
-              offset: Offset(-doc.left, -doc.top),
-              child: SizedBox(
-                width: logical.width,
-                height: logical.height,
-                child: CustomPaint(
-                  painter: _QuotationFormPainter(
-                    routeLabel: widget.routeLabel,
-                    template: image,
-                    boxes: widget.boxes,
-                    result: widget.result,
-                    rates: widget.rates,
-                    issuedAt: _issuedAt,
-                    config: _config,
-                    detailRows: _detailRows,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  Future<Uint8List> _renderHighResolutionPng() async {
-    final image = _templateImage;
-    if (image == null) throw StateError('견적서 원본 폼을 불러오지 못했습니다.');
-
-    final logical = _logicalSize(image);
-    final doc = _documentRect(image);
-    const exportScale = 1.75;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder)
-      ..scale(exportScale, exportScale)
-      ..translate(-doc.left, -doc.top);
-
-    _QuotationFormPainter(
-      routeLabel: widget.routeLabel,
-      template: image,
-      boxes: widget.boxes,
-      result: widget.result,
-      rates: widget.rates,
-      issuedAt: _issuedAt,
-      config: _config,
-      detailRows: _detailRows,
-    ).paint(canvas, logical);
-
-    final picture = recorder.endRecording();
-    final rendered = await picture.toImage(
-      (doc.width * exportScale).round(),
-      (doc.height * exportScale).round(),
-    );
-    picture.dispose();
-
-    final byteData = await rendered.toByteData(format: ui.ImageByteFormat.png);
-    rendered.dispose();
-    if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
-    return byteData.buffer.asUint8List();
-  }
   String _two(int v) => v.toString().padLeft(2, '0');
 
-  Future<void> _savePng() async {
+  Future<Uint8List> _renderPng() async {
+    if (_logo == null) throw StateError('견적서 리소스가 준비되지 않았습니다.');
+    const scale = 1.5;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(scale);
+    _painter.paint(canvas, Size(_docWidth, _docHeight));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(
+      (_docWidth * scale).round(),
+      (_docHeight * scale).round(),
+    );
+    picture.dispose();
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (data == null) throw StateError('PNG 변환에 실패했습니다.');
+    return data.buffer.asUint8List();
+  }
+
+  Future<void> _saveImage() async {
     setState(() => _saving = true);
     try {
-      final bytes = await _renderHighResolutionPng();
+      final bytes = await _renderPng();
       final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
-      final fileName =
+      final name =
           '${prefix.isEmpty ? 'QUOTATION' : prefix}_QUOTATION_${_issuedAt.year}${_two(_issuedAt.month)}${_two(_issuedAt.day)}.png';
-
-      final uri = await FilePicker.saveFile(
-        dialogTitle: '견적서 이미지 저장 위치 선택',
-        fileName: fileName,
+      final path = await FilePicker.saveFile(
+        dialogTitle: '가견적서 이미지 저장',
+        fileName: name,
         bytes: bytes,
         mimeType: 'image/png',
         type: FileType.custom,
@@ -206,16 +171,13 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            uri == null ? '이미지 저장을 취소했습니다.' : '고화질 견적서 이미지를 저장했습니다.',
-          ),
-        ),
+        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '가견적서 이미지를 저장했습니다.')),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('견적서 이미지 저장 실패: $error')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('이미지 저장 실패: $e')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -224,15 +186,14 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   Future<void> _savePdf() async {
     setState(() => _saving = true);
     try {
-      final png = await _renderHighResolutionPng();
+      final png = await _renderPng();
       final pdf = await DocumentPdfExport.quotation(png);
       final prefix = RouteCatalog.filePrefixFor(widget.routeLabel);
-      final fileName =
+      final name =
           '${prefix.isEmpty ? 'QUOTATION' : prefix}_QUOTATION_${_issuedAt.year}${_two(_issuedAt.month)}${_two(_issuedAt.day)}.pdf';
-
-      final uri = await FilePicker.saveFile(
-        dialogTitle: '견적서 출력용 PDF 저장 위치 선택',
-        fileName: fileName,
+      final path = await FilePicker.saveFile(
+        dialogTitle: '가견적서 출력용 PDF 저장',
+        fileName: name,
         bytes: pdf,
         mimeType: 'application/pdf',
         type: FileType.custom,
@@ -240,23 +201,21 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            uri == null ? 'PDF 저장을 취소했습니다.' : '출력용 견적서 PDF를 저장했습니다.',
-          ),
-        ),
+        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.')),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('견적서 PDF 저장 실패: $error')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('PDF 저장 실패: $e')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    final image = _templateImage;
+    final ready = !_loading && _logo != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -271,15 +230,11 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${widget.routeLabel} · 견적서 보기',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      '${widget.routeLabel} · 가견적서',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                     ),
                   ),
                   IconButton(
-                    tooltip: '닫기',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
                   ),
@@ -292,16 +247,38 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                 color: const Color(0xFF202124),
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
-                    : image == null
+                    : !ready
                         ? const Center(
-                            child: Text(
-                              '견적서 폼을 불러오지 못했습니다.',
-                              style: TextStyle(color: Colors.white),
-                            ),
+                            child: Text('가견적서를 불러오지 못했습니다.',
+                                style: TextStyle(color: Colors.white)),
                           )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.all(8),
-                            child: Center(child: _preview(image)),
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width =
+                                  (constraints.maxWidth - 16).clamp(320.0, 900.0);
+                              final height = width * _docHeight / _docWidth;
+                              return InteractiveViewer(
+                                minScale: .7,
+                                maxScale: 4,
+                                constrained: false,
+                                boundaryMargin: const EdgeInsets.all(80),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: SizedBox(
+                                    width: width,
+                                    height: height,
+                                    child: FittedBox(
+                                      fit: BoxFit.contain,
+                                      child: SizedBox(
+                                        width: _docWidth,
+                                        height: _docHeight,
+                                        child: CustomPaint(painter: _painter),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
               ),
             ),
@@ -319,7 +296,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: FilledButton.tonalIcon(
-                      onPressed: image == null || _saving ? null : _savePng,
+                      onPressed: !ready || _saving ? null : _saveImage,
                       icon: const Icon(Icons.image_outlined, size: 18),
                       label: const Text('이미지 저장'),
                     ),
@@ -327,7 +304,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: image == null || _saving ? null : _savePdf,
+                      onPressed: !ready || _saving ? null : _savePdf,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,
@@ -348,474 +325,238 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   }
 }
 
-class _RouteFormConfig {
-  const _RouteFormConfig({
-    required this.key,
-    required this.baseRows,
-    required this.bodyTop,
-    required this.bodyBottom,
-    required this.totalTop,
-    required this.amountStartTop,
-    this.dateRect = const Rect.fromLTRB(520, 154, 1102, 187),
-  });
-
-  final String key;
-  final int baseRows;
-  final double bodyTop;
-  final double bodyBottom;
-  final double totalTop;
-  final double amountStartTop;
-  final Rect dateRect;
-
-  double get rowHeight => (bodyBottom - bodyTop) / baseRows;
-
-  static _RouteFormConfig forKey(String key) {
-    // 실제 각 노선 Quotation 연결 그림을 기준으로 잡은 표 영역.
-    switch (key) {
-      case 'kr_la_sea':
-        return const _RouteFormConfig(
-          key: 'kr_la_sea',
-          baseRows: 10,
-          bodyTop: 293,
-          bodyBottom: 613,
-          totalTop: 613,
-          amountStartTop: 645,
-        );
-      case 'kr_la_air':
-        return const _RouteFormConfig(
-          key: 'kr_la_air',
-          baseRows: 10,
-          bodyTop: 288,
-          bodyBottom: 608,
-          totalTop: 608,
-          amountStartTop: 640,
-        );
-      case 'la_kr_air_exp':
-        return const _RouteFormConfig(
-          key: 'la_kr_air_exp',
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
-        );
-      case 'la_th_land':
-        return const _RouteFormConfig(
-          key: 'la_th_land',
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
-        );
-      case 'th_la_land':
-        return const _RouteFormConfig(
-          key: 'th_la_land',
-          baseRows: 5,
-          bodyTop: 250,
-          bodyBottom: 410,
-          totalTop: 410,
-          amountStartTop: 442,
-          dateRect: Rect.fromLTRB(530, 115, 1095, 148),
-        );
-      case 'la_vn_land':
-      case 'vn_la_land':
-        return _RouteFormConfig(
-          key: key,
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-          dateRect: const Rect.fromLTRB(530, 112, 1095, 145),
-        );
-      case 'la_ch_land':
-        return const _RouteFormConfig(
-          key: 'la_ch_land',
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-          dateRect: Rect.fromLTRB(530, 112, 1095, 145),
-        );
-      case 'ch_la_land':
-        return const _RouteFormConfig(
-          key: 'ch_la_land',
-          baseRows: 5,
-          bodyTop: 255,
-          bodyBottom: 415,
-          totalTop: 415,
-          amountStartTop: 447,
-          dateRect: Rect.fromLTRB(530, 120, 1095, 153),
-        );
-      case 'la_kh_land':
-      case 'kh_la_land':
-        return _RouteFormConfig(
-          key: key,
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-          dateRect: const Rect.fromLTRB(530, 112, 1095, 145),
-        );
-      default:
-        return _RouteFormConfig(
-          key: key,
-          baseRows: 5,
-          bodyTop: 245,
-          bodyBottom: 405,
-          totalTop: 405,
-          amountStartTop: 437,
-        );
-    }
-  }
-}
-
-class _QuotationFormPainter extends CustomPainter {
-  const _QuotationFormPainter({
+class _DigitalQuotationPainter extends CustomPainter {
+  const _DigitalQuotationPainter({
     required this.routeLabel,
-    required this.template,
     required this.boxes,
     required this.result,
     required this.rates,
     required this.issuedAt,
-    required this.config,
-    required this.detailRows,
+    required this.logo,
+    required this.qrUsd,
+    required this.qrKip,
+    required this.qrThb,
   });
 
   final String routeLabel;
-  final ui.Image template;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
   final DateTime issuedAt;
-  final _RouteFormConfig config;
-  final int detailRows;
+  final ui.Image logo;
+  final ui.Image qrUsd;
+  final ui.Image qrKip;
+  final ui.Image qrThb;
 
-  static const List<double> xRatio = <double>[
-    0.0105, 0.0694, 0.1580, 0.1859, 0.2264, 0.3045, 0.4110,
-    0.4464, 0.4817, 0.5170, 0.5986, 0.7068, 0.8098, 0.8922, 0.9891,
-  ];
-
-  double get _w => template.width.toDouble();
-  double get _extraHeight => (detailRows - config.baseRows) * config.rowHeight;
-
-  List<double> get xs => xRatio.map((v) => v * _w).toList(growable: false);
+  static const ink = Color(0xFF182433);
+  static const line = Color(0xFF8B97A3);
+  static const paleBlue = Color(0xFFEAF3FA);
+  static const actualColor = Color(0xFFFFF2CC);
+  static const volumeColor = Color(0xFFE2F0D9);
+  static const appliedColor = Color(0xFFD9EAF7);
+  static const totalColor = Color(0xFFFFF49A);
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..filterQuality = FilterQuality.high;
-    final originalH = template.height.toDouble();
+  void paint(Canvas c, Size size) {
+    final w = size.width;
+    final h = size.height;
+    c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    _image(c, logo, Rect.fromLTWH(18, 12, 120, 68));
+    _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 가견적서',
+        Rect.fromLTWH(180, 16, 1000, 58), 39, bold: true, center: true);
+    _labelValue(c, '구획(Zone)', '-', Rect.fromLTWH(w - 300, 8, 282, 72));
 
-    if (_extraHeight <= 0) {
-      canvas.drawImage(template, Offset.zero, paint);
-    } else {
-      canvas.drawImageRect(
-        template,
-        Rect.fromLTWH(0, 0, _w, config.bodyBottom),
-        Rect.fromLTWH(0, 0, _w, config.bodyBottom),
-        paint,
-      );
+    final infoTop = 90.0;
+    _box(c, Rect.fromLTWH(0, infoTop, w, 72), paleBlue.withOpacity(.38));
+    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 4, w * .49, 28));
+    _kv(c, '견적일',
+        '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}',
+        Rect.fromLTWH(8, infoTop + 34, w * .49, 28));
+    _kv(c, '고객명/회사명', '-', Rect.fromLTWH(w * .5, infoTop + 4, w * .49, 28));
+    _kv(c, '연락처', '-', Rect.fromLTWH(w * .5, infoTop + 34, w * .49, 28));
 
-      // 추가 행은 원본 Excel 폼의 마지막 빈 상세행을 그대로 반복 복사.
-      final rowH = config.rowHeight;
-      final left = xs.first;
-      final right = xs.last;
-      final sourceBlankRow = Rect.fromLTRB(
-        left,
-        config.bodyBottom - rowH,
-        right,
-        config.bodyBottom,
-      );
-      for (var i = 0; i < detailRows - config.baseRows; i++) {
-        final top = config.bodyBottom + (i * rowH);
-        canvas.drawImageRect(
-          template,
-          sourceBlankRow,
-          Rect.fromLTRB(left, top, right, top + rowH),
-          paint,
-        );
+    const tableTop = 170.0;
+    const headerH = 36.0;
+    const rowH = 28.0;
+    final rowCount = boxes.length < 10 ? 10 : boxes.length;
+    final cols = <double>[0, 65, 190, 280, 430, 580, 730, 875, 1040, 1230, 1540];
+    final headers = <String>[
+      'No.', '종류', '수량', '실제중량(kg)', '용적중량(kg)', '운임적용중량(kg)',
+      '단가', '청구운임', '규격(cm)', '비고'
+    ];
+    final fills = <Color?>[
+      null, null, null, actualColor, volumeColor, appliedColor, null, paleBlue, null, null
+    ];
+
+    for (var i = 0; i < headers.length; i++) {
+      final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
+      _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
+      _text(c, headers[i], r.deflate(3), 15, bold: true, center: true);
+    }
+
+    for (var i = 0; i < rowCount; i++) {
+      final y = tableTop + headerH + i * rowH;
+      final has = i < boxes.length;
+      final b = has ? boxes[i] : null;
+      final actualWins =
+          b != null && b.result.actualWeightKg >= b.result.volumeWeightKg;
+      final volumeWins =
+          b != null && b.result.volumeWeightKg > b.result.actualWeightKg;
+
+      for (var col = 0; col < headers.length; col++) {
+        Color fill = Colors.white;
+        if (has && col == 3 && actualWins) fill = actualColor;
+        if (has && col == 4 && volumeWins) fill = volumeColor;
+        if (has && col == 5) fill = appliedColor;
+        _box(c, Rect.fromLTRB(cols[col], y, cols[col + 1], y + rowH), fill);
       }
-
-      // 합계 / Remark / QR / 송금 / 도장 / 서명 영역은 원래 크기 그대로 아래로 이동.
-      canvas.drawImageRect(
-        template,
-        Rect.fromLTWH(0, config.bodyBottom, _w, originalH - config.bodyBottom),
-        Rect.fromLTWH(
-          0,
-          config.bodyBottom + _extraHeight,
-          _w,
-          originalH - config.bodyBottom,
-        ),
-        paint,
-      );
-    }
-
-    if (RouteCatalog.usesInheritedForm(routeLabel)) {
-      if (RouteCatalog.usesInheritedForm(routeLabel)) {
-      _paintRouteHeader(canvas);
-    }
-    }
-    _paintDate(canvas);
-    _paintRows(canvas);
-    _paintTotals(canvas);
-  }
-
-  void _paintRouteHeader(Canvas canvas) {
-    // BASE는 레이아웃만 사용하고 문서용 타이틀은 DB document_title 기준으로 표시.
-    final h = template.height.toDouble();
-    final documentTitle = RouteCatalog.documentTitleFor(routeLabel);
-    final titleRect = Rect.fromLTRB(_w * .19, h * .018, _w * .81, h * .108);
-    _clear(canvas, titleRect);
-    _text(
-      canvas,
-      '$documentTitle xxth 견적서',
-      titleRect,
-      48,
-      bold: true,
-    );
-
-    final receipt = RouteCatalog.receiptExampleFor(routeLabel);
-    if (receipt.isNotEmpty) {
-      final receiptRect =
-          Rect.fromLTRB(_w * .855, h * .09, _w * .985, h * .145);
-      _clear(canvas, receiptRect);
-      _text(canvas, receipt, receiptRect, 18, bold: true);
-    }
-  }
-
-  void _paintDate(Canvas canvas) {
-    final r = config.dateRect;
-    _clear(canvas, r);
-    _text(canvas, _date(issuedAt), r, 18, bold: true);
-  }
-
-  void _paintRows(Canvas canvas) {
-    final xx = xs;
-    final rowH = config.rowHeight;
-    for (var i = 0; i < detailRows; i++) {
-      final top = config.bodyTop + (i * rowH);
-      final bottom = top + rowH;
-
-      for (var c = 0; c < xx.length - 1; c++) {
-        _clear(canvas, Rect.fromLTRB(xx[c], top, xx[c + 1], bottom));
-      }
-
-      _text(
-        canvas,
-        '${i + 1}',
-        Rect.fromLTRB(xx[0], top, xx[1], bottom),
-        20,
-        bold: true,
-      );
-
-      if (i >= boxes.length) continue;
-      final b = boxes[i];
-      final line = b.result;
-      final qty = b.quantity < 1 ? 1 : b.quantity;
-      final unitVol = line.volumeWeightKg / qty;
-      final minimum = line.ratePerKg;
-      final actualFee = _minCharge(line.actualWeightKg * line.ratePerKg, minimum);
-      final volumeFee = _minCharge(line.volumeWeightKg * line.ratePerKg, minimum);
+      if (!has || b == null) continue;
 
       final values = <String>[
-        'BOX',
-        _num(line.ratePerKg),
-        '$qty',
-        _num(b.weightKg),
-        _num(line.actualWeightKg),
-        _num(b.lengthCm),
-        _num(b.widthCm),
-        _num(b.heightCm),
-        _num(unitVol),
-        _num(line.volumeWeightKg),
-        _num(actualFee),
-        _num(volumeFee),
-        _num(line.amountUsd),
+        '${i + 1}',
+        '화물',
+        '${b.quantity}',
+        _fmtWeight(b.result.actualWeightKg),
+        _fmtWeight(b.result.volumeWeightKg),
+        _fmtWeight(b.result.chargeableWeightKg),
+        '\$${b.result.ratePerKg.toStringAsFixed(2)}',
+        MoneyFormat.usd(b.result.amountUsd),
+        '${_fmtWeight(b.lengthCm)}×${_fmtWeight(b.widthCm)}×${_fmtWeight(b.heightCm)}',
+        actualWins ? '실중량 적용' : '용적 적용',
       ];
-
-      for (var c = 1; c < xx.length - 1; c++) {
-        _text(
-          canvas,
-          values[c - 1],
-          Rect.fromLTRB(xx[c], top, xx[c + 1], bottom),
-          c >= 11 ? 20 : 18,
-          bold: c >= 11,
-        );
+      for (var col = 0; col < values.length; col++) {
+        _text(c, values[col],
+            Rect.fromLTRB(cols[col] + 3, y + 2, cols[col + 1] - 3, y + rowH - 2),
+            col == 7 ? 14 : 13,
+            bold: col == 5 || col == 7,
+            center: true);
       }
     }
-  }
 
-  void _paintTotals(Canvas canvas) {
-    final xx = xs;
-    final top = config.totalTop + _extraHeight;
-    final bottom = top + config.rowHeight;
+    final sumTop = tableTop + headerH + rowCount * rowH + 8;
+    final leftW = w * .70;
+    _box(c, Rect.fromLTWH(0, sumTop, leftW, 120), const Color(0xFFFBFCFD));
+    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW - 20, 24),
+        17, bold: true);
+    _text(
+      c,
+      '본 가견적은 입력된 중량/규격을 기준으로 한 예상 운임입니다. '
+      '실제 입고 후 실측 중량·용적중량 중 큰 값을 운임 적용중량으로 사용하며, '
+      '최종 청구금액은 실제 측정 결과에 따라 달라질 수 있습니다.',
+      Rect.fromLTWH(10, sumTop + 35, leftW - 20, 76),
+      14,
+    );
 
-    for (var c = 0; c < xx.length - 1; c++) {
-      _clear(canvas, Rect.fromLTRB(xx[c], top, xx[c + 1], bottom));
+    final totalX = leftW + 6;
+    final totalW = w - totalX;
+    _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 120), totalColor);
+    _text(c, '가견적 총액', Rect.fromLTWH(totalX + 8, sumTop + 8, totalW - 16, 24),
+        18, bold: true, center: true);
+    final usd = result.totalUsd;
+    final money = <String>[
+      'USD  ${MoneyFormat.usd(usd)}',
+      'KIP  ${MoneyFormat.kip(usd * rates.appliedKip)}',
+      'THB  ${MoneyFormat.thb(usd * rates.appliedThb)}',
+      'KRW  ${MoneyFormat.krw(usd * rates.appliedKrw)}',
+    ];
+    for (var i = 0; i < money.length; i++) {
+      _text(c, money[i],
+          Rect.fromLTWH(totalX + 15, sumTop + 34 + i * 20, totalW - 30, 20),
+          17, bold: true, center: true);
     }
 
+    final payTop = sumTop + 132;
+    _payment(c, qrUsd, 'BCEL (USD)', '(SungHo Park)\n010-12-01-\n017655-60-001',
+        Rect.fromLTWH(6, payTop, w * .31, 145));
+    _payment(c, qrKip, 'BCEL (KIP)', '(SungHo Park)\n013-12-00-\n017655-60-001',
+        Rect.fromLTWH(w * .335, payTop, w * .31, 145));
+    _payment(c, qrThb, 'BCEL (Baht)', '(SungHo Park)\n010-12-02-\n017655-60-001',
+        Rect.fromLTWH(w * .665, payTop, w * .31, 145));
+
+    final noteTop = payTop + 150;
     _text(
-      canvas,
-      '합 계',
-      Rect.fromLTRB(xx[0], top, xx[2], bottom),
-      15,
-      bold: true,
+      c,
+      '* 운임은 USD 기준이며 표시된 기타 통화는 현재 앱 적용 환율 기준입니다.  '
+      '* 실제 입고 후 중량/크기 실측 결과에 따라 최종 운임이 확정됩니다.',
+      Rect.fromLTWH(15, noteTop, w - 30, 42),
+      13,
+      center: true,
     );
 
-    final qty = boxes.fold<int>(0, (s, b) => s + b.quantity);
-    final actual = boxes.fold<double>(0, (s, b) => s + b.result.actualWeightKg);
-    final volume = boxes.fold<double>(0, (s, b) => s + b.result.volumeWeightKg);
+    final signTop = noteTop + 46;
+    _box(c, Rect.fromLTWH(0, signTop, w * .48, h - signTop - 2), Colors.white);
+    _box(c, Rect.fromLTWH(w * .52, signTop, w * .48, h - signTop - 2), Colors.white);
+    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, w * .42, 30),
+        18, bold: true);
+    _text(c, '고객사 확인', Rect.fromLTWH(w * .54, signTop + 14, w * .42, 30),
+        18, bold: true);
+  }
 
-    _text(canvas, '$qty', Rect.fromLTRB(xx[3], top, xx[4], bottom), 19, bold: true);
-    _text(canvas, _num(actual), Rect.fromLTRB(xx[5], top, xx[6], bottom), 19, bold: true);
-    _text(canvas, _num(volume), Rect.fromLTRB(xx[10], top, xx[11], bottom), 19, bold: true);
+  void _payment(Canvas c, ui.Image image, String title, String detail, Rect r) {
+    _image(c, image, Rect.fromLTWH(r.left + 4, r.top + 2, 128, 128));
+    _text(c, title, Rect.fromLTWH(r.left + 140, r.top + 10, r.width - 145, 28),
+        19, bold: true);
+    _text(c, detail, Rect.fromLTWH(r.left + 140, r.top + 38, r.width - 145, 92),
+        16, bold: true);
+  }
 
-    final amountTop = config.amountStartTop + _extraHeight;
-    final amountH = 42.0;
-    _amount(canvas, amountTop, amountTop + amountH, '\$ ${_money(result.totalUsd, 2)}');
-    _amount(canvas, amountTop + amountH, amountTop + amountH * 2, '\$ -');
-    _amount(canvas, amountTop + amountH * 2, amountTop + amountH * 3, '\$ -');
-    _amount(canvas, amountTop + amountH * 3, amountTop + amountH * 4, '\$ -');
+  void _kv(Canvas c, String k, String v, Rect r) {
+    _text(c, '$k  ', Rect.fromLTWH(r.left, r.top, 145, r.height), 15, bold: true);
+    _text(c, v, Rect.fromLTWH(r.left + 145, r.top, r.width - 145, r.height),
+        17, bold: v != '-');
+  }
 
-    final kip = result.totalUsd * rates.appliedKip;
-    final thb = result.totalUsd * rates.appliedThb;
-    final krw = result.totalUsd * rates.appliedKrw;
+  void _labelValue(Canvas c, String label, String value, Rect r) {
+    _box(c, r, paleBlue);
+    _text(c, label, Rect.fromLTWH(r.left, r.top + 4, r.width, 22),
+        14, bold: true, center: true);
+    _text(c, value, Rect.fromLTWH(r.left, r.top + 26, r.width, r.height - 30),
+        30, bold: true, center: true);
+  }
 
-    _amount(
-      canvas,
-      amountTop + amountH * 4,
-      amountTop + amountH * 5,
-      '\$ ${_money(result.totalUsd, 2)}',
-      color: const Color(0xFF0070C0),
-    );
-    _amount(
-      canvas,
-      amountTop + amountH * 5,
-      amountTop + amountH * 6,
-      '₭ ${_money(kip, 0)}',
-      color: const Color(0xFF0070C0),
-    );
-    _amount(
-      canvas,
-      amountTop + amountH * 6,
-      amountTop + amountH * 7,
-      '฿ ${_money(thb, 0)}',
-      color: const Color(0xFF0070C0),
-    );
-    _amount(
-      canvas,
-      amountTop + amountH * 7,
-      amountTop + amountH * 8,
-      '₩ ${_money(krw, 0)}',
-      color: const Color(0xFF0070C0),
+  void _box(Canvas c, Rect r, Color fill) {
+    c.drawRect(r, Paint()..color = fill);
+    c.drawRect(
+      r,
+      Paint()
+        ..color = line
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
     );
   }
 
-  void _amount(Canvas canvas, double top, double bottom, String value,
-      {Color color = Colors.black}) {
-    final left = _w * 0.8922;
-    final right = _w * 0.9891;
-    final rect = Rect.fromLTRB(left, top, right, bottom);
-    _clear(canvas, rect);
-    _text(
-      canvas,
-      value,
-      rect,
-      20,
-      bold: true,
-      color: color,
-      align: TextAlign.right,
-      rightPadding: 12,
+  void _image(Canvas c, ui.Image image, Rect dst) {
+    c.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      dst,
+      Paint()..filterQuality = FilterQuality.high,
     );
   }
 
-  double _minCharge(double amount, double minimum) {
-    if (amount <= 0) return 0;
-    return amount < minimum ? minimum : amount;
-  }
-
-  void _clear(Canvas canvas, Rect rect) {
-    canvas.drawRect(
-      Rect.fromLTRB(
-        rect.left + 1.2,
-        rect.top + 1.2,
-        rect.right - 1.2,
-        rect.bottom - 1.2,
-      ),
-      Paint()..color = Colors.white,
-    );
-  }
-
-  void _text(
-    Canvas canvas,
-    String value,
-    Rect rect,
-    double fontSize, {
-    bool bold = false,
-    Color color = Colors.black,
-    TextAlign align = TextAlign.center,
-    double rightPadding = 0,
-  }) {
-    final tp = TextPainter(
+  void _text(Canvas c, String text, Rect r, double size,
+      {bool bold = false, bool center = false}) {
+    final p = TextPainter(
       text: TextSpan(
-        text: value,
+        text: text,
         style: TextStyle(
+          color: ink,
           fontFamily: 'NotoSansKR',
-          fontSize: fontSize,
-          height: 1,
-          fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-          color: color,
+          fontSize: size,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+          height: 1.15,
         ),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: align,
-      maxLines: 1,
-    )..layout(maxWidth: rect.width - rightPadding - 4);
-
-    final dx = align == TextAlign.right
-        ? rect.right - tp.width - rightPadding
-        : rect.left + (rect.width - tp.width) / 2;
-    final dy = rect.top + (rect.height - tp.height) / 2;
-    tp.paint(canvas, Offset(dx, dy));
-  }
-
-  String _date(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  String _num(num value) {
-    final d = value.toDouble();
-    if (d == d.roundToDouble()) return d.toStringAsFixed(0);
-    if ((d * 10).roundToDouble() == d * 10) return d.toStringAsFixed(1);
-    return d.toStringAsFixed(2);
-  }
-
-  String _money(double value, int decimals) {
-    final fixed = value.toStringAsFixed(decimals);
-    final parts = fixed.split('.');
-    final raw = parts.first;
-    final negative = raw.startsWith('-');
-    final digits = negative ? raw.substring(1) : raw;
-    final buffer = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(digits[i]);
-    }
-    final prefix = negative ? '-' : '';
-    if (decimals == 0) return '$prefix$buffer';
-    return '$prefix$buffer.${parts[1]}';
+      textAlign: center ? TextAlign.center : TextAlign.left,
+      maxLines: 3,
+      ellipsis: '…',
+    )..layout(maxWidth: r.width);
+    final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
+    final x = center ? r.left + (r.width - p.width) / 2 : r.left;
+    p.paint(c, Offset(x, y));
   }
 
   @override
-  bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
-
-
-
-
-
-

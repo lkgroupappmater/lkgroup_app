@@ -37,11 +37,15 @@ flutter:
     - assets/quotation_forms/
     - assets/statement_forms/
     - assets/images/company_logo.png
+    - assets/images/payment_qr_thb.png
+    - assets/images/payment_qr_kip.png
+    - assets/images/payment_qr_usd.png
 
   fonts:
     - family: NotoSansKR
       fonts:
         - asset: assets/fonts/NotoSansKR-Regular.otf
+
 
 
 
