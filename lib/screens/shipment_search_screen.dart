@@ -31,7 +31,7 @@ class ShipmentSearchBody extends StatefulWidget {
 }
 
 class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
-  int _selectedRoute = 0;
+  int _selectedRoute = -1;
   String _year = '전체';
   String _voyage = '전체';
   final _invoiceCtrl = TextEditingController();
@@ -47,15 +47,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
   bool get _showZone => widget.currentUser?.role == UserRole.admin || widget.currentUser?.role == UserRole.staff;
+  String get _selectedRouteLabel => _selectedRoute < 0 ? '전체' : routeLabels[_selectedRoute];
   List<String> get _availableYears {
-    final route = routeLabels[_selectedRoute];
+    final route = _selectedRouteLabel;
     final years =
         ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, route);
     return <String>['전체', ...years.map((e) => '$e년')];
   }
 
   List<String> get _availableVoyages {
-    final route = routeLabels[_selectedRoute];
+    final route = _selectedRouteLabel;
     final year =
         int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
     if (year == null) return const <String>['전체'];
@@ -439,7 +440,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   Future<void> _search() async {
     try {
       final dbRows = await ShipmentService.instance.searchRows(
-        route: routeLabels[_selectedRoute],
+        route: _selectedRouteLabel,
         invoice: _invoiceCtrl.text.trim(),
         recipient: _recipientCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
@@ -547,13 +548,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             value: _selectedRoute,
             isExpanded: true,
             decoration: _dropDecoration('운송 경로', Icons.route_outlined),
-            items: List.generate(
-              routeLabels.length,
-              (index) => DropdownMenuItem(
-                value: index,
-                child: Text(routeLabels[index]),
+            items: <DropdownMenuItem<int>>[
+              const DropdownMenuItem(value: -1, child: Text('전체')),
+              ...List.generate(
+                routeLabels.length,
+                (index) => DropdownMenuItem(
+                  value: index,
+                  child: Text(routeLabels[index]),
+                ),
               ),
-            ),
+            ],
             onChanged: (value) {
               if (value != null) {
                 setState(() {
@@ -665,7 +669,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           const SizedBox(height: 18),
           if (_searched && _results.isEmpty)
             const Center(child: Text('검색 결과가 없습니다.')),
-          ..._results.map((r) => _shipmentCard(r)),
+          ..._groupedResultWidgets(),
           if (!_canSeeAll && _searched)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -679,6 +683,135 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     );
   }
 
+  String _groupKey(Map<String, dynamic> r) =>
+      '${r['route'] ?? ''}|${r['shipment_year'] ?? ''}|${r['voyage'] ?? ''}';
+
+  List<MapEntry<String, List<Map<String, dynamic>>>> _resultGroups() {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final row in _results) {
+      map.putIfAbsent(_groupKey(row), () => <Map<String, dynamic>>[]).add(row);
+    }
+    return map.entries.toList();
+  }
+
+  void _toggleGroup(List<Map<String, dynamic>> rows) {
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    setState(() {
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
+  bool _isOwnShipment(Map<String, dynamic> r) {
+    final user = widget.currentUser;
+    if (user == null) return false;
+    if ('${r['customer_id'] ?? ''}' == user.id) return true;
+    final n1 = '${r['consignee_name'] ?? ''}'.trim().toLowerCase();
+    final n2 = user.name.trim().toLowerCase();
+    if (n1.isNotEmpty && n2.isNotEmpty && n1 == n2) return true;
+    String digits(String v) => v.replaceAll(RegExp(r'[^0-9]'), '');
+    final p1 = digits('${r['consignee_phone'] ?? ''}');
+    final p2 = digits(user.phone);
+    return p1.length >= 8 && p2.length >= 8 &&
+        p1.substring(p1.length - 8) == p2.substring(p2.length - 8);
+  }
+
+  Future<void> _showGroupFreight(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return;
+    try {
+      final result = await FreightService.instance.calculate(rows);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  '${rows.first['route']} · ${rows.first['shipment_year']}년 · ${_voyageLabel(rows.first['voyage'])}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                const Text('그룹 전체 운임'),
+                const Divider(),
+                ...result.lines.map((line) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
+                      subtitle: Text(
+                        '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg',
+                      ),
+                      trailing: Text('\$${line.amountUsd.toStringAsFixed(2)}'),
+                    )),
+                const Divider(),
+                Text('USD  \$${result.totalUsd.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('KIP  ${result.totalKip.toStringAsFixed(0)}'),
+                Text('THB  ${result.totalThb.toStringAsFixed(1)}'),
+                Text('KRW  ${result.totalKrw.toStringAsFixed(0)}'),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('그룹 운임 계산 실패: $error')));
+      }
+    }
+  }
+
+  List<Widget> _groupedResultWidgets() {
+    return _resultGroups().map((entry) {
+      final rows = entry.value;
+      final first = rows.first;
+      final ids = rows.map((r) => '${r['id']}').toSet();
+      final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
+      return Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+              color: AppColors.inputFill,
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: all,
+                    onChanged: (_) => _toggleGroup(rows),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${first['route']} · ${first['shipment_year']}년도 · ${_voyageLabel(first['voyage'])}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.navyPrimary,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _showGroupFreight(rows),
+                    icon: const Icon(Icons.price_check_outlined, size: 17),
+                    label: const Text('운임'),
+                  ),
+                ],
+              ),
+            ),
+            ...rows.map(_shipmentCard),
+          ],
+        ),
+      );
+    }).toList();
+  }
   Widget _shipmentCard(Map<String, dynamic> r) {
     final id = '${r['id']}';
     final size =
@@ -830,6 +963,7 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
 
 
 

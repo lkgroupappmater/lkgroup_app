@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/shipment_service.dart';
+import '../services/freight_service.dart';
 import '../services/shipment_filter_options_service.dart';
 import 'shipment_manual_add_screen.dart';
 import 'notice_management_screen.dart';
@@ -46,7 +47,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   final _widthController = TextEditingController();
   final _heightController = TextEditingController();
 
-  String _route = routeLabels.first;
+  String _route = '전체';
   String _year = '전체';
   String _voyage = '전체';
   List<Map<String, dynamic>> _results = const [];
@@ -903,9 +904,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   color: AppColors.primary,
                 ),
               ),
-              ..._results.map(_shipmentCard),
+              ..._managementGroupWidgets(),
             ],
-            if (_selectedIds.isNotEmpty) ...[
+            if (false && _selectedIds.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Text(
                 '선택한 화물 정보 수정',
@@ -1137,6 +1138,322 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         decoration: _decoration(label, Icons.straighten_outlined),
       );
 
+  String _managementGroupKey(Map<String, dynamic> r) =>
+      '${r['route'] ?? ''}|${r['shipment_year'] ?? ''}|${r['voyage'] ?? ''}';
+
+  List<MapEntry<String, List<Map<String, dynamic>>>> _managementGroups() {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final row in _results) {
+      map.putIfAbsent(_managementGroupKey(row), () => <Map<String, dynamic>>[]).add(row);
+    }
+    return map.entries.toList();
+  }
+
+  void _toggleManagementGroup(List<Map<String, dynamic>> rows) {
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    setState(() {
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> _checkedRowsInGroup(List<Map<String, dynamic>> rows) =>
+      rows.where((r) => _selectedIds.contains('${r['id']}')).toList();
+
+  Future<void> _editCheckedGroup(List<Map<String, dynamic>> rows) async {
+    final selected = _checkedRowsInGroup(rows);
+    if (selected.isEmpty) {
+      _message('편집할 화물을 먼저 체크해 주세요.');
+      return;
+    }
+    final one = selected.length == 1 ? selected.first : null;
+    final name = TextEditingController(text: one == null ? '' : '${one['consignee_name'] ?? ''}');
+    final phone = TextEditingController(text: one == null ? '' : '${one['consignee_phone'] ?? ''}');
+    final notes = TextEditingController(text: one == null ? '' : '${one['notes'] ?? ''}');
+    final weight = TextEditingController(text: one == null ? '' : '${one['weight_kg'] ?? ''}');
+    final length = TextEditingController(text: one == null ? '' : '${one['length_cm'] ?? ''}');
+    final width = TextEditingController(text: one == null ? '' : '${one['width_cm'] ?? ''}');
+    final height = TextEditingController(text: one == null ? '' : '${one['height_cm'] ?? ''}');
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('화물 편집 (${selected.length}건)'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected.length > 1)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '여러 화물 편집 시 입력한 항목만 선택 화물 전체에 적용됩니다.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                ),
+              TextField(controller: name, decoration: const InputDecoration(labelText: '이름/수령인')),
+              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처')),
+              TextField(controller: notes, decoration: const InputDecoration(labelText: '기타 내용')),
+              if (_isManager) ...[
+                TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '무게(kg)')),
+                TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '가로(cm)')),
+                TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '세로(cm)')),
+                TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '높이(cm)')),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('화물 정보 저장')),
+        ],
+      ),
+    );
+
+    if (save == true) {
+      final changes = <String, dynamic>{};
+      if (name.text.trim().isNotEmpty) changes['consignee_name'] = name.text.trim();
+      if (phone.text.trim().isNotEmpty) changes['consignee_phone'] = phone.text.trim();
+      if (notes.text.trim().isNotEmpty) changes['notes'] = notes.text.trim();
+      num? n(String v) => num.tryParse(v.trim());
+      if (_isManager && n(weight.text) != null) changes['weight_kg'] = n(weight.text);
+      if (_isManager && n(length.text) != null) changes['length_cm'] = n(length.text);
+      if (_isManager && n(width.text) != null) changes['width_cm'] = n(width.text);
+      if (_isManager && n(height.text) != null) changes['height_cm'] = n(height.text);
+
+      if (changes.isEmpty) {
+        _message('수정할 내용을 입력해 주세요.');
+      } else {
+        setState(() => _busy = true);
+        try {
+          for (final row in selected) {
+            await ShipmentService.instance.updateRow('${row['id']}', changes);
+          }
+          _message('선택한 화물 정보를 저장했습니다.');
+          await _search();
+        } catch (error) {
+          _message('화물 편집 실패: $error');
+        } finally {
+          if (mounted) setState(() => _busy = false);
+        }
+      }
+    }
+
+    name.dispose(); phone.dispose(); notes.dispose();
+    weight.dispose(); length.dispose(); width.dispose(); height.dispose();
+  }
+
+  Future<void> _deleteCheckedGroup(List<Map<String, dynamic>> rows) async {
+    final selected = _checkedRowsInGroup(rows);
+    if (selected.isEmpty) {
+      _message('삭제할 화물을 먼저 체크해 주세요.');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('선택 화물 삭제 대기'),
+        content: Text('${selected.length}건을 삭제 대기로 이동하시겠습니까?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('삭제 대기')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _busy = true);
+    try {
+      for (final row in selected) {
+        await ShipmentService.instance.requestShipmentDeletion('${row['id']}');
+        _selectedIds.remove('${row['id']}');
+      }
+      await _loadPendingDeletions();
+      await _search();
+      _message('${selected.length}건을 삭제 대기로 이동했습니다.');
+    } catch (error) {
+      _message('그룹 삭제 처리 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showGroupStatement(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty || _isPartner) return;
+    try {
+      final freight = await FreightService.instance.calculate(rows);
+      if (!mounted) return;
+      final receipts = rows
+          .map((r) => '${r['receipt_number'] ?? ''}'.trim())
+          .where((v) => v.isNotEmpty)
+          .toSet()
+          .toList();
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            '${rows.first['route']} · ${rows.first['shipment_year']}년 · ${_voyageLabel(rows.first['voyage'])}',
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('그룹 전체 운임', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text('박스 ${rows.length}건'),
+                Text('USD  \$${freight.totalUsd.toStringAsFixed(2)}'),
+                Text('KIP  ${freight.totalKip.toStringAsFixed(0)}'),
+                Text('THB  ${freight.totalThb.toStringAsFixed(1)}'),
+                Text('KRW  ${freight.totalKrw.toStringAsFixed(0)}'),
+                const Divider(),
+                if (receipts.isEmpty)
+                  const Text('명세서를 열 수 있는 영수번호가 없습니다.')
+                else ...[
+                  const Text('영수번호별 명세서', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  ...receipts.map((receipt) => OutlinedButton(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      await showDialog<void>(
+                        context: context,
+                        builder: (_) => StatementPreviewDialog(
+                          routeLabel: '${rows.first['route']}',
+                          year: (rows.first['shipment_year'] as num).toInt(),
+                          voyage: '${rows.first['voyage']}',
+                          receiptNumber: receipt,
+                        ),
+                      );
+                    },
+                    child: Text('$receipt 명세서 보기'),
+                  )),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('닫기')),
+          ],
+        ),
+      );
+    } catch (error) {
+      _message('그룹 명세서/운임 로딩 실패: $error');
+    }
+  }
+
+  List<Widget> _managementGroupWidgets() {
+    return _managementGroups().map((entry) {
+      final rows = entry.value;
+      final first = rows.first;
+      final ids = rows.map((r) => '${r['id']}').toSet();
+      final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
+      return Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+              color: AppColors.inputFill,
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: all,
+                    onChanged: (_) => _toggleManagementGroup(rows),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${first['route']} · ${first['shipment_year']}년도 · ${_voyageLabel(first['voyage'])}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.navyPrimary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  if (_isManager)
+                    IconButton(
+                      tooltip: '편집',
+                      onPressed: _busy ? null : () => _editCheckedGroup(rows),
+                      icon: const Icon(Icons.edit_outlined, size: 19),
+                    ),
+                  if (_isManager)
+                    IconButton(
+                      tooltip: '삭제',
+                      onPressed: _busy ? null : () => _deleteCheckedGroup(rows),
+                      icon: const Icon(Icons.delete_outline, size: 19),
+                    ),
+                  if (!_isPartner)
+                    IconButton(
+                      tooltip: '명세서 보기',
+                      onPressed: _busy ? null : () => _showGroupStatement(rows),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 19),
+                    ),
+                ],
+              ),
+            ),
+            ...rows.map(_groupShipmentCard),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _groupShipmentCard(Map<String, dynamic> item) {
+    final id = '${item['id']}';
+    final size =
+        '${item['length_cm'] ?? ''} × ${item['width_cm'] ?? ''} × ${item['height_cm'] ?? ''} cm';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: _selectedIds.contains(id)
+            ? Border.all(color: AppColors.accent, width: 1.5)
+            : null,
+      ),
+      child: InkWell(
+        onTap: () => _toggle(id),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _selectedIds.contains(id),
+                onChanged: (_) => _toggle(id),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('박스번호 ${item['box_number'] ?? ''}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyPrimary)),
+                    const SizedBox(height: 5),
+                    _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
+                    _infoRow('이름/수령인', '${item['consignee_name'] ?? ''}'),
+                    _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
+                    _infoRow('입고 날짜', '${item['received_at'] ?? ''}'),
+                    _infoRow('무게', '${item['weight_kg'] ?? ''} kg'),
+                    _infoRow('크기', size),
+                    _infoRow('영수증 번호', '${item['receipt_number'] ?? ''}'),
+                    if (_isAdmin || _isStaff)
+                      _infoRow('구획 (Zone)', '${item['unloading_zone'] ?? ''}'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   Widget _shipmentCard(Map<String, dynamic> item) {
     final id = '${item['id']}';
     final size =
@@ -1222,6 +1539,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 

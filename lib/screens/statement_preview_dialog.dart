@@ -304,11 +304,13 @@ class _StatementPainter extends CustomPainter {
   final String? arrivalDate;
   final int baseRows;
   final int detailRows;
+  final double sourceTop;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = template.width.toDouble();
-    final h = template.height.toDouble();
+    final fullH = template.height.toDouble();
+    final h = fullH - sourceTop;
     final rowH = h * .028;
     final bodyTop = h * .245;
     final bodyBottom = bodyTop + baseRows * rowH;
@@ -316,7 +318,12 @@ class _StatementPainter extends CustomPainter {
     final p = Paint()..filterQuality = FilterQuality.high;
 
     if (extra <= 0) {
-      canvas.drawImage(template, Offset.zero, p);
+      canvas.drawImageRect(
+        template,
+        Rect.fromLTWH(0, sourceTop, w, h),
+        Rect.fromLTWH(0, 0, w, h),
+        p,
+      );
     } else {
       canvas.drawImageRect(
         template,
@@ -324,7 +331,7 @@ class _StatementPainter extends CustomPainter {
         Rect.fromLTWH(0, 0, w, bodyBottom),
         p,
       );
-      final srcRow = Rect.fromLTWH(0, bodyBottom - rowH, w, rowH);
+      final srcRow = Rect.fromLTWH(0, sourceTop + bodyBottom - rowH, w, rowH);
       for (var i = 0; i < detailRows - baseRows; i++) {
         canvas.drawImageRect(
           template,
@@ -335,7 +342,7 @@ class _StatementPainter extends CustomPainter {
       }
       canvas.drawImageRect(
         template,
-        Rect.fromLTWH(0, bodyBottom, w, h - bodyBottom),
+        Rect.fromLTWH(0, sourceTop + bodyBottom, w, h - bodyBottom),
         Rect.fromLTWH(0, bodyBottom + extra, w, h - bodyBottom),
         p,
       );
@@ -510,5 +517,6 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
 
