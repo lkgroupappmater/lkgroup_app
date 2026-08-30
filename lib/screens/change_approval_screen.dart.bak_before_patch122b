@@ -42,8 +42,6 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       final rows = await ShipmentService.instance.getPendingChangeRequests();
       final unknownClaims =
           await UnknownRecipientService.instance.listPendingClaimsForAdmin();
-      final autoUnmatched =
-          await UnknownRecipientService.instance.listAutoUnmatchedForAdmin();
       if (!mounted) return;
       setState(() {
         _requests = rows;
@@ -748,5 +746,4 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
-
 

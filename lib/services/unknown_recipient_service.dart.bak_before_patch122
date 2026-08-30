@@ -45,43 +45,6 @@ class UnknownRecipientService {
         .toList(growable: false);
   }
 
-  Future<List<Map<String, dynamic>>> listAutoUnmatchedForAdmin() async {
-    if (!SupabaseConfig.isConfigured) return const [];
-    final raw = await SupabaseService.client
-        .rpc('admin_list_auto_unmatched_recipients') as List;
-    return raw
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList(growable: false);
-  }
-
-  Future<void> resolveAutoUnmatched({
-    required int queueId,
-    required String consigneeName,
-    required String consigneePhone,
-    required String invoiceNumber,
-    required String notes,
-  }) async {
-    if (!SupabaseConfig.isConfigured) return;
-    await SupabaseService.client.rpc(
-      'admin_resolve_auto_unmatched_recipient',
-      params: {
-        'p_queue_id': queueId,
-        'p_consignee_name': consigneeName.trim(),
-        'p_consignee_phone': consigneePhone.trim(),
-        'p_invoice_number': invoiceNumber.trim(),
-        'p_notes': notes.trim(),
-      },
-    );
-  }
-
-  Future<void> keepAutoUnmatched(int queueId) async {
-    if (!SupabaseConfig.isConfigured) return;
-    await SupabaseService.client.rpc(
-      'admin_keep_auto_unmatched_recipient',
-      params: {'p_queue_id': queueId},
-    );
-  }
-
   Future<void> reviewClaim({
     required int claimId,
     required String action,
