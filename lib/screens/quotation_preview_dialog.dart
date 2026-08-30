@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -73,7 +73,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   late final DateTime _issuedAt;
 
   static const double _docWidth = 1800;
-  int get _visibleRows => widget.boxes.length < 10 ? 10 : widget.boxes.length;
+  int get _visibleRows => widget.boxes.length + 1 < 10 ? 10 : widget.boxes.length + 1;
   double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
@@ -403,7 +403,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     const tableTop = 205.0;
     const headerH = 42.0;
     const rowH = 32.0;
-    final rowCount = boxes.length < 10 ? 10 : boxes.length;
+    final rowCount = boxes.length + 1 < 10 ? 10 : boxes.length + 1;
     final cols = <double>[
       0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
@@ -574,7 +574,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(signW - 125, signTop + 8, 110, 90));
+    _imageContain(c, stamp, Rect.fromLTWH((signW - 110) / 2, signTop + 30, 110, 68));
     _text(c,
       '* 운임은 USD 기준입니다.\n\n'
       '* 표시 기타 통화는 현재 앱 적용 환율 기준입니다.\n\n'
@@ -670,3 +670,4 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
+

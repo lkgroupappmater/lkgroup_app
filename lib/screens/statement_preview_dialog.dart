@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -55,7 +55,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   bool _saving = false;
 
   static const double _docWidth = 1800;
-  int get _visibleRows => _rows.length < 10 ? 10 : _rows.length;
+  int get _visibleRows => _rows.length + 1 < 10 ? 10 : _rows.length + 1;
   double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
@@ -393,7 +393,7 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서',
-        Rect.fromLTWH(190, 16, 940, 58),
+        Rect.fromLTWH(0, 14, w, 60),
         39,
         bold: true,
         center: true);
@@ -422,7 +422,7 @@ class _DigitalStatementPainter extends CustomPainter {
     const tableTop = 205.0;
     const headerH = 42.0;
     const rowH = 32.0;
-    final rowCount = rows.length < 10 ? 10 : rows.length;
+    final rowCount = rows.length + 1 < 10 ? 10 : rows.length + 1;
     final cols = <double>[
       0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
@@ -588,7 +588,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
         20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(signW - 125, signTop + 8, 110, 90));
+    _imageContain(c, stamp, Rect.fromLTWH((signW - 110) / 2, signTop + 30, 110, 68));
     _text(c,
       '* 운임은 USD 기준입니다.\n\n'
       '* 표시 기타 통화는 현재 앱 적용 환율 기준입니다.\n\n'
@@ -690,3 +690,4 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
 }
+
