@@ -1,9 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../core/money_format.dart';
 import '../services/excel_bulk_management_service.dart';
 import '../services/receipt_settlement_service.dart';
-import '../services/settlement_snapshot_service.dart';
 
 class VoyageTotalManagementScreen extends StatefulWidget {
   const VoyageTotalManagementScreen({super.key});
@@ -73,13 +72,6 @@ class _VoyageTotalManagementScreenState
       );
       final result =
           await ReceiptSettlementService.instance.calculate(rows);
-      await SettlementSnapshotService.instance.save(
-        routeKey: _route!,
-        routeLabel: _route!,
-        year: _year!,
-        voyage: _voyage!,
-        settlement: result,
-      );
       if (!mounted) return;
       setState(() => _settlement = result);
     } catch (e) {
@@ -311,4 +303,3 @@ class _VoyageTotalManagementScreenState
     );
   }
 }
-

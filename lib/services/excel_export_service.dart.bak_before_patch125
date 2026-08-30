@@ -1,13 +1,10 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 
 import '../config/supabase_config.dart';
 import '../core/route_catalog.dart';
 import 'supabase_service.dart';
-import 'excel_bulk_management_service.dart';
-import 'receipt_settlement_service.dart';
-import 'settlement_snapshot_service.dart';
 
 class ExcelExportBatch {
   const ExcelExportBatch({
@@ -124,25 +121,6 @@ class ExcelExportService {
       );
     }
 
-    // Excel 생성 직전 DB의 현재 화물을 중앙 FreightService로 영수번호별 정산하고
-    // 동일 결과를 snapshot으로 저장합니다. Edge Function은 다음 단계부터 이 snapshot을
-    // Row data에 그대로 사용하므로 Excel용 별도 운임 계산식을 만들지 않습니다.
-    final settlementRows =
-        await ExcelBulkManagementService.instance.listRows(
-      route: batch.routeLabel,
-      year: batch.year,
-      voyage: batch.voyage,
-    );
-    final settlement =
-        await ReceiptSettlementService.instance.calculate(settlementRows);
-    await SettlementSnapshotService.instance.save(
-      routeKey: batch.routeKey,
-      routeLabel: batch.routeLabel,
-      year: batch.year,
-      voyage: batch.voyage,
-      settlement: settlement,
-    );
-
     final response = await SupabaseService.client.functions.invoke(
       'export-shipment-excel',
       body: {
@@ -199,4 +177,3 @@ class ExcelExportService {
     );
   }
 }
-
