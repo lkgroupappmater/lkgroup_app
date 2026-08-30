@@ -593,6 +593,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       22,
       bold: true,
       center: true,
+      maxLines: 5,
     );
 
     final noteTop = payTop + 150;
@@ -700,7 +701,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false, bool right = false}) {
+      {bool bold = false, bool center = false, bool right = false, int maxLines = 3}) {
     final p = TextPainter(
       text: TextSpan(
         text: text,
@@ -714,7 +715,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
       textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
-      maxLines: 3,
+      maxLines: maxLines,
       ellipsis: '…',
     )..layout(maxWidth: r.width);
     final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
@@ -725,6 +726,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
+
 
 
 

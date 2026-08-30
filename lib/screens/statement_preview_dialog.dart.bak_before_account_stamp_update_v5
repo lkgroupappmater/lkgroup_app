@@ -604,7 +604,6 @@ class _DigitalStatementPainter extends CustomPainter {
       22,
       bold: true,
       center: true,
-      maxLines: 5,
     );
 
     final noteTop = payTop + 150;
@@ -717,7 +716,7 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false, bool right = false, int maxLines = 3}) {
+      {bool bold = false, bool center = false, bool right = false}) {
     final p = TextPainter(
       text: TextSpan(
         text: text,
@@ -731,7 +730,7 @@ class _DigitalStatementPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
       textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
-      maxLines: maxLines,
+      maxLines: 3,
       ellipsis: '…',
     )..layout(maxWidth: r.width);
     final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
@@ -742,7 +741,6 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
 }
-
 
 
 
