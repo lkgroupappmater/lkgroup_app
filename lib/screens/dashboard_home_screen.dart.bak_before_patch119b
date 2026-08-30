@@ -609,13 +609,18 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           ),
         );
       case 'google_maps':
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Image.asset(
-            'assets/images/google_maps_icon.png',
-            width: 24,
-            height: 24,
-            fit: BoxFit.contain,
+        return Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F3F4),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(
+            Icons.location_on_rounded,
+            size: 19,
+            color: Color(0xFF4285F4),
           ),
         );
       default:
@@ -762,5 +767,4 @@ class DashboardHomeScreen extends StatelessWidget {
         ),
       );
 }
-
 
