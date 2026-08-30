@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -105,7 +105,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedIds.addAll(widget.initialSelectedIds);
     _loadFilterBatches();
     if (widget.initialSelectedIds.isNotEmpty) _loadSelected();
     if (_isManager) _loadPendingDeletions();
@@ -163,7 +162,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       setState(() {
         _results = rows;
         _searched = true;
-        if (widget.initialSelectedIds.isEmpty) _selectedIds.clear();
+        _selectedIds.clear();
       });
       _syncEditControllers();
 
@@ -926,7 +925,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     TextButton.icon(
                       onPressed: _results.isEmpty
                           ? null
-                          : _showAllSearchResultStatements,
+                          : () {
+                              if (_selectedIds.isEmpty) {
+                                _message('\uC120\uD0DD\uB41C \uD56D\uCC28\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.');
+                                return;
+                              }
+                              _showStatement();
+                            },
                       icon: const Icon(Icons.receipt_long_outlined, size: 17),
                       label: const Text('명세서 보기'),
                       style: TextButton.styleFrom(
