@@ -97,10 +97,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       _formRouteKey == 'kr_la_sea' || _formRouteKey == 'kr_la_air' ? 10 : 5;
   int get _detailRows => _rows.length > _baseRows ? _rows.length + 1 : _baseRows;
 
-  double _cropRatio() =>
-      _formRouteKey == 'kr_la_sea' || _formRouteKey == 'kr_la_air'
-          ? .402
-          : .468;
+  double _cropRatio() => 0.0;
   Size _logicalSize(ui.Image image) {
     final visibleHeight = image.height * (1 - _cropRatio());
     final rowHeight = visibleHeight * .028;
@@ -110,10 +107,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   Rect _documentRect(ui.Image image) {
     final logical = _logicalSize(image);
-    // statement_forms는 좌우에 약 70px의 Excel 연결그림 캡처 여백이 있습니다.
-    // 위쪽의 큰 공백은 sourceTop crop에서 제거하고, 저장 시 좌우 캡처 여백도 제거합니다.
-    final x = image.width * .0470;
-    return Rect.fromLTRB(x, 0, logical.width - x, logical.height);
+    return Rect.fromLTWH(0, 0, logical.width, logical.height);
   }
   _StatementPainter _painter(ui.Image image) => _StatementPainter(
         template: image,
@@ -337,8 +331,8 @@ class _StatementPainter extends CustomPainter {
     final w = template.width.toDouble();
     final fullH = template.height.toDouble();
     final h = fullH - sourceTop;
-    final rowH = h * .028;
-    final bodyTop = h * .245;
+    final rowH = h * .0220;
+    final bodyTop = h * .1830;
     final bodyBottom = bodyTop + baseRows * rowH;
     final extra = (detailRows - baseRows) * rowH;
     final p = Paint()..filterQuality = FilterQuality.high;
@@ -376,26 +370,40 @@ class _StatementPainter extends CustomPainter {
 
     _paintRouteTitle(canvas, w, h);
 
-    // 기존 샘플 값만 흰색으로 지우고 실제 DB 값을 오버레이.
+    // Excel 원본의 선/색/폰트/셀 서식을 그대로 유지한다.
+    // 값이 들어가는 셀의 '안쪽'만 지워서 border는 절대 덮지 않는다.
+    final xx = <double>[
+      w * .0020, w * .0600, w * .1510, w * .1790, w * .2210,
+      w * .3030, w * .4120, w * .4400, w * .4700, w * .5010,
+      w * .5990, w * .7120, w * .8180, w * .9010, w * .9980,
+    ];
     final white = Paint()..color = Colors.white;
-    canvas.drawRect(Rect.fromLTWH(w * .57, h * .09, w * .40, h * .075), white);
-    canvas.drawRect(Rect.fromLTWH(w * .005, bodyTop, w * .985, rowH * baseRows), white);
 
-    final grid = Paint()
-      ..color = const Color(0xFF777777)
-      ..strokeWidth = 1;
-    for (var i = 0; i <= detailRows; i++) {
-      final y = bodyTop + i * rowH;
-      canvas.drawLine(Offset(w * .005, y), Offset(w * .99, y), grid);
+    void clearCell(int c, double top, double bottom) {
+      if (c < 0 || c >= xx.length - 1) return;
+      canvas.drawRect(
+        Rect.fromLTRB(
+          xx[c] + 2.0,
+          top + 2.0,
+          xx[c + 1] - 2.0,
+          bottom - 2.0,
+        ),
+        white,
+      );
     }
 
-    _text(canvas, receiptNumber, Offset(w * .865, h * .105), w * .11,
+    // 고객명/연락처/영수번호 영역도 셀 border를 남기고 내부만 갱신.
+    canvas.drawRect(
+      Rect.fromLTRB(w * .575, h * .062, w * .997, h * .118),
+      white,
+    );
+    _text(canvas, receiptNumber, Offset(w * .865, h * .073), w * .11,
         fontSize: w * .018, bold: true);
     final first = rows.first;
     _text(
       canvas,
       '${first['consignee_name'] ?? ''}',
-      Offset(w * .72, h * .105),
+      Offset(w * .72, h * .073),
       w * .14,
       fontSize: w * .014,
       bold: true,
@@ -404,7 +412,7 @@ class _StatementPainter extends CustomPainter {
       _text(
         canvas,
         arrivalDate!,
-        Offset(w * .35, h * .105),
+        Offset(w * .35, h * .073),
         w * .20,
         fontSize: w * .012,
       );
@@ -413,8 +421,13 @@ class _StatementPainter extends CustomPainter {
     final lines = freight.lines;
     for (var i = 0; i < rows.length && i < detailRows; i++) {
       final r = rows[i];
-      final y = bodyTop + i * rowH + rowH * .18;
+      final y = bodyTop + i * rowH + rowH * .16;
       final line = i < lines.length ? lines[i] : null;
+      final cellTop = bodyTop + i * rowH;
+      final cellBottom = cellTop + rowH;
+      for (var c = 0; c < xx.length - 1; c++) {
+        clearCell(c, cellTop, cellBottom);
+      }
       _text(canvas, '${i + 1}', Offset(w * .018, y), w * .04, fontSize: w * .010);
       _text(canvas, '${r['contents'] ?? ''}', Offset(w * .075, y), w * .11,
           fontSize: w * .009);
@@ -449,7 +462,7 @@ class _StatementPainter extends CustomPainter {
     }
 
     final shift = extra;
-    final totalY = h * .53 + shift;
+    final totalY = h * .465 + shift;
     _text(
       canvas,
       '\$${freight.totalUsd.toStringAsFixed(2)}',
@@ -461,7 +474,7 @@ class _StatementPainter extends CustomPainter {
     _text(
       canvas,
       '${freight.totalKip.toStringAsFixed(0)}',
-      Offset(w * .90, totalY + h * .027),
+      Offset(w * .90, totalY + h * .026),
       w * .08,
       fontSize: w * .011,
       bold: true,
@@ -477,7 +490,7 @@ class _StatementPainter extends CustomPainter {
     _text(
       canvas,
       '${freight.totalKrw.toStringAsFixed(0)}',
-      Offset(w * .90, totalY + h * .077),
+      Offset(w * .90, totalY + h * .078),
       w * .08,
       fontSize: w * .011,
       bold: true,
@@ -486,8 +499,8 @@ class _StatementPainter extends CustomPainter {
 
   void _paintRouteTitle(Canvas canvas, double w, double h) {
     final documentTitle = RouteCatalog.documentTitleFor(routeLabel);
-    // statement PNG는 상단에 원본 링크 이미지 여백이 있으므로 실제 문서 타이틀 위치에 덮어씀.
-    final rect = Rect.fromLTRB(w * .19, h * .472, w * .81, h * .525);
+    // 실제 Excel 명세서 form의 제목 셀만 현재 route document_title로 갱신.
+    final rect = Rect.fromLTRB(w * .19, h * .008, w * .81, h * .073);
     canvas.drawRect(
       rect,
       Paint()..color = Colors.white,
@@ -543,6 +556,7 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
 
 

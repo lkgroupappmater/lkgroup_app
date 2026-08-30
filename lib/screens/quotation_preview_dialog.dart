@@ -565,7 +565,7 @@ class _QuotationFormPainter extends CustomPainter {
         canvas,
         '${i + 1}',
         Rect.fromLTRB(xx[0], top, xx[1], bottom),
-        15,
+        20,
         bold: true,
       );
 
@@ -599,7 +599,7 @@ class _QuotationFormPainter extends CustomPainter {
           canvas,
           values[c - 1],
           Rect.fromLTRB(xx[c], top, xx[c + 1], bottom),
-          c >= 11 ? 14 : 13,
+          c >= 11 ? 20 : 18,
           bold: c >= 11,
         );
       }
@@ -627,9 +627,9 @@ class _QuotationFormPainter extends CustomPainter {
     final actual = boxes.fold<double>(0, (s, b) => s + b.result.actualWeightKg);
     final volume = boxes.fold<double>(0, (s, b) => s + b.result.volumeWeightKg);
 
-    _text(canvas, '$qty', Rect.fromLTRB(xx[3], top, xx[4], bottom), 15, bold: true);
-    _text(canvas, _num(actual), Rect.fromLTRB(xx[5], top, xx[6], bottom), 15, bold: true);
-    _text(canvas, _num(volume), Rect.fromLTRB(xx[10], top, xx[11], bottom), 15, bold: true);
+    _text(canvas, '$qty', Rect.fromLTRB(xx[3], top, xx[4], bottom), 19, bold: true);
+    _text(canvas, _num(actual), Rect.fromLTRB(xx[5], top, xx[6], bottom), 19, bold: true);
+    _text(canvas, _num(volume), Rect.fromLTRB(xx[10], top, xx[11], bottom), 19, bold: true);
 
     final amountTop = config.amountStartTop + _extraHeight;
     final amountH = 42.0;
@@ -682,7 +682,7 @@ class _QuotationFormPainter extends CustomPainter {
       canvas,
       value,
       rect,
-      16,
+      20,
       bold: true,
       color: color,
       align: TextAlign.right,
@@ -724,7 +724,7 @@ class _QuotationFormPainter extends CustomPainter {
           fontFamily: 'NotoSansKR',
           fontSize: fontSize,
           height: 1,
-          fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+          fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
           color: color,
         ),
       ),
@@ -769,5 +769,6 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+
 
 
