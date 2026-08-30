@@ -419,7 +419,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 16, bold: true, center: true);
+      _text(c, headers[i], r.deflate(3), 17, bold: true, center: true);
     }
 
     for (var i = 0; i < rowCount; i++) {
@@ -466,7 +466,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 18 : 16,
+            col >= 10 && col <= 12 ? 20 : 18,
             bold: col == 4 || col == 9 || col == 12,
             center: col < 10,
             right: col >= 10);
@@ -535,22 +535,22 @@ class _DigitalQuotationPainter extends CustomPainter {
         const Color(0xFFFCE48A));
     _text(c, 'USD    ' + MoneyFormat.usd(usd),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
-        18, bold: true, center: true);
+        20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFFC21A));
     _text(c, 'KIP    ' + MoneyFormat.kip(usd * rates.appliedKip),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
-        18, bold: true, center: true);
+        20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF91D18B));
     _text(c, 'THB    ' + MoneyFormat.thb(usd * rates.appliedThb),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
-        18, bold: true, center: true);
+        20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF23B6D8));
     _text(c, 'KRW    ' + MoneyFormat.krw(usd * rates.appliedKrw),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
-        18, bold: true, center: true);
+        20, bold: true, center: true);
     final payTop = sumTop + 204;
     const payGap = 4.0;
     final payW = (w - payGap * 3) / 4;
