@@ -897,12 +897,43 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ),
             if (_searched) ...[
               const SizedBox(height: 16),
-              Text(
-                '화물 정보 (${_results.length}건)',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '화물 정보 (${_results.length}건)',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  if (_isManager) ...[
+                    Checkbox(
+                      value: _allSearchResultsSelected,
+                      onChanged: _results.isEmpty
+                          ? null
+                          : (_) => _toggleAllSearchResults(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const Text(
+                      '전체',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ],
+                  if (!_isPartner)
+                    TextButton.icon(
+                      onPressed: _results.isEmpty
+                          ? null
+                          : _showAllSearchResultStatements,
+                      icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                      label: const Text('명세서 보기'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                    ),
+                ],
               ),
               ..._managementGroupWidgets(),
             ],
@@ -1141,6 +1172,67 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   String _managementGroupKey(Map<String, dynamic> r) =>
       '${r['route'] ?? ''}|${r['shipment_year'] ?? ''}|${r['voyage'] ?? ''}';
 
+  bool get _allSearchResultsSelected {
+    if (_results.isEmpty) return false;
+    return _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
+  }
+
+  void _toggleAllSearchResults() {
+    final ids = _results.map((r) => '${r['id']}').toSet();
+    setState(() {
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _showAllSearchResultStatements() async {
+    if (_results.isEmpty || _isPartner) return;
+    final groups = _managementGroups();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('검색 결과 명세서 (${_results.length}건)'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: groups.map((entry) {
+              final rows = entry.value;
+              final first = rows.first;
+              final receiptCount = rows
+                  .map((r) => '${r['receipt_number'] ?? ''}'.trim())
+                  .where((v) => v.isNotEmpty)
+                  .toSet()
+                  .length;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    await _showGroupStatement(rows);
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: Text(
+                    '${first['route']} · ${first['shipment_year']}년도 · '
+                    '${_voyageLabel(first['voyage'])} ($receiptCount건)',
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
   List<MapEntry<String, List<Map<String, dynamic>>>> _managementGroups() {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final row in _results) {
@@ -1539,6 +1631,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 

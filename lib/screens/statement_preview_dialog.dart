@@ -102,11 +102,19 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
           ? .402
           : .468;
   Size _logicalSize(ui.Image image) {
-    final rowHeight = image.height * .028;
+    final visibleHeight = image.height * (1 - _cropRatio());
+    final rowHeight = visibleHeight * .028;
     final extra = (_detailRows - _baseRows) * rowHeight;
-    return Size(image.width.toDouble(), image.height + extra);
+    return Size(image.width.toDouble(), visibleHeight + extra);
   }
 
+  Rect _documentRect(ui.Image image) {
+    final logical = _logicalSize(image);
+    // statement_forms는 좌우에 약 70px의 Excel 연결그림 캡처 여백이 있습니다.
+    // 위쪽의 큰 공백은 sourceTop crop에서 제거하고, 저장 시 좌우 캡처 여백도 제거합니다.
+    final x = image.width * .0470;
+    return Rect.fromLTRB(x, 0, logical.width - x, logical.height);
+  }
   _StatementPainter _painter(ui.Image image) => _StatementPainter(
         template: image,
         routeLabel: widget.routeLabel,
@@ -124,15 +132,20 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     if (image == null || _freight == null) {
       throw StateError('명세서를 아직 불러오지 못했습니다.');
     }
-    final size = _logicalSize(image);
+    final logical = _logicalSize(image);
+    final doc = _documentRect(image);
     const scale = 1.75;
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder)..scale(scale, scale);
-    _painter(image).paint(canvas, size);
+    final canvas = Canvas(recorder)
+      ..scale(scale, scale)
+      ..translate(-doc.left, -doc.top);
+
+    _painter(image).paint(canvas, logical);
+
     final picture = recorder.endRecording();
     final rendered = await picture.toImage(
-      (size.width * scale).round(),
-      (size.height * scale).round(),
+      (doc.width * scale).round(),
+      (doc.height * scale).round(),
     );
     picture.dispose();
     final bytes = await rendered.toByteData(format: ui.ImageByteFormat.png);
@@ -140,7 +153,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     if (bytes == null) throw StateError('PNG 변환에 실패했습니다.');
     return bytes.buffer.asUint8List();
   }
-
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -228,21 +240,29 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                               child: LayoutBuilder(
                                 builder: (context, constraints) {
                                   final logical = _logicalSize(image);
+                                  final doc = _documentRect(image);
                                   final width =
                                       constraints.maxWidth.clamp(320.0, 760.0);
                                   return SizedBox(
                                     width: width,
-                                    height: width *
-                                        logical.height /
-                                        logical.width,
+                                    height: width * doc.height / doc.width,
                                     child: FittedBox(
                                       fit: BoxFit.contain,
                                       alignment: Alignment.topCenter,
                                       child: SizedBox(
-                                        width: logical.width,
-                                        height: logical.height,
-                                        child: CustomPaint(
-                                          painter: _painter(image),
+                                        width: doc.width,
+                                        height: doc.height,
+                                        child: ClipRect(
+                                          child: Transform.translate(
+                                            offset: Offset(-doc.left, -doc.top),
+                                            child: SizedBox(
+                                              width: logical.width,
+                                              height: logical.height,
+                                              child: CustomPaint(
+                                                painter: _painter(image),
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -333,7 +353,7 @@ class _StatementPainter extends CustomPainter {
     } else {
       canvas.drawImageRect(
         template,
-        Rect.fromLTWH(0, 0, w, bodyBottom),
+        Rect.fromLTWH(0, sourceTop, w, bodyBottom),
         Rect.fromLTWH(0, 0, w, bodyBottom),
         p,
       );
@@ -523,6 +543,7 @@ class _StatementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _StatementPainter oldDelegate) => true;
 }
+
 
 
 

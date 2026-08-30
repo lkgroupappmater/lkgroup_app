@@ -103,11 +103,20 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     return Size(image.width.toDouble(), image.height.toDouble() + extra);
   }
 
+  Rect _documentRect(ui.Image image) {
+    final logical = _logicalSize(image);
+    // 기존 Excel 연결 그림의 바깥쪽 캡처 여백만 제거합니다.
+    // 문서 내부 셀/QR/도장/Remark 영역은 건드리지 않습니다.
+    final x = image.width * .0105;
+    final y = image.height * .0157;
+    return Rect.fromLTRB(x, y, logical.width - x, logical.height - y);
+  }
   Widget _preview(ui.Image image) {
     final logical = _logicalSize(image);
+    final doc = _documentRect(image);
     final screenWidth = MediaQuery.sizeOf(context).width - 28;
     final previewWidth = screenWidth.clamp(320.0, 760.0);
-    final previewHeight = previewWidth * logical.height / logical.width;
+    final previewHeight = previewWidth * doc.height / doc.width;
 
     return SizedBox(
       width: previewWidth,
@@ -116,34 +125,44 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         fit: BoxFit.contain,
         alignment: Alignment.topCenter,
         child: SizedBox(
-          width: logical.width,
-          height: logical.height,
-          child: CustomPaint(
-            painter: _QuotationFormPainter(
-              routeLabel: widget.routeLabel,
-              template: image,
-              boxes: widget.boxes,
-              result: widget.result,
-              rates: widget.rates,
-              issuedAt: _issuedAt,
-              config: _config,
-              detailRows: _detailRows,
+          width: doc.width,
+          height: doc.height,
+          child: ClipRect(
+            child: Transform.translate(
+              offset: Offset(-doc.left, -doc.top),
+              child: SizedBox(
+                width: logical.width,
+                height: logical.height,
+                child: CustomPaint(
+                  painter: _QuotationFormPainter(
+                    routeLabel: widget.routeLabel,
+                    template: image,
+                    boxes: widget.boxes,
+                    result: widget.result,
+                    rates: widget.rates,
+                    issuedAt: _issuedAt,
+                    config: _config,
+                    detailRows: _detailRows,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
-
   Future<Uint8List> _renderHighResolutionPng() async {
     final image = _templateImage;
     if (image == null) throw StateError('견적서 원본 폼을 불러오지 못했습니다.');
 
     final logical = _logicalSize(image);
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
+    final doc = _documentRect(image);
     const exportScale = 1.75;
-    canvas.scale(exportScale, exportScale);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..scale(exportScale, exportScale)
+      ..translate(-doc.left, -doc.top);
 
     _QuotationFormPainter(
       routeLabel: widget.routeLabel,
@@ -158,8 +177,8 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
     final picture = recorder.endRecording();
     final rendered = await picture.toImage(
-      (logical.width * exportScale).round(),
-      (logical.height * exportScale).round(),
+      (doc.width * exportScale).round(),
+      (doc.height * exportScale).round(),
     );
     picture.dispose();
 
@@ -168,7 +187,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     if (byteData == null) throw StateError('PNG 변환에 실패했습니다.');
     return byteData.buffer.asUint8List();
   }
-
   String _two(int v) => v.toString().padLeft(2, '0');
 
   Future<void> _savePng() async {
@@ -751,4 +769,5 @@ class _QuotationFormPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _QuotationFormPainter oldDelegate) => true;
 }
+
 
