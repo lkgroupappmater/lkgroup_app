@@ -453,51 +453,6 @@ function setStringCellInSheet(sheetXml: string, ref: string, value: string): str
   return sheetXml.replace(rowXml, updated);
 }
 
-function upgradeZoneQuantityFormulas(
-  files: Record<string, Uint8Array>,
-): void {
-  const path = workbookSheetPath(files, '고객 리스트');
-  if (!path || !files[path]) return;
-
-  let xml = strFromU8(files[path]);
-
-  // 기존 구획 판정용 F열은 G:DL에 조회된 "화물번호 개수"만 셌습니다.
-  // 따라서 1개 화물번호에 수량 100개가 들어와도 1개로 판단했습니다.
-  //
-  // 새 방식:
-  // 같은 영수번호의 '물품 입고 내역' I열(수량)을 합산합니다.
-  // - S001 / 수량 1 + S002 / 수량 1 = 2개
-  // - S001 / 수량 100 = 100개
-  // 두 입력 방식 모두 동일하게 처리됩니다.
-  //
-  // 기존 Zone 기준표(C117:D120 등)는 그대로 유지합니다.
-  for (let row = 4; row <= 114; row++) {
-    const ref = `F${row}`;
-    const cellRe = new RegExp(
-      `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>`,
-    );
-    const match = xml.match(cellRe);
-    if (!match) continue;
-
-    const body = match[3] ?? '';
-    if (!/<f\\b/.test(body)) continue;
-
-    const formula =
-      `SUMIF('물품 입고 내역'!$N$6:$N$1005,$A${row},'물품 입고 내역'!$I$6:$I$1005)`;
-
-    const newBody = body.replace(
-      /<f\b[^>]*>[\s\S]*?<\/f>/,
-      `<f>${formula}</f>`,
-    );
-
-    xml = xml.replace(
-      match[0],
-      `<c${match[1]}r="${ref}"${match[2]}>${newBody}</c>`,
-    );
-  }
-
-  files[path] = strToU8(xml);
-}
 function seedCustomerListFromShipments(
   files: Record<string, Uint8Array>,
   shipments: Record<string, unknown>[],
@@ -959,7 +914,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     );
     // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
     seedCustomerListFromShipments(files, enrichedShipments);
-    upgradeZoneQuantityFormulas(files);
     // Patch127d: 기존 명세서 수식 셀 cached value 직접 수정은 Excel XML 손상 가능성이 있어 비활성화.
     // 명세서 동적 연결은 다음 단계에서 안전한 방식으로 처리합니다.
 
@@ -1085,7 +1039,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
