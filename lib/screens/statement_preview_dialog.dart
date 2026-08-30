@@ -479,7 +479,6 @@ class _DigitalStatementPainter extends CustomPainter {
         f == null ? '-' : MoneyFormat.usd(actualFreight),
         f == null ? '-' : MoneyFormat.usd(volumeFreight),
         f == null ? '-' : MoneyFormat.usd(f.amountUsd),
-        actualWins ? '실중량 적용' : (volumeWins ? '용적 적용' : ''),
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
