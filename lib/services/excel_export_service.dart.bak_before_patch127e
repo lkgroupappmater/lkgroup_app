@@ -148,7 +148,6 @@ class ExcelExportService {
       body: {
         'route_key': batch.routeKey,
         'route_label': batch.routeLabel,
-        'shipment_rows': settlementRows,
         'shipment_year': batch.year,
         'voyage': batch.voyage,
       },
@@ -201,6 +200,5 @@ class ExcelExportService {
     );
   }
 }
-
 
 

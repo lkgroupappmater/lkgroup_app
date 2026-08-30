@@ -787,11 +787,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       throw downloadError ?? new Error('원본 템플릿 다운로드 실패');
     }
 
-    const requestShipmentRows = Array.isArray(body.shipment_rows)
-      ? body.shipment_rows
-          .filter((row) => row != null && typeof row === 'object' && !Array.isArray(row))
-          .map((row) => row as Record<string, unknown>)
-      : [];
     const shipmentRouteLabel =
       requestedRouteLabel ||
       String(routeDefinition?.display_name ?? '').trim() ||
@@ -810,15 +805,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     if (shipmentError) throw shipmentError;
 
-    // Excel 출력은 Flutter가 중앙 FreightService 정산에 사용한 동일 rows를 최우선 사용합니다.
-    // Edge Function의 별도 재조회 결과가 일부 필드만 갖는 경우에도 출력 데이터가 빠지지 않습니다.
-    const exportShipmentRows =
-      requestShipmentRows.length > 0
-        ? requestShipmentRows
-        : (shipments ?? []) as Record<string, unknown>[];
-
     const enrichedShipments = assignReceiptNumbers(
-      exportShipmentRows,
+      (shipments ?? []) as Record<string, unknown>[],
       routeKey,
       String(routeDefinition?.receipt_prefix ?? ''),
     ).map((shipment) => {
@@ -1039,7 +1027,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
