@@ -50,15 +50,12 @@ class QuotationPreviewDialog extends StatefulWidget {
     required this.boxes,
     required this.result,
     required this.rates,
-    this.vatApplied = false,
   });
 
   final String routeLabel;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
-  final bool vatApplied;
-  final bool vatApplied;
 
   @override
   State<QuotationPreviewDialog> createState() => _QuotationPreviewDialogState();
@@ -70,8 +67,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   ui.Image? _qrKip;
   ui.Image? _qrThb;
   ui.Image? _stamp;
-  ui.Image? _bankStripDefault;
-  ui.Image? _bankStripVat;
+  ui.Image? _bankStrip;
   bool _loading = true;
   bool _saving = false;
   late final DateTime _issuedAt;
@@ -94,8 +90,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
     _qrKip?.dispose();
     _qrThb?.dispose();
     _stamp?.dispose();
-    _bankStripDefault?.dispose();
-    _bankStripVat?.dispose();
+    _bankStrip?.dispose();
     super.dispose();
   }
 
@@ -115,8 +110,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         _assetImage('assets/images/payment_qr_kip.png'),
         _assetImage('assets/images/payment_qr_thb.png'),
         _assetImage('assets/images/company_stamp.png'),
-        _assetImage('assets/images/bank_accounts_default.png'),
-        _assetImage('assets/images/bank_accounts_vat.png'),
+        _assetImage('assets/images/bank_accounts_strip.png'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -125,8 +119,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         _qrKip = assets[2];
         _qrThb = assets[3];
         _stamp = assets[4];
-        _bankStripDefault = assets[5];
-        _bankStripVat = assets[6];
+        _bankStrip = assets[5];
         _loading = false;
       });
     } catch (e) {
@@ -142,15 +135,13 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         boxes: widget.boxes,
         result: widget.result,
         rates: widget.rates,
-        vatApplied: widget.vatApplied,
         issuedAt: _issuedAt,
         logo: _logo!,
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
         qrThb: _qrThb!,
         stamp: _stamp!,
-        bankStripDefault: _bankStripDefault!,
-        bankStripVat: _bankStripVat!,
+        bankStrip: _bankStrip!,
       );
 
   String _two(int v) => v.toString().padLeft(2, '0');
@@ -238,7 +229,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _logo != null && _stamp != null && _bankStripDefault != null && _bankStripVat != null;
+    final ready = !_loading && _logo != null && _stamp != null && _bankStrip != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
       clipBehavior: Clip.antiAlias,
@@ -354,30 +345,26 @@ class _DigitalQuotationPainter extends CustomPainter {
     required this.boxes,
     required this.result,
     required this.rates,
-    required this.vatApplied,
     required this.issuedAt,
     required this.logo,
     required this.qrUsd,
     required this.qrKip,
     required this.qrThb,
     required this.stamp,
-    required this.bankStripDefault,
-    required this.bankStripVat,
+    required this.bankStrip,
   });
 
   final String routeLabel;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
-  final bool vatApplied;
   final DateTime issuedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
   final ui.Image qrKip;
   final ui.Image qrThb;
   final ui.Image stamp;
-  final ui.Image bankStripDefault;
-  final ui.Image bankStripVat;
+  final ui.Image bankStrip;
 
   static const ink = Color(0xFF182433);
   static const line = Color(0xFF687A8C);
@@ -394,75 +381,24 @@ class _DigitalQuotationPainter extends CustomPainter {
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
     _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 가견적서',
-        Rect.fromLTWH(0, 14, w, 60), 39, bold: true, center: true);
+        Rect.fromLTWH(180, 16, 1000, 58), 39, bold: true, center: true);
     _labelValue(c, '구획(Zone)', '-', Rect.fromLTWH(w - 300, 8, 282, 72));
 
     final infoTop = 90.0;
-    const infoH = 108.0;
-    const rowHInfo = infoH / 3;
-    final leftWInfo = w * .56;
-    final rightWInfo = w - leftWInfo;
-
+    const infoH = 106.0;
     for (var r = 0; r < 3; r++) {
-      final y = infoTop + r * rowHInfo;
-      _box(c, Rect.fromLTWH(0, y, leftWInfo, rowHInfo), paleBlue.withOpacity(.38));
-      _box(c, Rect.fromLTWH(leftWInfo, y, rightWInfo, rowHInfo), paleBlue.withOpacity(.38));
+      final y = infoTop + r * (infoH / 3);
+      _box(c, Rect.fromLTWH(0, y, w * .5, infoH / 3), paleBlue.withOpacity(.38));
+      _box(c, Rect.fromLTWH(w * .5, y, w * .5, infoH / 3), paleBlue.withOpacity(.38));
     }
-
-    _infoCell(
-      c,
-      '회사명',
-      '엘케이(LK)무역',
-      Rect.fromLTWH(0, infoTop, leftWInfo, rowHInfo),
-      valueSize: 17,
-      boldValue: true,
-      valueLines: 1,
-    );
-    _infoCell(
-      c,
-      '회사주소',
-      '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목,\n엘케이(LK) 빌딩, 1층 LK Trading',
-      Rect.fromLTWH(0, infoTop + rowHInfo, leftWInfo, rowHInfo),
-      valueSize: 14,
-      valueLines: 2,
-    );
-    _infoCell(
-      c,
-      '전화번호',
-      '+856 20 9112 6780',
-      Rect.fromLTWH(0, infoTop + rowHInfo * 2, leftWInfo, rowHInfo),
-      valueSize: 17,
-      boldValue: true,
-      valueLines: 1,
-    );
-
-    _infoCell(
-      c,
-      '고객명/회사명',
-      '-',
-      Rect.fromLTWH(leftWInfo, infoTop, rightWInfo, rowHInfo),
-      valueSize: 18,
-      boldValue: true,
-      valueLines: 1,
-    );
-    _infoCell(
-      c,
-      '연락처',
-      '-',
-      Rect.fromLTWH(leftWInfo, infoTop + rowHInfo, rightWInfo, rowHInfo),
-      valueSize: 18,
-      boldValue: true,
-      valueLines: 1,
-    );
-    _infoCell(
-      c,
-      '견적일',
-      '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}',
-      Rect.fromLTWH(leftWInfo, infoTop + rowHInfo * 2, rightWInfo, rowHInfo),
-      valueSize: 17,
-      boldValue: true,
-      valueLines: 1,
-    );
+    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 2, w * .49, 22));
+    _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 24, w * .49, 22));
+    _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 46, w * .49, 22));
+    _kv(c, '견적일',
+        '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}',
+        Rect.fromLTWH(w * .5, infoTop + 73, w * .49, 26));
+    _kv(c, '고객명/회사명', '-', Rect.fromLTWH(w * .5, infoTop + 7, w * .49, 30));
+    _kv(c, '연락처', '-', Rect.fromLTWH(w * .5, infoTop + 41, w * .49, 30));
 
     const tableTop = 205.0;
     const headerH = 42.0;
@@ -565,21 +501,21 @@ class _DigitalQuotationPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
-    final routeRemark = RouteCatalog.remarkFor(routeLabel);
     _text(
       c,
-      routeRemark.isEmpty
-          ? '본 가견적은 입력된 중량/규격을 기준으로 한 예상 운임입니다. 실제 입고 후 실측 중량·용적중량 중 큰 값을 운임 적용중량으로 사용하며, 최종 청구금액은 실제 측정 결과에 따라 달라질 수 있습니다.'
-          : routeRemark,
+      '본 가견적은 입력된 중량/규격을 기준으로 한 예상 운임입니다. '
+      '실제 입고 후 실측 중량·용적중량 중 큰 값을 운임 적용중량으로 사용하며, '
+      '최종 청구금액은 실제 측정 결과에 따라 달라질 수 있습니다.',
       Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
       14,
-      maxLinesOverride: 6,
     );
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
         18, bold: true);
-
+    _text(c, '배송비/선불·착불/배송업체 등 추후 입력',
+        Rect.fromLTWH(leftW * .58 + 14, sumTop + 40, leftW * .42 - 24, 105),
+        15);
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
@@ -619,8 +555,7 @@ class _DigitalQuotationPainter extends CustomPainter {
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
         18, bold: true, center: true);
     final payTop = sumTop + 204;
-    _imageContain(c, vatApplied ? bankStripVat : bankStripDefault,
-        Rect.fromLTWH(8, payTop, w - 16, 150));
+    _imageContain(c, bankStrip, Rect.fromLTWH(8, payTop, w - 16, 150));
 
     final noteTop = payTop + 150;
     _text(
@@ -633,7 +568,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     );
 
     final signTop = noteTop + 46;
-    final signW = w * .26;
+    final signW = w * .34;
     final signH = 105.0;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
@@ -656,23 +591,6 @@ class _DigitalQuotationPainter extends CustomPainter {
         19, bold: true, center: true);
     _text(c, detail, Rect.fromLTWH(r.left + 132, r.top + 38, r.width - 136, 92),
         16, bold: true);
-  }
-
-  void _infoCell(
-    Canvas c,
-    String label,
-    String value,
-    Rect r, {
-    double valueSize = 16,
-    bool boldValue = false,
-    int valueLines = 2,
-  }) {
-    final labelW = r.width * .22;
-    _text(c, label, Rect.fromLTWH(r.left + 4, r.top + 2, labelW - 8, r.height - 4),
-        14, bold: true, center: true);
-    _text(c, value.isEmpty ? '-' : value,
-        Rect.fromLTWH(r.left + labelW + 4, r.top + 2, r.width - labelW - 8, r.height - 4),
-        valueSize, bold: boldValue, center: true, maxLinesOverride: valueLines);
   }
 
   void _kv(Canvas c, String k, String v, Rect r) {
@@ -727,7 +645,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false, bool right = false, int? maxLinesOverride}) {
+      {bool bold = false, bool center = false, bool right = false}) {
     final p = TextPainter(
       text: TextSpan(
         text: text,
@@ -741,7 +659,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
       textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
-      maxLines: maxLinesOverride ?? 3,
+      maxLines: 3,
       ellipsis: '…',
     )..layout(maxWidth: r.width);
     final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
