@@ -902,8 +902,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     );
     // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
     seedCustomerListFromShipments(files, enrichedShipments);
-    // Patch127d: 기존 명세서 수식 셀 cached value 직접 수정은 Excel XML 손상 가능성이 있어 비활성화.
-    // 명세서 동적 연결은 다음 단계에서 안전한 방식으로 처리합니다.
+    refreshReceiptSheetCaches(files, enrichedShipments);
 
     // 템플릿의 xx항차 제목을 실제 선택한 항차로 바꿉니다.
     let cargoTitleXml = strFromU8(files[targetPath]);
@@ -1027,7 +1026,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
