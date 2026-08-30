@@ -906,7 +906,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     // 템플릿의 xx항차 제목을 실제 선택한 항차로 바꿉니다.
     let cargoTitleXml = strFromU8(files[targetPath]);
-    const voyageLabel = voyage.endsWith('항차') ? voyage : voyage + '항차';
+    const voyageLabel = voyage.endsWith('항차') ? voyage : ${voyage}항차;
     cargoTitleXml = setStringCellInSheet(
       cargoTitleXml,
       'B1',
@@ -1026,7 +1026,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
