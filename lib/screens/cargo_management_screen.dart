@@ -1558,7 +1558,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           }
 
           return AlertDialog(
-            title: Text('$receipt · 기타 비용 (+$)'),
+            title: Text('$receipt · 기타 비용 (+\$)'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
