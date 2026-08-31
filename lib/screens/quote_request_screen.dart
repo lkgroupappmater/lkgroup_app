@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,7 +9,6 @@ import '../core/route_catalog.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
-import '../services/receipt_extra_cost_service.dart';
 import 'quotation_preview_dialog.dart';
 
 List<String> get _transportRoutes => RouteCatalog.routes;
@@ -43,7 +42,6 @@ class QuoteRequestBody extends StatefulWidget {
 class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   String _selectedRoute = _transportRoutes.first;
   final List<_BoxEntry> _boxes = [_BoxEntry()];
-  final List<ExtraCostItem> _extraCosts = <ExtraCostItem>[];
   QuoteFreightResult? _calculation;
   ExchangeRateSettings? _calculationRates;
   List<Map<String, dynamic>> _specialQuotes = const [];
@@ -73,79 +71,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         _calculation = null;
         _calculationRates = null;
       });
-  Future<void> _addQuoteExtraCost() async {
-    final nameController = TextEditingController();
-    final amountController = TextEditingController();
 
-    final added = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('湲고? 鍮꾩슜 異붽?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: '鍮꾩슜 ?대쫫',
-                hintText: '?? ?듦?鍮? 湲고? ?섏닔猷?,
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: amountController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: '湲덉븸 (USD)',
-                prefixText: '\$ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('痍⑥냼'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final amount = double.tryParse(amountController.text.trim());
-              if (name.isEmpty || amount == null || amount <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('鍮꾩슜 ?대쫫怨??щ컮瑜?USD 湲덉븸???낅젰??二쇱꽭??')),
-                );
-                return;
-              }
-              Navigator.pop(dialogContext, true);
-            },
-            child: const Text('異붽?'),
-          ),
-        ],
-      ),
-    );
-
-    if (added == true && mounted) {
-      final name = nameController.text.trim();
-      final amount = double.tryParse(amountController.text.trim());
-      if (name.isNotEmpty && amount != null && amount > 0) {
-        setState(() {
-          _extraCosts.add(
-            ExtraCostItem(name: name, amountUsd: amount),
-          );
-        });
-      }
-    }
-
-    nameController.dispose();
-    amountController.dispose();
-  }
   void _removeBox(int i) {
     if (_boxes.length <= 1) return;
     setState(() {
@@ -302,82 +228,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         boxes: previewBoxes,
         result: calculation,
         rates: rates,
-        extraCosts: List<ExtraCostItem>.unmodifiable(_extraCosts),
       ),
     );
-  }
-
-  Future<void> _addQuoteExtraCost() async {
-    final nameController = TextEditingController();
-    final amountController = TextEditingController();
-    final added = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('湲고? 鍮꾩슜 異붽?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: '鍮꾩슜紐?,
-                hintText: '?? ?듦?鍮? 異붽? 諛곗넚鍮?,
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: '湲덉븸 (USD)',
-                prefixText: r'$ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('痍⑥냼'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final amount = double.tryParse(amountController.text.trim());
-              if (name.isEmpty || amount == null || amount <= 0) {
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(content: Text('鍮꾩슜紐낃낵 0蹂대떎 ??USD 湲덉븸???낅젰??二쇱꽭??')),
-                );
-                return;
-              }
-              Navigator.pop(dialogContext, true);
-            },
-            child: const Text('異붽?'),
-          ),
-        ],
-      ),
-    );
-
-    if (added == true) {
-      final amount = double.tryParse(amountController.text.trim());
-      if (amount != null && amount > 0 && mounted) {
-        setState(() {
-          _extraCosts.add(
-            ExtraCostItem(
-              name: nameController.text.trim(),
-              amountUsd: amount,
-            ),
-          );
-        });
-      }
-    }
-    nameController.dispose();
-    amountController.dispose();
   }
   Future<void> _loadSpecialQuotes() async {
     if (!_isLoggedIn || !SupabaseConfig.isConfigured) {
@@ -711,42 +563,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _addQuoteExtraCost,
-            icon: const Icon(Icons.add_card_outlined, size: 18),
-            label: const Text('기타 비용 추가 (+$)',
-                style: TextStyle(fontSize: 13)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.navyPrimary,
-              side: const BorderSide(color: AppColors.navyPrimary),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-          ),
-          if (_extraCosts.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            ..._extraCosts.asMap().entries.map(
-              (entry) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(entry.value.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('\$${entry.value.amountUsd.toStringAsFixed(2)}'),
-                    IconButton(
-                      tooltip: '삭제',
-                      onPressed: () =>
-                          setState(() => _extraCosts.removeAt(entry.key)),
-                      icon: const Icon(Icons.close, size: 18),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
           const SizedBox(height: 20),
           Row(
             children: [
@@ -1315,9 +1131,6 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
-
-
-
 
 
 

@@ -11,7 +11,6 @@ import '../core/document_text_catalog.dart';
 import '../services/document_pdf_export.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
-import '../services/receipt_extra_cost_service.dart';
 
 
 double _d(dynamic value, [double fallback = 0]) =>
@@ -52,7 +51,6 @@ class QuotationPreviewDialog extends StatefulWidget {
     required this.boxes,
     required this.result,
     required this.rates,
-    this.extraCosts = const <ExtraCostItem>[],
   });
 
   final String routeLabel;
@@ -60,7 +58,6 @@ class QuotationPreviewDialog extends StatefulWidget {
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
 
-  final List<ExtraCostItem> extraCosts;
   @override
   State<QuotationPreviewDialog> createState() => _QuotationPreviewDialogState();
 }
@@ -139,7 +136,6 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         boxes: widget.boxes,
         result: widget.result,
         rates: widget.rates,
-        extraCosts: widget.extraCosts,
         issuedAt: _issuedAt,
         logo: _logo!,
         qrUsd: _qrUsd!,
@@ -349,7 +345,6 @@ class _DigitalQuotationPainter extends CustomPainter {
     required this.boxes,
     required this.result,
     required this.rates,
-    required this.extraCosts,
     required this.issuedAt,
     required this.logo,
     required this.qrUsd,
@@ -363,7 +358,6 @@ class _DigitalQuotationPainter extends CustomPainter {
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
-  final List<ExtraCostItem> extraCosts;
   final DateTime issuedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
@@ -524,15 +518,13 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
-    final extraTotal = extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final extraNames = extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
-    final usd = result.totalUsd + extraTotal;
+    final usd = result.totalUsd;
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, extraNames.isEmpty ? '기타 비용' : '기타 비용 ($extraNames)', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, extraTotal > 0 ? '+${MoneyFormat.usd(extraTotal)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
 
@@ -758,7 +750,6 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
-
 
 
 
