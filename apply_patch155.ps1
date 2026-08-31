@@ -1,153 +1,51 @@
-import 'package:flutter/material.dart';
+﻿$ErrorActionPreference = "Stop"
+$utf8 = [System.Text.UTF8Encoding]::new($false)
 
-import '../core/app_colors.dart';
-import '../services/excel_bulk_management_service.dart';
-import '../services/shipment_service.dart';
-
-class ExcelBulkManagementScreen extends StatefulWidget {
-  const ExcelBulkManagementScreen({super.key});
-
-  @override
-  State<ExcelBulkManagementScreen> createState() =>
-      _ExcelBulkManagementScreenState();
+function ReadText([string]$p) { [System.IO.File]::ReadAllText((Resolve-Path $p), $utf8) }
+function WriteText([string]$p,[string]$t) { [System.IO.File]::WriteAllText((Resolve-Path $p),$t,$utf8) }
+function ReplaceOnce([string]$text,[string]$old,[string]$new,[string]$label) {
+  $count = ([regex]::Matches($text,[regex]::Escape($old))).Count
+  if ($count -ne 1) { throw "안전 중단 [$label]: 대상 발견 수=$count" }
+  return $text.Replace($old,$new)
 }
 
-class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
-  List<ExcelBulkBatch> _batches = const [];
-  List<Map<String, dynamic>> _rows = const [];
-  final Set<String> _checked = <String>{};
+# ============================================================
+# 1) Excel bulk service: 송장번호까지 RPC 전달
+# ============================================================
+$p="lib/services/excel_bulk_management_service.dart"
+$t=ReadText $p
 
-  String? _route;
-  int? _year;
-  String? _voyage;
-  bool _busy = true;
+$t=ReplaceOnce $t @'
+    required String boxNumber,
+    required String senderName,
+'@ @'
+    required String boxNumber,
+    required String invoiceNumber,
+    required String senderName,
+'@ "bulk service invoice argument"
 
-  List<String> get _routes =>
-      _batches.map((e) => e.route).where((e) => e.isNotEmpty).toSet().toList()
-        ..sort();
+$t=ReplaceOnce $t @'
+        'p_box_number': boxNumber.trim(),
+        'p_sender_name': senderName.trim(),
+'@ @'
+        'p_box_number': boxNumber.trim(),
+        'p_invoice_number': invoiceNumber.trim(),
+        'p_sender_name': senderName.trim(),
+'@ "bulk service invoice param"
 
-  List<int> get _years {
-    final values = _batches
-        .where((e) => _route == null || e.route == _route)
-        .map((e) => e.year)
-        .where((e) => e > 0)
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
-    return values;
-  }
+WriteText $p $t
 
-  List<String> get _voyages {
-    final values = _batches
-        .where((e) =>
-            (_route == null || e.route == _route) &&
-            (_year == null || e.year == _year))
-        .map((e) => e.voyage)
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => a.compareTo(b));
-    return values;
-  }
+# ============================================================
+# 2) Excel bulk management screen
+# ============================================================
+$p="lib/screens/excel_bulk_management_screen.dart"
+$t=ReadText $p
 
-  @override
-  void initState() {
-    super.initState();
-    _loadBatches();
-  }
-
-  Future<void> _loadBatches() async {
-    setState(() => _busy = true);
-    try {
-      final batches = await ExcelBulkManagementService.instance.listBatches();
-      if (!mounted) return;
-      setState(() {
-        _batches = batches;
-        if (_route != null && !_routes.contains(_route)) _route = null;
-        if (_year != null && !_years.contains(_year)) _year = null;
-        if (_voyage != null && !_voyages.contains(_voyage)) _voyage = null;
-      });
-    } catch (error) {
-      _message('항차 목록 조회 실패: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _loadRows() async {
-    if (_route == null || _year == null || _voyage == null) {
-      setState(() {
-        _rows = const [];
-        _checked.clear();
-      });
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      final rows = await ExcelBulkManagementService.instance.listRows(
-        route: _route!,
-        year: _year!,
-        voyage: _voyage!,
-      );
-      if (!mounted) return;
-      setState(() {
-        _rows = rows;
-        _checked.clear();
-      });
-    } catch (error) {
-      _message('화물 데이터 조회 실패: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  void _routeChanged(String? value) {
-    setState(() {
-      _route = value;
-      _year = null;
-      _voyage = null;
-      _rows = const [];
-      _checked.clear();
-    });
-  }
-
-  void _yearChanged(int? value) {
-    setState(() {
-      _year = value;
-      _voyage = null;
-      _rows = const [];
-      _checked.clear();
-    });
-  }
-
-  void _voyageChanged(String? value) {
-    setState(() {
-      _voyage = value;
-      _rows = const [];
-      _checked.clear();
-    });
-    if (value != null) _loadRows();
-  }
-
-  void _toggle(String id) {
-    setState(() {
-      if (!_checked.remove(id)) _checked.add(id);
-    });
-  }
-
-  void _toggleAll(bool checked) {
-    setState(() {
-      if (checked) {
-        _checked
-          ..clear()
-          ..addAll(_rows.map((e) => '${e['id']}'));
-      } else {
-        _checked.clear();
-      }
-    });
-  }
-
+# A. receipt-group toggle helper
+$anchor=@'
+  Future<void> _setLock(bool locked) async {
+'@
+$insert=@'
   void _toggleReceiptRows(List<Map<String, dynamic>> rows) {
     final ids = rows.map((e) => '${e['id']}').toSet();
     setState(() {
@@ -160,191 +58,58 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
   }
 
   Future<void> _setLock(bool locked) async {
-    if (_checked.isEmpty) return;
-    setState(() => _busy = true);
-    try {
-      await ExcelBulkManagementService.instance
-          .setLocked(_checked.toList(), locked);
-      _message(locked ? '선택한 화물 데이터를 잠금했습니다.' : '선택한 화물 데이터 잠금을 해제했습니다.');
-      await _loadRows();
-    } catch (error) {
-      _message('잠금 처리 실패: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+'@
+$t=ReplaceOnce $t $anchor $insert "bulk receipt toggle"
 
-  Future<void> _requestDeleteSelected() async {
-    if (_checked.isEmpty) return;
-    final ok = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('화물 삭제'),
-            content: Text(
-              '선택한 ${_checked.length}개의 화물을 삭제 합니다.\n\n'
-              '30일 뒤에 자동으로 완전히 삭제 되며, 필요시 삭제 취소 혹은 바로 삭제가 가능 합니다.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('삭제'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!ok) return;
-
-    setState(() => _busy = true);
-    try {
-      for (final id in _checked.toList()) {
-        await ShipmentService.instance.requestShipmentDeletion(id);
-      }
-      _message('선택한 화물을 삭제 처리했습니다. 30일 동안 복구할 수 있습니다.');
-      await _loadRows();
-      await _loadBatches();
-    } catch (error) {
-      _message('화물 삭제 처리 실패: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _edit(Map<String, dynamic> row) async {
+# B. edit dialog: invoice controller + editable field
+$t=ReplaceOnce $t @'
+    final box = TextEditingController(text: '${row['box_number'] ?? ''}');
+    final special = TextEditingController(text: '${row['sender_name'] ?? ''}');
+'@ @'
     final box = TextEditingController(text: '${row['box_number'] ?? ''}');
     final invoice =
         TextEditingController(text: '${row['invoice_number'] ?? ''}');
     final special = TextEditingController(text: '${row['sender_name'] ?? ''}');
-    final name = TextEditingController(text: '${row['consignee_name'] ?? ''}');
-    final phone = TextEditingController(text: '${row['consignee_phone'] ?? ''}');
-    final receipt =
-        TextEditingController(text: '${row['receipt_number'] ?? ''}');
-    final zone =
-        TextEditingController(text: '${row['unloading_zone'] ?? ''}');
-    final notes = TextEditingController(text: '${row['notes'] ?? ''}');
+'@ "bulk invoice controller"
 
-    final save = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('화물 데이터 편집 · ${row['box_number'] ?? ''}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+$t=ReplaceOnce $t @'
+                  _field(box, '박스번호'),
+                  _readOnly('${row['invoice_number'] ?? ''}', '송장번호 (수정 불가)'),
+'@ @'
                   _field(box, '화물번호'),
                   _field(invoice, '송장번호'),
-                  _field(special, '특이사항', maxLines: 2),
-                  if ('${row['special_note_auto'] ?? ''}'.trim().isNotEmpty)
-                    _readOnly('${row['special_note_auto'] ?? ''}', '자동 매칭 특이사항'),
-                  _field(name, '이름'),
-                  _field(phone, '전화번호'),
-                  _field(receipt, '영수번호'),
-                  _field(zone, '구획'),
-                  _field(notes, '비고', maxLines: 3),
-                  if (row['data_locked'] == true)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lock, size: 16, color: Colors.redAccent),
-                          SizedBox(width: 5),
-                          Text(
-                            '데이터 수정 잠금된 화물',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('저장'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+'@ "bulk invoice field"
 
-    if (save) {
-      try {
-        await ExcelBulkManagementService.instance.updateRow(
-          id: '${row['id']}',
+$t=ReplaceOnce $t @'
+          boxNumber: box.text,
+          senderName: special.text,
+'@ @'
           boxNumber: box.text,
           invoiceNumber: invoice.text,
           senderName: special.text,
-          name: name.text,
-          phone: phone.text,
-          receiptNumber: receipt.text,
-          unloadingZone: zone.text,
-          notes: notes.text,
-        );
-        _message('화물 데이터를 수정했습니다.');
-        await _loadRows();
-      } catch (error) {
-        _message('수정 실패: $error');
-      }
-    }
+'@ "bulk invoice save"
 
+$t=ReplaceOnce $t @'
+    box.dispose();
+    special.dispose();
+'@ @'
     // Dialog reverse transition 종료 전에 controller를 dispose하지 않습니다.
     await Future<void>.delayed(const Duration(milliseconds: 350));
     box.dispose();
     invoice.dispose();
     special.dispose();
-    name.dispose();
-    phone.dispose();
-    receipt.dispose();
-    zone.dispose();
-    notes.dispose();
-  }
+'@ "bulk delayed dispose"
 
-  Widget _field(TextEditingController controller, String label,
-          {int maxLines = 1}) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-      );
+# C. build() 전체를 함수 범위 기준으로 교체
+$startToken="  @override`n  Widget build(BuildContext context) {"
+$endToken="`n  Widget _rowCard(Map<String, dynamic> row) {"
+$s=$t.IndexOf($startToken)
+$e=$t.IndexOf($endToken)
+if ($s -lt 0 -or $e -le $s) { throw "안전 중단 [bulk build range]" }
+$before=$t.Substring(0,$s)
+$after=$t.Substring($e)
 
-  Widget _readOnly(String value, String label) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: TextFormField(
-          initialValue: value,
-          readOnly: true,
-          decoration: InputDecoration(
-            labelText: label,
-            border: const OutlineInputBorder(),
-            filled: true,
-            isDense: true,
-          ),
-        ),
-      );
-
-  void _message(String value) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
-  }
-
+$build=@'
   @override
   Widget build(BuildContext context) {
     final allChecked =
@@ -616,6 +381,20 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
             ),
     );
   }
+'@
+
+$t=$before+$build+$after
+
+# D. row card 함수 전체 교체: 카드 탭=체크, 우측 편집 아이콘
+$startToken="  Widget _rowCard(Map<String, dynamic> row) {"
+$endToken="`n  Widget _line(String label, dynamic value)"
+$s=$t.IndexOf($startToken)
+$e=$t.IndexOf($endToken)
+if ($s -lt 0 -or $e -le $s) { throw "안전 중단 [bulk rowCard range]" }
+$before=$t.Substring(0,$s)
+$after=$t.Substring($e)
+
+$rowCard=@'
   Widget _rowCard(Map<String, dynamic> row) {
     final id = '${row['id']}';
     final locked = row['data_locked'] == true;
@@ -688,12 +467,269 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       ),
     );
   }
-  Widget _line(String label, dynamic value) => Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text(
-          '$label: ${value ?? ''}',
-          style: const TextStyle(fontSize: 12),
-        ),
-      );
-}
+'@
+$t=$before+$rowCard+$after
+WriteText $p $t
 
+# ============================================================
+# 3) Change approval: incomplete 확인/수정에 송장/영수번호
+# ============================================================
+$p="lib/screens/change_approval_screen.dart"
+$t=ReadText $p
+
+# _reviewIncomplete 함수 범위만 교체
+$startToken="  Future<void> _reviewIncomplete("
+$endToken="`n  Widget _incompleteCard("
+$s=$t.IndexOf($startToken)
+$e=$t.IndexOf($endToken)
+if ($s -lt 0 -or $e -le $s) { throw "안전 중단 [reviewIncomplete range]" }
+$before=$t.Substring(0,$s)
+$after=$t.Substring($e)
+
+$fn=@'
+  Future<void> _reviewIncomplete(
+    Map<String, dynamic> row, {
+    required bool lock,
+  }) async {
+    final invoice =
+        TextEditingController(text: '${row['invoice_number'] ?? ''}');
+    final name =
+        TextEditingController(text: '${row['consignee_name'] ?? ''}');
+    final phone =
+        TextEditingController(text: '${row['consignee_phone'] ?? ''}');
+    final receipt =
+        TextEditingController(text: '${row['receipt_number'] ?? ''}');
+    final notes = TextEditingController(text: '${row['notes'] ?? ''}');
+    String? receiptWarning;
+
+    final save = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: Text(
+                lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: invoice,
+                      decoration: const InputDecoration(
+                        labelText: '송장번호',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                        labelText: '수취인 이름 / 회사명',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: phone,
+                      decoration: const InputDecoration(
+                        labelText: '전화번호 (없으면 비워도 됨)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: receipt,
+                      decoration: const InputDecoration(
+                        labelText: '영수번호',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) {
+                        if (receiptWarning != null) {
+                          setDialogState(() => receiptWarning = null);
+                        }
+                      },
+                    ),
+                    if (receiptWarning != null) ...[
+                      const SizedBox(height: 5),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          receiptWarning!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notes,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '비고',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    final check = await UnknownRecipientService.instance
+                        .checkReceiptNumber(
+                      shipmentId:
+                          '${row['shipment_id'] ?? row['id'] ?? ''}',
+                      receiptNumber: receipt.text,
+                    );
+                    if (!context.mounted) return;
+                    if (check['duplicate'] == true) {
+                      final suggested =
+                          '${check['suggested_receipt'] ?? ''}'.trim();
+                      setDialogState(() {
+                        receiptWarning = suggested.isEmpty
+                            ? '이미 사용 중인 영수번호입니다.'
+                            : '이미 사용 중인 영수번호입니다. 추천: $suggested';
+                      });
+                      if (suggested.isNotEmpty) {
+                        receipt.text = suggested;
+                        receipt.selection = TextSelection.fromPosition(
+                          TextPosition(offset: receipt.text.length),
+                        );
+                      }
+                      return; // 추천만 기입. 자동 저장/확정 금지.
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(dialogContext, true);
+                    }
+                  },
+                  child: Text(lock ? '확정 및 잠금' : '수정 저장'),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        false;
+
+    if (save) {
+      try {
+        await UnknownRecipientService.instance.reviewIncomplete(
+          shipmentId: '${row['shipment_id'] ?? row['id'] ?? ''}',
+          invoiceNumber: invoice.text,
+          consigneeName: name.text,
+          consigneePhone: phone.text,
+          receiptNumber: receipt.text,
+          notes: notes.text,
+          lock: lock,
+        );
+        if (mounted) {
+          _message(
+            lock
+                ? '불확실 데이터를 확인 완료하고 잠금했습니다.'
+                : '불확실 데이터를 수정했습니다.',
+          );
+          await _load();
+        }
+      } catch (error) {
+        _message('불확실 데이터 처리 실패: $error');
+      }
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    invoice.dispose();
+    name.dispose();
+    phone.dispose();
+    receipt.dispose();
+    notes.dispose();
+  }
+'@
+$t=$before+$fn+$after
+WriteText $p $t
+
+# ============================================================
+# 4) Unknown recipient service: fields + duplicate check RPC
+# ============================================================
+$p="lib/services/unknown_recipient_service.dart"
+$t=ReadText $p
+
+$t=ReplaceOnce $t @'
+    required String shipmentId,
+    required String consigneeName,
+'@ @'
+    required String shipmentId,
+    required String invoiceNumber,
+    required String consigneeName,
+'@ "review incomplete invoice arg"
+
+$t=ReplaceOnce $t @'
+    required String consigneePhone,
+    required String notes,
+'@ @'
+    required String consigneePhone,
+    required String receiptNumber,
+    required String notes,
+'@ "review incomplete receipt arg"
+
+$t=ReplaceOnce $t @'
+        'p_shipment_id': id,
+        'p_consignee_name': consigneeName.trim(),
+'@ @'
+        'p_shipment_id': id,
+        'p_invoice_number': invoiceNumber.trim(),
+        'p_consignee_name': consigneeName.trim(),
+'@ "review incomplete invoice param"
+
+$t=ReplaceOnce $t @'
+        'p_consignee_phone': consigneePhone.trim(),
+        'p_notes': notes.trim(),
+'@ @'
+        'p_consignee_phone': consigneePhone.trim(),
+        'p_receipt_number': receiptNumber.trim(),
+        'p_notes': notes.trim(),
+'@ "review incomplete receipt param"
+
+$anchor=@'
+  Future<void> resolveAutoUnmatched({
+'@
+$method=@'
+  Future<Map<String, dynamic>> checkReceiptNumber({
+    required String shipmentId,
+    required String receiptNumber,
+  }) async {
+    if (!SupabaseConfig.isConfigured) {
+      return const {'duplicate': false};
+    }
+    final raw = await SupabaseService.client.rpc(
+      'admin_check_receipt_number',
+      params: {
+        'p_shipment_id': shipmentId.trim(),
+        'p_receipt_number': receiptNumber.trim(),
+      },
+    );
+    return Map<String, dynamic>.from(raw as Map);
+  }
+
+  Future<void> resolveAutoUnmatched({
+'@
+$t=ReplaceOnce $t $anchor $method "receipt check method"
+WriteText $p $t
+
+Write-Host ""
+Write-Host "Patch155 Flutter 적용 완료"
+Write-Host "- Excel 일괄관리 송장번호 편집"
+Write-Host "- 카드 탭=체크 / 우측 편집 버튼"
+Write-Host "- 영수번호 그룹 체크"
+Write-Host "- 하단 고정 전체/잠금/해체/삭제"
+Write-Host "- 카드 표시 간결화"
+Write-Host "- 승인관리 송장번호/영수번호 수정"
+Write-Host "- 영수번호 중복 시 다음 번호 추천만 입력 (자동 확정 안함)"
+Write-Host "- Dialog controller assertion 방지"
+Write-Host ""
+Write-Host "먼저 flutter analyze 실행"
+Write-Host "SQL 090은 analyze 0 error 확인 후 실행"

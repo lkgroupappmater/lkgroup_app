@@ -69,8 +69,10 @@ class UnknownRecipientService {
 
   Future<void> reviewIncomplete({
     required String shipmentId,
+    required String invoiceNumber,
     required String consigneeName,
     required String consigneePhone,
+    required String receiptNumber,
     required String notes,
     required bool lock,
   }) async {
@@ -81,13 +83,32 @@ class UnknownRecipientService {
       'admin_review_incomplete_shipment',
       params: {
         'p_shipment_id': id,
+        'p_invoice_number': invoiceNumber.trim(),
         'p_consignee_name': consigneeName.trim(),
         'p_consignee_phone': consigneePhone.trim(),
+        'p_receipt_number': receiptNumber.trim(),
         'p_notes': notes.trim(),
         'p_lock': lock,
       },
     );
   }
+  Future<Map<String, dynamic>> checkReceiptNumber({
+    required String shipmentId,
+    required String receiptNumber,
+  }) async {
+    if (!SupabaseConfig.isConfigured) {
+      return const {'duplicate': false};
+    }
+    final raw = await SupabaseService.client.rpc(
+      'admin_check_receipt_number',
+      params: {
+        'p_shipment_id': shipmentId.trim(),
+        'p_receipt_number': receiptNumber.trim(),
+      },
+    );
+    return Map<String, dynamic>.from(raw as Map);
+  }
+
   Future<void> resolveAutoUnmatched({
     required int queueId,
     required String consigneeName,

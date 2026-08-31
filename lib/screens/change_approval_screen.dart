@@ -263,55 +263,128 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     Map<String, dynamic> row, {
     required bool lock,
   }) async {
-    final name = TextEditingController(text: '${row['consignee_name'] ?? ''}');
-    final phone = TextEditingController(text: '${row['consignee_phone'] ?? ''}');
+    final invoice =
+        TextEditingController(text: '${row['invoice_number'] ?? ''}');
+    final name =
+        TextEditingController(text: '${row['consignee_name'] ?? ''}');
+    final phone =
+        TextEditingController(text: '${row['consignee_phone'] ?? ''}');
+    final receipt =
+        TextEditingController(text: '${row['receipt_number'] ?? ''}');
     final notes = TextEditingController(text: '${row['notes'] ?? ''}');
+    String? receiptWarning;
 
     final save = await showDialog<bool>(
           context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(
-                      labelText: '수취인 이름 / 회사명',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: phone,
-                    decoration: const InputDecoration(
-                      labelText: '전화번호 (없으면 비워도 됨)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notes,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: '비고',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: Text(
+                lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정',
               ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: invoice,
+                      decoration: const InputDecoration(
+                        labelText: '송장번호',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                        labelText: '수취인 이름 / 회사명',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: phone,
+                      decoration: const InputDecoration(
+                        labelText: '전화번호 (없으면 비워도 됨)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: receipt,
+                      decoration: const InputDecoration(
+                        labelText: '영수번호',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) {
+                        if (receiptWarning != null) {
+                          setDialogState(() => receiptWarning = null);
+                        }
+                      },
+                    ),
+                    if (receiptWarning != null) ...[
+                      const SizedBox(height: 5),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          receiptWarning!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notes,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '비고',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    final check = await UnknownRecipientService.instance
+                        .checkReceiptNumber(
+                      shipmentId:
+                          '${row['shipment_id'] ?? row['id'] ?? ''}',
+                      receiptNumber: receipt.text,
+                    );
+                    if (!context.mounted) return;
+                    if (check['duplicate'] == true) {
+                      final suggested =
+                          '${check['suggested_receipt'] ?? ''}'.trim();
+                      setDialogState(() {
+                        receiptWarning = suggested.isEmpty
+                            ? '이미 사용 중인 영수번호입니다.'
+                            : '이미 사용 중인 영수번호입니다. 추천: $suggested';
+                      });
+                      if (suggested.isNotEmpty) {
+                        receipt.text = suggested;
+                        receipt.selection = TextSelection.fromPosition(
+                          TextPosition(offset: receipt.text.length),
+                        );
+                      }
+                      return; // 추천만 기입. 자동 저장/확정 금지.
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(dialogContext, true);
+                    }
+                  },
+                  child: Text(lock ? '확정 및 잠금' : '수정 저장'),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(lock ? '확정 및 잠금' : '수정 저장'),
-              ),
-            ],
           ),
         ) ??
         false;
@@ -320,15 +393,19 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       try {
         await UnknownRecipientService.instance.reviewIncomplete(
           shipmentId: '${row['shipment_id'] ?? row['id'] ?? ''}',
+          invoiceNumber: invoice.text,
           consigneeName: name.text,
           consigneePhone: phone.text,
+          receiptNumber: receipt.text,
           notes: notes.text,
           lock: lock,
         );
         if (mounted) {
-          _message(lock
-              ? '불확실 데이터를 확인 완료하고 잠금했습니다.'
-              : '불확실 데이터를 수정했습니다.');
+          _message(
+            lock
+                ? '불확실 데이터를 확인 완료하고 잠금했습니다.'
+                : '불확실 데이터를 수정했습니다.',
+          );
           await _load();
         }
       } catch (error) {
@@ -336,11 +413,13 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       }
     }
 
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    invoice.dispose();
     name.dispose();
     phone.dispose();
+    receipt.dispose();
     notes.dispose();
   }
-
   Widget _incompleteCard(Map<String, dynamic> row) {
     return Card(
       color: const Color(0xFFFFFBF2),
