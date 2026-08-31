@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -25,6 +25,30 @@ class ExcelImportResult {
   // 이름/할인율은 있으나 전화번호가 없어 안전상 적용 대기 중인 규칙.
   final int customerRulesWaitingForPhone;
   final String message;
+}
+
+class _DeliveryRowStyle {
+  const _DeliveryRowStyle({
+    this.greenColumns = const <int>{},
+    this.yellowColumns = const <int>{},
+  });
+
+  final Set<int> greenColumns;
+  final Set<int> yellowColumns;
+
+  bool get isCity => greenColumns.isNotEmpty;
+
+  bool preferredFor(int? companyColumn, int? destinationColumn) {
+    if (yellowColumns.isEmpty) return false;
+    if (companyColumn != null && yellowColumns.contains(companyColumn)) {
+      return true;
+    }
+    if (destinationColumn != null &&
+        yellowColumns.contains(destinationColumn)) {
+      return true;
+    }
+    return companyColumn == null && destinationColumn == null;
+  }
 }
 
 class ExcelImportService {
@@ -142,6 +166,7 @@ class ExcelImportService {
     onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
+    await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
     onProgress?.call(0.86, '고객 규칙 확인 완료 · 원본 Excel 보관 중');
 
     if (SupabaseConfig.isConfigured) {
@@ -415,6 +440,478 @@ class ExcelImportService {
               : count >= 5
                   ? 'B'
                   : 'A';
+    }
+  }
+
+  Future<int> _importLocalDeliveryProfiles(
+    Uint8List bytes,
+    Map<String, List<List<String>>> workbook, {
+    required String routeKey,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return 0;
+
+    // BASE Excel에서 시내/지방 배송표를 운영하는 경로만 자동 동기화합니다.
+    // 할인율과 마찬가지로 반드시 routeKey 단위로 분리하며, 해상/항공 규칙을
+    // 서로 섞거나 "all" 규칙으로 변환하지 않습니다.
+    const supportedRoutes = <String>{
+      'kr_la_sea',
+      'kr_la_air',
+      'th_la_land',
+    };
+    if (!supportedRoutes.contains(routeKey)) return 0;
+
+    String? sheetName;
+    List<List<String>>? sheet;
+    for (final entry in workbook.entries) {
+      final normalized = entry.key
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\s,·ㆍ._-]+'), '');
+      if (normalized == '시내지방배송' ||
+          normalized == 'localdelivery' ||
+          normalized == 'cityprovincedelivery') {
+        sheetName = entry.key;
+        sheet = entry.value;
+        break;
+      }
+    }
+    if (sheetName == null || sheet == null || sheet.isEmpty) return 0;
+
+    final header = _findLocalDeliveryHeader(sheet);
+    final headerRow = header.row;
+    final columns = header.columns;
+    final styles = _readLocalDeliveryStyles(bytes, sheetName);
+
+    int? col(String key) => columns[key];
+
+    String valueAt(List<String> row, int? index) {
+      if (index == null || index < 0 || index >= row.length) return '';
+      return row[index].trim();
+    }
+
+    final bySourceNo = <int, Map<String, dynamic>>{};
+    for (var rr = headerRow + 1; rr < sheet.length; rr++) {
+      final row = sheet[rr];
+      if (row.every((cell) => cell.trim().isEmpty)) continue;
+
+      final sourceRaw = valueAt(row, col('source_no'));
+      final sourceNo = int.tryParse(
+            sourceRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          (rr + 1);
+
+      var customerName = valueAt(row, col('customer_name'));
+      final alternateName = valueAt(row, col('alternate_name'));
+      var companyName = valueAt(row, col('customer_company'));
+      final phoneDisplay = valueAt(row, col('phone'));
+      final phone = _digits(phoneDisplay);
+      final localCompany = valueAt(row, col('local_company'));
+      final destination = valueAt(row, col('destination'));
+      var paidBy = valueAt(row, col('paid_by'));
+      final notes = valueAt(row, col('notes'));
+
+      // Known BASE layout fallback:
+      // A No. / B customer / C alternate / D phone / E local company /
+      // F destination / G payment / H notes.
+      if (customerName.isEmpty && row.length > 1) {
+        customerName = row[1].trim();
+      }
+      if (companyName.isEmpty &&
+          customerName.isEmpty &&
+          row.length > 2) {
+        companyName = row[2].trim();
+      }
+
+      final fallbackPhoneDisplay =
+          phoneDisplay.isEmpty && row.length > 3 ? row[3].trim() : phoneDisplay;
+      final normalizedPhone =
+          phone.isEmpty ? _digits(fallbackPhoneDisplay) : phone;
+      final fallbackLocalCompany =
+          localCompany.isEmpty && row.length > 4 ? row[4].trim() : localCompany;
+      final fallbackDestination =
+          destination.isEmpty && row.length > 5 ? row[5].trim() : destination;
+
+      if (paidBy.isEmpty) {
+        final wholeRow = row.join(' ').toLowerCase();
+        if ((wholeRow.contains('한국') || wholeRow.contains('korea')) &&
+            (wholeRow.contains('선결제') ||
+                wholeRow.contains('선불') ||
+                wholeRow.contains('prepaid'))) {
+          paidBy = '한국 선결제';
+        } else if (wholeRow.contains('착불')) {
+          paidBy = '착불';
+        } else if (wholeRow.contains('선불') ||
+            wholeRow.contains('prepaid')) {
+          paidBy = '선불';
+        }
+      }
+
+      if (customerName.isEmpty &&
+          alternateName.isEmpty &&
+          companyName.isEmpty) {
+        continue;
+      }
+
+      final rowStyle = styles[rr] ?? const _DeliveryRowStyle();
+      final rowText = row.join(' ').toLowerCase();
+      final isCity = rowStyle.isCity ||
+          rowText.contains('시내배송') ||
+          rowText.contains('시내 배송') ||
+          rowText.contains('city');
+      final preferred = rowStyle.preferredFor(
+        col('local_company') ?? (row.length > 4 ? 4 : null),
+        col('destination') ?? (row.length > 5 ? 5 : null),
+      );
+
+      final profile = <String, dynamic>{
+        'route_key': routeKey,
+        'source_no': sourceNo,
+        'customer_name': customerName,
+        'alternate_name': alternateName,
+        'company_name': companyName,
+        'phone': normalizedPhone,
+        'phone_display': fallbackPhoneDisplay,
+        'delivery_type': isCity ? 'city' : 'province',
+        'local_company': fallbackLocalCompany,
+        'destination_address': fallbackDestination,
+        'paid_by': paidBy,
+        'notes': notes,
+        'preferred': preferred,
+        'active': normalizedPhone.isNotEmpty &&
+            (customerName.isNotEmpty ||
+                alternateName.isNotEmpty ||
+                companyName.isNotEmpty),
+      };
+
+      final existing = bySourceNo[sourceNo];
+      if (existing == null ||
+          preferred == true && existing['preferred'] != true) {
+        bySourceNo[sourceNo] = profile;
+      }
+    }
+
+    if (bySourceNo.isEmpty) return 0;
+
+    await SupabaseService.client.from('local_delivery_profiles').upsert(
+          bySourceNo.values.toList(growable: false),
+          onConflict: 'route_key,source_no',
+        );
+
+    try {
+      await SupabaseService.client.rpc('admin_refresh_shipment_special_notes');
+    } catch (_) {
+      // 배송표 저장 자체는 기존 특이사항 재계산 실패 때문에 막지 않습니다.
+    }
+    return bySourceNo.length;
+  }
+
+  ({int row, Map<String, int> columns}) _findLocalDeliveryHeader(
+    List<List<String>> sheet,
+  ) {
+    var bestRow = -1;
+    var bestScore = -1;
+    Map<String, int> best = const <String, int>{};
+
+    String keyOf(String value) => value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s·ㆍ._/()-]+'), '');
+
+    for (var r = 0; r < sheet.length && r < 20; r++) {
+      final found = <String, int>{};
+      final row = sheet[r];
+      for (var c = 0; c < row.length; c++) {
+        final key = keyOf(row[c]);
+        if (key.isEmpty) continue;
+
+        if (!found.containsKey('source_no') &&
+            (key == 'no' ||
+                key == '번호' ||
+                key == '순번' ||
+                key == '순서')) {
+          found['source_no'] = c;
+          continue;
+        }
+        if (!found.containsKey('phone') &&
+            (key.contains('전화') ||
+                key.contains('연락처') ||
+                key == 'phone' ||
+                key == 'phonenumber' ||
+                key == 'tel' ||
+                key == 'mobile')) {
+          found['phone'] = c;
+          continue;
+        }
+        if (!found.containsKey('local_company') &&
+            (key.contains('배송업체') ||
+                key.contains('배송회사') ||
+                key.contains('운송회사') ||
+                key.contains('택배') ||
+                key == 'localcompany' ||
+                key == 'deliverycompany' ||
+                key == 'transportcompany')) {
+          found['local_company'] = c;
+          continue;
+        }
+        if (!found.containsKey('destination') &&
+            (key.contains('목적지') ||
+                key.contains('배송지') ||
+                key.contains('주소') ||
+                key.contains('지점') ||
+                key == 'destination' ||
+                key == 'address')) {
+          found['destination'] = c;
+          continue;
+        }
+        if (!found.containsKey('paid_by') &&
+            (key.contains('선불') ||
+                key.contains('착불') ||
+                key.contains('결제') ||
+                key.contains('지불') ||
+                key == 'paidby' ||
+                key == 'payment')) {
+          found['paid_by'] = c;
+          continue;
+        }
+        if (!found.containsKey('notes') &&
+            (key == '비고' ||
+                key == 'remark' ||
+                key == 'remarks' ||
+                key == 'note' ||
+                key == 'notes')) {
+          found['notes'] = c;
+          continue;
+        }
+        if (!found.containsKey('alternate_name') &&
+            (key.contains('영문') ||
+                key.contains('englishname') ||
+                key.contains('alternatename') ||
+                key.contains('라오스명') ||
+                key.contains('laoname'))) {
+          found['alternate_name'] = c;
+          continue;
+        }
+        if (!found.containsKey('customer_company') &&
+            !key.contains('배송') &&
+            !key.contains('운송') &&
+            !key.contains('택배') &&
+            (key == '회사명' ||
+                key == '상호' ||
+                key == '업체명' ||
+                key == 'companyname' ||
+                key == 'customercompany')) {
+          found['customer_company'] = c;
+          continue;
+        }
+        if (!found.containsKey('customer_name') &&
+            !key.contains('영문') &&
+            !key.contains('english') &&
+            !key.contains('라오') &&
+            (key == '이름' ||
+                key == '성명' ||
+                key == '고객명' ||
+                key == '수령인' ||
+                key == '수신인' ||
+                key == 'name' ||
+                key == 'customername')) {
+          found['customer_name'] = c;
+        }
+      }
+
+      final score = found.length;
+      if (score > bestScore) {
+        bestRow = r;
+        bestScore = score;
+        best = found;
+      }
+    }
+
+    if (bestRow >= 0 && bestScore >= 3) {
+      return (row: bestRow, columns: best);
+    }
+
+    // Known BASE sheet fallback.
+    return (
+      row: 0,
+      columns: <String, int>{
+        'source_no': 0,
+        'customer_name': 1,
+        'alternate_name': 2,
+        'phone': 3,
+        'local_company': 4,
+        'destination': 5,
+        'paid_by': 6,
+        'notes': 7,
+      },
+    );
+  }
+
+  Map<int, _DeliveryRowStyle> _readLocalDeliveryStyles(
+    Uint8List bytes,
+    String sheetName,
+  ) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      final files = <String, List<int>>{};
+      for (final file in archive.files) {
+        if (file.isFile) {
+          files[file.name] = List<int>.from(file.content as List<int>);
+        }
+      }
+
+      final workbookBytes = files['xl/workbook.xml'];
+      final relsBytes = files['xl/_rels/workbook.xml.rels'];
+      final stylesBytes = files['xl/styles.xml'];
+      if (workbookBytes == null ||
+          relsBytes == null ||
+          stylesBytes == null) {
+        return const <int, _DeliveryRowStyle>{};
+      }
+
+      final workbookXml = utf8.decode(workbookBytes, allowMalformed: true);
+      final relsXml = utf8.decode(relsBytes, allowMalformed: true);
+      final stylesXml = utf8.decode(stylesBytes, allowMalformed: true);
+
+      final relationships = <String, String>{};
+      final relPattern = RegExp(
+        r'<Relationship\b[^>]*\bId="([^"]+)"[^>]*\bTarget="([^"]+)"[^>]*/?>',
+        caseSensitive: false,
+      );
+      for (final match in relPattern.allMatches(relsXml)) {
+        relationships[match.group(1)!] = match.group(2)!;
+      }
+
+      String? relId;
+      final sheetPattern = RegExp(
+        r'<sheet\b[^>]*\bname="([^"]+)"[^>]*\br:id="([^"]+)"[^>]*/?>',
+        caseSensitive: false,
+      );
+      for (final match in sheetPattern.allMatches(workbookXml)) {
+        if (_xmlDecode(match.group(1) ?? '') == sheetName) {
+          relId = match.group(2);
+          break;
+        }
+      }
+      if (relId == null) return const <int, _DeliveryRowStyle>{};
+
+      var target = relationships[relId] ?? '';
+      target = target.replaceAll(r'\', '/');
+      while (target.startsWith('../')) {
+        target = target.substring(3);
+      }
+      if (target.startsWith('/')) target = target.substring(1);
+      final sheetPath = target.startsWith('xl/') ? target : 'xl/$target';
+      final sheetBytes = files[sheetPath];
+      if (sheetBytes == null) return const <int, _DeliveryRowStyle>{};
+
+      final fillColors = <String?>[];
+      final fillsBody = RegExp(
+        r'<fills\b[^>]*>([\s\S]*?)</fills>',
+        caseSensitive: false,
+      ).firstMatch(stylesXml)?.group(1);
+      if (fillsBody != null) {
+        final fillPattern = RegExp(
+          r'<fill\b[^>]*>([\s\S]*?)</fill>',
+          caseSensitive: false,
+        );
+        for (final fill in fillPattern.allMatches(fillsBody)) {
+          final body = fill.group(1) ?? '';
+          final rgb = RegExp(
+            r'<fgColor\b[^>]*\brgb="([0-9A-Fa-f]{6,8})"',
+            caseSensitive: false,
+          ).firstMatch(body)?.group(1);
+          fillColors.add(rgb?.toUpperCase());
+        }
+      }
+
+      final styleFillIds = <int>[];
+      final cellXfsBody = RegExp(
+        r'<cellXfs\b[^>]*>([\s\S]*?)</cellXfs>',
+        caseSensitive: false,
+      ).firstMatch(stylesXml)?.group(1);
+      if (cellXfsBody != null) {
+        final xfPattern = RegExp(
+          r'<xf\b([^>]*)/?>',
+          caseSensitive: false,
+        );
+        for (final xf in xfPattern.allMatches(cellXfsBody)) {
+          final attrs = xf.group(1) ?? '';
+          final fillId = int.tryParse(
+                RegExp(
+                      r'\bfillId="(\d+)"',
+                      caseSensitive: false,
+                    ).firstMatch(attrs)?.group(1) ??
+                    '',
+              ) ??
+              0;
+          styleFillIds.add(fillId);
+        }
+      }
+
+      final sheetXml = utf8.decode(sheetBytes, allowMalformed: true);
+      final result = <int, _DeliveryRowStyle>{};
+      final rowPattern = RegExp(
+        r'<row\b[^>]*>([\s\S]*?)</row>',
+        caseSensitive: false,
+      );
+      final cellPattern = RegExp(
+        r'<c\b([^>]*?)(?:/>|>([\s\S]*?)</c>)',
+        caseSensitive: false,
+      );
+
+      var rowOrdinal = 0;
+      for (final rowMatch in rowPattern.allMatches(sheetXml)) {
+        final green = <int>{};
+        final yellow = <int>{};
+        final rowXml = rowMatch.group(1) ?? '';
+
+        for (final cellMatch in cellPattern.allMatches(rowXml)) {
+          final attrs = cellMatch.group(1) ?? '';
+          final styleIndex = int.tryParse(
+            RegExp(
+                  r'\bs="(\d+)"',
+                  caseSensitive: false,
+                ).firstMatch(attrs)?.group(1) ??
+                '',
+          );
+          if (styleIndex == null ||
+              styleIndex < 0 ||
+              styleIndex >= styleFillIds.length) {
+            continue;
+          }
+
+          final fillId = styleFillIds[styleIndex];
+          if (fillId < 0 || fillId >= fillColors.length) continue;
+          final rgb = fillColors[fillId];
+          if (rgb == null || rgb.isEmpty) continue;
+
+          final ref = RegExp(
+            r'\br="([A-Z]+)\d+"',
+            caseSensitive: false,
+          ).firstMatch(attrs)?.group(1)?.toUpperCase();
+          if (ref == null) continue;
+          final column = _columnIndex(ref);
+          final rgb6 = rgb.length >= 6
+              ? rgb.substring(rgb.length - 6).toUpperCase()
+              : rgb.toUpperCase();
+
+          if (rgb6 == '92D050') green.add(column);
+          if (rgb6 == 'FFFF00') yellow.add(column);
+        }
+
+        if (green.isNotEmpty || yellow.isNotEmpty) {
+          result[rowOrdinal] = _DeliveryRowStyle(
+            greenColumns: Set<int>.unmodifiable(green),
+            yellowColumns: Set<int>.unmodifiable(yellow),
+          );
+        }
+        rowOrdinal++;
+      }
+
+      return result;
+    } catch (_) {
+      // Style parsing failure must never block cargo import.
+      return const <int, _DeliveryRowStyle>{};
     }
   }
 

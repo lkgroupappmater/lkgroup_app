@@ -352,6 +352,8 @@ class CustomerBenefitService {
         .select()
         .eq('route_key', routeKey)
         .eq('active', true)
+        .order('preferred', ascending: false)
+        .order('source_no')
         .limit(500);
     for (final raw in rows) {
       final rule =
