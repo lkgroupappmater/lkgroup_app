@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../services/shipment_service.dart';
@@ -41,6 +41,29 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     setState(() => _loading = true);
     try {
       final rows = await ShipmentService.instance.getPendingChangeRequests();
+
+      // 변경 요청 RPC가 data_locked를 포함하지 않는 DB 버전도 있으므로,
+      // 실제 shipments 행의 현재 잠금 상태를 보강해 승인 카드에서 확실히 표시합니다.
+      final shipmentIds = rows
+          .map((r) => '${r['shipment_id'] ?? ''}'.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+      if (shipmentIds.isNotEmpty) {
+        final shipmentRows =
+            await ShipmentService.instance.getRowsByIds(shipmentIds);
+        final lockedById = <String, bool>{
+          for (final shipment in shipmentRows)
+            '${shipment['id']}': shipment['data_locked'] == true,
+        };
+        for (final row in rows) {
+          final shipmentId = '${row['shipment_id'] ?? ''}'.trim();
+          if (shipmentId.isNotEmpty && lockedById.containsKey(shipmentId)) {
+            row['data_locked'] = lockedById[shipmentId];
+          }
+        }
+      }
+
       final unknownClaims =
           await UnknownRecipientService.instance.listPendingClaimsForAdmin();
       final autoUnmatched =
@@ -696,7 +719,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                   Icon(Icons.lock, size: 16, color: Colors.redAccent),
                   SizedBox(width: 5),
                   Text(
-                    '데이터 수정 잠금된 화물',
+                    '🔒 현재 잠금 상태',
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.bold,
@@ -771,7 +794,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                   Icon(Icons.lock, size: 16, color: Colors.redAccent),
                   SizedBox(width: 5),
                   Text(
-                    '데이터 수정 잠금된 화물',
+                    '🔒 현재 잠금 상태',
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.bold,

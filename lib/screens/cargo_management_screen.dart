@@ -538,48 +538,85 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
-  Widget _pendingDeletionCard(Map<String, dynamic> item) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '박스번호 ${item['box_number'] ?? ''}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.navyPrimary,
+  Widget _pendingDeletionCard(Map<String, dynamic> item) {
+    final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
+    final receipt = '${item['receipt_number'] ?? ''}'.trim();
+    final zone = '${item['unloading_zone'] ?? ''}'.trim();
+    final phone = '${item['consignee_phone'] ?? ''}'.trim();
+    final receivedDate = _dateOnly(item['received_at']);
+    final length = _naturalNumber(item['length_cm']);
+    final height = _naturalNumber(item['height_cm']);
+    final width = _naturalNumber(item['width_cm']);
+    final size = '$length × $height × $width cm';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${item['consignee_name'] ?? '-'}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navyPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              _infoRow('운송 경로', '${item['route'] ?? ''}'),
-              _infoRow('년도', '${item['shipment_year'] ?? ''}'),
-              _infoRow('항차', _voyageLabel(item['voyage'])),
-              _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-              _infoRow('이름', '${item['consignee_name'] ?? ''}'),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed:
-                          _busy ? null : () => _cancelDeletion(item),
-                      child: const Text('삭제 취소'),
-                    ),
+                Text(
+                  phone.isEmpty ? '-' : phone,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  '${item['route'] ?? ''} · ${item['shipment_year'] ?? ''}년 · ${_voyageLabel(item['voyage'])}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _busy ? null : () => _deleteNow(item),
-                      child: const Text('바로 삭제'),
-                    ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            _infoRow('화물번호', '${item['box_number'] ?? ''}'),
+            _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
+            _infoRow('화물개수', '$quantity개'),
+            _infoRow(
+              '무게 / 크기',
+              '${_weightOneDecimal(item['weight_kg'])} kg / $size',
+            ),
+            _infoRow('입고날짜', receivedDate),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : () => _cancelDeletion(item),
+                    child: const Text('삭제 취소'),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _busy ? null : () => _deleteNow(item),
+                    child: const Text('바로 삭제'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
   Future<void> _reloadCurrentRows() async {
     if (_selectedIds.isEmpty) return;
     final rows = await ShipmentService.instance.getRowsByIds(_selectedIds.toList());
@@ -1362,6 +1399,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       }
     }
 
+    // Dialog reverse transition이 끝나기 전에 controller를 dispose하면
+    // Flutter framework의 _dependents.isEmpty assertion이 발생할 수 있습니다.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     name.dispose(); phone.dispose(); notes.dispose();
     weight.dispose(); length.dispose(); width.dispose(); height.dispose();
   }
@@ -1757,8 +1797,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   visualDensity: VisualDensity.compact,
                 ),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         '$name / ${company.isEmpty ? '-' : company}',
@@ -1767,14 +1809,18 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                           color: AppColors.navyPrimary,
                         ),
                       ),
-                      Text(phone.isEmpty ? '-' : phone,
-                          style: const TextStyle(fontSize: 12)),
+                      Text(
+                        phone.isEmpty ? '-' : phone,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       Text(
                         '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
                         style: const TextStyle(fontSize: 12),
                       ),
-                      Text('총 개수: $totalQty개',
-                          style: const TextStyle(fontSize: 12)),
+                      Text(
+                        '총 개수: $totalQty개',
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
