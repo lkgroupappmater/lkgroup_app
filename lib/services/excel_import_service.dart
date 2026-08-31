@@ -450,9 +450,9 @@ class ExcelImportService {
   }) async {
     if (!SupabaseConfig.isConfigured) return 0;
 
-    // BASE Excel에서 시내/지방 배송표를 운영하는 경로만 자동 동기화합니다.
-    // 할인율과 마찬가지로 반드시 routeKey 단위로 분리하며, 해상/항공 규칙을
-    // 서로 섞거나 "all" 규칙으로 변환하지 않습니다.
+    // Patch166: 새 BASE Excel은 지방배송/시내배송을 위·아래 별도 구간으로
+    // 나누고 C열 Pay in advance를 명시합니다. 이제 색상/문구 추정보다
+    // "구간 + Pay in advance"를 우선 source of truth로 사용합니다.
     const supportedRoutes = <String>{
       'kr_la_sea',
       'kr_la_air',
@@ -477,12 +477,125 @@ class ExcelImportService {
     }
     if (sheetName == null || sheet == null || sheet.isEmpty) return 0;
 
-    final header = _findLocalDeliveryHeader(sheet);
-    final headerRow = header.row;
-    final columns = header.columns;
     final styles = _readLocalDeliveryStyles(bytes, sheetName);
 
-    int? col(String key) => columns[key];
+    String keyOf(String value) => value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s·ㆍ._/()\-]+'), '');
+
+    bool hasPrepaidMarker(String value) {
+      final key = keyOf(value);
+      return key.contains('선결제') ||
+          key.contains('선결재') ||
+          key.contains('payinadvance') ||
+          key.contains('prepaid');
+    }
+
+    Map<String, int> columnsFor(List<String> row) {
+      final found = <String, int>{};
+      for (var c = 0; c < row.length; c++) {
+        final key = keyOf(row[c]);
+        if (key.isEmpty) continue;
+        if (!found.containsKey('source_no') &&
+            (key == 'no' || key == '번호' || key == '순번' || key == '순서')) {
+          found['source_no'] = c;
+        } else if (!found.containsKey('pay_in_advance') &&
+            (key == 'payinadvance' || key == '선결제' || key == '선결재')) {
+          found['pay_in_advance'] = c;
+        } else if (!found.containsKey('phone') &&
+            (key.contains('전화') || key.contains('연락처') || key == 'tel' ||
+                key == 'phone' || key == 'phonenumber' || key == 'mobile')) {
+          found['phone'] = c;
+        } else if (!found.containsKey('local_company') &&
+            (key.contains('배송업체') || key.contains('배송회사') ||
+                key.contains('운송회사') || key == 'localcompany' ||
+                key == 'deliverycompany' || key == 'transportcompany')) {
+          found['local_company'] = c;
+        } else if (!found.containsKey('destination') &&
+            (key.contains('목적지') || key.contains('배송지') || key.contains('주소') ||
+                key == 'destinationaddress' || key == 'destination' || key == 'address')) {
+          found['destination'] = c;
+        } else if (!found.containsKey('paid_by') &&
+            (key == 'paidby' || key == 'payment' || key.contains('결제') ||
+                key.contains('지불'))) {
+          found['paid_by'] = c;
+        } else if (!found.containsKey('notes') &&
+            (key == '비고' || key == 'remark' || key == 'remarks' ||
+                key == 'note' || key == 'notes')) {
+          found['notes'] = c;
+        } else if (!found.containsKey('alternate_name') &&
+            (key == 'receiver' || key.contains('수령인') || key.contains('수신인') ||
+                key.contains('영문') || key.contains('englishname') ||
+                key.contains('alternatename'))) {
+          found['alternate_name'] = c;
+        } else if (!found.containsKey('customer_name') &&
+            (key == 'name' || key == '이름' || key == '성명' || key == '고객명' ||
+                key == 'customername')) {
+          found['customer_name'] = c;
+        } else if (!found.containsKey('customer_company') &&
+            (key == '회사명' || key == '상호' || key == '업체명' ||
+                key == 'companyname' || key == 'customercompany')) {
+          found['customer_company'] = c;
+        }
+      }
+      return found;
+    }
+
+    String compactRow(List<String> row) => keyOf(row.join(' '));
+    String? sectionType(List<String> row) {
+      final key = compactRow(row);
+      if (key.contains('지방배송고객list') || key.contains('지방배송고객목록') ||
+          key.contains('provincedeliverycustomerlist')) {
+        return 'province';
+      }
+      if (key.contains('시내배송고객list') || key.contains('시내배송고객목록') ||
+          key.contains('citydeliverycustomerlist')) {
+        return 'city';
+      }
+      return null;
+    }
+
+    final sections = <({int headerRow, int endRow, String? type, Map<String, int> columns})>[];
+    String? pendingType;
+    for (var r = 0; r < sheet.length; r++) {
+      final marker = sectionType(sheet[r]);
+      if (marker != null) {
+        pendingType = marker;
+        continue;
+      }
+      final columns = columnsFor(sheet[r]);
+      final looksLikeHeader = columns.containsKey('source_no') &&
+          columns.containsKey('customer_name') &&
+          columns.containsKey('phone');
+      if (!looksLikeHeader) continue;
+      final startRow = r;
+      var endRow = sheet.length;
+      for (var rr = r + 1; rr < sheet.length; rr++) {
+        if (sectionType(sheet[rr]) != null) {
+          endRow = rr;
+          break;
+        }
+      }
+      sections.add((
+        headerRow: startRow,
+        endRow: endRow,
+        type: pendingType,
+        columns: columns,
+      ));
+      pendingType = null;
+    }
+
+    // 구형 BASE Excel 호환: 별도 지방/시내 구간명이 없던 파일도 기존처럼 읽습니다.
+    if (sections.isEmpty) {
+      final header = _findLocalDeliveryHeader(sheet);
+      sections.add((
+        headerRow: header.row,
+        endRow: sheet.length,
+        type: null,
+        columns: header.columns,
+      ));
+    }
 
     String valueAt(List<String> row, int? index) {
       if (index == null || index < 0 || index >= row.length) return '';
@@ -490,103 +603,99 @@ class ExcelImportService {
     }
 
     final bySourceNo = <int, Map<String, dynamic>>{};
-    for (var rr = headerRow + 1; rr < sheet.length; rr++) {
-      final row = sheet[rr];
-      if (row.every((cell) => cell.trim().isEmpty)) continue;
+    for (final section in sections) {
+      int? currentSourceNo;
+      String currentCustomerName = '';
+      String currentAlternateName = '';
+      String currentCompanyName = '';
+      String currentPhoneDisplay = '';
+      bool currentPrepaid = false;
 
-      final sourceRaw = valueAt(row, col('source_no'));
-      final sourceNo = int.tryParse(
-            sourceRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-          ) ??
-          (rr + 1);
+      int? col(String key) => section.columns[key];
 
-      var customerName = valueAt(row, col('customer_name'));
-      final alternateName = valueAt(row, col('alternate_name'));
-      var companyName = valueAt(row, col('customer_company'));
-      final phoneDisplay = valueAt(row, col('phone'));
-      final phone = _digits(phoneDisplay);
-      final localCompany = valueAt(row, col('local_company'));
-      final destination = valueAt(row, col('destination'));
-      var paidBy = valueAt(row, col('paid_by'));
-      final notes = valueAt(row, col('notes'));
+      for (var rr = section.headerRow + 1; rr < section.endRow; rr++) {
+        final row = sheet[rr];
+        if (row.every((cell) => cell.trim().isEmpty)) continue;
+        if (sectionType(row) != null) break;
 
-      // Known BASE layout fallback:
-      // A No. / B customer / C alternate / D phone / E local company /
-      // F destination / G payment / H notes.
-      if (customerName.isEmpty && row.length > 1) {
-        customerName = row[1].trim();
-      }
-      if (companyName.isEmpty &&
-          customerName.isEmpty &&
-          row.length > 2) {
-        companyName = row[2].trim();
-      }
+        final sourceRaw = valueAt(row, col('source_no'));
+        final parsedSource = int.tryParse(sourceRaw.replaceAll(RegExp(r'[^0-9]'), ''));
+        final rowCustomer = valueAt(row, col('customer_name'));
+        final rowAlternate = valueAt(row, col('alternate_name'));
+        final rowCompany = valueAt(row, col('customer_company'));
+        final rowPhone = valueAt(row, col('phone'));
+        final payAdvance = valueAt(row, col('pay_in_advance'));
 
-      final fallbackPhoneDisplay =
-          phoneDisplay.isEmpty && row.length > 3 ? row[3].trim() : phoneDisplay;
-      final normalizedPhone =
-          phone.isEmpty ? _digits(fallbackPhoneDisplay) : phone;
-      final fallbackLocalCompany =
-          localCompany.isEmpty && row.length > 4 ? row[4].trim() : localCompany;
-      final fallbackDestination =
-          destination.isEmpty && row.length > 5 ? row[5].trim() : destination;
-
-      if (paidBy.isEmpty) {
-        final wholeRow = row.join(' ').toLowerCase();
-        if ((wholeRow.contains('한국') || wholeRow.contains('korea')) &&
-            (wholeRow.contains('선결제') ||
-                wholeRow.contains('선불') ||
-                wholeRow.contains('prepaid'))) {
-          paidBy = '한국 선결제';
-        } else if (wholeRow.contains('착불')) {
-          paidBy = '착불';
-        } else if (wholeRow.contains('선불') ||
-            wholeRow.contains('prepaid')) {
-          paidBy = '선불';
+        // No.가 있는 행이 한 고객의 대표행이고, 다음 No. 전까지는 같은 고객의
+        // 대체 배송업체/목적지 행으로 간주합니다.
+        if (parsedSource != null) {
+          currentSourceNo = parsedSource;
+          currentCustomerName = rowCustomer;
+          currentAlternateName = rowAlternate;
+          currentCompanyName = rowCompany;
+          currentPhoneDisplay = rowPhone;
+          currentPrepaid = hasPrepaidMarker(payAdvance);
+        } else if (currentSourceNo == null) {
+          continue;
         }
-      }
 
-      if (customerName.isEmpty &&
-          alternateName.isEmpty &&
-          companyName.isEmpty) {
-        continue;
-      }
+        final sourceNo = currentSourceNo!;
+        final customerName = rowCustomer.isNotEmpty ? rowCustomer : currentCustomerName;
+        final alternateName = rowAlternate.isNotEmpty ? rowAlternate : currentAlternateName;
+        final companyName = rowCompany.isNotEmpty ? rowCompany : currentCompanyName;
+        final phoneDisplay = rowPhone.isNotEmpty ? rowPhone : currentPhoneDisplay;
+        final normalizedPhone = _digits(phoneDisplay);
+        final localCompany = valueAt(row, col('local_company'));
+        final destination = valueAt(row, col('destination'));
+        final rawPaidBy = valueAt(row, col('paid_by'));
+        final notes = valueAt(row, col('notes'));
 
-      final rowStyle = styles[rr] ?? const _DeliveryRowStyle();
-      final rowText = row.join(' ').toLowerCase();
-      final isCity = rowStyle.isCity ||
-          rowText.contains('시내배송') ||
-          rowText.contains('시내 배송') ||
-          rowText.contains('city');
-      final preferred = rowStyle.preferredFor(
-        col('local_company') ?? (row.length > 4 ? 4 : null),
-        col('destination') ?? (row.length > 5 ? 5 : null),
-      );
+        final fallbackText = [payAdvance, destination, rawPaidBy, notes].join(' ');
+        final prepaid = currentPrepaid || hasPrepaidMarker(fallbackText);
+        // C열 Pay in advance가 있으면 그 값을 최우선으로 사용합니다.
+        // 구형 자료 호환용으로 Destination/Paid by의 선결제/선결재/prepaid도 보조 판정.
+        // 단, 일반적인 '선불' 단어만으로는 선결제로 승격하지 않습니다.
+        final paidBy = prepaid ? '선결제' : rawPaidBy;
 
-      final profile = <String, dynamic>{
-        'route_key': routeKey,
-        'source_no': sourceNo,
-        'customer_name': customerName,
-        'alternate_name': alternateName,
-        'company_name': companyName,
-        'phone': normalizedPhone,
-        'phone_display': fallbackPhoneDisplay,
-        'delivery_type': isCity ? 'city' : 'province',
-        'local_company': fallbackLocalCompany,
-        'destination_address': fallbackDestination,
-        'paid_by': paidBy,
-        'notes': notes,
-        'preferred': preferred,
-        'active': normalizedPhone.isNotEmpty &&
-            (customerName.isNotEmpty ||
-                alternateName.isNotEmpty ||
-                companyName.isNotEmpty),
-      };
+        final rowStyle = styles[rr] ?? const _DeliveryRowStyle();
+        final rowText = row.join(' ').toLowerCase();
+        final isCity = section.type == 'city' ||
+            (section.type == null &&
+                (rowStyle.isCity || rowText.contains('시내배송') ||
+                    rowText.contains('시내 배송') || rowText.contains('city')));
+        final preferred = rowStyle.preferredFor(
+          col('local_company') ?? (row.length > 5 ? 5 : null),
+          col('destination') ?? (row.length > 6 ? 6 : null),
+        );
 
-      final existing = bySourceNo[sourceNo];
-      if (existing == null ||
-          preferred == true && existing['preferred'] != true) {
-        bySourceNo[sourceNo] = profile;
+        if (customerName.isEmpty && alternateName.isEmpty && companyName.isEmpty) {
+          continue;
+        }
+
+        final profile = <String, dynamic>{
+          'route_key': routeKey,
+          'source_no': sourceNo,
+          'customer_name': customerName,
+          'alternate_name': alternateName,
+          'company_name': companyName,
+          'phone': normalizedPhone,
+          'phone_display': phoneDisplay,
+          'delivery_type': isCity ? 'city' : 'province',
+          'local_company': localCompany,
+          'destination_address': destination,
+          'paid_by': paidBy,
+          'notes': notes,
+          'preferred': preferred,
+          'active': normalizedPhone.isNotEmpty &&
+              (customerName.isNotEmpty || alternateName.isNotEmpty || companyName.isNotEmpty),
+        };
+
+        final existing = bySourceNo[sourceNo];
+        // 같은 고객의 여러 후보행은 기존 정책대로 preferred(노란색)가 있으면 우선,
+        // 없으면 대표행을 유지합니다. 고객 identity/Pay in advance는 대표행에서 승계됩니다.
+        if (existing == null || (preferred && existing['preferred'] != true)) {
+          bySourceNo[sourceNo] = profile;
+        }
       }
     }
 

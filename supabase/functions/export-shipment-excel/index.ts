@@ -428,6 +428,74 @@ function routeReceiptPrefix(routeKey: string): string {
   return map[routeKey] ?? '';
 }
 
+function applyDeliveryColorConditionalFormatting(
+  files: Record<string, Uint8Array>,
+  routeKey: string,
+): void {
+  if (routeKey !== 'kr_la_sea' && routeKey !== 'kr_la_air') return;
+  const stylesPath = 'xl/styles.xml';
+  if (!files[stylesPath]) return;
+
+  let styles = strFromU8(files[stylesPath]);
+  const dxfMatch = styles.match(/<dxfs\b([^>]*)count="(\d+)"([^>]*)>([\s\S]*?)<\/dxfs>/);
+  if (!dxfMatch) return;
+  const baseDxf = Number(dxfMatch[2] ?? 0);
+  const fills = [
+    'FFFFC000',
+    'FF5B9BD5',
+    'FF92D050',
+    'FFFFFF00',
+  ];
+  const extraDxfs = fills.map((rgb) =>
+    '<dxf><fill><patternFill patternType="solid"><fgColor rgb="' + rgb +
+    '"/><bgColor indexed="64"/></patternFill></fill></dxf>'
+  ).join('');
+  styles = styles.replace(
+    dxfMatch[0],
+    `<dxfs${dxfMatch[1]}count="${baseDxf + fills.length}"${dxfMatch[3]}>${dxfMatch[4]}${extraDxfs}</dxfs>`,
+  );
+  files[stylesPath] = strToU8(styles);
+
+  const prefix = routeReceiptPrefix(routeKey).toUpperCase();
+  const workbook = strFromU8(files['xl/workbook.xml']);
+  const sheetNames = [...workbook.matchAll(
+    /<sheet\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\/?>/g,
+  )].map((m) => m[1]).filter((name) => name.toUpperCase().startsWith(prefix));
+
+  for (const sheetName of sheetNames) {
+    const sheetPath = workbookSheetPath(files, sheetName);
+    if (!sheetPath || !files[sheetPath]) continue;
+    let xml = strFromU8(files[sheetPath]);
+    if (xml.includes('SEARCH(&quot;시내배송(선결제)&quot;')) continue;
+
+    const maxPriority = Math.max(
+      0,
+      ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)]
+        .map((m) => Number(m[1] ?? 0)),
+    );
+    const check = (label: string) =>
+      `OR(IFERROR(ISNUMBER(SEARCH("${label}",$A$18)),FALSE),IFERROR(ISNUMBER(SEARCH("${label}",$F$18)),FALSE))`;
+    const rules = [
+      { label: '시내배송(선결제)', dxf: baseDxf + 3 },
+      { label: '시내배송', dxf: baseDxf + 2 },
+      { label: '지방배송(선결제)', dxf: baseDxf + 1 },
+      { label: '지방배송', dxf: baseDxf + 0 },
+    ].map((r, i) =>
+      `<cfRule type="expression" dxfId="${r.dxf}" priority="${maxPriority + i + 1}" stopIfTrue="1"><formula>${escXml(check(r.label))}</formula></cfRule>`
+    ).join('');
+    const block = `<conditionalFormatting sqref="A18:E24 F18:K24">${rules}</conditionalFormatting>`;
+
+    if (xml.includes('<dataValidations ')) {
+      xml = xml.replace('<dataValidations ', `${block}<dataValidations `);
+    } else if (xml.includes('<pageMargins ')) {
+      xml = xml.replace('<pageMargins ', `${block}<pageMargins `);
+    } else {
+      xml = xml.replace('</worksheet>', `${block}</worksheet>`);
+    }
+    files[sheetPath] = strToU8(xml);
+  }
+}
+
 function normalizePhone(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, '').replace(/-/g, '');
 }
@@ -1512,6 +1580,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyage,
     );
     wireStatementAutomationFormulas(files, routeKey);
+    applyDeliveryColorConditionalFormatting(files, routeKey);
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
     addStatementLanguageSelector(files, routeKey);
     populateSpotTransportStatement(
