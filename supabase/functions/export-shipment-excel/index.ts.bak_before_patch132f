@@ -803,8 +803,6 @@ function addStatementLanguageSelector(
   files: Record<string, Uint8Array>,
   routeKey: string,
 ): void {
-  // PATCH132F_LANGUAGE_DISABLED: Excel sheet XML 복구 팝업 원인 분리용.
-  return;
   // SEA/AIR 정기항차 명세서에 언어 선택 기반을 추가합니다.
   // 실제 다국어 문구 치환은 원본 문구별 매핑을 확정한 뒤 다음 패치에서 연결합니다.
   if (routeKey !== 'kr_la_sea' && routeKey !== 'kr_la_air') return;
@@ -1209,25 +1207,23 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const original = new Uint8Array(await templateBlob.arrayBuffer());
     const files = unzipSync(original);
-
     const targetPath = workbookSheetPath(files, '물품 입고 내역');
-    const strings = sharedStrings(files);
-
-    if (targetPath && files[targetPath]) {
-      const sheetXml = strFromU8(files[targetPath]);
-      files[targetPath] = strToU8(
-        updateCargoSheet(
-          sheetXml,
-          strings,
-          enrichedShipments,
-        ),
-      );
-    } else if (routeKey !== 'th_la_land') {
+    if (!targetPath || !files[targetPath]) {
       return json(422, {
         error:
-          '현재 1차 Export는 \"물품 입고 내역\" 시트가 있는 실제 Excel부터 지원합니다. 원본 템플릿은 안전하게 저장되어 있습니다.',
+          '현재 1차 Export는 "물품 입고 내역" 시트가 있는 실제 Excel부터 지원합니다. 원본 템플릿은 안전하게 저장되어 있습니다.',
       });
     }
+
+    const strings = sharedStrings(files);
+    const sheetXml = strFromU8(files[targetPath]);
+    files[targetPath] = strToU8(
+      updateCargoSheet(
+        sheetXml,
+        strings,
+        enrichedShipments,
+      ),
+    );
     // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
     seedCustomerListFromShipments(files, enrichedShipments);
     upgradeZoneQuantityFormulas(files);
@@ -1372,7 +1368,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
