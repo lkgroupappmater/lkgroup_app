@@ -296,7 +296,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     if (save) {
       try {
         await UnknownRecipientService.instance.reviewIncomplete(
-          shipmentId: '${row['id']}',
+          shipmentId: '${row['shipment_id'] ?? row['id'] ?? ''}',
           consigneeName: name.text,
           consigneePhone: phone.text,
           notes: notes.text,
@@ -348,7 +348,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 5),
               child: Text(
-                '${row['reason'] ?? '수취인 정보 확인 필요'}',
+                '${row['uncertainty_reason'] ?? row['reason'] ?? '수취인 정보 확인 필요'}',
                 style: const TextStyle(
                   color: Colors.orange,
                   fontWeight: FontWeight.w600,
@@ -912,6 +912,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
+
 
 
 
