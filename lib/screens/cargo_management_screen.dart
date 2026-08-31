@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -1184,6 +1184,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               else
                 ..._pendingDeletions.map(_pendingDeletionCard),
             ],
+          ],
           ),
             if (_searched)
               Positioned(
@@ -2501,6 +2502,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 
