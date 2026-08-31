@@ -14,6 +14,26 @@ class UnknownRecipientService {
         .toList(growable: false);
   }
 
+  Future<void> resolveUnknownFromSearch({
+    required String shipmentId,
+    required String consigneeName,
+    required String consigneePhone,
+    String notes = '',
+  }) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId.trim());
+    if (id == null) throw StateError('화물 ID가 올바르지 않습니다.');
+    await SupabaseService.client.rpc(
+      'admin_resolve_unknown_recipient_from_search',
+      params: {
+        'p_shipment_id': id,
+        'p_consignee_name': consigneeName.trim(),
+        'p_consignee_phone': consigneePhone.trim(),
+        'p_notes': notes.trim(),
+      },
+    );
+  }
+
   Future<void> createClaim({
     required String shipmentId,
     required String claimantName,

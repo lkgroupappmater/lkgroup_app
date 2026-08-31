@@ -177,59 +177,75 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
   Future<void> _claimUnknownCargo(Map<String, dynamic> row) async {
     final user = widget.currentUser;
-    if (user == null || user.role != UserRole.member) return;
+    if (user == null ||
+        (user.role != UserRole.member && user.role != UserRole.admin)) {
+      return;
+    }
+    final isAdmin = user.role == UserRole.admin;
 
-    final name = TextEditingController(text: user.name);
-    final phone = TextEditingController(text: user.phone);
-    final note = TextEditingController();
+    final name = TextEditingController(
+      text: isAdmin ? '${row['consignee_name'] ?? ''}' : user.name,
+    );
+    final phone = TextEditingController(
+      text: isAdmin ? '${row['consignee_phone'] ?? ''}' : user.phone,
+    );
+    final note = TextEditingController(text: '${row['notes'] ?? ''}');
 
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('본인 화물 확인 및 정정 요청'),
+            title: Text(
+              isAdmin ? '수취인 불명 화물 정보 입력' : '본인 화물 확인 및 정정 요청',
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
+                    '${row['route'] ?? ''} / ${row['shipment_year'] ?? ''}년도 / '
                     '${_voyageLabel(row['voyage'])}\n'
-                    '박스번호 ${row['box_number'] ?? ''}\n'
-                    '송장번호 ${row['invoice_number'] ?? ''}',
+                    '화물번호: ${row['box_number'] ?? ''}\n'
+                    '송장번호: ${row['invoice_number'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(
-                      labelText: '본인 이름',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: isAdmin ? '수취인 이름 / 회사명' : '본인 이름',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: phone,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: '본인 연락처',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: isAdmin ? '연락처' : '본인 연락처',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: note,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: '확인 참고 내용 (선택)',
-                      hintText: '물품 내용, 발송인 등 관리자 확인에 도움이 되는 내용을 입력해 주세요.',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: isAdmin ? '비고' : '확인 참고 내용 (선택)',
+                      hintText: isAdmin
+                          ? '필요한 경우 비고를 입력해 주세요.'
+                          : '물품 내용, 발송인 등 관리자 확인에 도움이 되는 내용을 입력해 주세요.',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '요청 승인 후 이름은 "수취인 불명 / 고객 이름" 형태로 기록되며, '
-                    '영수번호는 해당 항차의 마지막 영수번호 다음 번호로 자동 부여됩니다.',
-                    style: TextStyle(
+                  Text(
+                    isAdmin
+                        ? '관리자는 입력한 수취인 정보를 바로 반영하고 영수번호/구획을 다시 계산합니다.'
+                        : '요청 승인 후 수취인 정보가 반영되며 영수번호는 해당 항차 기준으로 처리됩니다.',
+                    style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
                     ),
@@ -244,7 +260,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('본인 화물 확인 및 정정 요청'),
+                child: Text(isAdmin ? '수취인 정보 적용' : '본인 화물 확인 요청'),
               ),
             ],
           ),
@@ -253,37 +269,58 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
     if (confirmed) {
       try {
-        await UnknownRecipientService.instance.createClaim(
-          shipmentId: '${row['id']}',
-          claimantName: name.text,
-          claimantPhone: phone.text,
-          note: note.text,
-        );
+        if (isAdmin) {
+          await UnknownRecipientService.instance.resolveUnknownFromSearch(
+            shipmentId: '${row['id']}',
+            consigneeName: name.text,
+            consigneePhone: phone.text,
+            notes: note.text,
+          );
+        } else {
+          await UnknownRecipientService.instance.createClaim(
+            shipmentId: '${row['id']}',
+            claimantName: name.text,
+            claimantPhone: phone.text,
+            note: note.text,
+          );
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.'),
+          SnackBar(
+            content: Text(
+              isAdmin
+                  ? '수취인 정보를 반영했습니다.'
+                  : '관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.',
+            ),
           ),
         );
         await _loadUnknownRecipientCargo();
       } catch (error) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('본인 화물 확인 요청 실패: $error')),
+          SnackBar(
+            content: Text(
+              isAdmin
+                  ? '수취인 정보 적용 실패: $error'
+                  : '본인 화물 확인 요청 실패: $error',
+            ),
+          ),
         );
       }
     }
 
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     name.dispose();
     phone.dispose();
     note.dispose();
   }
-
   Widget _unknownRecipientSection() {
     if (!widget.isLoggedIn || widget.currentUser == null) {
       return const SizedBox.shrink();
     }
-    final canClaim = widget.currentUser?.role == UserRole.member;
+    final role = widget.currentUser!.role;
+    final canOpen = role == UserRole.member || role == UserRole.admin;
+    final isAdmin = role == UserRole.admin;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,19 +350,17 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               ),
               child: const Text(
                 '상세 안내',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
-          '수취인을 특정할 수 없는 화물은 로그인한 가입자에게 제한된 정보로 표시됩니다. '
-          '일반 회원은 본인 화물이 확인되면 해당 카드를 눌러 정정 요청할 수 있습니다.',
-          style: TextStyle(
+        Text(
+          isAdmin
+              ? '관리자는 확인이 필요한 화물을 눌러 수취인 이름과 연락처를 바로 입력·수정할 수 있습니다.'
+              : '본인 화물이 확인되면 해당 화물을 눌러 이름과 연락처를 입력하고 확인 요청할 수 있습니다.',
+          style: const TextStyle(
             fontSize: 11,
             color: AppColors.textSecondary,
           ),
@@ -360,75 +395,106 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                     ? Colors.orange
                     : null;
 
+            final route = '${row['route'] ?? ''}'.trim();
+            final year = '${row['shipment_year'] ?? ''}'.trim();
+            final voyage = _voyageLabel(row['voyage']);
+            final box = '${row['box_number'] ?? ''}'.trim();
+            final invoice = '${row['invoice_number'] ?? ''}'.trim();
+            final name = '${row['consignee_name'] ?? ''}'.trim();
+            final phone = '${row['consignee_phone'] ?? ''}'.trim();
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
-              shape: warningBorder == null
-                  ? null
-                  : RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: warningBorder,
-                        width: 2.2,
-                      ),
-                    ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: warningBorder ?? const Color(0xFFE1E7EF),
+                  width: warningBorder == null ? 1 : 2.2,
+                ),
+              ),
               child: InkWell(
-                onTap: canClaim && !pending
+                borderRadius: BorderRadius.circular(12),
+                onTap: canOpen && (!pending || isAdmin)
                     ? () => _claimUnknownCargo(row)
                     : null,
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '박스번호 ${row['box_number'] ?? ''}',
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$route / ${year}년도 / $voyage',
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
                                 color: AppColors.navyPrimary,
                               ),
                             ),
-                          ),
-                          if (pending)
-                            const Text(
-                              '확인 요청 대기',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.orange,
-                                fontWeight: FontWeight.bold,
+                            const SizedBox(height: 8),
+                            Text(
+                              '화물번호: ${box.isEmpty ? '-' : box}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                        ],
+                            const SizedBox(height: 3),
+                            Text(
+                              '송장번호: ${invoice.isEmpty ? '-' : invoice}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '이름/연락처: '
+                              '${name.isEmpty ? '수취인 불명' : name} / '
+                              '${phone.isEmpty ? '-' : phone}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            if (pending && !isAdmin) ...[
+                              const SizedBox(height: 6),
+                              const Text(
+                                '확인 요청 대기',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 6),
-                      _row('운송 경로', '${row['route'] ?? ''}'),
-                      _row('년도', '${row['shipment_year'] ?? ''}'),
-                      _row('항차', _voyageLabel(row['voyage'])),
-                      _row('송장번호', '${row['invoice_number'] ?? ''}'),
-                      _row(
-                        '수취인',
-                        '${row['consignee_name'] ?? '수취인 불명'}',
-                      ),
-                      _row(
-                        '연락처',
-                        '${row['consignee_phone'] ?? ''}',
-                      ),
-                      if (canClaim && !pending) ...[
-                        const SizedBox(height: 8),
-                        const Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            '카드를 눌러 본인 화물 확인 요청',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.bold,
+                      if (canOpen && (!pending || isAdmin))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 18),
+                          child: Container(
+                            width: 92,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.navyPrimary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isAdmin
+                                  ? '화물을 눌러\n정보 입력/수정'
+                                  : '화물을 눌러\n본인 확인 요청',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                height: 1.25,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),

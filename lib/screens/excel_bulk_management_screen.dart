@@ -551,63 +551,53 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       ),
       bottomNavigationBar: _rows.isEmpty
           ? null
-          : Material(
-              elevation: 12,
-              color: Colors.white,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: Material(
+                elevation: 14,
+                borderRadius: BorderRadius.circular(22),
+                color: Colors.transparent,
+                shadowColor: Colors.black38,
+                child: Container(
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: AppColors.navyPrimary,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .12),
+                    ),
+                  ),
                   child: Row(
                     children: [
-                      InkWell(
+                      _bulkBarAction(
+                        icon: allChecked
+                            ? Icons.check_circle
+                            : Icons.check_circle_outline,
+                        label: '전체',
+                        enabled: _rows.isNotEmpty && !_busy,
                         onTap: () => _toggleAll(!allChecked),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: allChecked,
-                              onChanged: (v) => _toggleAll(v == true),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            const Text(
-                              '전체',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _checked.isEmpty || _busy
-                              ? null
-                              : () => _setLock(true),
-                          child: const Text('잠금'),
-                        ),
+                      _bulkBarDivider(),
+                      _bulkBarAction(
+                        icon: Icons.lock_outline,
+                        label: '잠금',
+                        enabled: _checked.isNotEmpty && !_busy,
+                        onTap: () => _setLock(true),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _checked.isEmpty || _busy
-                              ? null
-                              : () => _setLock(false),
-                          child: const Text('해체'),
-                        ),
+                      _bulkBarDivider(),
+                      _bulkBarAction(
+                        icon: Icons.lock_open_outlined,
+                        label: '해체',
+                        enabled: _checked.isNotEmpty && !_busy,
+                        onTap: () => _setLock(false),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _checked.isEmpty || _busy
-                              ? null
-                              : _requestDeleteSelected,
-                          child: const Text('삭제'),
-                        ),
+                      _bulkBarDivider(),
+                      _bulkBarAction(
+                        icon: Icons.delete_outline,
+                        label: '삭제',
+                        enabled: _checked.isNotEmpty && !_busy,
+                        onTap: _requestDeleteSelected,
                       ),
                     ],
                   ),
@@ -616,6 +606,44 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
             ),
     );
   }
+  Widget _bulkBarDivider() => Container(
+        width: 1,
+        height: 32,
+        color: Colors.white.withValues(alpha: .16),
+      );
+
+  Widget _bulkBarAction({
+    required IconData icon,
+    required String label,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) =>
+      Expanded(
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(15),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 21,
+                color: enabled ? AppColors.tealAccent : Colors.white38,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: enabled ? Colors.white : Colors.white38,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   Widget _rowCard(Map<String, dynamic> row) {
     final id = '${row['id']}';
     final locked = row['data_locked'] == true;

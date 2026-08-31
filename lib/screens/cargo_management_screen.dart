@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -819,60 +819,99 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   }
 
   Widget _cargoFixedBottomBar() {
+    final enabled = _results.isNotEmpty;
     return Material(
-      elevation: 10,
-      borderRadius: BorderRadius.circular(14),
-      color: Colors.white,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          child: Row(
-            children: [
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: _results.isEmpty ? null : _toggleAllSearchResults,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Checkbox(
-                        value: _allSearchResultsSelected,
-                        onChanged: _results.isEmpty
-                            ? null
-                            : (_) => _toggleAllSearchResults(),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      const Text(
-                        '전체',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+      elevation: 14,
+      borderRadius: BorderRadius.circular(22),
+      color: Colors.transparent,
+      shadowColor: Colors.black38,
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: AppColors.navyPrimary,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: .12)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: enabled ? _toggleAllSearchResults : null,
+                    borderRadius: BorderRadius.circular(15),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _allSearchResultsSelected
+                              ? Icons.check_circle
+                              : Icons.check_circle_outline,
+                          size: 21,
+                          color: enabled
+                              ? AppColors.tealAccent
+                              : Colors.white38,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          '전체',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: enabled ? Colors.white : Colors.white38,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _isPartner ? null : _showSelectedStatementChoice,
-                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                  label: const Text('명세서'),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
+                Container(
+                  width: 1,
+                  height: 34,
+                  color: Colors.white.withValues(alpha: .16),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: InkWell(
+                    onTap: _isPartner ? null : _showSelectedStatementChoice,
+                    borderRadius: BorderRadius.circular(15),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 22,
+                          color: _isPartner
+                              ? Colors.white38
+                              : AppColors.tealAccent,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _selectedIds.isEmpty
+                              ? '명세서'
+                              : '명세서 · ${_selectedIds.length}개 선택',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color:
+                                _isPartner ? Colors.white38 : Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) => Material(
         color: Colors.transparent,
