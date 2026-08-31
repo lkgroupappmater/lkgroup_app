@@ -345,11 +345,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               '구획: ${row['unloading_zone'] ?? '-'}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            const Padding(
-              padding: EdgeInsets.only(top: 5),
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
               child: Text(
-                '이름은 있으나 연락처가 없어 확인이 필요한 데이터입니다.',
-                style: TextStyle(
+                '${row['reason'] ?? '수취인 정보 확인 필요'}',
+                style: const TextStyle(
                   color: Colors.orange,
                   fontWeight: FontWeight.w600,
                 ),
@@ -912,6 +912,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         .join('\n');
   }
 }
+
 
 
 
