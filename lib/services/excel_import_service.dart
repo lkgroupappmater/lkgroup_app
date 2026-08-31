@@ -183,6 +183,7 @@ class ExcelImportService {
           'p_route': routeLabel,
           'p_year': year,
           'p_voyage': voyage,
+          'p_resequence': true,
         },
       );
     }
@@ -622,7 +623,7 @@ class ExcelImportService {
       return row[index].trim();
     }
 
-    final bySourceNo = <int, Map<String, dynamic>>{};
+    final bySourceNo = <String, Map<String, dynamic>>{};
     for (final section in sections) {
       int? currentSourceNo;
       String currentCustomerName = '';
@@ -660,6 +661,9 @@ class ExcelImportService {
         }
 
         final sourceNo = currentSourceNo!;
+        final profileSourceNo =
+            section.type == 'city' ? 10000 + sourceNo : sourceNo;
+        final profileKey = '${section.type ?? 'legacy'}|$sourceNo';
         final customerName = rowCustomer.isNotEmpty ? rowCustomer : currentCustomerName;
         final alternateName = rowAlternate.isNotEmpty ? rowAlternate : currentAlternateName;
         final companyName = rowCompany.isNotEmpty ? rowCompany : currentCompanyName;
@@ -694,7 +698,7 @@ class ExcelImportService {
 
         final profile = <String, dynamic>{
           'route_key': routeKey,
-          'source_no': sourceNo,
+          'source_no': profileSourceNo,
           'customer_name': customerName,
           'alternate_name': alternateName,
           'company_name': companyName,
@@ -710,16 +714,21 @@ class ExcelImportService {
               (customerName.isNotEmpty || alternateName.isNotEmpty || companyName.isNotEmpty),
         };
 
-        final existing = bySourceNo[sourceNo];
+        final existing = bySourceNo[profileKey];
         // 같은 고객의 여러 후보행은 기존 정책대로 preferred(노란색)가 있으면 우선,
         // 없으면 대표행을 유지합니다. 고객 identity/Pay in advance는 대표행에서 승계됩니다.
         if (existing == null || (preferred && existing['preferred'] != true)) {
-          bySourceNo[sourceNo] = profile;
+          bySourceNo[profileKey] = profile;
         }
       }
     }
 
     if (bySourceNo.isEmpty) return 0;
+
+    await SupabaseService.client
+        .from('local_delivery_profiles')
+        .delete()
+        .eq('route_key', routeKey);
 
     await SupabaseService.client.from('local_delivery_profiles').upsert(
           bySourceNo.values.toList(growable: false),
