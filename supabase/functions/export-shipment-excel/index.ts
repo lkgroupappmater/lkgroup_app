@@ -1131,46 +1131,81 @@ function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): 
   return sheetXml.replace(rowXml, updateCell(rowXml, rowNumber, column, '', 'text').replace(new RegExp(`<c\\b[^>]*r="${ref}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`), replacement));
 }
 
-function wireStatementAutomationFormulas(files: Record<string, Uint8Array>, routeKey: string): void {
+function wireStatementAutomationFormulas(
+  files: Record<string, Uint8Array>,
+  routeKey: string,
+): void {
   const prefix = routeReceiptPrefix(routeKey);
+  if (!prefix) return;
+
   const workbook = strFromU8(files['xl/workbook.xml']);
-  const names = [...workbook.matchAll(/<sheet\\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\\/?>/g)].map(m => m[1]);
-  const sheetName = names.find(name => {
+  const sheetPattern = new RegExp(
+    '<sheet\\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\\/?>',
+    'g',
+  );
+  const names = Array.from(workbook.matchAll(sheetPattern), (m) => m[1]);
+  const numberSuffix = new RegExp('\\d+\\s*$');
+  const sheetName = names.find((name) => {
     const upper = name.toUpperCase();
-    if (upper.includes('XX')) return false;
-    return prefix ? upper.startsWith(prefix.toUpperCase()) && /\\d+\\s*$/.test(name) : false;
+    return !upper.includes('XX') &&
+      upper.startsWith(prefix.toUpperCase()) &&
+      numberSuffix.test(name);
   });
   if (!sheetName) return;
+
   const path = workbookSheetPath(files, sheetName);
   if (!path || !files[path]) return;
+
   let xml = strFromU8(files[path]);
   const strings = sharedStrings(files);
   let remarkRef = '';
   let inlandRef = '';
-  for (const m of xml.matchAll(/<c\\b[^>]*r="([A-Z]+\\d+)"[^>]*>[\\s\\S]*?<\\/c>/g)) {
+  const cellPattern = new RegExp(
+    '<c\\b[^>]*r="([A-Z]+\\d+)"[^>]*>[\\s\\S]*?<\\/c>',
+    'g',
+  );
+
+  for (const m of xml.matchAll(cellPattern)) {
     const text = cellText(m[0], strings).trim().toLowerCase();
-    if (!remarkRef && (text.includes('remark') || text === '鍮꾧퀬')) remarkRef = m[1];
-    if (!inlandRef && (text.includes('inland') || text.includes('吏諛?諛곗넚') || text.includes('吏諛⑸같??))) inlandRef = m[1];
+    if (!remarkRef && (text.includes('remark') || text === '鍮꾧퀬')) {
+      remarkRef = m[1];
+    }
+    if (!inlandRef && (
+      text.includes('inland') ||
+      text.includes('吏諛?諛곗넚') ||
+      text.includes('吏諛⑸같??)
+    )) {
+      inlandRef = m[1];
+    }
   }
-  const below = (ref: string) => {
-    const col = ref.match(/^[A-Z]+/)?.[0] ?? '';
-    const row = Number(ref.match(/\\d+$/)?.[0] ?? 0);
+
+  const below = (ref: string): string => {
+    const colMatch = ref.match(new RegExp('^[A-Z]+'));
+    const rowMatch = ref.match(new RegExp('\\d+$'));
+    const col = colMatch?.[0] ?? '';
+    const row = Number(rowMatch?.[0] ?? 0);
     return col && row ? `${col}${row + 1}` : '';
   };
+
   const remarkTarget = below(remarkRef);
   const inlandTarget = below(inlandRef);
+  const remarkFormula =
+    `IFERROR(INDEX('Row data'!$AA:$AA,MATCH($N$2,'Row data'!$X:$X,0)),"")`;
+  const inlandFormula =
+    `IFERROR(INDEX('Row data'!$AB:$AB,MATCH($N$2,'Row data'!$X:$X,0)),"")`;
+  const deliveryTypeFormula =
+    `IFERROR(INDEX('Row data'!$AC:$AC,MATCH($N$2,'Row data'!$X:$X,0)),"")`;
+
   if (remarkTarget) {
-    xml = setFormulaCellInSheet(xml, remarkTarget,
-      `IFERROR(INDEX('Row data'!$AA:$AA,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+    xml = setFormulaCellInSheet(xml, remarkTarget, remarkFormula);
   }
   if (inlandTarget) {
-    xml = setFormulaCellInSheet(xml, inlandTarget,
-      `IFERROR(INDEX('Row data'!$AB:$AB,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+    xml = setFormulaCellInSheet(xml, inlandTarget, inlandFormula);
   }
-  // N3/N4/N5???숈쟻 臾몄꽌 怨꾩궛 蹂댁“?. 紐낆꽭???쒖떆 ?怨?媛숈? N2瑜?source濡??ъ슜?⑸땲??
-  xml = setFormulaCellInSheet(xml, 'N3', `IFERROR(INDEX('Row data'!$AA:$AA,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
-  xml = setFormulaCellInSheet(xml, 'N4', `IFERROR(INDEX('Row data'!$AB:$AB,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
-  xml = setFormulaCellInSheet(xml, 'N5', `IFERROR(INDEX('Row data'!$AC:$AC,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+
+  xml = setFormulaCellInSheet(xml, 'N3', remarkFormula);
+  xml = setFormulaCellInSheet(xml, 'N4', inlandFormula);
+  xml = setFormulaCellInSheet(xml, 'N5', deliveryTypeFormula);
   files[path] = strToU8(xml);
 }
 Deno.serve(async (req) => {
