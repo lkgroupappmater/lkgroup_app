@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -79,41 +79,6 @@ class ExcelImportService {
           final map = <String, dynamic>{};
           for (var i = 0; i < headers.length && i < row.length; i++) {
             if (headers[i].isNotEmpty) map[headers[i]] = row[i].trim();
-          }
-
-          // 실무에서 오래 사용한 일부 Excel은 현재 헤더 형식은 유지하면서
-          // 실제 값은 D(발신인)에 수령인 이름을 넣고 E(수신인)는 비워 둔 경우가 있습니다.
-          // 전화번호(F)가 있고 E가 비어 있으면 D의 값이 사람이름/회사명일 때만
-          // 수령인으로 안전하게 보정합니다. A001 같은 내부코드/반품 표시는 제외합니다.
-          final consignee = '${map['consignee_name'] ?? ''}'.trim();
-          final sender = '${map['sender_name'] ?? ''}'.trim();
-          final phone = '${map['consignee_phone'] ?? ''}'.trim();
-          if (consignee.isEmpty &&
-              phone.isNotEmpty &&
-              _looksLikeLegacyConsigneeName(sender)) {
-            map['consignee_name'] = sender;
-          }
-
-          // 같은 구형 실무 파일에서 G에 수량(대부분 1), I가 비어 있는 경우 보정.
-          final quantityText = '${map['quantity'] ?? ''}'.trim();
-          final legacyContents = '${map['contents'] ?? ''}'.trim();
-          if (quantityText.isEmpty) {
-            final legacyQuantity = int.tryParse(legacyContents);
-            if (legacyQuantity != null && legacyQuantity >= 1) {
-              map['quantity'] = legacyQuantity.toString();
-              map['contents'] = '';
-            }
-          }
-
-          // 구형 파일에서 P(비고)에 Excel 날짜 serial이 있고 Q(접수일)가 비어 있는 경우.
-          final received = '${map['received_at'] ?? ''}'.trim();
-          final legacyDate = '${map['notes'] ?? ''}'.trim();
-          if (received.isEmpty) {
-            final serial = int.tryParse(legacyDate);
-            if (serial != null && serial >= 30000 && serial <= 70000) {
-              map['received_at'] = _excelSerialDate(serial);
-              map['notes'] = '';
-            }
           }
 
           final box = '${map['box_number'] ?? ''}'.trim();
@@ -506,36 +471,6 @@ class ExcelImportService {
     return (applied: applied, waitingForPhone: waitingForPhone);
   }
 
-  static bool _looksLikeLegacyConsigneeName(String value) {
-    final text = value.trim();
-    if (text.isEmpty) return false;
-
-    // 내부 분류 코드(A001 등), 숫자만, 반품/취소 같은 업무 표시값은 이름으로 보지 않습니다.
-    if (RegExp(r'^[A-Z]\d{2,5}$', caseSensitive: false).hasMatch(text)) {
-      return false;
-    }
-    if (RegExp(r'^\d+$').hasMatch(text)) return false;
-
-    final lowered = text.toLowerCase();
-    if (lowered == '반품' ||
-        lowered == '취소' ||
-        lowered == 'return' ||
-        lowered == 'unknown' ||
-        lowered == '미상' ||
-        lowered.contains('수취인 불명')) {
-      return false;
-    }
-    return true;
-  }
-
-  static String _excelSerialDate(int serial) {
-    // Excel 1900 date system. 25569 == 1970-01-01.
-    final millis = (serial - 25569) * Duration.millisecondsPerDay;
-    final date = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
-  }
   static bool _isCustomerNameHeader(String value) {
     final key = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
     return key == '이름' ||
@@ -638,5 +573,4 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
 

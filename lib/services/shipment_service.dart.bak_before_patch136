@@ -51,67 +51,7 @@ class ShipmentService {
         'p_phone': phone.trim(),
       },
     );
-
-    final result = List<Map<String, dynamic>>.from(rows as List);
-
-    // 관리자·직원·협력/파트너 검색에서는 수취인 불명 화물도 일반 화물 검색 결과
-    // 아래에 보여야 합니다. 과거 RPC 버전에 recipient_unknown 제외 조건이 남아 있어도
-    // 앱에서 해당 항차의 불명 화물을 보강해 누락되지 않게 합니다.
-    final isManager = currentUser.role == UserRole.admin ||
-        currentUser.role == UserRole.staff ||
-        currentUser.role == UserRole.partner;
-
-    if (isManager) {
-      try {
-        var query = SupabaseService.client
-            .from('shipments')
-            .select()
-            .eq('recipient_unknown', true);
-
-        if (route != '전체') {
-          query = query.eq('route', route);
-        }
-        if (parsedYear != null && year != '전체') {
-          query = query.eq('shipment_year', parsedYear);
-        }
-        if (voyageValue.isNotEmpty) {
-          query = query.eq('voyage', voyageValue);
-        }
-
-        final unknownRaw = await query;
-        final unknownRows =
-            List<Map<String, dynamic>>.from(unknownRaw as List);
-
-        bool containsIgnoreCase(dynamic source, String term) {
-          if (term.trim().isEmpty) return true;
-          return '${source ?? ''}'
-              .toLowerCase()
-              .contains(term.trim().toLowerCase());
-        }
-
-        final filtered = unknownRows.where((row) {
-          if (!containsIgnoreCase(row['box_number'], boxNumber)) return false;
-          if (!containsIgnoreCase(row['invoice_number'], invoice)) return false;
-          if (!containsIgnoreCase(row['consignee_name'], recipient)) return false;
-          if (!containsIgnoreCase(row['consignee_phone'], phone)) return false;
-
-          final deletionStatus =
-              '${row['deletion_status'] ?? 'active'}'.trim().toLowerCase();
-          return deletionStatus != 'pending';
-        });
-
-        final existingIds = result.map((row) => '${row['id']}').toSet();
-        for (final row in filtered) {
-          if (existingIds.add('${row['id']}')) {
-            result.add(row);
-          }
-        }
-      } catch (_) {
-        // 불명 화물 보강 실패가 기존 검색 RPC 결과까지 막지는 않도록 합니다.
-      }
-    }
-
-    return result;
+    return List<Map<String, dynamic>>.from(rows as List);
   }
 
   Future<List<Map<String, dynamic>>> getRowsByIds(List<String> ids) async {
@@ -452,7 +392,6 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-
 
 
 

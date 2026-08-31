@@ -1,0 +1,685 @@
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../core/app_colors.dart';
+import '../core/route_catalog.dart';
+import '../core/money_format.dart';
+import '../models/app_user.dart';
+import '../services/shipment_service.dart';
+import '../services/freight_service.dart';
+import '../services/shipment_filter_options_service.dart';
+import 'shipment_manual_add_screen.dart';
+import 'notice_management_screen.dart';
+import 'schedule_management_screen.dart';
+import 'excel_upload_screen.dart';
+import 'exchange_rate_screen.dart';
+import 'member_management_screen.dart';
+import 'change_approval_screen.dart';
+import 'quote_request_management_screen.dart';
+import 'statement_preview_dialog.dart';
+import 'batch_statement_pdf_dialog.dart';
+
+class CargoManagementScreen extends StatefulWidget {
+  const CargoManagementScreen({
+    super.key,
+    required this.user,
+    this.onBack,
+    this.initialSelectedIds = const <String>[],
+  });
+
+  final AppUser user;
+  final VoidCallback? onBack;
+  final List<String> initialSelectedIds;
+
+  @override
+  State<CargoManagementScreen> createState() => _CargoManagementScreenState();
+}
+
+class _CargoManagementScreenState extends State<CargoManagementScreen> {
+  final _boxNumberController = TextEditingController();
+  final _invoiceController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+
+  final _editBoxNumberController = TextEditingController();
+  final _editNameController = TextEditingController();
+  final _editPhoneController = TextEditingController();
+  final _editNoteController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _lengthController = TextEditingController();
+  final _widthController = TextEditingController();
+  final _heightController = TextEditingController();
+
+  String _route = '전체';
+  String _year = '전체';
+  String _voyage = '전체';
+  List<Map<String, dynamic>> _results = const [];
+  List<Map<String, dynamic>> _pendingDeletions = const [];
+  List<ShipmentBatchOption> _filterBatches = const [];
+  final Set<String> _selectedIds = <String>{};
+  bool _searched = false;
+  bool _busy = false;
+
+  bool _showBoxSearch = true;
+  bool _showInvoiceSearch = true;
+  bool _showNameSearch = true;
+  bool _showPhoneSearch = true;
+
+  bool get _isAdmin => widget.user.role == UserRole.admin;
+  bool get _isStaff => widget.user.role == UserRole.staff;
+  bool get _isPartner => widget.user.role == UserRole.partner;
+  bool get _isManager => _isAdmin || _isStaff || _isPartner;
+  bool get _canSaveDirectly => _isManager;
+  List<String> get _availableYears {
+    final years =
+        ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, _route);
+    return <String>['전체', ...years.map((e) => '$e년')];
+  }
+
+  List<String> get _availableVoyages {
+    final year =
+        int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (year == null) return const <String>['전체'];
+    final voyages = ShipmentFilterOptionsService.instance
+        .voyagesFor(_filterBatches, _route, year);
+    return <String>[
+      '전체',
+      ...voyages.map(
+        (e) => e.endsWith('항차') ? e : '${e}항차',
+      ),
+    ];
+  }
+
+  Future<void> _loadFilterBatches() async {
+    try {
+      final rows = await ShipmentFilterOptionsService.instance.listBatches();
+      if (!mounted) return;
+      setState(() {
+        _filterBatches = rows;
+        if (!_availableYears.contains(_year)) _year = '전체';
+        if (!_availableVoyages.contains(_voyage)) _voyage = '전체';
+      });
+    } catch (_) {
+      // 공통 조회 옵션 실패가 기존 화물 관리 기능을 막지 않도록 합니다.
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFilterBatches();
+    if (widget.initialSelectedIds.isNotEmpty) _loadSelected();
+    if (_isManager) _loadPendingDeletions();
+  }
+
+  @override
+  void dispose() {
+    _boxNumberController.dispose();
+    _invoiceController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _editBoxNumberController.dispose();
+    _editNameController.dispose();
+    _editPhoneController.dispose();
+    _editNoteController.dispose();
+    _weightController.dispose();
+    _lengthController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSelected() async {
+    final rows = await ShipmentService.instance.getRowsByIds(widget.initialSelectedIds);
+    if (!mounted) return;
+    setState(() {
+      _results = rows;
+      _searched = true;
+    });
+    _syncEditControllers();
+  }
+
+  String _boxNumberForRequest() {
+    final raw = _boxNumberController.text.trim();
+    if (raw.isEmpty) return '';
+    final prefix = RouteCatalog.boxPrefixFor(_route);
+    if (prefix.isEmpty) return raw;
+    return '$prefix$raw';
+  }
+
+  Future<void> _search() async {
+    setState(() => _busy = true);
+    try {
+      final rows = await ShipmentService.instance.searchRows(
+        route: _route,
+        boxNumber: _showBoxSearch ? _boxNumberForRequest() : '',
+        invoice: _showInvoiceSearch ? _invoiceController.text.trim() : '',
+        recipient: _showNameSearch ? _nameController.text.trim() : '',
+        phone: _showPhoneSearch ? _phoneController.text.trim() : '',
+        year: _year,
+        voyage: _voyage,
+        currentUser: widget.user,
+      );
+      if (!mounted) return;
+      setState(() {
+        _results = rows;
+        _searched = true;
+        _selectedIds.clear();
+      });
+      _syncEditControllers();
+
+      if (_isManager && rows.isEmpty) {
+        final add = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            content: const Text(
+              '검색 하신 화물 데이타가 없습니다. 화물을 추가 하시겠습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('화물 추가 입력'),
+              ),
+            ],
+          ),
+        );
+        if (add == true && mounted) {
+          await _openManualAdd(
+            route: _route,
+            year: _year,
+            voyage: _voyage,
+            boxNumber: _boxNumberController.text.trim(),
+            invoice: _invoiceController.text.trim(),
+            name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+          );
+        }
+      }
+    } catch (error) {
+      _message('화물 검색 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openManualAdd({
+    String? route,
+    String? year,
+    String? voyage,
+    String boxNumber = '',
+    String invoice = '',
+    String name = '',
+    String phone = '',
+  }) async {
+    final parsedYear = year == null || year == '전체'
+        ? null
+        : int.tryParse(year.replaceAll(RegExp(r'[^0-9]'), ''));
+    final selectedVoyage =
+        voyage == null || voyage == '전체' ? null : voyage;
+
+    final added = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShipmentManualAddScreen(
+          initialRoute: route,
+          initialYear: parsedYear,
+          initialVoyage: selectedVoyage,
+          initialBoxNumber: boxNumber,
+          initialInvoice: invoice,
+          initialName: name,
+          initialPhone: phone,
+        ),
+      ),
+    );
+    if (added == true && mounted) {
+      await _search();
+    }
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (!_selectedIds.remove(id)) _selectedIds.add(id);
+    });
+    _syncEditControllers();
+  }
+
+  void _syncEditControllers() {
+    if (_selectedIds.length != 1) {
+      _editBoxNumberController.clear();
+      _editNameController.clear();
+      _editPhoneController.clear();
+      _editNoteController.clear();
+      _weightController.clear();
+      _lengthController.clear();
+      _widthController.clear();
+      _heightController.clear();
+      return;
+    }
+    final id = _selectedIds.first;
+    Map<String, dynamic>? row;
+    for (final item in _results) {
+      if ('${item['id']}' == id) {
+        row = item;
+        break;
+      }
+    }
+    if (row == null) return;
+    final rowRoute = '${row['route'] ?? ''}';
+    final prefix = RouteCatalog.boxPrefixFor(rowRoute);
+    final currentBox = '${row['box_number'] ?? ''}';
+    _editBoxNumberController.text = prefix.isNotEmpty && currentBox.startsWith(prefix)
+        ? currentBox.substring(prefix.length)
+        : currentBox;
+    _editNameController.text = '${row['consignee_name'] ?? ''}';
+    _editPhoneController.text = '${row['consignee_phone'] ?? ''}';
+    _editNoteController.text = '${row['notes'] ?? ''}';
+    _weightController.text = '${row['weight_kg'] ?? ''}';
+    _lengthController.text = '${row['length_cm'] ?? ''}';
+    _widthController.text = '${row['width_cm'] ?? ''}';
+    _heightController.text = '${row['height_cm'] ?? ''}';
+  }
+
+  Map<String, dynamic> _memberChanges() {
+    final changes = <String, dynamic>{};
+    if (_editNameController.text.trim().isNotEmpty) {
+      changes['consignee_name'] = _editNameController.text.trim();
+    }
+    if (_editPhoneController.text.trim().isNotEmpty) {
+      changes['consignee_phone'] = _editPhoneController.text.trim();
+    }
+    if (_editNoteController.text.trim().isNotEmpty) {
+      changes['notes'] = _editNoteController.text.trim();
+    }
+    return changes;
+  }
+
+  Map<String, dynamic> _managerChanges() {
+    final changes = _memberChanges();
+    final weight = num.tryParse(_weightController.text.trim());
+    final length = num.tryParse(_lengthController.text.trim());
+    final width = num.tryParse(_widthController.text.trim());
+    final height = num.tryParse(_heightController.text.trim());
+    if (_weightController.text.trim().isNotEmpty && weight != null) {
+      changes['weight_kg'] = weight;
+    }
+    if (_lengthController.text.trim().isNotEmpty && length != null) {
+      changes['length_cm'] = length;
+    }
+    if (_widthController.text.trim().isNotEmpty && width != null) {
+      changes['width_cm'] = width;
+    }
+    if (_heightController.text.trim().isNotEmpty && height != null) {
+      changes['height_cm'] = height;
+    }
+    return changes;
+  }
+
+  Future<void> _showStatement() async {
+    if (_isPartner) {
+      _message('협력/파트너 계정은 명세서를 조회할 수 없습니다.');
+      return;
+    }
+    if (_selectedIds.isEmpty) {
+      _message('명세서를 확인할 화물을 선택해 주세요.');
+      return;
+    }
+
+    final selected = _results
+        .where((row) => _selectedIds.contains('${row['id']}'))
+        .toList(growable: false);
+    if (selected.isEmpty) return;
+
+    final receipt = '${selected.first['receipt_number'] ?? ''}'.trim();
+    if (receipt.isEmpty) {
+      _message('선택한 화물에 영수번호가 없습니다.');
+      return;
+    }
+    if (selected.any((row) =>
+        '${row['receipt_number'] ?? ''}'.trim() != receipt)) {
+      _message('명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.');
+      return;
+    }
+
+    final route = '${selected.first['route'] ?? ''}';
+    final year = (selected.first['shipment_year'] as num?)?.toInt();
+    final voyage = '${selected.first['voyage'] ?? ''}';
+    if (route.isEmpty || year == null || voyage.isEmpty) {
+      _message('명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => StatementPreviewDialog(
+        routeLabel: route,
+        year: year,
+        voyage: voyage,
+        receiptNumber: receipt,
+      ),
+    );
+  }
+
+  Future<void> _showBatchStatementPdf({
+    List<Map<String, dynamic>>? scopeRows,
+  }) async {
+    if (_isPartner) {
+      _message('협력/파트너 계정은 명세서를 출력할 수 없습니다.');
+      return;
+    }
+    if (_selectedIds.isEmpty) {
+      _message('PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.');
+      return;
+    }
+    final source = scopeRows ?? _results;
+    final selected = source
+        .where((row) => _selectedIds.contains('${row['id']}'))
+        .toList(growable: false);
+    if (selected.isEmpty) {
+      _message('이 항차에서 체크된 화물이 없습니다.');
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => BatchStatementPdfDialog(selectedRows: selected),
+    );
+  }
+  Future<void> _save() async {
+    if (_selectedIds.isEmpty) return;
+    final changes = _canSaveDirectly ? _managerChanges() : _memberChanges();
+    if (changes.isEmpty) {
+      _message('수정할 내용을 입력해 주세요.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      if (_canSaveDirectly) {
+        if (_isAdmin && _selectedIds.length == 1 && _editBoxNumberController.text.trim().isNotEmpty) {
+          final selectedId = _selectedIds.first;
+          final row = _results.firstWhere((item) => '${item['id']}' == selectedId);
+          final rowRoute = '${row['route'] ?? ''}';
+          final prefix = RouteCatalog.boxPrefixFor(rowRoute);
+          final raw = _editBoxNumberController.text.trim();
+          final fullBox = prefix.isEmpty || raw.startsWith(prefix) ? raw : '$prefix$raw';
+          if (fullBox != '${row['box_number'] ?? ''}') {
+            await ShipmentService.instance.adminUpdateBoxNumber(
+              shipmentId: selectedId,
+              boxNumber: fullBox,
+            );
+          }
+        }
+        for (final id in _selectedIds) {
+          await ShipmentService.instance.updateRow(id, changes);
+        }
+        _message('선택한 화물 정보를 저장했습니다.');
+        await _reloadCurrentRows();
+      } else {
+        await ShipmentService.instance.requestChanges(
+          shipmentIds: _selectedIds.toList(),
+          changes: changes,
+        );
+        _message('관리자에게 화물 정보 수정 요청을 보냈습니다.');
+      }
+    } catch (error) {
+      _message('화물 정보 처리 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _loadPendingDeletions() async {
+    if (!_isManager) return;
+    try {
+      final rows =
+          await ShipmentService.instance.getPendingShipmentDeletions();
+      if (!mounted) return;
+      setState(() => _pendingDeletions = rows);
+    } catch (error) {
+      _message('화물 삭제 대기 목록 불러오기 실패: $error');
+    }
+  }
+
+  Future<void> _requestDeletion(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    final box = '${item['box_number'] ?? ''}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('화물 삭제'),
+        content: Text(
+          '$box 화물을 삭제 대기로 이동하시겠습니까?\n\n'
+          '삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('삭제 대기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.requestShipmentDeletion(id);
+      _selectedIds.remove(id);
+      setState(() {
+        _results = _results
+            .where((row) => '${row['id']}' != id)
+            .toList(growable: false);
+      });
+      await _loadPendingDeletions();
+      _message('$box 화물을 삭제 대기로 이동했습니다.');
+    } catch (error) {
+      _message('화물 삭제 대기 처리 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _cancelDeletion(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.cancelShipmentDeletion(id);
+      await _loadPendingDeletions();
+      _message('화물 삭제를 취소했습니다.');
+      if (_searched) await _search();
+    } catch (error) {
+      _message('삭제 취소 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteNow(Map<String, dynamic> item) async {
+    final id = '${item['id']}';
+    final box = '${item['box_number'] ?? ''}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('화물 바로 삭제'),
+        content: Text(
+          '$box 화물을 바로 삭제하시겠습니까?\n\n'
+          '바로 삭제 후에는 앱에서 복구할 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('바로 삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.deleteShipmentNow(id);
+      await _loadPendingDeletions();
+      _message('$box 화물을 바로 삭제했습니다.');
+    } catch (error) {
+      _message('화물 바로 삭제 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _pendingDeletionCard(Map<String, dynamic> item) {
+    final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
+    final receivedDate = _dateOnly(item['received_at']);
+    final length = _naturalNumber(item['length_cm']);
+    final height = _naturalNumber(item['height_cm']);
+    final width = _naturalNumber(item['width_cm']);
+    final size = '$length × $height × $width cm';
+    final name = '${item['consignee_name'] ?? ''}'.trim();
+    final company = '${item['consignee_company'] ?? item['company_name'] ?? ''}'.trim();
+    final nameCompany = company.isEmpty || company == name
+        ? (name.isEmpty ? '-' : name)
+        : '${name.isEmpty ? '-' : name} / $company';
+    final receipt = '${item['receipt_number'] ?? ''}'.trim();
+    final zone = '${item['unloading_zone'] ?? ''}'.trim();
+
+    return Card(
+      color: const Color(0xFFFFF6F6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    '박스번호: ${item['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navyPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  '삭제 대기',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            _infoRow('운송 경로', '${item['route'] ?? ''}'),
+            _infoRow(
+              '년도 / 항차',
+              '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
+            ),
+            _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
+            _infoRow('수령인 / 회사명', nameCompany),
+            _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
+            _infoRow(
+              '무게 / 크기',
+              '${_weightOneDecimal(item['weight_kg'])} kg / $size',
+            ),
+            _infoRow(
+              '영수번호 / 구획',
+              '${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : () => _cancelDeletion(item),
+                    child: const Text('삭제 취소'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _busy ? null : () => _deleteNow(item),
+                    child: const Text('바로 삭제'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  String _naturalNumber(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    final number = double.tryParse(text);
+    return number == null ? (text.isEmpty ? '-' : text) : number.round().toString();
+  }
+  String _dateOnly(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '-';
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) {
+      return text.length >= 10 ? text.substring(0, 10) : text;
+    }
+    final local = parsed.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  String _companyOf(Map<String, dynamic> row) {
+    for (final key in const ['consignee_company', 'company_name', 'company']) {
+      final value = '${row[key] ?? ''}'.trim();
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
+  String _voyageLabel(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '';
+    return text.endsWith('항차') ? text : '$text항차';
+  }
+
+  Widget _infoRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 88,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

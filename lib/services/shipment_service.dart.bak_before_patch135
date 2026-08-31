@@ -51,67 +51,7 @@ class ShipmentService {
         'p_phone': phone.trim(),
       },
     );
-
-    final result = List<Map<String, dynamic>>.from(rows as List);
-
-    // 관리자·직원·협력/파트너 검색에서는 수취인 불명 화물도 일반 화물 검색 결과
-    // 아래에 보여야 합니다. 과거 RPC 버전에 recipient_unknown 제외 조건이 남아 있어도
-    // 앱에서 해당 항차의 불명 화물을 보강해 누락되지 않게 합니다.
-    final isManager = currentUser.role == UserRole.admin ||
-        currentUser.role == UserRole.staff ||
-        currentUser.role == UserRole.partner;
-
-    if (isManager) {
-      try {
-        var query = SupabaseService.client
-            .from('shipments')
-            .select()
-            .eq('recipient_unknown', true);
-
-        if (route != '전체') {
-          query = query.eq('route', route);
-        }
-        if (parsedYear != null && year != '전체') {
-          query = query.eq('shipment_year', parsedYear);
-        }
-        if (voyageValue.isNotEmpty) {
-          query = query.eq('voyage', voyageValue);
-        }
-
-        final unknownRaw = await query;
-        final unknownRows =
-            List<Map<String, dynamic>>.from(unknownRaw as List);
-
-        bool containsIgnoreCase(dynamic source, String term) {
-          if (term.trim().isEmpty) return true;
-          return '${source ?? ''}'
-              .toLowerCase()
-              .contains(term.trim().toLowerCase());
-        }
-
-        final filtered = unknownRows.where((row) {
-          if (!containsIgnoreCase(row['box_number'], boxNumber)) return false;
-          if (!containsIgnoreCase(row['invoice_number'], invoice)) return false;
-          if (!containsIgnoreCase(row['consignee_name'], recipient)) return false;
-          if (!containsIgnoreCase(row['consignee_phone'], phone)) return false;
-
-          final deletionStatus =
-              '${row['deletion_status'] ?? 'active'}'.trim().toLowerCase();
-          return deletionStatus != 'pending';
-        });
-
-        final existingIds = result.map((row) => '${row['id']}').toSet();
-        for (final row in filtered) {
-          if (existingIds.add('${row['id']}')) {
-            result.add(row);
-          }
-        }
-      } catch (_) {
-        // 불명 화물 보강 실패가 기존 검색 RPC 결과까지 막지는 않도록 합니다.
-      }
-    }
-
-    return result;
+    return List<Map<String, dynamic>>.from(rows as List);
   }
 
   Future<List<Map<String, dynamic>>> getRowsByIds(List<String> ids) async {
@@ -127,58 +67,12 @@ class ShipmentService {
 
   Future<int> upsertFromRows(List<Map<String, dynamic>> rows) async {
     if (!SupabaseConfig.isConfigured || rows.isEmpty) return 0;
-
-    // 대용량 Excel을 한 번의 RPC로 보내면 PostgreSQL statement_timeout(57014)에
-    // 걸릴 수 있으므로 작은 묶음으로 나눠 순차 반영합니다.
-    // 각 행의 import_key가 동일하므로 기존 upsert 동작/중복 방지는 그대로 유지됩니다.
-    const chunkSize = 40;
-    var inserted = 0;
-
-    for (var start = 0; start < rows.length; start += chunkSize) {
-      final end = (start + chunkSize < rows.length)
-          ? start + chunkSize
-          : rows.length;
-      final chunk = rows.sublist(start, end);
-      inserted += await _upsertShipmentChunk(chunk);
-    }
-
-    return inserted;
-  }
-
-  Future<int> _upsertShipmentChunk(
-    List<Map<String, dynamic>> rows,
-  ) async {
-    if (rows.isEmpty) return 0;
-
     final payload = rows.map(_shipmentPayload).toList();
-
-    try {
-      final result = await SupabaseService.client.rpc(
-        'manager_upsert_unlocked_shipments',
-        params: {'p_rows': payload},
-      );
-      return (result as num?)?.toInt() ?? 0;
-    } catch (error) {
-      final message = error.toString();
-
-      // DB statement_timeout이면 현재 묶음을 한 번 더 쪼개서 재시도합니다.
-      // 최소 5행까지 자동 분할하여 현장 대용량 업로드 성공률을 높입니다.
-      final isStatementTimeout =
-          message.contains('57014') ||
-          message.toLowerCase().contains('statement timeout');
-
-      if (isStatementTimeout && rows.length > 5) {
-        final middle = (rows.length / 2).ceil();
-        final left = rows.sublist(0, middle);
-        final right = rows.sublist(middle);
-
-        final leftCount = await _upsertShipmentChunk(left);
-        final rightCount = await _upsertShipmentChunk(right);
-        return leftCount + rightCount;
-      }
-
-      rethrow;
-    }
+    final result = await SupabaseService.client.rpc(
+      'manager_upsert_unlocked_shipments',
+      params: {'p_rows': payload},
+    );
+    return (result as num?)?.toInt() ?? 0;
   }
 
   Future<void> updateRow(String id, Map<String, dynamic> changes) async {
@@ -452,7 +346,5 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-
-
 
 
