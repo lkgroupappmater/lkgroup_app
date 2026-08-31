@@ -1104,8 +1104,15 @@ function appendDocumentAutomationBlock(
       return [x.customer_name,x.alternate_name,x.company_name].some(v => normalizeName(v) === target && target !== '');
     });
     const paidBy = String(d?.paid_by ?? '').toLowerCase();
-    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (paidBy.includes('?쒓뎅') || paidBy.includes('korea') || paidBy.includes('prepaid') ? 'province_prepaid_kr' : 'province')) : '';
-    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address].filter(Boolean).join(', ') : '';
+    const koreaMarker =
+      paidBy.includes('\uD55C\uAD6D') || paidBy.includes('korea');
+    const prepaidMarker =
+      paidBy.includes('\uC120\uACB0\uC81C') ||
+      paidBy.includes('\uC120\uBD88') ||
+      paidBy.includes('prepaid');
+    const isKoreaPrepaid = koreaMarker && prepaidMarker;
+    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (isKoreaPrepaid ? 'province_prepaid_kr' : 'province')) : '';
+    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address, d.paid_by].filter(Boolean).join(', ') : '';
     const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
     const extra = extraMap.get(receipt) ?? 0;
     add([receipt,name,phone,auto,delivery,type,extra,(receiptAmounts.get(receipt) ?? 0) + extra]);
@@ -1443,9 +1450,11 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const { data: localDeliveryProfiles, error: localDeliveryError } = await admin
       .from('local_delivery_profiles')
-      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes')
+      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes,preferred')
       .eq('route_key', routeKey)
-      .eq('active', true);
+      .eq('active', true)
+      .order('preferred', { ascending: false })
+      .order('source_no', { ascending: true });
     if (localDeliveryError) throw localDeliveryError;
     const filePrefixes: Record<string, string> = {
       kr_la_sea: 'KR_LA_SEA',

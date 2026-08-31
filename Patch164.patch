@@ -1,0 +1,119 @@
+diff --git a/lib/services/customer_benefit_service.dart b/lib/services/customer_benefit_service.dart
+--- a/lib/services/customer_benefit_service.dart
++++ b/lib/services/customer_benefit_service.dart
+@@ -168,6 +168,7 @@
+       tel,
+       localCompany,
+       destinationAddress,
++      paidBy,
+     ].where((e) => e.trim().isNotEmpty).join(', ');
+   }
+ }
+diff --git a/supabase/functions/export-shipment-excel/index.ts b/supabase/functions/export-shipment-excel/index.ts
+--- a/supabase/functions/export-shipment-excel/index.ts
++++ b/supabase/functions/export-shipment-excel/index.ts
+@@ -1084,9 +1084,14 @@
+       return [x.customer_name,x.alternate_name,x.company_name].some(v => normalizeName(v) === target && target !== '');
+     });
+     const paidBy = String(d?.paid_by ?? '').toLowerCase();
+-    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (paidBy.includes('?쒓뎅') || paidBy.includes('korea') || paidBy.includes('prepaid') ? 'province_prepaid_kr' : 'province')) : '';
+-    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address].filter(Boolean).join(', ') : '';
++    const koreaMarker =
++      paidBy.includes('\uD55C\uAD6D') || paidBy.includes('korea');
++    const prepaidMarker =
++      paidBy.includes('\uC120\uACB0\uC81C') ||
++      paidBy.includes('\uC120\uBD88') ||
++      paidBy.includes('prepaid');
++    const isKoreaPrepaid = koreaMarker && prepaidMarker;
++    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (isKoreaPrepaid ? 'province_prepaid_kr' : 'province')) : '';
++    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address, d.paid_by].filter(Boolean).join(', ') : '';
+     const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
+     const extra = extraMap.get(receipt) ?? 0;
+     add([receipt,name,phone,auto,delivery,type,extra,(receiptAmounts.get(receipt) ?? 0) + extra]);
+@@ -1421,9 +1426,11 @@
+
+     const { data: localDeliveryProfiles, error: localDeliveryError } = await admin
+       .from('local_delivery_profiles')
+-      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes')
++      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes,preferred')
+       .eq('route_key', routeKey)
+-      .eq('active', true);
++      .eq('active', true)
++      .order('preferred', { ascending: false })
++      .order('source_no', { ascending: true });
+     if (localDeliveryError) throw localDeliveryError;
+     const filePrefixes: Record<string, string> = {
+       kr_la_sea: 'KR_LA_SEA',
+diff --git a/supabase/supabase_096_delivery_document_consistency.sql b/supabase/supabase_096_delivery_document_consistency.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/supabase_096_delivery_document_consistency.sql
+@@ -0,0 +1,68 @@
++-- Patch164 / 096
++-- Route-specific discount + local-delivery document consistency.
++-- Freight calculation, receipt numbering, Zone logic, and settlement snapshot logic are unchanged.
++
++create or replace function public.compute_shipment_special_note(
++  p_route text,
++  p_name text,
++  p_phone text
++)
++returns text
++language plpgsql
++stable
++security definer
++set search_path=public
++as $$
++declare
++  v_route_key text := public.route_base_key_for_label(p_route);
++  v_group text := '';
++  v_discount numeric := 0;
++  v_delivery text := '';
++  v_discount_text text := '';
++begin
++  if public.normalize_phone(p_phone) <> '' and public.normalize_person_name(p_name) <> '' then
++    select coalesce(group_name,''), coalesce(discount_percent,0)
++      into v_group, v_discount
++    from public.customer_rate_overrides r
++    where r.active=true
++      and (r.route_key=v_route_key or r.route_key='all')
++      and public.phone_matches(r.phone,p_phone)
++      and (
++        public.normalize_person_name(r.customer_name)=public.normalize_person_name(p_name)
++        or (coalesce(r.company_name,'')<>'' and public.normalize_person_name(r.company_name)=public.normalize_person_name(p_name))
++      )
++    order by case when r.route_key=v_route_key then 0 else 1 end, r.id
++    limit 1;
++
++    select case when d.delivery_type='city' then '시내배송' else '지방배송' end
++      into v_delivery
++    from public.local_delivery_profiles d
++    where d.active=true
++      and d.route_key=v_route_key
++      and public.phone_matches(d.phone,p_phone)
++      and (
++        public.normalize_person_name(d.customer_name)=public.normalize_person_name(p_name)
++        or (coalesce(d.alternate_name,'')<>'' and public.normalize_person_name(d.alternate_name)=public.normalize_person_name(p_name))
++        or (coalesce(d.company_name,'')<>'' and public.normalize_person_name(d.company_name)=public.normalize_person_name(p_name))
++      )
++    order by d.preferred desc, d.source_no nulls last, d.id
++    limit 1;
++  end if;
++
++  if coalesce(v_discount,0)>0 then
++    v_discount_text := concat(
++      case when lower(v_group) like '%특별%' then '특별할인 ' else '할인 ' end,
++      trim(to_char(v_discount*100,'FM999990.##')),
++      '% 적용'
++    );
++  end if;
++
++  return concat_ws(' / ', nullif(v_discount_text,''), nullif(v_delivery,''));
++end
++$$;
++
++-- Existing shipments are refreshed so App / Statement / Excel use the same auto remark.
++update public.shipments s
++set special_note_auto=public.compute_shipment_special_note(
++  s.route,s.consignee_name,s.consignee_phone
++);
