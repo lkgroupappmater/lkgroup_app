@@ -81,6 +81,41 @@ class ExcelImportService {
             if (headers[i].isNotEmpty) map[headers[i]] = row[i].trim();
           }
 
+          // 실무에서 오래 사용한 일부 Excel은 현재 헤더 형식은 유지하면서
+          // 실제 값은 D(발신인)에 수령인 이름을 넣고 E(수신인)는 비워 둔 경우가 있습니다.
+          // 전화번호(F)가 있고 E가 비어 있으면 D의 값이 사람이름/회사명일 때만
+          // 수령인으로 안전하게 보정합니다. A001 같은 내부코드/반품 표시는 제외합니다.
+          final consignee = '${map['consignee_name'] ?? ''}'.trim();
+          final sender = '${map['sender_name'] ?? ''}'.trim();
+          final phone = '${map['consignee_phone'] ?? ''}'.trim();
+          if (consignee.isEmpty &&
+              phone.isNotEmpty &&
+              _looksLikeLegacyConsigneeName(sender)) {
+            map['consignee_name'] = sender;
+          }
+
+          // 같은 구형 실무 파일에서 G에 수량(대부분 1), I가 비어 있는 경우 보정.
+          final quantityText = '${map['quantity'] ?? ''}'.trim();
+          final legacyContents = '${map['contents'] ?? ''}'.trim();
+          if (quantityText.isEmpty) {
+            final legacyQuantity = int.tryParse(legacyContents);
+            if (legacyQuantity != null && legacyQuantity >= 1) {
+              map['quantity'] = legacyQuantity.toString();
+              map['contents'] = '';
+            }
+          }
+
+          // 구형 파일에서 P(비고)에 Excel 날짜 serial이 있고 Q(접수일)가 비어 있는 경우.
+          final received = '${map['received_at'] ?? ''}'.trim();
+          final legacyDate = '${map['notes'] ?? ''}'.trim();
+          if (received.isEmpty) {
+            final serial = int.tryParse(legacyDate);
+            if (serial != null && serial >= 30000 && serial <= 70000) {
+              map['received_at'] = _excelSerialDate(serial);
+              map['notes'] = '';
+            }
+          }
+
           final box = '${map['box_number'] ?? ''}'.trim();
           if (box.isEmpty) {
             if (row.any((cell) => cell.trim().isNotEmpty)) skipped++;
@@ -98,14 +133,6 @@ class ExcelImportService {
             map['weight_kg'],
           ].any((v) => '${v ?? ''}'.trim().isNotEmpty);
           if (!hasBusinessData) continue;
-
-          // Excel 날짜 셀은 OOXML에서 2026-07-14 같은 문자열이 아니라
-          // 46217 같은 serial number로 저장될 수 있습니다.
-          // DB received_at은 timestamptz이므로 업로드 전에 ISO 날짜로 정규화합니다.
-          final receivedAtRaw = '${map['received_at'] ?? ''}'.trim();
-          if (receivedAtRaw.isNotEmpty) {
-            map['received_at'] = _normaliseExcelDateValue(receivedAtRaw);
-          }
 
           rows.add({
             ...map,
@@ -243,12 +270,8 @@ class ExcelImportService {
       r'<row\b[^>]*>([\s\S]*?)</row>',
       caseSensitive: false,
     );
-    // 중요: self-closing 빈 셀(<c .../>)이 다음 일반 셀(<c ...>...</c>)을
-    // 삼키지 않도록 하나의 패턴으로 처리합니다.
-    // 예: <c r="D6" .../><c r="E6" ...><v>...</v></c>
-    // 기존 정규식은 D6부터 E6의 </c>까지 한 셀로 오인할 수 있었습니다.
     final cellPattern = RegExp(
-      r'<c\b([^>]*?)(?:/>|>([\s\S]*?)</c>)',
+      r'<c\b([^>]*)>([\s\S]*?)</c>|<c\b([^>]*)/>',
       caseSensitive: false,
     );
 
@@ -257,7 +280,7 @@ class ExcelImportService {
       final values = <String>[];
 
       for (final cellMatch in cellPattern.allMatches(rowXml)) {
-        final attrs = cellMatch.group(1) ?? '';
+        final attrs = cellMatch.group(1) ?? cellMatch.group(3) ?? '';
         final body = cellMatch.group(2) ?? '';
         final ref = RegExp(r'\br="([A-Z]+)\d+"', caseSensitive: false)
             .firstMatch(attrs)
@@ -483,28 +506,35 @@ class ExcelImportService {
     return (applied: applied, waitingForPhone: waitingForPhone);
   }
 
-  static String _normaliseExcelDateValue(String value) {
+  static bool _looksLikeLegacyConsigneeName(String value) {
     final text = value.trim();
-    if (text.isEmpty) return '';
+    if (text.isEmpty) return false;
 
-    // 이미 ISO/일반 날짜 문자열이면 그대로 둡니다.
-    if (DateTime.tryParse(text) != null) return text;
-
-    // Excel 1900 date system serial.
-    // 25569 == 1970-01-01. 소수부가 있으면 시간까지 보존합니다.
-    final serial = double.tryParse(text);
-    if (serial != null && serial >= 30000 && serial <= 70000) {
-      final milliseconds =
-          ((serial - 25569) * Duration.millisecondsPerDay).round();
-      final date = DateTime.fromMillisecondsSinceEpoch(
-        milliseconds,
-        isUtc: true,
-      );
-      return date.toIso8601String();
+    // 내부 분류 코드(A001 등), 숫자만, 반품/취소 같은 업무 표시값은 이름으로 보지 않습니다.
+    if (RegExp(r'^[A-Z]\d{2,5}$', caseSensitive: false).hasMatch(text)) {
+      return false;
     }
+    if (RegExp(r'^\d+$').hasMatch(text)) return false;
 
-    // 날짜로 해석할 수 없는 값은 그대로 반환하여 기존 동작을 보존합니다.
-    return text;
+    final lowered = text.toLowerCase();
+    if (lowered == '반품' ||
+        lowered == '취소' ||
+        lowered == 'return' ||
+        lowered == 'unknown' ||
+        lowered == '미상' ||
+        lowered.contains('수취인 불명')) {
+      return false;
+    }
+    return true;
+  }
+
+  static String _excelSerialDate(int serial) {
+    // Excel 1900 date system. 25569 == 1970-01-01.
+    final millis = (serial - 25569) * Duration.millisecondsPerDay;
+    final date = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
   static bool _isCustomerNameHeader(String value) {
     final key = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
@@ -608,6 +638,5 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
 
 
