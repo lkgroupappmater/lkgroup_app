@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -73,7 +73,79 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         _calculation = null;
         _calculationRates = null;
       });
+  Future<void> _addQuoteExtraCost() async {
+    final nameController = TextEditingController();
+    final amountController = TextEditingController();
 
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('湲고? 鍮꾩슜 異붽?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: '鍮꾩슜 ?대쫫',
+                hintText: '?? ?듦?鍮? 湲고? ?섏닔猷?,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: amountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: '湲덉븸 (USD)',
+                prefixText: '\$ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('痍⑥냼'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final amount = double.tryParse(amountController.text.trim());
+              if (name.isEmpty || amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('鍮꾩슜 ?대쫫怨??щ컮瑜?USD 湲덉븸???낅젰??二쇱꽭??')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            child: const Text('異붽?'),
+          ),
+        ],
+      ),
+    );
+
+    if (added == true && mounted) {
+      final name = nameController.text.trim();
+      final amount = double.tryParse(amountController.text.trim());
+      if (name.isNotEmpty && amount != null && amount > 0) {
+        setState(() {
+          _extraCosts.add(
+            ExtraCostItem(name: name, amountUsd: amount),
+          );
+        });
+      }
+    }
+
+    nameController.dispose();
+    amountController.dispose();
+  }
   void _removeBox(int i) {
     if (_boxes.length <= 1) return;
     setState(() {
