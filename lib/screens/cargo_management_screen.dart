@@ -756,11 +756,130 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         visualDensity: VisualDensity.compact,
       );
 
+  Future<void> _showSelectedStatementChoice() async {
+    if (_isPartner) {
+      _message('협력/파트너 계정은 명세서를 조회할 수 없습니다.');
+      return;
+    }
+    if (_selectedIds.isEmpty) {
+      _message('확인 할 고객을 선택 하시오');
+      return;
+    }
+
+    final selected = _results
+        .where((row) => _selectedIds.contains('${row['id']}'))
+        .toList(growable: false);
+    if (selected.isEmpty) {
+      _message('확인 할 고객을 선택 하시오');
+      return;
+    }
+
+    String receiptKey(Map<String, dynamic> row) =>
+        '${row['route'] ?? ''}|${row['shipment_year'] ?? ''}|'
+        '${row['voyage'] ?? ''}|${row['receipt_number'] ?? ''}';
+
+    final receiptGroups = selected.map(receiptKey).toSet();
+    final singleReceipt = receiptGroups.length == 1;
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('명세서 발급'),
+        content: Text(
+          singleReceipt
+              ? '선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.'
+              : '복수 고객/영수번호 명세서는 PDF로만 발급됩니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소'),
+          ),
+          if (singleReceipt)
+            OutlinedButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, 'image'),
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: const Text('이미지'),
+            ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, 'pdf'),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('PDF'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || choice == null) return;
+    if (choice == 'image') {
+      await _showStatement();
+    } else if (choice == 'pdf') {
+      await _showBatchStatementPdf();
+    }
+  }
+
+  Widget _cargoFixedBottomBar() {
+    return Material(
+      elevation: 10,
+      borderRadius: BorderRadius.circular(14),
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _results.isEmpty ? null : _toggleAllSearchResults,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Checkbox(
+                        value: _allSearchResultsSelected,
+                        onChanged: _results.isEmpty
+                            ? null
+                            : (_) => _toggleAllSearchResults(),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      const Text(
+                        '전체',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isPartner ? null : _showSelectedStatementChoice,
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: const Text('명세서'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Material(
         color: Colors.transparent,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
             if (widget.onBack != null)
               Align(
@@ -964,41 +1083,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ),
             if (_searched) ...[
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '화물 정보 (${_results.length}건)',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  if (_isManager) ...[
-                    Checkbox(
-                      value: _allSearchResultsSelected,
-                      onChanged: _results.isEmpty
-                          ? null
-                          : (_) => _toggleAllSearchResults(),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    const Text(
-                      '전체',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                  ],
-                  if (!_isPartner)
-                    TextButton.icon(
-                      onPressed: _results.isEmpty ? null : _showBatchStatementPdf,
-                      icon: const Icon(Icons.receipt_long_outlined, size: 17),
-                      label: const Text('명세서 보기'),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                      ),
-                    ),
-                ],
+              Text(
+                '화물 정보 (${_results.length}건)',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
               ..._managementGroupWidgets(),
             ],
@@ -1094,6 +1184,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               else
                 ..._pendingDeletions.map(_pendingDeletionCard),
             ],
+          ),
+            if (_searched)
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: _cargoFixedBottomBar(),
+              ),
           ],
         ),
       );
@@ -2125,10 +2223,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                             Padding(
                               padding: const EdgeInsets.only(right: 2),
                               child: Text(
-                                List<String>.generate(
-                                  count,
-                                  (i) => '+${i + 1}',
-                                ).join(' '),
+                                '+$count',
                                 style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,

@@ -545,8 +545,7 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalVolume = freight.lines.fold<double>(0, (v, f) => v + f.volumeWeight);
     final extraTotal =
         extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final extraNames =
-        extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
+
     final finalUsd = freight.totalUsd + extraTotal;
     final summaryValues = <int, String>{
       1: '합계',
@@ -590,8 +589,8 @@ class _DigitalStatementPainter extends CustomPainter {
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
     _text(c, freight.discountTotalUsd > 0 ? '-${MoneyFormat.usd(freight.discountTotalUsd)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, extraNames.isEmpty ? '기타 비용' : '기타 비용 ($extraNames)', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, extraTotal > 0 ? '+${MoneyFormat.usd(extraTotal)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
 

@@ -552,14 +552,13 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
-    final extraNames =
-        extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
+
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, extraNames.isEmpty ? '기타 비용' : '기타 비용 ($extraNames)', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, extraTotal > 0 ? '+${MoneyFormat.usd(extraTotal)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
 

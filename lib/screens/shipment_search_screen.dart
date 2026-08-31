@@ -531,19 +531,88 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     }
   }
 
+  Widget _searchFixedBottomBar() {
+    final allSelected = _results.isNotEmpty &&
+        _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
+
+    return Material(
+      elevation: 10,
+      borderRadius: BorderRadius.circular(14),
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          child: Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _results.isEmpty ? null : _toggleAll,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Checkbox(
+                      value: allSelected,
+                      onChanged: _results.isEmpty ? null : (_) => _toggleAll(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const Text(
+                      '전체',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _selectedIds.isEmpty ? null : _showFreight,
+                  icon: const Icon(Icons.price_check_outlined, size: 17),
+                  label: const Text('운임 확인'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed:
+                      _selectedIds.isEmpty || widget.onManageSelected == null
+                          ? null
+                          : () => widget.onManageSelected!(
+                                _selectedIds.toList(),
+                              ),
+                  icon: const Icon(Icons.inventory_2_outlined, size: 17),
+                  label: const Text('화물 관리'),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isLoggedIn) {
       return _LoginRequiredView(onLogin: widget.onRequireLogin);
     }
 
-    final allSelected = _results.isNotEmpty &&
-        _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      child: Stack(
+        children: [
+          ListView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 96),
         children: [
           DropdownButtonFormField<int>(
             value: _selectedRoute,
@@ -613,60 +682,19 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           _input(_phoneCtrl, '연락처', Icons.phone_outlined,
               type: TextInputType.phone),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: _search,
-                    icon: const Icon(Icons.search_rounded),
-                    label: const Text('화물 검색'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.navyPrimary,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _search,
+              icon: const Icon(Icons.search_rounded),
+              label: const Text('화물 검색'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navyPrimary,
+                foregroundColor: Colors.white,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: _selectedIds.isEmpty ? null : _showFreight,
-                    icon: const Icon(Icons.price_check_outlined),
-                    label: const Text('운임 확인'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (_searched && _results.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Checkbox(
-                  value: allSelected,
-                  onChanged: (_) => _toggleAll(),
-                  activeColor: AppColors.primary,
-                ),
-                const Text('전체 선택'),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _selectedIds.isEmpty || widget.onManageSelected == null
-                      ? null
-                      : () => widget.onManageSelected!(_selectedIds.toList()),
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('화물 관리'),
-                ),
-              ],
             ),
-          ],
+          ),
+
           const SizedBox(height: 18),
           if (_searched && _results.isEmpty)
             const Center(child: Text('검색 결과가 없습니다.')),
@@ -679,6 +707,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),          _unknownRecipientSection(),
+        ],
+          ),
+          if (_searched)
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: _searchFixedBottomBar(),
+            ),
         ],
       ),
     );
