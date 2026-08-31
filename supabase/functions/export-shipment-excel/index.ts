@@ -1159,12 +1159,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     if (shipmentError) throw shipmentError;
 
-    // Excel 출력은 Flutter가 중앙 FreightService 정산에 사용한 동일 rows를 최우선 사용합니다.
-    // Edge Function의 별도 재조회 결과가 일부 필드만 갖는 경우에도 출력 데이터가 빠지지 않습니다.
+    // Patch161: 실제 Excel 화물행은 DB의 현재 shipments를 source of truth로 사용합니다.
+    // 특히 잠금 재업로드 변경요청이 pending/rejected인 경우 request payload의
+    // incoming Excel 값을 출력에 섞지 않습니다.
+    // 중앙 FreightService 정산값은 아래 voyage_settlement_snapshots에서 별도로 사용합니다.
     const exportShipmentRows =
-      requestShipmentRows.length > 0
-        ? requestShipmentRows
-        : (shipments ?? []) as Record<string, unknown>[];
+      (shipments ?? []) as Record<string, unknown>[];
 
     const enrichedShipments = assignReceiptNumbers(
       exportShipmentRows,
@@ -1223,6 +1223,59 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
         .maybeSingle();
 
     if (settlementSnapshotError) throw settlementSnapshotError;
+
+    // Patch161: 영수번호별 기타 비용을 실제 Excel 정산금액에도 반영합니다.
+    // 운임 자체는 FreightService snapshot을 그대로 사용하고,
+    // 기타비용은 운임 계산 후 별도 가산합니다.
+    const { data: receiptExtraCosts, error: receiptExtraCostsError } =
+      await admin
+        .from('receipt_extra_costs')
+        .select('voyage,receipt_number,cost_name,amount_usd')
+        .eq('route', shipmentRouteLabel)
+        .eq('shipment_year', shipmentYear);
+
+    if (receiptExtraCostsError) throw receiptExtraCostsError;
+
+    const voyageDigits = voyage.replace(/[^0-9]/g, '');
+    const voyageExtraCosts = (receiptExtraCosts ?? []).filter((row) => {
+      // 현재 테이블 select에 voyage를 포함하도록 아래 쿼리에서 보강됩니다.
+      const rowVoyage = String((row as Record<string, unknown>).voyage ?? '');
+      return rowVoyage.replace(/[^0-9]/g, '') === voyageDigits;
+    }) as Record<string, unknown>[];
+
+    const extraByReceipt = new Map<string, number>();
+    let extraCostTotalUsd = 0;
+    for (const item of voyageExtraCosts) {
+      const receipt = String(item.receipt_number ?? '').trim();
+      const amount = Number(item.amount_usd ?? 0);
+      if (!receipt || !Number.isFinite(amount)) continue;
+      extraByReceipt.set(receipt, (extraByReceipt.get(receipt) ?? 0) + amount);
+      extraCostTotalUsd += amount;
+    }
+
+    const settlementForExcel =
+      settlementSnapshot && typeof settlementSnapshot === 'object'
+        ? (() => {
+            const copy = {
+              ...(settlementSnapshot as Record<string, unknown>),
+            };
+            const rawReceipts = Array.isArray(copy.receipts)
+              ? copy.receipts as Record<string, unknown>[]
+              : [];
+            copy.receipts = rawReceipts.map((receipt) => {
+              const receiptNo = String(receipt.receipt_number ?? '').trim();
+              const extra = extraByReceipt.get(receiptNo) ?? 0;
+              return {
+                ...receipt,
+                extra_cost_usd: extra,
+                net_usd: Number(receipt.net_usd ?? 0) + extra,
+              };
+            });
+            copy.extra_cost_usd = extraCostTotalUsd;
+            copy.net_usd = Number(copy.net_usd ?? 0) + extraCostTotalUsd;
+            return copy;
+          })()
+        : settlementSnapshot;
 
     const filePrefixes: Record<string, string> = {
       kr_la_sea: 'KR_LA_SEA',
@@ -1317,7 +1370,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // 기존 Row data의 실제 Total / Amount / 총 할인 금액도 같은 snapshot으로 직접 갱신합니다.
     applySettlementToExistingRowData(
       files,
-      settlementSnapshot as Record<string, unknown> | null,
+      settlementForExcel as Record<string, unknown> | null,
       shipmentRouteLabel,
       shipmentYear,
       voyage,
@@ -1405,6 +1458,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
+
 
 
 
