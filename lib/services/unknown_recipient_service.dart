@@ -72,8 +72,8 @@ class UnknownRecipientService {
     required bool lock,
   }) async {
     if (!SupabaseConfig.isConfigured) return;
-    final id = int.tryParse(shipmentId);
-    if (id == null) throw StateError('화물 ID가 올바르지 않습니다.');
+    final id = shipmentId.trim();
+    if (id.isEmpty) throw StateError('화물 ID가 비어 있습니다.');
     await SupabaseService.client.rpc(
       'admin_review_incomplete_shipment',
       params: {
@@ -127,4 +127,5 @@ class UnknownRecipientService {
     );
   }
 }
+
 
