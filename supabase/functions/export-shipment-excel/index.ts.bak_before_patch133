@@ -873,70 +873,30 @@ function applySettlementToExistingRowData(
   if (!path || !files[path]) return;
 
   let xml = strFromU8(files[path]);
-  const strings = sharedStrings(files);
   const voyageLabel = voyage.endsWith('항차') ? voyage : `${voyage}항차`;
 
-  // Row data 위치는 노선별로 다릅니다.
-  // 단일 단가형: 환율표 아래에서 곧바로 Total/Amount 영역이 시작될 수 있고,
-  // 구간별 단가형: 환율표 -> Kg 구간 단가표 -> Total/Amount 영역 순서입니다.
-  // 따라서 B14/C15... 같은 고정 행을 절대 사용하지 않고
-  // 원본 Excel의 실제 라벨 위치를 찾아 중앙 FreightService snapshot을 기록합니다.
-  const findLabelRow = (label: string): number | null => {
-    for (const rowMatch of xml.matchAll(
-      /<row\b[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g,
-    )) {
-      const rowNumber = Number(rowMatch[1]);
-      for (const cellMatch of rowMatch[2].matchAll(
-        /<c\b[^>]*r="([A-Z]+\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
-      )) {
-        const ref = cellMatch[1];
-        if (colOf(ref) !== 'B') continue;
-        if (cellText(cellMatch[0], strings).trim() === label) {
-          return rowNumber;
-        }
-      }
-    }
-    return null;
-  };
-
-  const totalRow = findLabelRow('Total');
-  const amountRow = findLabelRow('Amount');
-  const discountRow = findLabelRow('총 할인 금액');
-
-  if (totalRow == null || amountRow == null) {
-    // 템플릿 원본에 업무용 요약 영역이 없으면 임의 위치에 쓰지 않습니다.
-    return;
-  }
-
-  // 기존 LK 템플릿은 항차 제목이 Total 바로 윗행에 배치되어 있습니다.
-  // SEA/AIR의 B14, TH-LA LAND의 B23처럼 구조가 달라도 자동 대응합니다.
-  const voyageTitleRow = totalRow - 1;
-  if (voyageTitleRow > 0) {
-    xml = setStringCellInSheet(
-      xml,
-      `B${voyageTitleRow}`,
-      `${routeLabel} ${shipmentYear}년 ${voyageLabel}`,
-    );
-  }
-
+  // 기존 LK Excel의 실제 업무용 요약 위치.
+  // 수백 장 명세서의 SUM 결과가 아니라 중앙 FreightService snapshot을 직접 기록합니다.
+  xml = setStringCellInSheet(
+    xml,
+    'B14',
+    `${routeLabel} ${shipmentYear}년 ${voyageLabel}`,
+  );
   xml = setNumericCellInSheet(
     xml,
-    `C${totalRow}`,
+    'C15',
     Number(snapshot.total_quantity ?? 0),
   );
   xml = setNumericCellInSheet(
     xml,
-    `C${amountRow}`,
+    'C16',
     Number(snapshot.net_usd ?? 0),
   );
-
-  if (discountRow != null) {
-    xml = setNumericCellInSheet(
-      xml,
-      `C${discountRow}`,
-      Number(snapshot.discount_usd ?? 0),
-    );
-  }
+  xml = setNumericCellInSheet(
+    xml,
+    'C18',
+    Number(snapshot.discount_usd ?? 0),
+  );
 
   files[path] = strToU8(xml);
 }
@@ -1291,17 +1251,14 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // 명세서 동적 연결은 다음 단계에서 안전한 방식으로 처리합니다.
 
     // 템플릿의 xx항차 제목을 실제 선택한 항차로 바꿉니다.
-    // TH-LA LAND 같은 스팟형은 물품 입고 내역 시트가 없으므로 건너뜁니다.
-    if (targetPath && files[targetPath]) {
-      let cargoTitleXml = strFromU8(files[targetPath]);
-      const voyageLabel = voyage.endsWith('항차') ? voyage : voyage + '항차';
-      cargoTitleXml = setStringCellInSheet(
-        cargoTitleXml,
-        'B1',
-        `${shipmentYear}년 ${voyageLabel} ${shipmentRouteLabel} 물품 입고 내역 (Cargo list)`,
-      );
-      files[targetPath] = strToU8(cargoTitleXml);
-    }
+    let cargoTitleXml = strFromU8(files[targetPath]);
+    const voyageLabel = voyage.endsWith('항차') ? voyage : voyage + '항차';
+    cargoTitleXml = setStringCellInSheet(
+      cargoTitleXml,
+      'B1',
+      `${shipmentYear}년 ${voyageLabel} ${shipmentRouteLabel} 물품 입고 내역 (Cargo list)`,
+    );
+    files[targetPath] = strToU8(cargoTitleXml);
 
     if (exchangeRate) {
       updateExchangeRates(files, {
@@ -1322,8 +1279,18 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       shipmentYear,
       voyage,
     );
-    // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
-// 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
+    // 기존 Row data의 수식/표는 건드리지 않고, 맨 아래에 DB 정산 원본 블록을 추가합니다.
+    // 따라서 수백 개 영수증 sheet를 만들지 않아도 영수번호별 실제 금액/할인/총액을
+    // Excel 파일 자체에 보관할 수 있습니다.
+    appendRowDataSettlementBlock(
+      files,
+      settlementSnapshot as Record<string, unknown> | null,
+      routeKey,
+      shipmentYear,
+      voyage,
+    );
+
+    // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
     // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
     delete files['xl/calcChain.xml'];
 
@@ -1405,7 +1372,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
 
 
 
