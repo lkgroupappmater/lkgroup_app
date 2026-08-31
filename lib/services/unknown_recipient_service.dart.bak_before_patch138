@@ -1,4 +1,4 @@
-﻿import '../config/supabase_config.dart';
+import '../config/supabase_config.dart';
 import 'supabase_service.dart';
 
 class UnknownRecipientService {
@@ -54,37 +54,6 @@ class UnknownRecipientService {
         .toList(growable: false);
   }
 
-  Future<List<Map<String, dynamic>>> listIncompleteForAdmin() async {
-    if (!SupabaseConfig.isConfigured) return const [];
-    final raw =
-        await SupabaseService.client.rpc('admin_list_incomplete_shipments')
-            as List;
-    return raw
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList(growable: false);
-  }
-
-  Future<void> reviewIncomplete({
-    required String shipmentId,
-    required String consigneeName,
-    required String consigneePhone,
-    required String notes,
-    required bool lock,
-  }) async {
-    if (!SupabaseConfig.isConfigured) return;
-    final id = int.tryParse(shipmentId);
-    if (id == null) throw StateError('화물 ID가 올바르지 않습니다.');
-    await SupabaseService.client.rpc(
-      'admin_review_incomplete_shipment',
-      params: {
-        'p_shipment_id': id,
-        'p_consignee_name': consigneeName.trim(),
-        'p_consignee_phone': consigneePhone.trim(),
-        'p_notes': notes.trim(),
-        'p_lock': lock,
-      },
-    );
-  }
   Future<void> resolveAutoUnmatched({
     required int queueId,
     required String consigneeName,
@@ -127,4 +96,3 @@ class UnknownRecipientService {
     );
   }
 }
-

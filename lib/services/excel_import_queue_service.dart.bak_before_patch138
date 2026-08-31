@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -111,19 +111,14 @@ class ExcelImportQueueService extends ChangeNotifier {
         if (next == null) break;
 
         next.status = ExcelImportJobStatus.processing;
-        next.progress = 0.12;
-        next.message = '12% · Excel 구조 확인 중';
+        next.progress = 0.35;
+        next.message = 'Excel 분석 · 중복 정리 · DB 반영 중';
         notifyListeners();
 
         try {
           final result = await ExcelImportService.instance.importBytes(
             next.bytes,
             fileName: next.fileName,
-            onProgress: (progress, message) {
-              next!.progress = progress;
-              next.message = '${(progress * 100).round()}% · $message';
-              notifyListeners();
-            },
           );
           next.progress = 1;
           next.status = result.customerRulesWaitingForPhone > 0
@@ -172,4 +167,3 @@ class ExcelImportQueueService extends ChangeNotifier {
     );
   }
 }
-

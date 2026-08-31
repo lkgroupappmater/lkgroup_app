@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../services/excel_import_queue_service.dart';
@@ -78,6 +78,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
 
   Widget _jobCard(ExcelImportJob job) {
     final color = _statusColor(job.status);
+    final working = job.status == ExcelImportJobStatus.processing;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -97,9 +98,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  job.status == ExcelImportJobStatus.processing
-                      ? '% 진행중'
-                      : _statusText(job.status),
+                  _statusText(job.status),
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.bold,
@@ -119,7 +118,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: job.progress,
+              value: working ? null : job.progress,
               minHeight: 8,
             ),
             const SizedBox(height: 7),
@@ -203,4 +202,3 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
         ),
       );
 }
-

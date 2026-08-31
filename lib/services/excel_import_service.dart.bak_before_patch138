@@ -51,11 +51,8 @@ class ExcelImportService {
   Future<ExcelImportResult> importBytes(
     Uint8List bytes, {
     required String fileName,
-    void Function(double progress, String message)? onProgress,
   }) async {
-    onProgress?.call(0.12, 'Excel 구조 확인 중');
     final workbook = _readRawWorkbook(bytes);
-    onProgress?.call(0.25, '화물 행 분석 중');
     final meta = _parseFileMeta(fileName);
     if (meta == null) {
       throw StateError(
@@ -137,12 +134,9 @@ class ExcelImportService {
     }
     final uniqueRows = uniqueRowsByImportKey.values.toList(growable: false);
 
-    onProgress?.call(0.45, '중복 정리 완료 · 화물 DB 반영 중');
     final inserted = await ShipmentService.instance.upsertFromRows(uniqueRows);
-    onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
-    onProgress?.call(0.86, '고객 규칙 확인 완료 · 원본 Excel 보관 중');
 
     if (SupabaseConfig.isConfigured) {
       await _saveWorkbookTemplate(
@@ -154,8 +148,6 @@ class ExcelImportService {
         voyage: voyage,
       );
     }
-
-    onProgress?.call(0.96, '최종 정리 중');
 
     final noCargoSheet =
         rows.isEmpty && !workbook.keys.any((name) => name.trim() == '물품 입고 내역');
@@ -641,7 +633,6 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
 
 
 
