@@ -1145,10 +1145,11 @@ function wireStatementAutomationFormulas(
   );
   const names = Array.from(workbook.matchAll(sheetPattern), (m) => m[1]);
   const numberSuffix = new RegExp('\\d+\\s*$');
+  const prefixUpper = prefix.toUpperCase();
   const sheetName = names.find((name) => {
     const upper = name.toUpperCase();
     return !upper.includes('XX') &&
-      upper.startsWith(prefix.toUpperCase()) &&
+      upper.startsWith(prefixUpper) &&
       numberSuffix.test(name);
   });
   if (!sheetName) return;
@@ -1165,26 +1166,25 @@ function wireStatementAutomationFormulas(
     'g',
   );
 
-  for (const m of xml.matchAll(cellPattern)) {
-    const text = cellText(m[0], strings).trim().toLowerCase();
-    if (!remarkRef && (text.includes('remark') || text === '鍮꾧퀬')) {
-      remarkRef = m[1];
-    }
-    if (!inlandRef && (
-      text.includes('inland') ||
-      text.includes('吏諛?諛곗넚') ||
-      text.includes('吏諛⑸같??)
-    )) {
-      inlandRef = m[1];
-    }
+  for (const match of xml.matchAll(cellPattern)) {
+    const label = cellText(match[0], strings).trim().toLowerCase();
+    const isRemark =
+      label.includes('remark') ||
+      label === '\ube44\uace0';
+    const isInland =
+      label.includes('inland') ||
+      label.includes('\uc9c0\ubc29 \ubc30\uc1a1') ||
+      label.includes('\uc9c0\ubc29\ubc30\uc1a1');
+
+    if (!remarkRef && isRemark) remarkRef = match[1];
+    if (!inlandRef && isInland) inlandRef = match[1];
+    if (remarkRef && inlandRef) break;
   }
 
   const below = (ref: string): string => {
-    const colMatch = ref.match(new RegExp('^[A-Z]+'));
-    const rowMatch = ref.match(new RegExp('\\d+$'));
-    const col = colMatch?.[0] ?? '';
-    const row = Number(rowMatch?.[0] ?? 0);
-    return col && row ? `${col}${row + 1}` : '';
+    const col = ref.match(/^[A-Z]+/)?.[0] ?? '';
+    const row = Number(ref.match(/\d+$/)?.[0] ?? 0);
+    return col && row > 0 ? `${col}${row + 1}` : '';
   };
 
   const remarkTarget = below(remarkRef);
