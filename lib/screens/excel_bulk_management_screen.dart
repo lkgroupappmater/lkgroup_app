@@ -21,6 +21,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
   int? _year;
   String? _voyage;
   bool _busy = true;
+  bool _lockedOnly = false;
+
+  List<Map<String, dynamic>> get _visibleRows => _lockedOnly
+      ? _rows.where((e) => e['data_locked'] == true).toList(growable: false)
+      : _rows;
+
+  int get _lockedCount =>
+      _rows.where((e) => e['data_locked'] == true).length;
 
   List<String> get _routes =>
       _batches.map((e) => e.route).where((e) => e.isNotEmpty).toSet().toList()
@@ -94,6 +102,16 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       setState(() {
         _rows = rows;
         _checked.clear();
+        if (_lockedOnly && !rows.any((e) => e['data_locked'] == true)) {
+          _lockedOnly = false;
+        }
+        if (_lockedOnly) {
+          _checked.addAll(
+            rows
+                .where((e) => e['data_locked'] == true)
+                .map((e) => '${e['id']}'),
+          );
+        }
       });
     } catch (error) {
       _message('화물 데이터 조회 실패: $error');
@@ -137,15 +155,61 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
   }
 
   void _toggleAll(bool checked) {
+    final visible = _visibleRows;
     setState(() {
       if (checked) {
         _checked
           ..clear()
-          ..addAll(_rows.map((e) => '${e['id']}'));
+          ..addAll(visible.map((e) => '${e['id']}'));
       } else {
         _checked.clear();
       }
     });
+  }
+
+  void _toggleLockedOnly() {
+    if (_lockedOnly) {
+      setState(() {
+        _lockedOnly = false;
+        _checked.clear();
+      });
+      return;
+    }
+
+    final locked = _rows.where((e) => e['data_locked'] == true).toList();
+    if (locked.isEmpty) {
+      _message('현재 잠금된 화물이 없습니다.');
+      return;
+    }
+    setState(() {
+      _lockedOnly = true;
+      _checked
+        ..clear()
+        ..addAll(locked.map((e) => '${e['id']}'));
+    });
+  }
+
+  Future<void> _unlockSingle(Map<String, dynamic> row) async {
+    if (_busy || row['data_locked'] != true) return;
+    final id = '${row['id']}';
+    setState(() => _busy = true);
+    try {
+      await ExcelBulkManagementService.instance.setLocked([id], false);
+      if (!mounted) return;
+      setState(() {
+        row['data_locked'] = false;
+        _checked.remove(id);
+        if (_lockedOnly &&
+            !_rows.any((e) => e['data_locked'] == true)) {
+          _lockedOnly = false;
+        }
+      });
+      _message('해당 화물 잠금을 해제했습니다.');
+    } catch (error) {
+      _message('잠금 해제 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _toggleReceiptRows(List<Map<String, dynamic>> rows) {
@@ -347,10 +411,11 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allChecked =
-        _rows.isNotEmpty && _checked.length == _rows.length;
+    final visibleRows = _visibleRows;
+    final visibleIds = visibleRows.map((e) => '${e['id']}').toSet();
+    final allChecked = visibleIds.isNotEmpty && _checked.containsAll(visibleIds);
     final grouped = <String, List<Map<String, dynamic>>>{};
-    for (final row in _rows) {
+    for (final row in visibleRows) {
       final receipt = '${row['receipt_number'] ?? ''}'.trim();
       grouped.putIfAbsent(
         receipt.isEmpty ? '(영수번호 없음)' : receipt,
@@ -439,7 +504,9 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      '선택 ${_checked.length}개',
+                      _lockedOnly
+                          ? '잠금만 보기 · ${_lockedCount}개'
+                          : '선택 ${_checked.length}개',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -462,7 +529,11 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                         ? const Center(
                             child: Text('해당 항차 화물 데이터가 없습니다.'),
                           )
-                        : ListView(
+                        : visibleRows.isEmpty
+                            ? const Center(
+                                child: Text('현재 조건에 해당하는 화물이 없습니다.'),
+                              )
+                            : ListView(
                             padding:
                                 const EdgeInsets.fromLTRB(10, 8, 10, 88),
                             children: groups.expand((entry) {
@@ -580,10 +651,17 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                       ),
                       _bulkBarDivider(),
                       _bulkBarAction(
-                        icon: Icons.lock_outline,
-                        label: '잠금',
-                        enabled: _checked.isNotEmpty && !_busy,
-                        onTap: () => _setLock(true),
+                        icon: _lockedOnly ? Icons.lock : Icons.lock_outline,
+                        label: _lockedOnly ? '잠금만' : '잠금',
+                        enabled: _lockedCount > 0 || _checked.isNotEmpty,
+                        forceRed: true,
+                        onTap: () {
+                          if (_lockedOnly || _checked.isEmpty) {
+                            _toggleLockedOnly();
+                          } else {
+                            _setLock(true);
+                          }
+                        },
                       ),
                       _bulkBarDivider(),
                       _bulkBarAction(
@@ -617,6 +695,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
     required String label,
     required bool enabled,
     required VoidCallback onTap,
+    bool forceRed = false,
   }) =>
       Expanded(
         child: InkWell(
@@ -628,7 +707,11 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
               Icon(
                 icon,
                 size: 21,
-                color: enabled ? AppColors.tealAccent : Colors.white38,
+                color: !enabled
+                    ? Colors.white38
+                    : forceRed
+                        ? Colors.redAccent
+                        : AppColors.tealAccent,
               ),
               const SizedBox(height: 2),
               Text(
@@ -696,12 +779,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                 ),
               ),
               if (locked)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8, right: 2),
-                  child: Icon(
+                IconButton(
+                  tooltip: '잠금 해제',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _busy ? null : () => _unlockSingle(row),
+                  icon: const Icon(
                     Icons.lock,
                     color: Colors.redAccent,
-                    size: 17,
+                    size: 18,
                   ),
                 ),
               IconButton(

@@ -601,62 +601,85 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final allSelected = _results.isNotEmpty &&
         _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
 
+    Widget divider() => Container(
+          width: 1,
+          height: 34,
+          color: Colors.white.withValues(alpha: .16),
+        );
+
+    Widget action({
+      required IconData icon,
+      required String label,
+      required bool enabled,
+      required VoidCallback onTap,
+    }) =>
+        Expanded(
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            borderRadius: BorderRadius.circular(15),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 21,
+                  color: enabled ? AppColors.tealAccent : Colors.white38,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: enabled ? Colors.white : Colors.white38,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
     return Material(
-      elevation: 10,
-      borderRadius: BorderRadius.circular(14),
-      color: Colors.white,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      elevation: 14,
+      borderRadius: BorderRadius.circular(22),
+      color: Colors.transparent,
+      shadowColor: Colors.black38,
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: AppColors.navyPrimary,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withValues(alpha: .12)),
+        ),
+        child: SafeArea(
+          top: false,
           child: Row(
             children: [
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: _results.isEmpty ? null : _toggleAll,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Checkbox(
-                      value: allSelected,
-                      onChanged: _results.isEmpty ? null : (_) => _toggleAll(),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    const Text(
-                      '전체',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+              action(
+                icon: allSelected
+                    ? Icons.check_circle
+                    : Icons.check_circle_outline,
+                label: '전체',
+                enabled: _results.isNotEmpty,
+                onTap: _toggleAll,
               ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _selectedIds.isEmpty ? null : _showFreight,
-                  icon: const Icon(Icons.price_check_outlined, size: 17),
-                  label: const Text('운임 확인'),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
+              divider(),
+              action(
+                icon: Icons.price_check_outlined,
+                label: '운임 확인',
+                enabled: _selectedIds.isNotEmpty,
+                onTap: _showFreight,
               ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed:
-                      _selectedIds.isEmpty || widget.onManageSelected == null
-                          ? null
-                          : () => widget.onManageSelected!(
-                                _selectedIds.toList(),
-                              ),
-                  icon: const Icon(Icons.inventory_2_outlined, size: 17),
-                  label: const Text('화물 관리'),
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
+              divider(),
+              action(
+                icon: Icons.inventory_2_outlined,
+                label: '화물 관리',
+                enabled:
+                    _selectedIds.isNotEmpty && widget.onManageSelected != null,
+                onTap: () => widget.onManageSelected!(
+                  _selectedIds.toList(),
                 ),
               ),
             ],
@@ -665,7 +688,6 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     if (!widget.isLoggedIn) {
