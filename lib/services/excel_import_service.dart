@@ -161,13 +161,33 @@ class ExcelImportService {
     }
     final uniqueRows = uniqueRowsByImportKey.values.toList(growable: false);
 
-    onProgress?.call(0.45, '중복 정리 완료 · 화물 DB 반영 중');
+    // Patch167: current BASE Excel delivery table is the source of truth.
+    // Import it before shipment upsert so normalize/finalize can see city/province
+    // delivery + prepaid + company/address for this very upload.
+    onProgress?.call(0.38, '시내·지방 배송표 DB 반영 중');
+    await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
+
+    onProgress?.call(0.45, '배송표 반영 완료 · 화물 DB 반영 중');
     final inserted = await ShipmentService.instance.upsertFromRows(uniqueRows);
     onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
-    await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
-    onProgress?.call(0.86, '고객 규칙 확인 완료 · 원본 Excel 보관 중');
+
+    // One batch-scoped finalizer after all rows/rules are ready.
+    // Do not silently finish an upload with missing delivery/receipt/zone data.
+    if (SupabaseConfig.isConfigured) {
+      onProgress?.call(0.82, '배송·구획·영수번호 최종 정리 중');
+      await SupabaseService.client.rpc(
+        'admin_finalize_excel_batch_rules',
+        params: {
+          'p_route': routeLabel,
+          'p_year': year,
+          'p_voyage': voyage,
+        },
+      );
+    }
+
+    onProgress?.call(0.86, '최종 규칙 반영 완료 · 원본 Excel 보관 중');
 
     if (SupabaseConfig.isConfigured) {
       await _saveWorkbookTemplate(
@@ -706,11 +726,8 @@ class ExcelImportService {
           onConflict: 'route_key,source_no',
         );
 
-    try {
-      await SupabaseService.client.rpc('admin_refresh_shipment_special_notes');
-    } catch (_) {
-      // 배송표 저장 자체는 기존 특이사항 재계산 실패 때문에 막지 않습니다.
-    }
+    // Patch167: do not run a global shipment refresh here.
+    // importBytes() runs one batch-scoped finalizer after shipment upsert.
     return bySourceNo.length;
   }
 

@@ -2133,6 +2133,23 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
     final receipt = '${first['receipt_number'] ?? ''}'.trim();
     final zone = '${first['unloading_zone'] ?? ''}'.trim();
+    final specialNote = '${first['special_note_auto'] ?? ''}'.trim();
+    final deliveryLabel = const <String>[
+      '지방배송(선결제)',
+      '지방배송',
+      '시내배송(선결제)',
+      '시내배송',
+    ].firstWhere(
+      (label) => specialNote.contains(label),
+      orElse: () => '',
+    );
+    final deliveryColor = switch (deliveryLabel) {
+      '지방배송(선결제)' => const Color(0xFF5B9BD5),
+      '지방배송' => const Color(0xFFFFC000),
+      '시내배송(선결제)' => const Color(0xFFFFFF00),
+      '시내배송' => const Color(0xFF92D050),
+      _ => Colors.transparent,
+    };
     final name = '${first['consignee_name'] ?? ''}'.trim();
     final company = _companyOf(first);
     final phone = '${first['consignee_phone'] ?? ''}'.trim();
@@ -2214,6 +2231,28 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                           ],
                         ),
                       ),
+                      if (deliveryLabel.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: deliveryColor,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.black.withValues(alpha: .12),
+                            ),
+                          ),
+                          child: Text(
+                            deliveryLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
                       Text.rich(
                         TextSpan(
                           children: [
