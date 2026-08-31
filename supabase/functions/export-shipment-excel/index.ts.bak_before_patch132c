@@ -1228,7 +1228,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     seedCustomerListFromShipments(files, enrichedShipments);
     upgradeZoneQuantityFormulas(files);
     // 한 장의 기존 명세서에서 N2 영수번호를 선택해 전체 내용을 바꾸는 동적 명세서 기반.
-    // Patch132c HOTFIX: worksheet XML repair popup 방지를 위해 selector XML mutation 임시 중지.$([Environment]::NewLine)    // enableDynamicReceiptSelector(
+    enableDynamicReceiptSelector(
       files,
       enrichedShipments,
       routeKey,
@@ -1236,8 +1236,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyage,
     );
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
-    // Patch132c HOTFIX: language dataValidation XML 변경 임시 중지.
-populateSpotTransportStatement(
+    addStatementLanguageSelector(files, routeKey);
+    populateSpotTransportStatement(
       files,
       enrichedShipments,
       routeKey,
@@ -1368,7 +1368,6 @@ populateSpotTransportStatement(
     return json(500, { error: message });
   }
 });
-
 
 
 
