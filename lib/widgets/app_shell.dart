@@ -89,6 +89,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (!mounted || rows.isEmpty) return;
     await showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('알림'),
         content: SingleChildScrollView(
@@ -105,13 +106,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('확인'),
           ),
         ],
       ),
     );
+
+    // 로그인 팝업에서 사용자가 실제로 '확인'한 알림은 읽음 처리합니다.
+    // 기존에는 팝업만 닫고 is_read=false 상태가 그대로라 다음 로그인 때
+    // 같은 알림이 계속 다시 표시되었습니다.
+    try {
+      await NotificationService.instance.markAllRead();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotifications = const [];
+        _popupShownForCurrentBatch = false;
+      });
+    } catch (_) {
+      // 읽음 처리 실패가 앱 사용을 막지는 않도록 합니다.
+      // 실패한 경우 DB에는 unread 상태가 남으므로 다음 새로고침에서 다시 확인 가능합니다.
+    }
   }
 
   Future<void> _openNotifications() async {
