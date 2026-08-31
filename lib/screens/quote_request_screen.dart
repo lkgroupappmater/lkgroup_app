@@ -9,6 +9,7 @@ import '../core/route_catalog.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
+import '../services/receipt_extra_cost_service.dart';
 import 'quotation_preview_dialog.dart';
 
 List<String> get _transportRoutes => RouteCatalog.routes;
@@ -42,6 +43,7 @@ class QuoteRequestBody extends StatefulWidget {
 class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   String _selectedRoute = _transportRoutes.first;
   final List<_BoxEntry> _boxes = [_BoxEntry()];
+  final List<ExtraCostItem> _extraCosts = <ExtraCostItem>[];
   QuoteFreightResult? _calculation;
   ExchangeRateSettings? _calculationRates;
   List<Map<String, dynamic>> _specialQuotes = const [];
@@ -228,6 +230,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         boxes: previewBoxes,
         result: calculation,
         rates: rates,
+        extraCosts: List<ExtraCostItem>.unmodifiable(_extraCosts),
       ),
     );
   }
@@ -563,6 +566,42 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _addQuoteExtraCost,
+            icon: const Icon(Icons.add_card_outlined, size: 18),
+            label: const Text('기타 비용 추가 (+$)',
+                style: TextStyle(fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.navyPrimary,
+              side: const BorderSide(color: AppColors.navyPrimary),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+          if (_extraCosts.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            ..._extraCosts.asMap().entries.map(
+              (entry) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(entry.value.name),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('\$${entry.value.amountUsd.toStringAsFixed(2)}'),
+                    IconButton(
+                      tooltip: '삭제',
+                      onPressed: () =>
+                          setState(() => _extraCosts.removeAt(entry.key)),
+                      icon: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [
@@ -1131,6 +1170,8 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
+
+
 
 
 

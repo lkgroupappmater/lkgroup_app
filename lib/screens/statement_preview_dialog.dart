@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -12,6 +12,7 @@ import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
 import '../services/customer_benefit_service.dart';
+import '../services/receipt_extra_cost_service.dart';
 
 
 double _d(dynamic value, [double fallback = 0]) =>
@@ -48,6 +49,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   FreightCalculation? _freight;
   String? _arrivalDate;
   String _inlandDeliveryText = '';
+  List<ExtraCostItem> _extraCosts = const <ExtraCostItem>[];
   ui.Image? _logo;
   ui.Image? _qrUsd;
   ui.Image? _qrKip;
@@ -113,6 +115,12 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       );
       final inland = await CustomerBenefitService.instance
           .inlandTextForRows(widget.routeLabel, rows);
+      final extraCosts = await ReceiptExtraCostService.instance.list(
+        route: widget.routeLabel,
+        year: widget.year,
+        voyage: widget.voyage,
+        receiptNumber: widget.receiptNumber,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -126,6 +134,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _freight = freight;
         _arrivalDate = arrival;
         _inlandDeliveryText = inland;
+        _extraCosts = extraCosts;
         _loading = false;
       });
     } catch (error) {
@@ -143,6 +152,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         receiptNumber: widget.receiptNumber,
         arrivalDate: _arrivalDate,
         inlandDeliveryText: _inlandDeliveryText,
+        extraCosts: _extraCosts,
         logo: _logo!,
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
@@ -360,6 +370,7 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.receiptNumber,
     required this.arrivalDate,
     required this.inlandDeliveryText,
+    required this.extraCosts,
     required this.logo,
     required this.qrUsd,
     required this.qrKip,
@@ -374,6 +385,7 @@ class _DigitalStatementPainter extends CustomPainter {
   final String receiptNumber;
   final String? arrivalDate;
   final String inlandDeliveryText;
+  final List<ExtraCostItem> extraCosts;
   final ui.Image logo;
   final ui.Image qrUsd;
   final ui.Image qrKip;
@@ -511,7 +523,7 @@ class _DigitalStatementPainter extends CustomPainter {
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(freight.totalUsd),
+      13: MoneyFormat.usd(finalUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -541,7 +553,9 @@ class _DigitalStatementPainter extends CustomPainter {
       maxLines: 5,
       lineHeight: 1.12,
     );
-    
+    final extraTotal = extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final extraNames = extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
+    final finalUsd = freight.totalUsd + extraTotal;
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
@@ -549,8 +563,8 @@ class _DigitalStatementPainter extends CustomPainter {
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
     _text(c, freight.discountTotalUsd > 0 ? '-${MoneyFormat.usd(freight.discountTotalUsd)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
+    _text(c, extraNames.isEmpty ? '기타 비용' : '기타 비용 ($extraNames)', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
+    _text(c, extraTotal > 0 ? '+${MoneyFormat.usd(extraTotal)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
     _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
     _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
 
@@ -561,22 +575,22 @@ class _DigitalStatementPainter extends CustomPainter {
         19, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFCE48A));
-    _text(c, 'USD    ' + MoneyFormat.usd(freight.totalUsd),
+    _text(c, 'USD    ' + MoneyFormat.usd(finalUsd),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
         20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFFC21A));
-    _text(c, 'KIP    ' + MoneyFormat.kip(freight.totalKip),
+    _text(c, 'KIP    ' + MoneyFormat.kip(finalUsd * freight.rates.appliedKip),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
         20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF91D18B));
-    _text(c, 'THB    ' + MoneyFormat.thb(freight.totalThb),
+    _text(c, 'THB    ' + MoneyFormat.thb(finalUsd * freight.rates.appliedThb),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
         20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF23B6D8));
-    _text(c, 'KRW    ' + MoneyFormat.krw(freight.totalKrw),
+    _text(c, 'KRW    ' + MoneyFormat.krw(finalUsd * freight.rates.appliedKrw),
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
         20, bold: true, center: true);
     final payTop = sumTop + 204;
@@ -841,6 +855,13 @@ class StatementDocumentRenderer {
     const docWidth = 1800.0;
     const scale = 1.35;
 
+    final extraCosts = await ReceiptExtraCostService.instance.list(
+      route: request.routeLabel,
+      year: request.year,
+      voyage: request.voyage,
+      receiptNumber: request.receiptNumber,
+    );
+
     final painter = _DigitalStatementPainter(
       routeLabel: request.routeLabel,
       rows: rows,
@@ -848,6 +869,7 @@ class StatementDocumentRenderer {
       receiptNumber: request.receiptNumber,
       arrivalDate: arrival,
       inlandDeliveryText: inland,
+      extraCosts: extraCosts,
       logo: assets[0],
       qrUsd: assets[1],
       qrKip: assets[2],
@@ -895,4 +917,5 @@ class StatementDocumentRenderer {
     }
   }
 }
+
 
