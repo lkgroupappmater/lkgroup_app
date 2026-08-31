@@ -1761,13 +1761,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '이름/회사명: $name / ${company.isEmpty ? '-' : company}',
+                        '$name / ${company.isEmpty ? '-' : company}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppColors.navyPrimary,
                         ),
                       ),
-                      Text('연락처: ${phone.isEmpty ? '-' : phone}',
+                      Text(phone.isEmpty ? '-' : phone,
                           style: const TextStyle(fontSize: 12)),
                       Text(
                         '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
@@ -1890,6 +1890,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                             },
                       icon: const Icon(Icons.edit_outlined, size: 19),
                     ),
+                    if (_isAdmin) const SizedBox(height: 8),
                     if (_isAdmin)
                       Container(
                         width: 34,
