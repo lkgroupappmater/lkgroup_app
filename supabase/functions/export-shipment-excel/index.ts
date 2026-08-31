@@ -1,4 +1,4 @@
-﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
 const corsHeaders = {
@@ -373,8 +373,16 @@ function updateCargoSheet(
     const fixedBox = cellText(bMatch[0], strings).trim();
     if (!fixedBox) continue;
 
-    const shipment = shipmentByBox.get(fixedBox.toUpperCase());
-    if (!shipment) continue;
+    const sourceShipment = shipmentByBox.get(fixedBox.toUpperCase());
+    if (!sourceShipment) continue;
+    const manualNote = String(sourceShipment.notes ?? '').trim();
+    const autoNote = String(sourceShipment.special_note_auto ?? '').trim();
+    const shipment = {
+      ...sourceShipment,
+      notes: [manualNote, autoNote]
+        .filter((v, i, a) => v && a.indexOf(v) === i)
+        .join(' / '),
+    };
 
     matchedBoxes.add(fixedBox.toUpperCase());
     let rowXml = candidate.xml;
@@ -1044,6 +1052,127 @@ function appendRowDataSettlementBlock(
 
   files[path] = strToU8(xml);
 }
+function appendDocumentAutomationBlock(
+  files: Record<string, Uint8Array>,
+  shipments: Record<string, unknown>[],
+  deliveries: Record<string, unknown>[],
+  extraCosts: Record<string, unknown>[],
+  settlement: Record<string, unknown> | null,
+): void {
+  const path = workbookSheetPath(files, 'Row data');
+  if (!path || !files[path]) return;
+  let xml = strFromU8(files[path]);
+  const close = xml.lastIndexOf('</sheetData>');
+  if (close < 0) return;
+
+  const normalizeName = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const phoneMatch = (a: unknown, b: unknown) => {
+    const aa = normalizePhone(a); const bb = normalizePhone(b);
+    return !!aa && !!bb && (aa === bb || (aa.length >= 8 && bb.length >= 8 && aa.slice(-8) === bb.slice(-8)));
+  };
+  const groups = new Map<string, Record<string, unknown>[]>();
+  for (const s of shipments) {
+    const receipt = String(s.receipt_number ?? '').trim();
+    if (!receipt) continue;
+    const list = groups.get(receipt) ?? []; list.push(s); groups.set(receipt, list);
+  }
+  const receiptAmounts = new Map<string, number>();
+  const rawReceipts = Array.isArray(settlement?.receipts) ? settlement!.receipts as Record<string, unknown>[] : [];
+  for (const r of rawReceipts) receiptAmounts.set(String(r.receipt_number ?? '').trim(), Number(r.net_usd ?? 0));
+  const extraMap = new Map<string, number>();
+  for (const e of extraCosts) {
+    const receipt = String(e.receipt_number ?? '').trim();
+    extraMap.set(receipt, (extraMap.get(receipt) ?? 0) + Number(e.amount_usd ?? 0));
+  }
+
+  const existingRows = [...xml.matchAll(/<row\b[^>]*r="(\d+)"/g)].map(m => Number(m[1]));
+  let row = (existingRows.length ? Math.max(...existingRows) : 0) + 2;
+  const out: string[] = [];
+  const add = (vals: Array<string | number>) => {
+    const cols = ['X','Y','Z','AA','AB','AC','AD','AE'];
+    const cells = vals.map((v,i) => typeof v === 'number' ? numericCell(`${cols[i]}${row}`,'',v) : inlineCell(`${cols[i]}${row}`,'',v)).join('');
+    out.push(`<row r="${row}">${cells}</row>`); row++;
+  };
+  add(['DOCUMENT AUTOMATION','Customer','Phone','Remark Auto','Inland / Delivery','Delivery Type','Extra USD','Amount USD']);
+  for (const [receipt, rows] of groups) {
+    const first = rows[0];
+    const name = String(first.consignee_name ?? '').trim();
+    const phone = String(first.consignee_phone ?? '').trim();
+    const d = deliveries.find(x => {
+      if (!phoneMatch(phone, x.phone)) return false;
+      const target = normalizeName(name);
+      return [x.customer_name,x.alternate_name,x.company_name].some(v => normalizeName(v) === target && target !== '');
+    });
+    const paidBy = String(d?.paid_by ?? '').toLowerCase();
+    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (paidBy.includes('?쒓뎅') || paidBy.includes('korea') || paidBy.includes('prepaid') ? 'province_prepaid_kr' : 'province')) : '';
+    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address].filter(Boolean).join(', ') : '';
+    const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
+    const extra = extraMap.get(receipt) ?? 0;
+    add([receipt,name,phone,auto,delivery,type,extra,(receiptAmounts.get(receipt) ?? 0) + extra]);
+  }
+  xml = `${xml.substring(0, close)}${out.join('')}${xml.substring(close)}`;
+  files[path] = strToU8(xml);
+}
+function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): string {
+  const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
+  const column = ref.match(/^[A-Z]+/)?.[0] ?? '';
+  if (!rowNumber || !column) return sheetXml;
+  const rowRe = new RegExp(`<row\\b[^>]*r="${rowNumber}"[^>]*>[\\s\\S]*?<\\/row>`);
+  const rowMatch = sheetXml.match(rowRe);
+  if (!rowMatch) return sheetXml;
+  const rowXml = rowMatch[0];
+  const cellRe = new RegExp(`<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`);
+  const existing = rowXml.match(cellRe);
+  const attrs = existing ? `${existing[1] ?? ''}${existing[2] ?? ''}` : '';
+  const styleMatch = attrs.match(/\bs="([^"]+)"/);
+  const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
+  const replacement = `<c r="${ref}"${style}><f>${escXml(formula)}</f><v></v></c>`;
+  if (existing) return sheetXml.replace(rowXml, rowXml.replace(cellRe, replacement));
+  return sheetXml.replace(rowXml, updateCell(rowXml, rowNumber, column, '', 'text').replace(new RegExp(`<c\\b[^>]*r="${ref}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`), replacement));
+}
+
+function wireStatementAutomationFormulas(files: Record<string, Uint8Array>, routeKey: string): void {
+  const prefix = routeReceiptPrefix(routeKey);
+  const workbook = strFromU8(files['xl/workbook.xml']);
+  const names = [...workbook.matchAll(/<sheet\\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\\/?>/g)].map(m => m[1]);
+  const sheetName = names.find(name => {
+    const upper = name.toUpperCase();
+    if (upper.includes('XX')) return false;
+    return prefix ? upper.startsWith(prefix.toUpperCase()) && /\\d+\\s*$/.test(name) : false;
+  });
+  if (!sheetName) return;
+  const path = workbookSheetPath(files, sheetName);
+  if (!path || !files[path]) return;
+  let xml = strFromU8(files[path]);
+  const strings = sharedStrings(files);
+  let remarkRef = '';
+  let inlandRef = '';
+  for (const m of xml.matchAll(/<c\\b[^>]*r="([A-Z]+\\d+)"[^>]*>[\\s\\S]*?<\\/c>/g)) {
+    const text = cellText(m[0], strings).trim().toLowerCase();
+    if (!remarkRef && (text.includes('remark') || text === '鍮꾧퀬')) remarkRef = m[1];
+    if (!inlandRef && (text.includes('inland') || text.includes('吏諛?諛곗넚') || text.includes('吏諛⑸같??))) inlandRef = m[1];
+  }
+  const below = (ref: string) => {
+    const col = ref.match(/^[A-Z]+/)?.[0] ?? '';
+    const row = Number(ref.match(/\\d+$/)?.[0] ?? 0);
+    return col && row ? `${col}${row + 1}` : '';
+  };
+  const remarkTarget = below(remarkRef);
+  const inlandTarget = below(inlandRef);
+  if (remarkTarget) {
+    xml = setFormulaCellInSheet(xml, remarkTarget,
+      `IFERROR(INDEX('Row data'!$AA:$AA,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+  }
+  if (inlandTarget) {
+    xml = setFormulaCellInSheet(xml, inlandTarget,
+      `IFERROR(INDEX('Row data'!$AB:$AB,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+  }
+  // N3/N4/N5???숈쟻 臾몄꽌 怨꾩궛 蹂댁“?. 紐낆꽭???쒖떆 ?怨?媛숈? N2瑜?source濡??ъ슜?⑸땲??
+  xml = setFormulaCellInSheet(xml, 'N3', `IFERROR(INDEX('Row data'!$AA:$AA,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+  xml = setFormulaCellInSheet(xml, 'N4', `IFERROR(INDEX('Row data'!$AB:$AB,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+  xml = setFormulaCellInSheet(xml, 'N5', `IFERROR(INDEX('Row data'!$AC:$AC,MATCH($N$2,'Row data'!$X:$X,0)),"")`);
+  files[path] = strToU8(xml);
+}
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -1148,7 +1277,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: shipments, error: shipmentError } = await admin
       .from('shipments')
       .select(
-        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,notes,received_at,created_at',
+        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,notes,special_note_auto,received_at,created_at',
       )
       .eq('route', shipmentRouteLabel)
       .eq('shipment_year', shipmentYear)
@@ -1277,6 +1406,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
           })()
         : settlementSnapshot;
 
+    const { data: localDeliveryProfiles, error: localDeliveryError } = await admin
+      .from('local_delivery_profiles')
+      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes')
+      .eq('route_key', routeKey)
+      .eq('active', true);
+    if (localDeliveryError) throw localDeliveryError;
     const filePrefixes: Record<string, string> = {
       kr_la_sea: 'KR_LA_SEA',
       kr_la_air: 'KR_LA_AIR',
@@ -1332,6 +1467,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       shipmentYear,
       voyage,
     );
+    wireStatementAutomationFormulas(files, routeKey);
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
     addStatementLanguageSelector(files, routeKey);
     populateSpotTransportStatement(
@@ -1374,6 +1510,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       shipmentRouteLabel,
       shipmentYear,
       voyage,
+    );    appendDocumentAutomationBlock(
+      files,
+      enrichedShipments,
+      (localDeliveryProfiles ?? []) as Record<string, unknown>[],
+      voyageExtraCosts,
+      settlementForExcel as Record<string, unknown> | null,
     );
     // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
 // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.

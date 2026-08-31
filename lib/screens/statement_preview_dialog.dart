@@ -567,7 +567,15 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         17, bold: true);
-    _text(c, docText.remark,
+    final autoNotes = rows
+        .map((row) => _s(row['special_note_auto']))
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .join(' / ');
+    final remarkText = autoNotes.isEmpty
+        ? docText.remark
+        : '${docText.remark}\n\n$autoNotes';
+    _text(c, remarkText,
         Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
         docText.remarkFontSize, maxLines: 6, lineHeight: 1.05);
 
