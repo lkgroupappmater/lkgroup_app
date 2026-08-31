@@ -1202,8 +1202,21 @@ function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): 
   const styleMatch = attrs.match(/\bs="([^"]+)"/);
   const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
   const replacement = `<c r="${ref}"${style}><f>${escXml(formula)}</f><v></v></c>`;
-  if (existing) return sheetXml.replace(rowXml, rowXml.replace(cellRe, replacement));
-  return sheetXml.replace(rowXml, updateCell(rowXml, rowNumber, column, '', 'text').replace(new RegExp(`<c\\b[^>]*r="${ref}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`), replacement));
+  // IMPORTANT: replacement contains Excel formulas such as $N$2.
+  // JavaScript String.replace(re, "text with $2") treats $2 as regex capture group,
+  // which corrupted exported formulas (e.g. $N s="246") and made Excel repair the file.
+  // Always use a callback so '$' is written literally.
+  if (existing) {
+    const updatedRow = rowXml.replace(cellRe, () => replacement);
+    return sheetXml.replace(rowXml, updatedRow);
+  }
+
+  const seeded = updateCell(rowXml, rowNumber, column, '', 'text');
+  const targetRe = new RegExp(
+    `<c\\b[^>]*r="${ref}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`,
+  );
+  const updatedRow = seeded.replace(targetRe, () => replacement);
+  return sheetXml.replace(rowXml, updatedRow);
 }
 
 function wireStatementAutomationFormulas(
@@ -1278,9 +1291,11 @@ function wireStatementAutomationFormulas(
     xml = setFormulaCellInSheet(xml, inlandTarget, inlandFormula);
   }
 
-  xml = setFormulaCellInSheet(xml, 'N3', remarkFormula);
-  xml = setFormulaCellInSheet(xml, 'N4', inlandFormula);
-  xml = setFormulaCellInSheet(xml, 'N5', deliveryTypeFormula);
+  // N2:N3 and L4:N4 are merged areas in the real SEA template.
+  // Writing helper formulas into N3/N4 caused Excel to repair/remove records.
+  // The visible Remark/Inland target formulas above are sufficient.
+  // N5 helper is also intentionally omitted to keep the original template untouched.
+  void deliveryTypeFormula;
   files[path] = strToU8(xml);
 }
 Deno.serve(async (req) => {
