@@ -1400,6 +1400,26 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
+  Future<void> _toggleShipmentLock(Map<String, dynamic> item) async {
+    if (!_isAdmin || _busy) return;
+    final id = '${item['id']}';
+    final current = item['data_locked'] == true;
+    setState(() => _busy = true);
+    try {
+      await ShipmentService.instance.updateRow(
+        id,
+        {'data_locked': !current},
+      );
+      if (!mounted) return;
+      setState(() => item['data_locked'] = !current);
+      _message(!current ? '화물 데이터를 잠금했습니다.' : '화물 데이터 잠금을 해제했습니다.');
+    } catch (error) {
+      _message('화물 잠금 처리 실패: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _showGroupStatement(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty || _isPartner) return;
     try {
@@ -1573,23 +1593,45 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                           ),
                         ),
                         if (_isManager)
-                          TextButton.icon(
-                            onPressed: _busy
-                                ? null
-                                : () async {
-                                    setState(() {
-                                      _selectedIds
-                                        ..clear()
-                                        ..add(id);
-                                    });
-                                    await _editCheckedGroup([item]);
-                                  },
-                            icon: const Icon(Icons.edit_outlined, size: 17),
-                            label: const Text('편집'),
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                            ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton.icon(
+                                onPressed: _busy
+                                    ? null
+                                    : () async {
+                                        setState(() {
+                                          _selectedIds
+                                            ..clear()
+                                            ..add(id);
+                                        });
+                                        await _editCheckedGroup([item]);
+                                      },
+                                icon: const Icon(Icons.edit_outlined, size: 17),
+                                label: const Text('편집'),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                ),
+                              ),
+                              if (_isAdmin)
+                                IconButton(
+                                  tooltip: item['data_locked'] == true ? '잠금 해제' : '잠금',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _toggleShipmentLock(item),
+                                  icon: Icon(
+                                    item['data_locked'] == true
+                                        ? Icons.lock
+                                        : Icons.lock_open_outlined,
+                                    size: 20,
+                                    color: item['data_locked'] == true
+                                        ? AppColors.primary
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
                           ),
                       ],
                     ),
@@ -1777,6 +1819,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 
