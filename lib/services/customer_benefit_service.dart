@@ -164,7 +164,10 @@ class LocalDeliveryRule {
   String toStatementText() {
     final name = alternateName.isNotEmpty ? alternateName : customerName;
     final tel = phoneDisplay.isNotEmpty ? phoneDisplay : phone;
-    final no = sourceNo == null ? '' : '(${sourceNo!}) ';
+    final displayNo = sourceNo == null
+        ? null
+        : (sourceNo! >= 10000 ? sourceNo! - 10000 : sourceNo!);
+    final no = displayNo == null ? '' : '($displayNo) ';
     return <String>[
       '$no$name'.trim(),
       tel,
@@ -199,21 +202,40 @@ class CustomerBenefitService {
     if (aa.isEmpty || bb.isEmpty) return false;
     if (aa == bb) return true;
     if (aa.length >= 8 && bb.length >= 8) {
-      return aa.substring(aa.length - 8) == bb.substring(bb.length - 8);
+      if (aa.substring(aa.length - 8) == bb.substring(bb.length - 8)) {
+        return true;
+      }
+      // BASE 배송표 한 셀에 전화번호가 2개 이상 들어간 경우도 허용.
+      if (aa.contains(bb) || bb.contains(aa)) return true;
     }
     return false;
+  }
+
+  static Iterable<String> _nameTokens(String value) sync* {
+    final normalized = _normalizeName(value);
+    if (normalized.isEmpty) return;
+    yield normalized;
+
+    // 실무 BASE 표기: 이경화/이경희, 이름,이름, 이름(보조명) 등.
+    for (final part in normalized.split(RegExp(r'[/,;|()\\]+'))) {
+      final token = _normalizeName(part);
+      if (token.isNotEmpty) yield token;
+    }
   }
 
   static bool _nameMatches(
     String shipmentName,
     Iterable<String> candidates,
   ) {
-    final target = _normalizeName(shipmentName);
-    if (target.isEmpty) return false;
-    return candidates.any(
-      (value) =>
-          value.trim().isNotEmpty && _normalizeName(value) == target,
-    );
+    final shipmentTokens = _nameTokens(shipmentName).toSet();
+    if (shipmentTokens.isEmpty) return false;
+
+    for (final value in candidates) {
+      if (value.trim().isEmpty) continue;
+      final candidateTokens = _nameTokens(value).toSet();
+      if (shipmentTokens.any(candidateTokens.contains)) return true;
+    }
+    return false;
   }
 
   Future<List<DiscountRule>> listDiscountRules() async {
