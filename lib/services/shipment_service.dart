@@ -1,4 +1,4 @@
-﻿import '../config/supabase_config.dart';
+import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import '../models/shipment.dart';
 import '../data/mock_data.dart';
@@ -131,7 +131,9 @@ class ShipmentService {
     // 대용량 Excel을 한 번의 RPC로 보내면 PostgreSQL statement_timeout(57014)에
     // 걸릴 수 있으므로 작은 묶음으로 나눠 순차 반영합니다.
     // 각 행의 import_key가 동일하므로 기존 upsert 동작/중복 방지는 그대로 유지됩니다.
-    const chunkSize = 40;
+    // Patch168: bulk-import RPC suppresses the expensive per-row normalize trigger.
+    // 100 rows keeps request count low while avoiding one huge JSON payload.
+    const chunkSize = 100;
     var inserted = 0;
 
     for (var start = 0; start < rows.length; start += chunkSize) {
@@ -154,7 +156,7 @@ class ShipmentService {
 
     try {
       final result = await SupabaseService.client.rpc(
-        'manager_upsert_unlocked_shipments',
+        'manager_upsert_unlocked_shipments_bulk',
         params: {'p_rows': payload},
       );
       return (result as num?)?.toInt() ?? 0;
@@ -163,11 +165,16 @@ class ShipmentService {
 
       // DB statement_timeout이면 현재 묶음을 한 번 더 쪼개서 재시도합니다.
       // 최소 5행까지 자동 분할하여 현장 대용량 업로드 성공률을 높입니다.
-      final isStatementTimeout =
+      final lower = message.toLowerCase();
+      final isRetryable =
           message.contains('57014') ||
-          message.toLowerCase().contains('statement timeout');
+          lower.contains('statement timeout') ||
+          lower.contains('connection abort') ||
+          lower.contains('connection reset') ||
+          lower.contains('connection closed') ||
+          lower.contains('clientexception');
 
-      if (isStatementTimeout && rows.length > 5) {
+      if (isRetryable && rows.length > 10) {
         final middle = (rows.length / 2).ceil();
         final left = rows.sublist(0, middle);
         final right = rows.sublist(middle);
