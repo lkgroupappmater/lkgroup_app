@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -77,7 +77,9 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
   late final DateTime _issuedAt;
 
   static const double _docWidth = 1800;
-  int get _visibleRows => widget.boxes.length + 1 < 10 ? 10 : widget.boxes.length + 1;
+  int get _visibleRows => widget.boxes.length + widget.extraCosts.length + 1 < 10
+      ? 10
+      : widget.boxes.length + widget.extraCosts.length + 1;
   double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
@@ -409,7 +411,8 @@ class _DigitalQuotationPainter extends CustomPainter {
     const tableTop = 205.0;
     const headerH = 42.0;
     const rowH = 32.0;
-    final rowCount = boxes.length + 1 < 10 ? 10 : boxes.length + 1;
+    final usedRows = boxes.length + extraCosts.length;
+    final rowCount = usedRows + 1 < 10 ? 10 : usedRows + 1;
     final cols = <double>[
       0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
@@ -432,6 +435,8 @@ class _DigitalQuotationPainter extends CustomPainter {
     for (var i = 0; i < rowCount; i++) {
       final y = tableTop + headerH + i * rowH;
       final has = i < boxes.length;
+      final extraIndex = i - boxes.length;
+      final hasExtra = extraIndex >= 0 && extraIndex < extraCosts.length;
       final b = has ? boxes[i] : null;
       final actualWins =
           b != null && b.result.actualWeightKg >= b.result.volumeWeightKg;
@@ -448,6 +453,26 @@ class _DigitalQuotationPainter extends CustomPainter {
       _text(c, '${i + 1}',
           Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
           15, bold: true, center: true);
+      if (hasExtra) {
+        final extra = extraCosts[extraIndex];
+        _text(
+          c,
+          extra.name,
+          Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
+          17,
+          bold: true,
+          center: true,
+        );
+        _text(
+          c,
+          MoneyFormat.usd(extra.amountUsd),
+          Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
+          20,
+          bold: true,
+          right: true,
+        );
+        continue;
+      }
       if (!has || b == null) continue;
 
       final qty = b.quantity < 1 ? 1 : b.quantity;
@@ -488,12 +513,15 @@ class _DigitalQuotationPainter extends CustomPainter {
     final totalQty = boxes.fold<double>(0, (v, b) => v + b.quantity);
     final totalActual = boxes.fold<double>(0, (v, b) => v + b.result.actualWeightKg);
     final totalVolume = boxes.fold<double>(0, (v, b) => v + b.result.volumeWeightKg);
+    final extraTotal =
+        extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final usd = result.totalUsd + extraTotal;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(result.totalUsd),
+      13: MoneyFormat.usd(usd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -524,9 +552,8 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
-    final extraTotal = extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final extraNames = extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
-    final usd = result.totalUsd + extraTotal;
+    final extraNames =
+        extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
     _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);

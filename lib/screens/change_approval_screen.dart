@@ -842,28 +842,13 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               '요청인: ${r['requester_name'] ?? ''} '
               '(${r['requester_email'] ?? ''})',
             ),
-            if (r['data_locked'] == true) ...[
-              const SizedBox(height: 8),
-              const Row(
-                children: [
-                  Icon(Icons.lock, size: 16, color: Colors.redAccent),
-                  SizedBox(width: 5),
-                  Text(
-                    '🔒 현재 잠금 상태',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+
             const SizedBox(height: 8),
             const Text(
               '요청 내용',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text(_changesText(requested)),
+            Text(_changesText(requested, r)),
             if (editing) ...[
               const Divider(height: 22),
               const Text(
@@ -973,7 +958,10 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     ];
   }
 
-  String _changesText(Map<String, dynamic> changes) {
+  String _changesText(
+    Map<String, dynamic> changes,
+    Map<String, dynamic> current,
+  ) {
     if (changes.isEmpty) return '변경 내용 없음';
     const labels = {
       'consignee_name': '이름/수령인',
@@ -984,10 +972,31 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       'length_cm': '가로',
       'width_cm': '세로',
       'height_cm': '높이',
+      'received_at': '요청 일시',
     };
-    return changes.entries
-        .map((e) => '${labels[e.key] ?? e.key}: ${e.value ?? ''}')
-        .join('\n');
+
+    String clean(dynamic value) {
+      final text = '${value ?? ''}'.trim();
+      if (text.isEmpty) return '-';
+      final parsed = DateTime.tryParse(text);
+      if (parsed != null) {
+        final local = parsed.toLocal();
+        String two(int v) => v.toString().padLeft(2, '0');
+        return '${local.year}-${two(local.month)}-${two(local.day)} '
+            '${two(local.hour)}:${two(local.minute)}';
+      }
+      return text;
+    }
+
+    return changes.entries.map((e) {
+      final label = labels[e.key] ?? e.key;
+      if (e.key == 'received_at') {
+        return '$label: ${clean(e.value)}';
+      }
+      final before = clean(current[e.key]);
+      final after = clean(e.value);
+      return '$label: $before → $after';
+    }).join('\n');
   }
 }
 

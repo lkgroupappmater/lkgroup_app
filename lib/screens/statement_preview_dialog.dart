@@ -60,7 +60,9 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   bool _saving = false;
 
   static const double _docWidth = 1800;
-  int get _visibleRows => _rows.length + 1 < 10 ? 10 : _rows.length + 1;
+  int get _visibleRows => _rows.length + _extraCosts.length + 1 < 10
+      ? 10
+      : _rows.length + _extraCosts.length + 1;
   double get _docHeight => 1120 + (_visibleRows - 10) * 32;
 
   @override
@@ -441,7 +443,8 @@ class _DigitalStatementPainter extends CustomPainter {
     const tableTop = 205.0;
     const headerH = 42.0;
     const rowH = 32.0;
-    final rowCount = rows.length + 1 < 10 ? 10 : rows.length + 1;
+    final usedRows = rows.length + extraCosts.length;
+    final rowCount = usedRows + 1 < 10 ? 10 : usedRows + 1;
     final cols = <double>[
       0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
@@ -464,6 +467,8 @@ class _DigitalStatementPainter extends CustomPainter {
     for (var i = 0; i < rowCount; i++) {
       final y = tableTop + headerH + i * rowH;
       final has = i < rows.length;
+      final extraIndex = i - rows.length;
+      final hasExtra = extraIndex >= 0 && extraIndex < extraCosts.length;
       final row = has ? rows[i] : const <String, dynamic>{};
       final f = i < lines.length ? lines[i] : null;
       final actualWins = f != null && f.actualWeight >= f.volumeWeight;
@@ -479,6 +484,26 @@ class _DigitalStatementPainter extends CustomPainter {
       _text(c, '${i + 1}',
           Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
           15, bold: true, center: true);
+      if (hasExtra) {
+        final extra = extraCosts[extraIndex];
+        _text(
+          c,
+          extra.name,
+          Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
+          17,
+          bold: true,
+          center: true,
+        );
+        _text(
+          c,
+          MoneyFormat.usd(extra.amountUsd),
+          Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
+          20,
+          bold: true,
+          right: true,
+        );
+        continue;
+      }
       if (!has) continue;
       final qty = _d(row['quantity'], 1).clamp(1, 999999).toDouble();
       final unitActual = f == null ? 0.0 : f.actualWeight / qty;

@@ -782,9 +782,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
 
   Widget _freightResultCard(QuoteFreightResult result) {
     final rates = _calculationRates;
-    final kip = rates == null ? null : result.totalUsd * rates.appliedKip;
-    final thb = rates == null ? null : result.totalUsd * rates.appliedThb;
-    final krw = rates == null ? null : result.totalUsd * rates.appliedKrw;
+    final extraTotal =
+        _extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final finalUsd = result.totalUsd + extraTotal;
+    final kip = rates == null ? null : finalUsd * rates.appliedKip;
+    final thb = rates == null ? null : finalUsd * rates.appliedThb;
+    final krw = rates == null ? null : finalUsd * rates.appliedKrw;
 
     return Card(
       child: Padding(
@@ -819,6 +822,28 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 ),
               ),
             ),
+            if (_extraCosts.isNotEmpty) ...[
+              const Divider(),
+              ..._extraCosts.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '기타 비용 · ${e.name}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      Text(
+                        '+\$${e.amountUsd.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const Divider(),
             Align(
               alignment: Alignment.centerRight,
@@ -826,7 +851,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '총 운임  USD \$${result.totalUsd.toStringAsFixed(2)}',
+                    '총 운임  USD \$${finalUsd.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

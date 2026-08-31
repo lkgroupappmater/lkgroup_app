@@ -2042,18 +2042,58 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         phone.isEmpty ? '-' : phone,
                         style: const TextStyle(fontSize: 12),
                       ),
-                      Text(
-                        '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.navyPrimary,
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: '영수번호/구획: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: receipt.isEmpty ? '-' : receipt,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navyPrimary,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' / ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: zone.isEmpty ? '-' : zone,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navyPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        '총 개수: $totalQty개',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.navyPrimary,
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: '총 개수: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '$totalQty개',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navyPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

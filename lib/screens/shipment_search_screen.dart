@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
@@ -769,6 +769,39 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     }
   }
 
+  List<MapEntry<String, List<Map<String, dynamic>>>> _receiptGroups(
+    List<Map<String, dynamic>> rows,
+  ) {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      final receipt = '${row['receipt_number'] ?? ''}'.trim();
+      map.putIfAbsent(receipt, () => <Map<String, dynamic>>[]).add(row);
+    }
+    final entries = map.entries.toList();
+    int tailNumber(String value) {
+      final m = RegExp(r'(\d+)\s*$').firstMatch(value);
+      return m == null ? 999999 : int.tryParse(m.group(1)!) ?? 999999;
+    }
+    entries.sort((a, b) {
+      final an = tailNumber(a.key);
+      final bn = tailNumber(b.key);
+      if (an != bn) return an.compareTo(bn);
+      return a.key.compareTo(b.key);
+    });
+    return entries;
+  }
+
+  void _toggleReceiptGroup(List<Map<String, dynamic>> rows) {
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    setState(() {
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
   List<Widget> _groupedResultWidgets() {
     return _resultGroups().map((entry) {
       final rows = entry.value;
@@ -807,12 +840,132 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 ],
               ),
             ),
-            ...rows.map(_shipmentCard),
+            ..._receiptGroups(rows).map((e) => _receiptResultCard(e.value)),
           ],
         ),
       );
     }).toList();
   }
+
+  Widget _receiptResultCard(List<Map<String, dynamic>> rows) {
+    final first = rows.first;
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
+    final receipt = '${first['receipt_number'] ?? ''}'.trim();
+    final zone = '${first['unloading_zone'] ?? ''}'.trim();
+    final name = '${first['consignee_name'] ?? ''}'.trim();
+    final company = _companyOf(first);
+    final phone = '${first['consignee_phone'] ?? ''}'.trim();
+    final totalQty = rows.fold<int>(
+      0,
+      (sum, r) => sum + (int.tryParse('${r['quantity'] ?? ''}') ?? 1),
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFD7DEE7)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(4, 6, 6, 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: all,
+                  onChanged: (_) => _toggleReceiptGroup(rows),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Expanded(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '$name / ${company.isEmpty ? '-' : company}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyPrimary,
+                        ),
+                      ),
+                      Text(
+                        phone.isEmpty ? '-' : phone,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyPrimary,
+                        ),
+                      ),
+                      Text.rich(
+                        TextSpan(children: [
+                          const TextSpan(
+                            text: '영수번호/구획: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          TextSpan(
+                            text: receipt.isEmpty ? '-' : receipt,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navyPrimary,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: ' / ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          TextSpan(
+                            text: _showZone ? (zone.isEmpty ? '-' : zone) : '-',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navyPrimary,
+                            ),
+                          ),
+                        ]),
+                      ),
+                      Text.rich(
+                        TextSpan(children: [
+                          const TextSpan(
+                            text: '총 개수: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          TextSpan(
+                            text: '$totalQty개',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navyPrimary,
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...rows.map(_shipmentCard),
+        ],
+      ),
+    );
+  }
+
   Widget _shipmentCard(Map<String, dynamic> r) {
     final id = '${r['id']}';
     final quantity = int.tryParse('${r['quantity'] ?? ''}') ?? 1;
@@ -821,65 +974,39 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final height = _naturalNumber(r['height_cm']);
     final width = _naturalNumber(r['width_cm']);
     final size = '$length × $height × $width cm';
-    final name = '${r['consignee_name'] ?? ''}'.trim();
-    final company = _companyOf(r);
-    final nameCompany = '$name / ${company.isEmpty ? '-' : company}';
-    final receipt = '${r['receipt_number'] ?? ''}'.trim();
-    final zone = '${r['unloading_zone'] ?? ''}'.trim();
 
-    return Card(
-      child: InkWell(
-        onTap: () => _toggle(id),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                value: _selectedIds.contains(id),
-                onChanged: (_) => _toggle(id),
+    return InkWell(
+      onTap: () => _toggle(id),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 8, 8, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: _selectedIds.contains(id),
+              onChanged: (_) => _toggle(id),
+              visualDensity: VisualDensity.compact,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _row('화물번호', '${r['box_number'] ?? ''}'),
+                  _row('송장번호', '${r['invoice_number'] ?? ''}'),
+                  _row('화물개수', '$quantity개'),
+                  _row(
+                    '무게 / 크기',
+                    '${_weightOneDecimal(r['weight_kg'])} kg / $size',
+                  ),
+                  _row('입고날짜', receivedDate),
+                ],
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '박스번호: ${r['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.navyPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _row('운송 경로', '${r['route'] ?? ''}'),
-                    _row(
-                      '년도 / 항차',
-                      '${r['shipment_year'] ?? ''} / ${_voyageLabel(r['voyage'])}',
-                    ),
-                    _row('송장번호', '${r['invoice_number'] ?? ''}'),
-                    _row('수령인 / 회사명', nameCompany),
-                    _row('연락처', '${r['consignee_phone'] ?? ''}'),
-                    _row(
-                      '무게 / 크기',
-                      '${_weightOneDecimal(r['weight_kg'])} kg / $size',
-                    ),
-                    if (_showZone)
-                      _row(
-                        '영수번호 / 구획',
-                        '$receipt / ${zone.isEmpty ? '-' : zone}',
-                      )
-                    else
-                      _row('영수번호', receipt),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
   String _weightOneDecimal(dynamic value) {
     final text = '${value ?? ''}'.trim();
     final number = double.tryParse(text);
