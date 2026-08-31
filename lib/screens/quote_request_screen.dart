@@ -234,6 +234,79 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       ),
     );
   }
+
+  Future<void> _addQuoteExtraCost() async {
+    final nameController = TextEditingController();
+    final amountController = TextEditingController();
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('湲고? 鍮꾩슜 異붽?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: '鍮꾩슜紐?,
+                hintText: '?? ?듦?鍮? 異붽? 諛곗넚鍮?,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: '湲덉븸 (USD)',
+                prefixText: r'$ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('痍⑥냼'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final amount = double.tryParse(amountController.text.trim());
+              if (name.isEmpty || amount == null || amount <= 0) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('鍮꾩슜紐낃낵 0蹂대떎 ??USD 湲덉븸???낅젰??二쇱꽭??')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            child: const Text('異붽?'),
+          ),
+        ],
+      ),
+    );
+
+    if (added == true) {
+      final amount = double.tryParse(amountController.text.trim());
+      if (amount != null && amount > 0 && mounted) {
+        setState(() {
+          _extraCosts.add(
+            ExtraCostItem(
+              name: nameController.text.trim(),
+              amountUsd: amount,
+            ),
+          );
+        });
+      }
+    }
+    nameController.dispose();
+    amountController.dispose();
+  }
   Future<void> _loadSpecialQuotes() async {
     if (!_isLoggedIn || !SupabaseConfig.isConfigured) {
       if (mounted) setState(() => _specialQuotes = const []);
@@ -1170,6 +1243,7 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
+
 
 
 

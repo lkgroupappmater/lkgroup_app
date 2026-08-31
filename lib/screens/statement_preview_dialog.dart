@@ -518,6 +518,9 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalQty = rows.fold<double>(0, (v, r) => v + _d(r['quantity'], 1));
     final totalActual = freight.lines.fold<double>(0, (v, f) => v + f.actualWeight);
     final totalVolume = freight.lines.fold<double>(0, (v, f) => v + f.volumeWeight);
+    final extraTotal = extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final extraNames = extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
+    final finalUsd = freight.totalUsd + extraTotal;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
@@ -553,9 +556,6 @@ class _DigitalStatementPainter extends CustomPainter {
       maxLines: 5,
       lineHeight: 1.12,
     );
-    final extraTotal = extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final extraNames = extraCosts.map((e) => e.name).where((e) => e.isNotEmpty).join(', ');
-    final finalUsd = freight.totalUsd + extraTotal;
 
     final totalX = leftW + 6;
     final totalW = w - totalX;
@@ -917,5 +917,6 @@ class StatementDocumentRenderer {
     }
   }
 }
+
 
 
