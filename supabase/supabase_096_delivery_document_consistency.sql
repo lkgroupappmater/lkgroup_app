@@ -1,4 +1,7 @@
--- Patch164 FIXED2 / 096
+-- Patch164 FIXED / 096
+-- Route-specific discount + local-delivery document consistency.
+-- Freight calculation, receipt numbering, Zone logic, and settlement snapshot logic are unchanged.
+
 create or replace function public.compute_shipment_special_note(
   p_route text,
   p_name text,
