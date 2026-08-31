@@ -146,6 +146,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       }
     }
 
+    // Dialog가 사라지는 애니메이션 중 controller를 먼저 dispose하지 않습니다.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     nameController.dispose();
     amountController.dispose();
   }

@@ -1,4 +1,4 @@
-﻿import '../config/supabase_config.dart';
+import '../config/supabase_config.dart';
 import 'supabase_service.dart';
 
 class UnknownRecipientService {
@@ -59,9 +59,12 @@ class UnknownRecipientService {
     final raw =
         await SupabaseService.client.rpc('admin_list_incomplete_shipments')
             as List;
-    return raw
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList(growable: false);
+    return raw.map((e) {
+      final row = Map<String, dynamic>.from(e as Map);
+      row['id'] ??= row['shipment_id'];
+      row['reason'] ??= row['uncertainty_reason'];
+      return row;
+    }).toList(growable: false);
   }
 
   Future<void> reviewIncomplete({

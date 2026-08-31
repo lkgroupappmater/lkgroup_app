@@ -1660,6 +1660,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         },
       ),
     );
+    // showDialog의 reverse transition이 완전히 끝난 뒤 controller를 정리합니다.
+    // 즉시 dispose하면 Flutter InheritedElement의 _dependents assertion이 발생할 수 있습니다.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     name.dispose();
     amount.dispose();
   }
@@ -1776,11 +1779,50 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ),
                 ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
-                  IconButton(
-                    tooltip: '기타 비용 (+\$)',
-                    onPressed:
-                        _busy ? null : () => _showReceiptExtraCostDialog(rows),
-                    icon: const Icon(Icons.add_card_outlined, size: 21),
+                  FutureBuilder<List<ExtraCostItem>>(
+                    future: ReceiptExtraCostService.instance.list(
+                      route: '${first['route'] ?? ''}'.trim(),
+                      year: (first['shipment_year'] as num?)?.toInt() ?? 0,
+                      voyage: '${first['voyage'] ?? ''}'.trim(),
+                      receiptNumber: receipt,
+                    ),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data?.length ?? 0;
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (count > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 2),
+                              child: Text(
+                                List<String>.generate(
+                                  count,
+                                  (i) => '+${i + 1}',
+                                ).join(' '),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navyPrimary,
+                                ),
+                              ),
+                            ),
+                          IconButton(
+                            tooltip: '기타 비용 (+\$)',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _busy
+                                ? null
+                                : () async {
+                                    await _showReceiptExtraCostDialog(rows);
+                                    if (mounted) setState(() {});
+                                  },
+                            icon: const Icon(
+                              Icons.add_card_outlined,
+                              size: 21,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
               ],
             ),
@@ -1824,53 +1866,62 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     '${_weightOneDecimal(item['weight_kg'])} kg / $size',
                   ),
                   _infoRow('입고날짜', receivedDate),
-                  if (_isManager) ...[
-                    const SizedBox(height: 3),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Wrap(
-                        spacing: 12,
-                        children: [
-                          IconButton(
-                            tooltip: '편집',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: _busy
-                                ? null
-                                : () async {
-                                    setState(() {
-                                      _selectedIds
-                                        ..clear()
-                                        ..add(id);
-                                    });
-                                    await _editCheckedGroup([item]);
-                                  },
-                            icon: const Icon(Icons.edit_outlined, size: 19),
-                          ),
-                          if (_isAdmin)
-                            IconButton(
-                              tooltip:
-                                  item['data_locked'] == true ? '잠금 해제' : '잠금',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: _busy
-                                  ? null
-                                  : () => _toggleShipmentLock(item),
-                              icon: Icon(
-                                item['data_locked'] == true
-                                    ? Icons.lock
-                                    : Icons.lock_open_outlined,
-                                size: 19,
-                                color: item['data_locked'] == true
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
+            if (_isManager)
+              Padding(
+                padding: const EdgeInsets.only(left: 2, top: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '편집',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              setState(() {
+                                _selectedIds
+                                  ..clear()
+                                  ..add(id);
+                              });
+                              await _editCheckedGroup([item]);
+                            },
+                      icon: const Icon(Icons.edit_outlined, size: 19),
+                    ),
+                    if (_isAdmin)
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: item['data_locked'] == true
+                              ? Colors.transparent
+                              : const Color(0xFF9CA3AF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip:
+                              item['data_locked'] == true ? '잠금 해제' : '잠금',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _busy
+                              ? null
+                              : () => _toggleShipmentLock(item),
+                          icon: Icon(
+                            item['data_locked'] == true
+                                ? Icons.lock
+                                : Icons.lock_open_outlined,
+                            size: 19,
+                            color: item['data_locked'] == true
+                                ? Colors.red
+                                : Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
