@@ -1461,6 +1461,235 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
+  Future<void> _editReceiptGroupCustomer(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (rows.isEmpty || !(_isAdmin || _isStaff)) return;
+
+    final first = rows.first;
+    final name = TextEditingController(
+      text: '${first['consignee_name'] ?? ''}',
+    );
+    final phone = TextEditingController(
+      text: '${first['consignee_phone'] ?? ''}',
+    );
+    final notes = TextEditingController(
+      text: '${first['notes'] ?? ''}',
+    );
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          '${first['receipt_number'] ?? ''} 고객 정보 편집',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(
+                  labelText: '이름 / 회사명',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: '연락처',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: notes,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: '기타 내용',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '이 영수번호에 묶인 ${rows.length}개 화물에 동일하게 적용됩니다.',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('일괄 저장'),
+          ),
+        ],
+      ),
+    );
+
+    if (save == true) {
+      final changes = <String, dynamic>{
+        'consignee_name': name.text.trim(),
+        'consignee_phone': phone.text.trim(),
+        'notes': notes.text.trim(),
+      };
+
+      setState(() => _busy = true);
+      try {
+        for (final row in rows) {
+          await ShipmentService.instance.updateRow(
+            '${row['id']}',
+            changes,
+          );
+        }
+        if (mounted) {
+          _message('${rows.length}개 화물의 고객 정보를 수정했습니다.');
+          await _search();
+        }
+      } catch (error) {
+        _message('고객 단위 편집 실패: $error');
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    name.dispose();
+    phone.dispose();
+    notes.dispose();
+  }
+
+  Future<void> _editCargoMeasurements(
+    Map<String, dynamic> item,
+  ) async {
+    final weight = TextEditingController(
+      text: '${item['weight_kg'] ?? ''}',
+    );
+    final length = TextEditingController(
+      text: '${item['length_cm'] ?? ''}',
+    );
+    final width = TextEditingController(
+      text: '${item['width_cm'] ?? ''}',
+    );
+    final height = TextEditingController(
+      text: '${item['height_cm'] ?? ''}',
+    );
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${item['box_number'] ?? ''} 중량 / 크기 편집'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: weight,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: '중량 (kg)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: length,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: '가로 (cm)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: width,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: '세로 (cm)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: height,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: '높이 (cm)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+
+    if (save == true) {
+      num? n(String value) =>
+          value.trim().isEmpty ? null : num.tryParse(value.trim());
+
+      final changes = <String, dynamic>{
+        'weight_kg': n(weight.text),
+        'length_cm': n(length.text),
+        'width_cm': n(width.text),
+        'height_cm': n(height.text),
+      };
+
+      setState(() => _busy = true);
+      try {
+        await ShipmentService.instance.updateRow(
+          '${item['id']}',
+          changes,
+        );
+        if (mounted) {
+          _message('중량 / 크기 정보를 저장했습니다.');
+          await _search();
+        }
+      } catch (error) {
+        _message('중량 / 크기 편집 실패: $error');
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    weight.dispose();
+    length.dispose();
+    width.dispose();
+    height.dispose();
+  }
+
   Future<void> _showGroupStatement(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty || _isPartner) return;
     try {
@@ -1815,15 +2044,30 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       ),
                       Text(
                         '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyPrimary,
+                        ),
                       ),
                       Text(
                         '총 개수: $totalQty개',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyPrimary,
+                        ),
                       ),
                     ],
                   ),
                 ),
+                if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
+                  IconButton(
+                    tooltip: '고객 단위 편집',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _busy
+                        ? null
+                        : () => _editReceiptGroupCustomer(rows),
+                    icon: const Icon(Icons.edit_note_outlined, size: 20),
+                  ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
                   FutureBuilder<List<ExtraCostItem>>(
                     future: ReceiptExtraCostService.instance.list(
@@ -1926,14 +2170,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       visualDensity: VisualDensity.compact,
                       onPressed: _busy
                           ? null
-                          : () async {
-                              setState(() {
-                                _selectedIds
-                                  ..clear()
-                                  ..add(id);
-                              });
-                              await _editCheckedGroup([item]);
-                            },
+                          : () => _editCargoMeasurements(item),
                       icon: const Icon(Icons.edit_outlined, size: 19),
                     ),
                     if (_isAdmin) const SizedBox(height: 8),

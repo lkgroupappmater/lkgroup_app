@@ -349,12 +349,54 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${row['box_number'] ?? ''} · ${row['invoice_number'] ?? ''}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${row['box_number'] ?? ''} · ${row['invoice_number'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => _reviewIncomplete(row, lock: false),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
+                      child: const Text(
+                        '확인/수정',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _reviewIncomplete(row, lock: true),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                      ),
+                      icon: const Icon(Icons.lock_outline, size: 14),
+                      label: const Text(
+                        '확정/잠금',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             Text(
               '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
@@ -378,22 +420,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton(
-                  onPressed: () => _reviewIncomplete(row, lock: false),
-                  child: const Text('확인 / 수정'),
-                ),
-                const SizedBox(width: 6),
-                FilledButton.icon(
-                  onPressed: () => _reviewIncomplete(row, lock: true),
-                  icon: const Icon(Icons.lock_outline, size: 17),
-                  label: const Text('확정 / 잠금'),
-                ),
-              ],
-            ),
+            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -779,6 +806,34 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                     ),
                   ),
                 ),
+                if (r['data_locked'] == true)
+                  Container(
+                    margin: const EdgeInsets.only(left: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE5E5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.redAccent),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock, size: 13, color: Colors.redAccent),
+                        SizedBox(width: 3),
+                        Text(
+                          '잠금',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             Text(
