@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -7,6 +7,7 @@ import '../models/app_user.dart';
 import '../services/shipment_service.dart';
 import '../services/freight_service.dart';
 import '../services/shipment_filter_options_service.dart';
+import '../services/receipt_extra_cost_service.dart';
 import 'shipment_manual_add_screen.dart';
 import 'notice_management_screen.dart';
 import 'schedule_management_screen.dart';
@@ -1484,6 +1485,185 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
+  List<MapEntry<String, List<Map<String, dynamic>>>> _receiptGroups(
+    List<Map<String, dynamic>> rows,
+  ) {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      final receipt = '${row['receipt_number'] ?? ''}'.trim();
+      map.putIfAbsent(receipt, () => <Map<String, dynamic>>[]).add(row);
+    }
+    final entries = map.entries.toList();
+    int tailNumber(String value) {
+      final m = RegExp(r'(\d+)\s*$').firstMatch(value);
+      return m == null ? 999999 : int.tryParse(m.group(1)!) ?? 999999;
+    }
+    entries.sort((a, b) {
+      final an = tailNumber(a.key);
+      final bn = tailNumber(b.key);
+      if (an != bn) return an.compareTo(bn);
+      return a.key.compareTo(b.key);
+    });
+    return entries;
+  }
+
+  void _toggleReceiptGroup(List<Map<String, dynamic>> rows) {
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    setState(() {
+      if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
+        _selectedIds.removeAll(ids);
+      } else {
+        _selectedIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _showReceiptExtraCostDialog(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (rows.isEmpty || !(_isAdmin || _isStaff)) return;
+    final first = rows.first;
+    final route = '${first['route'] ?? ''}'.trim();
+    final year = (first['shipment_year'] as num?)?.toInt();
+    final voyage = '${first['voyage'] ?? ''}'.trim();
+    final receipt = '${first['receipt_number'] ?? ''}'.trim();
+    if (route.isEmpty || year == null || voyage.isEmpty || receipt.isEmpty) {
+      _message('기타 비용을 연결할 영수번호 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    int? editingId;
+    var items = await ReceiptExtraCostService.instance.list(
+      route: route,
+      year: year,
+      voyage: voyage,
+      receiptNumber: receipt,
+    );
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> reload() async {
+            final next = await ReceiptExtraCostService.instance.list(
+              route: route,
+              year: year,
+              voyage: voyage,
+              receiptNumber: receipt,
+            );
+            if (dialogContext.mounted) setDialogState(() => items = next);
+          }
+
+          return AlertDialog(
+            title: Text('$receipt · 기타 비용 (+$)'),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (items.isNotEmpty) ...[
+                      ...items.map(
+                        (e) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(e.name),
+                          subtitle: Text('\$${e.amountUsd.toStringAsFixed(2)}'),
+                          trailing: Wrap(
+                            spacing: 4,
+                            children: [
+                              IconButton(
+                                tooltip: '수정',
+                                onPressed: () {
+                                  setDialogState(() => editingId = e.id);
+                                  name.text = e.name;
+                                  amount.text = e.amountUsd.toStringAsFixed(2);
+                                },
+                                icon: const Icon(Icons.edit_outlined, size: 19),
+                              ),
+                              IconButton(
+                                tooltip: '삭제',
+                                onPressed: e.id == null
+                                    ? null
+                                    : () async {
+                                        await ReceiptExtraCostService.instance
+                                            .delete(e.id!);
+                                        await reload();
+                                      },
+                                icon: const Icon(Icons.delete_outline, size: 19),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(),
+                    ],
+                    TextField(
+                      controller: name,
+                      decoration: const InputDecoration(
+                        labelText: '비용 이름',
+                        hintText: '예: 통관비용, 보관료',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: amount,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: '금액 (USD)',
+                        prefixText: '\$ ',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('닫기'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  final value = double.tryParse(amount.text.trim());
+                  if (name.text.trim().isEmpty || value == null || value < 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('비용 이름과 금액을 확인해 주세요.')),
+                    );
+                    return;
+                  }
+                  await ReceiptExtraCostService.instance.save(
+                    id: editingId,
+                    route: route,
+                    year: year,
+                    voyage: voyage,
+                    receiptNumber: receipt,
+                    name: name.text,
+                    amountUsd: value,
+                  );
+                  name.clear();
+                  amount.clear();
+                  setDialogState(() => editingId = null);
+                  await reload();
+                },
+                icon: const Icon(Icons.add_card_outlined, size: 18),
+                label: Text(editingId == null ? '추가' : '수정 저장'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    name.dispose();
+    amount.dispose();
+  }
+
   List<Widget> _managementGroupWidgets() {
     return _managementGroups().map((entry) {
       final rows = entry.value;
@@ -1517,33 +1697,101 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ),
                   if (_isManager)
                     IconButton(
-                      tooltip: '편집',
+                      tooltip: '선택 화물 편집',
                       onPressed: _busy ? null : () => _editCheckedGroup(rows),
                       icon: const Icon(Icons.edit_outlined, size: 19),
                     ),
                   if (_isManager)
                     IconButton(
-                      tooltip: '삭제',
+                      tooltip: '선택 화물 삭제',
                       onPressed: _busy ? null : () => _deleteCheckedGroup(rows),
                       icon: const Icon(Icons.delete_outline, size: 19),
-                    ),
-                  if (!_isPartner)
-                    IconButton(
-                      tooltip: '명세서 보기',
-                      onPressed: _busy ? null : () => _showGroupStatement(rows),
-                      icon: const Icon(Icons.receipt_long_outlined, size: 19),
                     ),
                 ],
               ),
             ),
-            ...rows.map(_groupShipmentCard),
+            ..._receiptGroups(rows).map((e) => _receiptGroupCard(e.value)),
           ],
         ),
       );
     }).toList();
   }
 
-  Widget _groupShipmentCard(Map<String, dynamic> item) {
+  Widget _receiptGroupCard(List<Map<String, dynamic>> rows) {
+    final first = rows.first;
+    final ids = rows.map((r) => '${r['id']}').toSet();
+    final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
+    final receipt = '${first['receipt_number'] ?? ''}'.trim();
+    final zone = '${first['unloading_zone'] ?? ''}'.trim();
+    final name = '${first['consignee_name'] ?? ''}'.trim();
+    final company = _companyOf(first);
+    final phone = '${first['consignee_phone'] ?? ''}'.trim();
+    final totalQty = rows.fold<int>(
+      0,
+      (sum, r) => sum + (int.tryParse('${r['quantity'] ?? ''}') ?? 1),
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFD7DEE7)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: all,
+                  onChanged: (_) => _toggleReceiptGroup(rows),
+                  visualDensity: VisualDensity.compact,
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '이름/회사명: $name / ${company.isEmpty ? '-' : company}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyPrimary,
+                        ),
+                      ),
+                      Text('연락처: ${phone.isEmpty ? '-' : phone}',
+                          style: const TextStyle(fontSize: 12)),
+                      Text(
+                        '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      Text('총 개수: $totalQty개',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+                if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
+                  IconButton(
+                    tooltip: '기타 비용 (+\$)',
+                    onPressed:
+                        _busy ? null : () => _showReceiptExtraCostDialog(rows),
+                    icon: const Icon(Icons.add_card_outlined, size: 21),
+                  ),
+              ],
+            ),
+          ),
+          ...rows.map(_receiptShipmentCard),
+        ],
+      ),
+    );
+  }
+
+  Widget _receiptShipmentCard(Map<String, dynamic> item) {
     final id = '${item['id']}';
     final quantity = int.tryParse('${item['quantity'] ?? ''}') ?? 1;
     final receivedDate = _dateOnly(item['received_at']);
@@ -1551,115 +1799,79 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final height = _naturalNumber(item['height_cm']);
     final width = _naturalNumber(item['width_cm']);
     final size = '$length × $height × $width cm';
-    final name = '${item['consignee_name'] ?? ''}'.trim();
-    final company = _companyOf(item);
-    final nameCompany = '$name / ${company.isEmpty ? '-' : company}';
-    final receipt = '${item['receipt_number'] ?? ''}'.trim();
-    final zone = '${item['unloading_zone'] ?? ''}'.trim();
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: _selectedIds.contains(id)
-            ? Border.all(color: AppColors.accent, width: 1.5)
-            : null,
-      ),
-      child: InkWell(
-        onTap: () => _toggle(id),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                value: _selectedIds.contains(id),
-                onChanged: (_) => _toggle(id),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '박스번호: ${item['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.navyPrimary,
-                            ),
+    return InkWell(
+      onTap: () => _toggle(id),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 8, 8, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: _selectedIds.contains(id),
+              onChanged: (_) => _toggle(id),
+              visualDensity: VisualDensity.compact,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _infoRow('화물번호', '${item['box_number'] ?? ''}'),
+                  _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
+                  _infoRow('화물개수', '$quantity개'),
+                  _infoRow(
+                    '무게 / 크기',
+                    '${_weightOneDecimal(item['weight_kg'])} kg / $size',
+                  ),
+                  _infoRow('입고날짜', receivedDate),
+                  if (_isManager) ...[
+                    const SizedBox(height: 3),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(
+                        spacing: 12,
+                        children: [
+                          IconButton(
+                            tooltip: '편집',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _busy
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      _selectedIds
+                                        ..clear()
+                                        ..add(id);
+                                    });
+                                    await _editCheckedGroup([item]);
+                                  },
+                            icon: const Icon(Icons.edit_outlined, size: 19),
                           ),
-                        ),
-                        if (_isManager)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton.icon(
-                                onPressed: _busy
-                                    ? null
-                                    : () async {
-                                        setState(() {
-                                          _selectedIds
-                                            ..clear()
-                                            ..add(id);
-                                        });
-                                        await _editCheckedGroup([item]);
-                                      },
-                                icon: const Icon(Icons.edit_outlined, size: 17),
-                                label: const Text('편집'),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                ),
+                          if (_isAdmin)
+                            IconButton(
+                              tooltip:
+                                  item['data_locked'] == true ? '잠금 해제' : '잠금',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _busy
+                                  ? null
+                                  : () => _toggleShipmentLock(item),
+                              icon: Icon(
+                                item['data_locked'] == true
+                                    ? Icons.lock
+                                    : Icons.lock_open_outlined,
+                                size: 19,
+                                color: item['data_locked'] == true
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
                               ),
-                              if (_isAdmin)
-                                IconButton(
-                                  tooltip: item['data_locked'] == true ? '잠금 해제' : '잠금',
-                                  visualDensity: VisualDensity.compact,
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _toggleShipmentLock(item),
-                                  icon: Icon(
-                                    item['data_locked'] == true
-                                        ? Icons.lock
-                                        : Icons.lock_open_outlined,
-                                    size: 20,
-                                    color: item['data_locked'] == true
-                                        ? AppColors.primary
-                                        : AppColors.textSecondary,
-                                  ),
-                                ),
-                            ],
-                          ),
-                      ],
+                            ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 5),
-                    _infoRow('운송 경로', '${item['route'] ?? ''}'),
-                    _infoRow(
-                      '년도 / 항차',
-                      '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
-                    ),
-                    _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('수령인 / 회사명', nameCompany),
-                    _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
-                    _infoRow(
-                      '무게 / 크기',
-                      '${_weightOneDecimal(item['weight_kg'])} kg / $size',
-                    ),
-                    if (_isAdmin || _isStaff)
-                      _infoRow(
-                        '영수번호 / 구획',
-                        '$receipt / ${zone.isEmpty ? '-' : zone}',
-                      )
-                    else
-                      _infoRow('영수번호', receipt),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1819,6 +2031,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
+
 
 
 
