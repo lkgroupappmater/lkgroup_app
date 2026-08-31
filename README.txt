@@ -1,6 +1,8 @@
-Patch171
-- DB: phone mandatory + exact full name/token name delivery matching
-- Statement: Inland delivery font 18.5 bold centered
-- Statement delivery color: province orange / province prepaid blue / city green / city prepaid yellow
-- Keeps Patch169 Park rule and Patch168 fast bulk upload behavior
-- No Edge deploy
+Patch172A - Excel download unblock / fast-path
+- Fix 500 permission denied receipt_extra_costs via service_role SELECT only.
+- Edge export reuses shipment_rows already fetched from DB by Flutter instead of re-querying shipments.
+- DB fallback remains for old/direct callers.
+- Statement Remark content centered / enlarged.
+- No unrelated UI changes.
+After applying: flutter analyze -> SQL -> deploy Edge.
+Then download V08 XLSX and upload it to ChatGPT for actual output verification.
