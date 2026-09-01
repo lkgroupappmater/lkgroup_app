@@ -302,7 +302,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('화물 데이타 엑셀 다운로드'),
+          title: const Text('화물 데이타 엑셀 파일 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
         ),
@@ -377,37 +377,42 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                         }),
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<int>(
-                key: ValueKey('year-$_route'),
-                initialValue: _year,
-                decoration: _dec('년도'),
-                items: _years
-                    .map((v) => DropdownMenuItem(
-                          value: v,
-                          child: Text('$v년'),
-                        ))
-                    .toList(),
-                onChanged: _route == null || _exporting || _recalculating
-                    ? null
-                    : (v) => setState(() {
-                          _year = v;
-                          _voyage = null;
-                        }),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                key: ValueKey('voyage-$_route-$_year'),
-                initialValue: _voyage,
-                decoration: _dec('항차'),
-                items: _voyages
-                    .map((v) => DropdownMenuItem(
-                          value: v,
-                          child: Text(v.endsWith('항차') ? v : '$v항차'),
-                        ))
-                    .toList(),
-                onChanged: _year == null || _exporting || _recalculating
-                    ? null
-                    : (v) => setState(() => _voyage = v),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      key: ValueKey('year-$_route'),
+                      initialValue: _year,
+                      decoration: _dec('년도'),
+                      items: _years
+                          .map((v) => DropdownMenuItem(value: v, child: Text('$v년')))
+                          .toList(),
+                      onChanged: _route == null || _exporting || _recalculating
+                          ? null
+                          : (v) => setState(() {
+                                _year = v;
+                                _voyage = null;
+                              }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('voyage-$_route-$_year'),
+                      initialValue: _voyage,
+                      decoration: _dec('항차'),
+                      items: _voyages
+                          .map((v) => DropdownMenuItem(
+                                value: v,
+                                child: Text(v.endsWith('항차') ? v : '$v항차'),
+                              ))
+                          .toList(),
+                      onChanged: _year == null || _exporting || _recalculating
+                          ? null
+                          : (v) => setState(() => _voyage = v),
+                    ),
+                  ),
+                ],
               ),
             ],
 

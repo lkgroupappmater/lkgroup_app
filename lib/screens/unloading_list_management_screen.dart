@@ -141,7 +141,7 @@ class _UnloadingListManagementScreenState
     final font = pw.Font.helvetica();
     final bold = pw.Font.helveticaBold();
 
-    const rowsPerColumn = 16;
+    const rowsPerColumn = 27;
     const groups = 5;
     const perPage = rowsPerColumn * groups;
 
@@ -197,7 +197,7 @@ class _UnloadingListManagementScreenState
                                 pw.Expanded(
                                   flex: flex,
                                   child: pw.Container(
-                                    height: 22,
+                                    height: 18.2,
                                     alignment: pw.Alignment.center,
                                     decoration: pw.BoxDecoration(
                                       color: warning
@@ -309,44 +309,50 @@ class _UnloadingListManagementScreenState
                       }),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<int>(
-              value: _year,
-              decoration: const InputDecoration(
-                labelText: '년도',
-                border: OutlineInputBorder(),
-              ),
-              items: _years
-                  .map((e) =>
-                      DropdownMenuItem(value: e, child: Text('$e년')))
-                  .toList(),
-              onChanged: _route == null || _busy
-                  ? null
-                  : (v) => setState(() {
-                        _year = v;
-                        _voyage = null;
-                        _rows = const [];
-                      }),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _voyage,
-              decoration: const InputDecoration(
-                labelText: '항차',
-                border: OutlineInputBorder(),
-              ),
-              items: _voyages
-                  .map((e) =>
-                      DropdownMenuItem(value: e, child: Text('${e}항차')))
-                  .toList(),
-              onChanged: _year == null || _busy
-                  ? null
-                  : (v) {
-                      setState(() {
-                        _voyage = v;
-                        _rows = const [];
-                      });
-                      if (v != null) _loadRows();
-                    },
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    value: _year,
+                    decoration: const InputDecoration(
+                      labelText: '년도',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _years
+                        .map((e) => DropdownMenuItem(value: e, child: Text('$e년')))
+                        .toList(),
+                    onChanged: _route == null || _busy
+                        ? null
+                        : (v) => setState(() {
+                              _year = v;
+                              _voyage = null;
+                              _rows = const [];
+                            }),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _voyage,
+                    decoration: const InputDecoration(
+                      labelText: '항차',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _voyages
+                        .map((e) => DropdownMenuItem(value: e, child: Text('${e}항차')))
+                        .toList(),
+                    onChanged: _year == null || _busy
+                        ? null
+                        : (v) {
+                            setState(() {
+                              _voyage = v;
+                              _rows = const [];
+                            });
+                            if (v != null) _loadRows();
+                          },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             if (_busy) const LinearProgressIndicator(),

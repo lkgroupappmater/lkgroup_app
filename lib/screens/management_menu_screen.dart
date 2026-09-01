@@ -7,7 +7,6 @@ import 'change_approval_screen.dart';
 import 'additional_feature_development_screen.dart';
 import 'excel_export_screen.dart';
 import 'excel_bulk_management_screen.dart';
-import 'excel_upload_screen.dart';
 import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
 import 'notice_management_screen.dart';
@@ -167,18 +166,11 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
       'action': widget.onOpenCargoManagement,
     });
 
-    items.addAll([
-      {
-        'label': '화물 데이타 엑셀 업로드 및 Update',
-        'icon': Icons.upload_file_outlined,
-        'page': const ExcelUploadScreen(),
-      },
-      {
-        'label': '화물 데이타 엑셀 다운로드',
-        'icon': Icons.download_outlined,
-        'page': const ExcelExportScreen(),
-      },
-    ]);
+    items.add({
+      'label': '화물 데이타 엑셀 파일 관리',
+      'icon': Icons.folder_copy_outlined,
+      'page': const ExcelExportScreen(),
+    });
 
     if (_isAdmin) {
       items.addAll([

@@ -172,13 +172,14 @@ class ExcelImportService {
     onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
+    await _importStatementShareRules(workbook, routeKey: routeKey);
 
     // One batch-scoped finalizer after all rows/rules are ready.
     // Do not silently finish an upload with missing delivery/receipt/zone data.
     if (SupabaseConfig.isConfigured) {
       onProgress?.call(0.82, '배송·구획·영수번호 최종 정리 중');
       await SupabaseService.client.rpc(
-        'admin_finalize_excel_batch_rules',
+        'admin_finalize_excel_batch_rules_fast',
         params: {
           'p_route': routeLabel,
           'p_year': year,
@@ -1100,6 +1101,12 @@ class ExcelImportService {
           final discount = _toPercent(discountCell);
           if (discount == null) continue;
 
+          final groupName = _discountGroupNameForSheet(
+            sheet,
+            headerRow: r,
+            customerColumn: c,
+          );
+
           final phone = phoneOffset >= 0 && c + phoneOffset < dataRow.length
               ? dataRow[c + phoneOffset].trim()
               : '';
@@ -1111,6 +1118,8 @@ class ExcelImportService {
             'phone': normalizedPhone,
             'route_key': routeKey,
             'discount_percent': discount,
+            if (groupName.isNotEmpty) 'group_name': groupName,
+            if (groupName.isNotEmpty) 'source_detail': 'BASE Excel · $groupName',
             // 동명이인/오적용 방지: 전화번호가 없는 규칙은 저장하되 적용하지 않습니다.
             'active': ready,
           });
@@ -1146,6 +1155,198 @@ class ExcelImportService {
         );
 
     return (applied: applied, waitingForPhone: waitingForPhone);
+  }
+
+  String _discountGroupNameForSheet(
+    List<List<String>> sheet, {
+    required int headerRow,
+    required int customerColumn,
+  }) {
+    String clean(String value) {
+      var text = value.trim();
+      text = text
+          .replaceAll(RegExp(r'customer\\s*list', caseSensitive: false), '')
+          .replaceAll(RegExp(r'customer\\s*discount', caseSensitive: false), '')
+          .replaceAll(RegExp(r'discount\\s*list', caseSensitive: false), '')
+          .replaceAll('고객 리스트', '')
+          .replaceAll('고객리스트', '')
+          .replaceAll('할인 고객', '')
+          .replaceAll('할인율', '')
+          .replaceAll(RegExp(r'\\s+'), ' ')
+          .trim();
+      return text;
+    }
+
+    bool looksLikeGroup(String value) {
+      final v = value.trim().toLowerCase();
+      if (v.isEmpty) return false;
+      if (_isCustomerNameHeader(v) || _isDiscountHeader(v) || _isPhoneHeader(v)) {
+        return false;
+      }
+      return v.contains('할인') ||
+          v.contains('협') ||
+          v.contains('회원사') ||
+          v.contains('법인장') ||
+          v.contains('아파트') ||
+          v.contains('기업') ||
+          v.contains('특별');
+    }
+
+    for (var rr = headerRow; rr >= 0 && rr >= headerRow - 3; rr--) {
+      final row = sheet[rr];
+      final start = customerColumn - 4 < 0 ? 0 : customerColumn - 4;
+      final end = customerColumn + 6 < row.length
+          ? customerColumn + 6
+          : row.length - 1;
+      for (var cc = start; cc <= end; cc++) {
+        final raw = row[cc].trim();
+        if (!looksLikeGroup(raw)) continue;
+        final cleaned = clean(raw);
+        if (cleaned.isNotEmpty) return cleaned;
+      }
+    }
+    return '';
+  }
+
+  Future<int> _importStatementShareRules(
+    Map<String, List<List<String>>> workbook, {
+    required String routeKey,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return 0;
+
+    List<List<String>>? sheet;
+    for (final entry in workbook.entries) {
+      final key = entry.key
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\\s,·ㆍ._-]+'), '');
+      if (key == '시내지방배송' ||
+          key == 'localdelivery' ||
+          key == 'cityprovincedelivery') {
+        sheet = entry.value;
+        break;
+      }
+    }
+    if (sheet == null || sheet.isEmpty) return 0;
+
+    String keyOf(String value) => value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\\s,·ㆍ._/()\\-]+'), '');
+
+    int markerRow = -1;
+    for (var r = 0; r < sheet.length; r++) {
+      final joined = keyOf(sheet[r].join(' '));
+      if (joined.contains('명세서선공유고객') ||
+          joined.contains('명세서선공개고객') ||
+          joined.contains('statementsharecustomer')) {
+        markerRow = r;
+        break;
+      }
+    }
+    if (markerRow < 0) return 0;
+
+    int? nameCol;
+    int? phoneCol;
+    int? contentCol;
+    int headerRow = -1;
+
+    for (var r = markerRow + 1; r < sheet.length && r <= markerRow + 8; r++) {
+      final row = sheet[r];
+      int? n;
+      int? p;
+      int? c;
+      for (var col = 0; col < row.length; col++) {
+        final key = keyOf(row[col]);
+        if (key.isEmpty) continue;
+        if (n == null &&
+            (key == 'name' ||
+                key == '이름' ||
+                key == '성명' ||
+                key == '고객명' ||
+                key == 'customername')) {
+          n = col;
+        } else if (p == null &&
+            (key == 'tel' ||
+                key == 'phone' ||
+                key == '전화번호' ||
+                key == '연락처' ||
+                key == 'mobile')) {
+          p = col;
+        } else if (c == null &&
+            (key == 'content' ||
+                key == '내용' ||
+                key == 'remark' ||
+                key == 'remarks' ||
+                key == '비고' ||
+                key == '메모')) {
+          c = col;
+        }
+      }
+      if (n != null && p != null) {
+        headerRow = r;
+        nameCol = n;
+        phoneCol = p;
+        contentCol = c;
+        break;
+      }
+    }
+
+    if (headerRow < 0 || nameCol == null || phoneCol == null) return 0;
+
+    String at(List<String> row, int? col) =>
+        col == null || col < 0 || col >= row.length ? '' : row[col].trim();
+
+    final rows = <Map<String, dynamic>>[];
+    var blankStreak = 0;
+    var sourceNo = 0;
+
+    for (var r = headerRow + 1; r < sheet.length; r++) {
+      final row = sheet[r];
+      final name = at(row, nameCol);
+      final phoneDisplay = at(row, phoneCol);
+      final content = at(row, contentCol);
+
+      if (name.isEmpty && phoneDisplay.isEmpty && content.isEmpty) {
+        blankStreak++;
+        if (blankStreak >= 3) break;
+        continue;
+      }
+      blankStreak = 0;
+
+      final joined = keyOf(row.join(' '));
+      if (joined.contains('지방배송고객list') ||
+          joined.contains('시내배송고객list')) {
+        break;
+      }
+
+      final phone = _digits(phoneDisplay);
+      if (name.isEmpty || phone.isEmpty) continue;
+
+      sourceNo++;
+      rows.add({
+        'route_key': routeKey,
+        'source_no': sourceNo,
+        'customer_name': name,
+        'phone': phone,
+        'phone_display': phoneDisplay,
+        'content': content.isEmpty ? '카톡 명세서 선공유' : content,
+        'active': true,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
+
+    await SupabaseService.client
+        .from('customer_statement_share_rules')
+        .delete()
+        .eq('route_key', routeKey);
+
+    if (rows.isNotEmpty) {
+      await SupabaseService.client
+          .from('customer_statement_share_rules')
+          .upsert(rows, onConflict: 'route_key,source_no');
+    }
+    return rows.length;
   }
 
   static String _normaliseExcelDateValue(String value) {
