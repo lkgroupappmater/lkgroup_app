@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../core/route_catalog.dart';
 import 'excel_import_service.dart';
+import 'global_notice_service.dart';
 
 enum ExcelImportJobStatus {
   queued,
@@ -132,10 +133,16 @@ class ExcelImportQueueService extends ChangeNotifier {
           next.message =
               '작업 완료 · 화물 ${result.inserted}건 · 비화물 ${result.skipped}건'
               '${result.customerRulesWaitingForPhone > 0 ? ' · 할인 전화번호 대기 ${result.customerRulesWaitingForPhone}건' : ''}';
+          GlobalNoticeService.instance.show(
+            '업로드 완료 · ${next.routeLabel} · ${next.year}년 · ${next.voyage}항차'
+            '${next.status == ExcelImportJobStatus.warning ? ' · 확인 필요' : ''}',
+          );
         } catch (error) {
           next.progress = 1;
           next.status = ExcelImportJobStatus.failed;
           next.message = '처리 실패: $error';
+          GlobalNoticeService.instance.show(
+            '업로드 실패 · ${next.routeLabel} · ${next.year}년 · ${next.voyage}항차', error: true);
         }
 
         notifyListeners();

@@ -1,0 +1,94 @@
+﻿
+  lib\screens\cargo_management_screen.dart:658:        'label': '공지사항 관리',
+  lib\screens\cargo_management_screen.dart:659:        'icon': Icons.campaign_outlined,
+  lib\screens\cargo_management_screen.dart:660:        'page': NoticeManagementScreen(user: widget.user),
+  lib\screens\cargo_management_screen.dart:661:      },
+  lib\screens\cargo_management_screen.dart:662:      {
+  lib\screens\cargo_management_screen.dart:663:        'label': '화물 종합 관리',
+  lib\screens\cargo_management_screen.dart:664:        'icon': Icons.inventory_2_outlined,
+  lib\screens\cargo_management_screen.dart:665:        'page': CargoManagementScreen(user: widget.user),
+  lib\screens\cargo_management_screen.dart:666:      },
+  lib\screens\cargo_management_screen.dart:667:    ];
+  lib\screens\cargo_management_screen.dart:668:
+  lib\screens\cargo_management_screen.dart:669:    if (_isAdmin || _isStaff) {
+  lib\screens\cargo_management_screen.dart:670:      items.add({
+  lib\screens\cargo_management_screen.dart:671:        'label': '엑셀 화물 업로드',
+  lib\screens\cargo_management_screen.dart:672:        'icon': Icons.upload_file_outlined,
+> lib\screens\cargo_management_screen.dart:673:        'page': const ExcelUploadScreen(),
+  lib\screens\cargo_management_screen.dart:674:      });
+  lib\screens\cargo_management_screen.dart:675:    }
+  lib\screens\cargo_management_screen.dart:676:
+  lib\screens\cargo_management_screen.dart:677:    if (_isAdmin) {
+  lib\screens\cargo_management_screen.dart:678:      items.addAll([
+  lib\screens\cargo_management_screen.dart:679:        {
+  lib\screens\cargo_management_screen.dart:680:          'label': '회원 종합 관리',
+  lib\screens\cargo_management_screen.dart:681:          'icon': Icons.people_alt_outlined,
+  lib\screens\cargo_management_screen.dart:682:          'page': const MemberManagementScreen(),
+  lib\screens\cargo_management_screen.dart:683:        },
+  lib\screens\cargo_management_screen.dart:684:        {
+  lib\screens\cargo_management_screen.dart:685:          'label': '변경 승인 관리',
+  lib\screens\cargo_management_screen.dart:686:          'icon': Icons.fact_check_outlined,
+  lib\screens\cargo_management_screen.dart:687:          'page': const ChangeApprovalScreen(),
+  lib\screens\cargo_management_screen.dart:688:        },
+  lib\screens\cargo_management_screen.dart:689:        {
+  lib\screens\cargo_management_screen.dart:690:          'label': '견적 요청 관리',
+  lib\screens\cargo_management_screen.dart:691:          'icon': Icons.request_quote_outlined,
+  lib\screens\cargo_management_screen.dart:692:          'page': const QuoteRequestManagementScreen(),
+  lib\screens\cargo_management_screen.dart:693:        },
+  lib\screens\cargo_management_screen.dart:694:        {
+  lib\screens\cargo_management_screen.dart:695:          'label': '기준 환율 입력',
+  lib\screens\cargo_management_screen.dart:696:          'icon': Icons.currency_exchange,
+  lib\screens\cargo_management_screen.dart:697:          'page': const ExchangeRateScreen(),
+  lib\screens\cargo_management_screen.dart:698:        },
+  lib\screens\cargo_management_screen.dart:699:      ]);
+  lib\screens\cargo_management_screen.dart:700:    }
+  lib\screens\cargo_management_screen.dart:701:
+  lib\screens\cargo_management_screen.dart:702:    return Column(
+  lib\screens\cargo_management_screen.dart:703:      crossAxisAlignment: CrossAxisAlignment.start,
+  lib\screens\excel_upload_screen.dart:1:import 'package:flutter/material.dart';
+  lib\screens\excel_upload_screen.dart:2:
+  lib\screens\excel_upload_screen.dart:3:import '../core/app_colors.dart';
+  lib\screens\excel_upload_screen.dart:4:import '../services/excel_import_queue_service.dart';
+  lib\screens\excel_upload_screen.dart:5:import '../services/excel_bulk_management_service.dart';
+  lib\screens\excel_upload_screen.dart:6:import '../services/recalculation_job_service.dart';
+  lib\screens\excel_upload_screen.dart:7:
+> lib\screens\excel_upload_screen.dart:8:class ExcelUploadScreen extends StatefulWidget {
+> lib\screens\excel_upload_screen.dart:9:  const ExcelUploadScreen({super.key});
+  lib\screens\excel_upload_screen.dart:10:
+  lib\screens\excel_upload_screen.dart:11:  @override
+> lib\screens\excel_upload_screen.dart:12:  State<ExcelUploadScreen> createState() => _ExcelUploadScreenState();
+  lib\screens\excel_upload_screen.dart:13:}
+  lib\screens\excel_upload_screen.dart:14:
+> lib\screens\excel_upload_screen.dart:15:class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
+  lib\screens\excel_upload_screen.dart:16:  final _recalc = RecalculationJobService.instance;
+  lib\screens\excel_upload_screen.dart:17:  bool get _recalculating => _recalc.running;
+  lib\screens\excel_upload_screen.dart:18:  final _queue = ExcelImportQueueService.instance;
+  lib\screens\excel_upload_screen.dart:19:  List<ExcelBulkBatch> _batches = const [];
+  lib\screens\excel_upload_screen.dart:20:  String? _route;
+  lib\screens\excel_upload_screen.dart:21:  int? _year;
+  lib\screens\excel_upload_screen.dart:22:  String? _voyage;
+  lib\screens\excel_upload_screen.dart:23:  bool _loadingBatches = true;
+  lib\screens\excel_upload_screen.dart:24:  String _recalculateMessage = '';
+  lib\screens\excel_upload_screen.dart:25:
+  lib\screens\excel_upload_screen.dart:26:  String _message =
+  lib\screens\excel_upload_screen.dart:27:      '파일명에서 운송 경로·년도·항차를 먼저 확인해 즉시 접수합니다. '
+  lib\screens\excel_upload_screen.dart:28:      '접수 후에는 이 화면에서 나가 다른 업무를 해도 앱이 켜져 있는 동안 순차 처리됩니다.';
+  lib\screens\excel_upload_screen.dart:29:
+  lib\screens\excel_upload_screen.dart:30:  @override
+  lib\screens\excel_upload_screen.dart:31:  void initState() {
+  lib\screens\excel_upload_screen.dart:32:    super.initState();
+  lib\screens\excel_upload_screen.dart:33:    _recalculateMessage = _recalc.message;
+  lib\screens\excel_upload_screen.dart:34:    _queue.addListener(_refresh);
+  lib\screens\excel_upload_screen.dart:35:    _recalc.addListener(_refresh);
+  lib\screens\excel_upload_screen.dart:36:    _loadBatches();
+  lib\screens\excel_upload_screen.dart:37:  }
+  lib\screens\excel_upload_screen.dart:38:
+  lib\screens\excel_upload_screen.dart:39:  @override
+  lib\screens\excel_upload_screen.dart:40:  void dispose() {
+  lib\screens\excel_upload_screen.dart:41:    _queue.removeListener(_refresh);
+  lib\screens\excel_upload_screen.dart:42:    _recalc.removeListener(_refresh);
+  lib\screens\excel_upload_screen.dart:43:    super.dispose();
+  lib\screens\excel_upload_screen.dart:44:  }
+  lib\screens\excel_upload_screen.dart:45:
+
+

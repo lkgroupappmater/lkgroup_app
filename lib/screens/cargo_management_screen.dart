@@ -1998,8 +1998,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 TextField(
                   controller: discountName,
                   decoration: const InputDecoration(
-                    labelText: '할인명 / 단체명',
-                    hintText: '예: 라선협, 기업 할인, 특별할인',
+                    labelText: '추가 할인명',
+                    hintText: '예: 지인 할인, 서비스 할인',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -2052,7 +2052,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   voyage: voyage,
                   receiptNumber: receipt,
                   discountName: discountName.text.trim().isEmpty
-                      ? '특별할인'
+                      ? '추가 할인'
                       : discountName.text.trim(),
                   discountPercent: value / 100,
                 );

@@ -751,14 +751,30 @@ class _DigitalStatementPainter extends CustomPainter {
                     : 2,
               )}%'
             : '');
-    final discountLabel = actualDiscountPctText.isEmpty
-        ? '할인'
-        : '할인 $actualDiscountPctText';
-    final isSpecialDiscount = discountGroupText.contains('특별');
-    final regularDiscountUsd =
-        isSpecialDiscount ? 0.0 : totalDiscountUsd;
-    final specialDiscountUsd =
-        isSpecialDiscount ? totalDiscountUsd : 0.0;
+    final autoDiscountPercent = freight.lines
+        .map((line) => line.autoDiscountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+    final additionalDiscountPercent = freight.lines
+        .map((line) => line.additionalDiscountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+    final additionalDiscountName = freight.lines
+        .map((line) => line.additionalDiscountName.trim())
+        .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+    String patch199Pct(double value) {
+      if (value <= 0) return '';
+      final p = value * 100;
+      final digits = (p - p.roundToDouble()).abs() < .001 ? 0 : 2;
+      return '${p.toStringAsFixed(digits)}%';
+    }
+    final autoDiscountPctText = patch199Pct(autoDiscountPercent);
+    final additionalDiscountPctText = patch199Pct(additionalDiscountPercent);
+    const discountLabel = '할인';
+    final regularDiscountUsd = freight.lines.fold<double>(
+          0, (sum, line) => sum + line.autoDiscountAmountUsd) +
+        discountableExtraTotal * autoDiscountPercent;
+    final specialDiscountUsd = freight.lines.fold<double>(
+          0, (sum, line) => sum + line.additionalDiscountAmountUsd) +
+        discountableExtraTotal * additionalDiscountPercent;
 
     // Three clear columns: label | percent (~2/3) | amount (far right).
     const adjustmentFont = 15.0;
@@ -777,8 +793,8 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      !isSpecialDiscount && actualDiscountPctText.isNotEmpty
-          ? actualDiscountPctText
+      autoDiscountPctText.isNotEmpty
+          ? autoDiscountPctText
           : '-',
       Rect.fromLTWH(percentX, sumTop + 7, percentW, adjH),
       adjustmentFont,
@@ -787,7 +803,7 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      !isSpecialDiscount && actualDiscountPctText.isNotEmpty
+      autoDiscountPctText.isNotEmpty
           ? '-${MoneyFormat.usd(regularDiscountUsd)}'
           : '-',
       Rect.fromLTWH(amountX, sumTop + 7, amountW, adjH),
@@ -798,15 +814,17 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _text(
       c,
-      '특별할인',
+      additionalDiscountPctText.isNotEmpty
+          ? (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName)
+          : '',
       Rect.fromLTWH(totalX + 12, sumTop + 34, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
     _text(
       c,
-      isSpecialDiscount && actualDiscountPctText.isNotEmpty
-          ? actualDiscountPctText
+      additionalDiscountPctText.isNotEmpty
+          ? additionalDiscountPctText
           : '-',
       Rect.fromLTWH(percentX, sumTop + 34, percentW, adjH),
       adjustmentFont,
@@ -815,7 +833,7 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      isSpecialDiscount && actualDiscountPctText.isNotEmpty
+      additionalDiscountPctText.isNotEmpty
           ? '-${MoneyFormat.usd(specialDiscountUsd)}'
           : '-',
       Rect.fromLTWH(amountX, sumTop + 34, amountW, adjH),

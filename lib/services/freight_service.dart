@@ -18,6 +18,11 @@ class FreightLineResult {
     this.grossAmountUsd = 0,
     this.discountPercent = 0,
     this.discountAmountUsd = 0,
+    this.autoDiscountPercent = 0,
+    this.additionalDiscountPercent = 0,
+    this.autoDiscountAmountUsd = 0,
+    this.additionalDiscountAmountUsd = 0,
+    this.additionalDiscountName = '',
     this.discountGroup = '',
     this.discountCustomer = '',
     this.discountCombinedQuantity = 0,
@@ -33,8 +38,14 @@ class FreightLineResult {
   final double rate;
   final double amountUsd;
   final double grossAmountUsd;
+  /// Total additive discount = automatic BASE/DB + manual additional.
   final double discountPercent;
   final double discountAmountUsd;
+  final double autoDiscountPercent;
+  final double additionalDiscountPercent;
+  final double autoDiscountAmountUsd;
+  final double additionalDiscountAmountUsd;
+  final String additionalDiscountName;
   final String discountGroup;
   final String discountCustomer;
   final int discountCombinedQuantity;
@@ -75,6 +86,7 @@ class FreightService {
     final lines = <FreightLineResult>[];
     final policyCache = <String, FreightPolicy>{};
     final overrideCache = <String, Map<String, dynamic>?>{};
+    final manualDiscountCache = <String, Map<String, dynamic>?>{};
 
     for (final row in shipments) {
       final routeLabel = '${row['route'] ?? ''}';
@@ -119,6 +131,17 @@ class FreightService {
             );
       overrideCache[cacheKey] = override;
 
+      final manualKey = '$routeKey|${year ?? ''}|$voyage|$receiptNumber';
+      final manualAdditional = manualDiscountCache.containsKey(manualKey)
+          ? manualDiscountCache[manualKey]
+          : await _receiptAdditionalDiscount(
+              routeKey: routeKey,
+              year: year,
+              voyage: voyage,
+              receiptNumber: receiptNumber,
+            );
+      manualDiscountCache[manualKey] = manualAdditional;
+
       final overrideRate = _nullableD(override?['rate_override']);
       if (overrideRate != null) {
         rate = overrideRate;
@@ -128,11 +151,20 @@ class FreightService {
         }
       }
 
-      final discount =
+      final autoDiscount =
           _d(override?['discount_percent']).clamp(0, 1).toDouble();
-      final discountAmount = grossAmount * discount;
+      final additionalDiscount =
+          _d(manualAdditional?['discount_percent']).clamp(0, 1).toDouble();
+      // Additive against the same original eligible amount: 20% + 10% = 30%.
+      final discount =
+          (autoDiscount + additionalDiscount).clamp(0, 1).toDouble();
+      final autoDiscountAmount = grossAmount * autoDiscount;
+      final additionalDiscountAmount = grossAmount * additionalDiscount;
+      final discountAmount = autoDiscountAmount + additionalDiscountAmount;
       final amount = grossAmount - discountAmount;
       final group = '${override?['group_name'] ?? ''}'.trim();
+      final additionalDiscountName =
+          '${manualAdditional?['discount_name'] ?? ''}'.trim();
       final matchedCustomer =
           '${override?['customer_name'] ?? ''}'.trim();
       final combinedQuantity =
@@ -152,6 +184,11 @@ class FreightService {
           grossAmountUsd: grossAmount,
           discountPercent: discount,
           discountAmountUsd: discountAmount,
+          autoDiscountPercent: autoDiscount,
+          additionalDiscountPercent: additionalDiscount,
+          autoDiscountAmountUsd: autoDiscountAmount,
+          additionalDiscountAmountUsd: additionalDiscountAmount,
+          additionalDiscountName: additionalDiscountName,
           discountGroup: group,
           discountCustomer: matchedCustomer,
           discountCombinedQuantity: combinedQuantity,
@@ -167,10 +204,18 @@ class FreightService {
         lines.fold<double>(0, (sum, line) => sum + line.amountUsd);
     final byGroup = <String, double>{};
     for (final line in lines) {
-      if (line.discountAmountUsd <= 0) continue;
-      final key =
-          line.discountGroup.isEmpty ? '기타 할인' : line.discountGroup;
-      byGroup[key] = (byGroup[key] ?? 0) + line.discountAmountUsd;
+      if (line.autoDiscountAmountUsd > 0) {
+        final key =
+            line.discountGroup.isEmpty ? '기타 할인' : line.discountGroup;
+        byGroup[key] = (byGroup[key] ?? 0) + line.autoDiscountAmountUsd;
+      }
+      if (line.additionalDiscountAmountUsd > 0) {
+        final key = line.additionalDiscountName.isEmpty
+            ? '추가 할인'
+            : line.additionalDiscountName;
+        byGroup[key] =
+            (byGroup[key] ?? 0) + line.additionalDiscountAmountUsd;
+      }
     }
 
     return FreightCalculation(
@@ -186,6 +231,33 @@ class FreightService {
     );
   }
 
+  Future<Map<String, dynamic>?> _receiptAdditionalDiscount({
+    required String routeKey,
+    required int? year,
+    required String voyage,
+    required String receiptNumber,
+  }) async {
+    if (!SupabaseConfig.isConfigured || year == null || receiptNumber.isEmpty) {
+      return null;
+    }
+    try {
+      final raw = await SupabaseService.client.rpc(
+        'get_receipt_discount_override',
+        params: {
+          'p_route_key': routeKey,
+          'p_year': year,
+          'p_voyage': voyage,
+          'p_receipt_number': receiptNumber,
+        },
+      );
+      if (raw is Map) {
+        final row = Map<String, dynamic>.from(raw);
+        if (row['id'] != null) return row;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<Map<String, dynamic>?> _customerOverride({
     required String routeKey,
     required int? year,
@@ -196,32 +268,6 @@ class FreightService {
   }) async {
     if (!SupabaseConfig.isConfigured || name.trim().isEmpty) {
       return null;
-    }
-
-    if (year != null && receiptNumber.isNotEmpty) {
-      try {
-        final rawManual = await SupabaseService.client.rpc(
-          'get_receipt_discount_override',
-          params: {
-            'p_route_key': routeKey,
-            'p_year': year,
-            'p_voyage': voyage,
-            'p_receipt_number': receiptNumber,
-          },
-        );
-        if (rawManual is Map) {
-          final manual = Map<String, dynamic>.from(rawManual);
-          if (manual['id'] != null) {
-            return {
-              'id': manual['id'],
-              'discount_percent': manual['discount_percent'] ?? 0,
-              'group_name': manual['discount_name'] ?? '특별할인',
-              'customer_name': name,
-              'source_detail': '영수번호 수동 할인',
-            };
-          }
-        }
-      } catch (_) {}
     }
 
     // Patch123+: Customer Group의 개인명+회사명 물량을 같은 항차에서 합산해
