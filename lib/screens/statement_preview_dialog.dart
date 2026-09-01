@@ -152,6 +152,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         rows: _rows,
         freight: _freight!,
         receiptNumber: widget.receiptNumber,
+        voyage: widget.voyage,
         arrivalDate: _arrivalDate,
         inlandDeliveryText: _inlandDeliveryText,
         extraCosts: _extraCosts,
@@ -370,6 +371,7 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.rows,
     required this.freight,
     required this.receiptNumber,
+    required this.voyage,
     required this.arrivalDate,
     required this.inlandDeliveryText,
     required this.extraCosts,
@@ -385,6 +387,7 @@ class _DigitalStatementPainter extends CustomPainter {
   final List<Map<String, dynamic>> rows;
   final FreightCalculation freight;
   final String receiptNumber;
+  final String voyage;
   final String? arrivalDate;
   final String inlandDeliveryText;
   final List<ExtraCostItem> extraCosts;
@@ -414,7 +417,14 @@ class _DigitalStatementPainter extends CustomPainter {
       ..strokeWidth = 1;
 
     _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
-    _text(c, '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서',
+    final voyageText = voyage.trim().isEmpty
+        ? ''
+        : (voyage.trim().endsWith('항차') ? voyage.trim() : '${voyage.trim()}항차');
+    final statementTitle = voyageText.isEmpty
+        ? '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서'
+        : '${RouteCatalog.documentTitleFor(routeLabel)} $voyageText 거래 명세서';
+
+    _text(c, statementTitle,
         Rect.fromLTWH(0, 12, w, 62),
         39,
         bold: true,
