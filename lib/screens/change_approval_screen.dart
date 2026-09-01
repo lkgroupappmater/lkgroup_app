@@ -68,8 +68,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           await UnknownRecipientService.instance.listPendingClaimsForAdmin();
       final autoUnmatched =
           await UnknownRecipientService.instance.listAutoUnmatchedForAdmin();
-      final incomplete =
-          await UnknownRecipientService.instance.listIncompleteForAdmin();
+      final incomplete = <Map<String, dynamic>>[
+        ...await UnknownRecipientService.instance.listIncompleteForAdmin(),
+      ];
       final manualUncertain =
           await ShipmentService.instance.listManualUncertainForAdmin();
       final incompleteById=<String,Map<String,dynamic>>{
