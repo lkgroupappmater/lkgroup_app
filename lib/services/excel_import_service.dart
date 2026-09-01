@@ -1242,50 +1242,122 @@ class ExcelImportService {
     required int headerRow,
     required int customerColumn,
   }) {
-    String clean(String value) {
-      var text = value.trim();
+    String clean(String raw) {
+      var text = raw.trim();
       text = text
           .replaceAll(RegExp(r'customer\\s*list', caseSensitive: false), '')
-          .replaceAll(RegExp(r'customer\\s*discount', caseSensitive: false), '')
           .replaceAll(RegExp(r'discount\\s*list', caseSensitive: false), '')
+          .replaceAll(RegExp(r'customer\\s*discount', caseSensitive: false), '')
           .replaceAll('고객 리스트', '')
           .replaceAll('고객리스트', '')
+          .replaceAll('할인 고객 리스트', '')
+          .replaceAll('할인고객리스트', '')
           .replaceAll('할인 고객', '')
-          .replaceAll('할인율', '')
+          .replaceAll('할인고객', '')
           .replaceAll(RegExp(r'\\s+'), ' ')
+          .trim();
+
+      text = text
+          .replaceFirst(RegExp(r'\\s+고객$'), '')
+          .replaceFirst(RegExp(r'\\s+list$', caseSensitive: false), '')
           .trim();
       return text;
     }
 
-    bool looksLikeGroup(String value) {
-      final v = value.trim().toLowerCase();
-      if (v.isEmpty) return false;
-      if (_isCustomerNameHeader(v) || _isDiscountHeader(v) || _isPhoneHeader(v)) {
-        return false;
-      }
-      return v.contains('할인') ||
-          v.contains('협') ||
-          v.contains('회원사') ||
-          v.contains('법인장') ||
-          v.contains('아파트') ||
-          v.contains('기업') ||
-          v.contains('특별');
+    bool isGeneric(String raw) {
+      final key = raw
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\\s_./()-]+'), '');
+      const generic = <String>{
+        '할인',
+        '할인율',
+        '할인금액',
+        '할인액',
+        '할인적용',
+        'discount',
+        'discountrate',
+        'discountamount',
+        'name',
+        'customer',
+        'customername',
+        'phone',
+        'tel',
+        '연락처',
+        '전화번호',
+        '이름',
+        '성명',
+        '고객명',
+      };
+      return generic.contains(key);
     }
 
-    for (var rr = headerRow; rr >= 0 && rr >= headerRow - 12; rr--) {
+    int semanticScore(String raw) {
+      final v = raw.trim().toLowerCase();
+      if (v.isEmpty || isGeneric(v)) return -9999;
+      if (_isCustomerNameHeader(v) ||
+          _isDiscountHeader(v) ||
+          _isPhoneHeader(v)) {
+        return -9999;
+      }
+
+      var score = 0;
+      const strong = <String>[
+        '라선협',
+        '지상사',
+        '협의회',
+        '회원사',
+        '법인장',
+        '지인',
+        '아파트',
+        '기업',
+        '특별',
+        '파트너',
+        '협력사',
+        '임직원',
+      ];
+      for (final token in strong) {
+        if (v.contains(token)) score += 100;
+      }
+      if (v.contains('할인')) score += 20;
+      if (v.contains('협')) score += 15;
+
+      if (RegExp(r'^\\d+(\\.\\d+)?%?$').hasMatch(v)) return -9999;
+      if (RegExp(r'^\\+?\\d[\\d\\s-]{6,}$').hasMatch(v)) return -9999;
+
+      return score;
+    }
+
+    String best = '';
+    var bestScore = -9999;
+
+    final minRow = headerRow - 20 < 0 ? 0 : headerRow - 20;
+    for (var rr = headerRow; rr >= minRow; rr--) {
       final row = sheet[rr];
-      final start = customerColumn - 4 < 0 ? 0 : customerColumn - 4;
-      final end = customerColumn + 6 < row.length
-          ? customerColumn + 6
+      if (row.isEmpty) continue;
+      final startCol = customerColumn - 10 < 0 ? 0 : customerColumn - 10;
+      final endCol = customerColumn + 10 < row.length
+          ? customerColumn + 10
           : row.length - 1;
-      for (var cc = start; cc <= end; cc++) {
+
+      for (var cc = startCol; cc <= endCol; cc++) {
         final raw = row[cc].trim();
-        if (!looksLikeGroup(raw)) continue;
-        final cleaned = clean(raw);
-        if (cleaned.isNotEmpty) return cleaned;
+        final semantic = semanticScore(raw);
+        if (semantic < 0) continue;
+
+        final distance =
+            (headerRow - rr).abs() * 2 + (customerColumn - cc).abs();
+        final score = semantic - distance;
+        if (score > bestScore) {
+          final cleaned = clean(raw);
+          if (cleaned.isNotEmpty && !isGeneric(cleaned)) {
+            best = cleaned;
+            bestScore = score;
+          }
+        }
       }
     }
-    return '';
+    return best;
   }
 
   Future<int> _importStatementShareRules(
