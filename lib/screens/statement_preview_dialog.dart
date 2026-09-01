@@ -1147,6 +1147,7 @@ class StatementDocumentRenderer {
       rows: rows,
       freight: freight,
       receiptNumber: request.receiptNumber,
+      voyage: request.voyage,
       arrivalDate: arrival,
       inlandDeliveryText: inland,
       extraCosts: extraCosts,
