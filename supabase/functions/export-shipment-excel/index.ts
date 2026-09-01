@@ -1145,12 +1145,30 @@ function appendDocumentAutomationBlock(
     const list = groups.get(receipt) ?? []; list.push(s); groups.set(receipt, list);
   }
   const receiptAmounts = new Map<string, number>();
+  const receiptDiscountRates = new Map<string, number>();
   const rawReceipts = Array.isArray(settlement?.receipts) ? settlement!.receipts as Record<string, unknown>[] : [];
-  for (const r of rawReceipts) receiptAmounts.set(String(r.receipt_number ?? '').trim(), Number(r.net_usd ?? 0));
+  for (const r of rawReceipts) {
+    const receipt = String(r.receipt_number ?? '').trim();
+    const gross = Number(r.gross_usd ?? 0);
+    const discount = Number(r.discount_usd ?? 0);
+    receiptAmounts.set(receipt, Number(r.net_usd ?? 0));
+    receiptDiscountRates.set(
+      receipt,
+      gross > 0 ? Math.max(0, Math.min(1, discount / gross)) : 0,
+    );
+  }
   const extraMap = new Map<string, number>();
+  const discountedExtraMap = new Map<string, number>();
   for (const e of extraCosts) {
     const receipt = String(e.receipt_number ?? '').trim();
-    extraMap.set(receipt, (extraMap.get(receipt) ?? 0) + Number(e.amount_usd ?? 0));
+    const amount = Number(e.amount_usd ?? 0);
+    extraMap.set(receipt, (extraMap.get(receipt) ?? 0) + amount);
+    if (e.discount_applies === true) {
+      discountedExtraMap.set(
+        receipt,
+        (discountedExtraMap.get(receipt) ?? 0) + amount,
+      );
+    }
   }
 
   const existingRows = [...xml.matchAll(/<row\b[^>]*r="(\d+)"/g)].map(m => Number(m[1]));
@@ -1183,7 +1201,19 @@ function appendDocumentAutomationBlock(
     const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address, d.paid_by].filter(Boolean).join(', ') : '';
     const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
     const extra = extraMap.get(receipt) ?? 0;
-    add([receipt,name,phone,auto,delivery,type,extra,(receiptAmounts.get(receipt) ?? 0) + extra]);
+    const discountRate = receiptDiscountRates.get(receipt) ?? 0;
+    const extraDiscount =
+      (discountedExtraMap.get(receipt) ?? 0) * discountRate;
+    add([
+      receipt,
+      name,
+      phone,
+      auto,
+      delivery,
+      type,
+      extra,
+      (receiptAmounts.get(receipt) ?? 0) + extra - extraDiscount,
+    ]);
   }
   xml = `${xml.substring(0, close)}${out.join('')}${xml.substring(close)}`;
   files[path] = strToU8(xml);
@@ -1484,7 +1514,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: receiptExtraCosts, error: receiptExtraCostsError } =
       await admin
         .from('receipt_extra_costs')
-        .select('voyage,receipt_number,cost_name,amount_usd')
+        .select('voyage,receipt_number,cost_name,amount_usd,discount_applies')
         .eq('route', shipmentRouteLabel)
         .eq('shipment_year', shipmentYear);
 

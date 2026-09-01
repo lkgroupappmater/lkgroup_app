@@ -1942,6 +1942,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final name = TextEditingController();
     final amount = TextEditingController();
     int? editingId;
+    var discountApplies = false;
     var items = await ReceiptExtraCostService.instance.list(
       route: route,
       year: year,
@@ -1978,7 +1979,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           title: Text(e.name),
-                          subtitle: Text('\$${e.amountUsd.toStringAsFixed(2)}'),
+                          subtitle: Text(
+                            '\$${e.amountUsd.toStringAsFixed(2)}'
+                            '${e.discountApplies ? ' · 할인 적용' : ''}',
+                          ),
                           trailing: Wrap(
                             spacing: 4,
                             children: [
@@ -1988,6 +1992,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                                   setDialogState(() => editingId = e.id);
                                   name.text = e.name;
                                   amount.text = e.amountUsd.toStringAsFixed(2);
+                                  setDialogState(
+                                    () => discountApplies = e.discountApplies,
+                                  );
                                 },
                                 icon: const Icon(Icons.edit_outlined, size: 19),
                               ),
@@ -2027,6 +2034,19 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: discountApplies,
+                      title: const Text('할인 적용'),
+                      subtitle: const Text(
+                        '체크 시 해당 고객의 할인율을 이 기타 비용에도 적용합니다. '
+                        '기본은 미체크입니다.',
+                      ),
+                      onChanged: (v) => setDialogState(
+                        () => discountApplies = v == true,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -2053,10 +2073,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     receiptNumber: receipt,
                     name: name.text,
                     amountUsd: value,
+                    discountApplies: discountApplies,
                   );
                   name.clear();
                   amount.clear();
-                  setDialogState(() => editingId = null);
+                  setDialogState(() {
+                    editingId = null;
+                    discountApplies = false;
+                  });
                   await reload();
                 },
                 icon: const Icon(Icons.add_card_outlined, size: 18),

@@ -488,7 +488,7 @@ class _DigitalStatementPainter extends CustomPainter {
         final extra = extraCosts[extraIndex];
         _text(
           c,
-          extra.name,
+          extra.discountApplies ? '${extra.name} (할인)' : extra.name,
           Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
           17,
           bold: true,
@@ -523,7 +523,7 @@ class _DigitalStatementPainter extends CustomPainter {
         f == null ? '-' : _fmtWeight(f.volumeWeight),
         f == null ? '-' : MoneyFormat.usd(actualFreight),
         f == null ? '-' : MoneyFormat.usd(volumeFreight),
-        f == null ? '-' : MoneyFormat.usd(f.amountUsd),
+        f == null ? '-' : MoneyFormat.usd(f.grossAmountUsd),
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
@@ -545,8 +545,19 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalVolume = freight.lines.fold<double>(0, (v, f) => v + f.volumeWeight);
     final extraTotal =
         extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-
-    final finalUsd = freight.totalUsd + extraTotal;
+    final baseDiscountPercent = freight.grossTotalUsd <= 0
+        ? 0.0
+        : (freight.discountTotalUsd / freight.grossTotalUsd)
+            .clamp(0.0, 1.0);
+    final discountableExtraTotal = extraCosts
+        .where((e) => e.discountApplies)
+        .fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final extraDiscountUsd =
+        discountableExtraTotal * baseDiscountPercent;
+    final totalDiscountUsd =
+        freight.discountTotalUsd + extraDiscountUsd;
+    final finalUsd =
+        freight.grossTotalUsd + extraTotal - totalDiscountUsd;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
@@ -572,12 +583,33 @@ class _DigitalStatementPainter extends CustomPainter {
         .where((value) => value.isNotEmpty)
         .toSet()
         .join(' / ');
-    final remarkText = autoNotes.isEmpty
+    final freightGroups = freight.lines
+        .map((line) => line.discountGroup.trim())
+        .where((value) => value.isNotEmpty && value != '기타 할인')
+        .toSet()
+        .toList(growable: false);
+    var displayAutoNotes = autoNotes;
+    if (freightGroups.length == 1 &&
+        displayAutoNotes.contains(RegExp(r'(^| / )할인\s+[0-9.]+% 적용'))) {
+      final group = freightGroups.first;
+      displayAutoNotes = displayAutoNotes.replaceFirst(
+        RegExp(r'(^| / )할인\s+([0-9.]+% 적용)'),
+        (m) => '${m.group(1) ?? ''}$group 할인 ${m.group(2)}',
+      );
+    }
+    final remarkText = displayAutoNotes.isEmpty
         ? docText.remark
-        : '${docText.remark}\n\n$autoNotes';
-    _text(c, remarkText,
-        Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
-        docText.remarkFontSize, maxLines: 6, lineHeight: 1.05);
+        : '${docText.remark}\n\n$displayAutoNotes';
+    _text(
+      c,
+      remarkText,
+      Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
+      docText.remarkFontSize,
+      bold: true,
+      center: true,
+      maxLines: 6,
+      lineHeight: 1.05,
+    );
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
@@ -617,12 +649,66 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalW = w - totalX;
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
-    _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
-    _text(c, freight.discountTotalUsd > 0 ? '-${MoneyFormat.usd(freight.discountTotalUsd)}' : '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
+    final discountPercentText = baseDiscountPercent > 0
+        ? '${(baseDiscountPercent * 100).toStringAsFixed(
+            ((baseDiscountPercent * 100) -
+                        (baseDiscountPercent * 100).roundToDouble())
+                    .abs() <
+                .001
+                ? 0
+                : 2,
+          )}%'
+        : '';
+    final discountGroupText = freight.lines
+        .map((line) => line.discountGroup.trim())
+        .firstWhere(
+          (value) => value.isNotEmpty,
+          orElse: () => '',
+        );
+    final isSpecialDiscount = discountGroupText.contains('특별');
+    final regularDiscountUsd =
+        isSpecialDiscount ? 0.0 : totalDiscountUsd;
+    final specialDiscountUsd =
+        isSpecialDiscount ? totalDiscountUsd : 0.0;
+
+    _text(
+      c,
+      discountPercentText.isEmpty ? '할인' : '할인 $discountPercentText',
+      Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .52, adjH),
+      15,
+      bold: true,
+    );
+    _text(
+      c,
+      regularDiscountUsd > 0
+          ? '-${MoneyFormat.usd(regularDiscountUsd)}'
+          : '-',
+      Rect.fromLTWH(totalX + totalW * .56, sumTop + 7, totalW * .40, adjH),
+      16,
+      bold: true,
+      right: true,
+    );
+    _text(
+      c,
+      discountPercentText.isEmpty
+          ? '특별할인'
+          : '특별할인 $discountPercentText',
+      Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .52, adjH),
+      15,
+      bold: true,
+    );
+    _text(
+      c,
+      specialDiscountUsd > 0
+          ? '-${MoneyFormat.usd(specialDiscountUsd)}'
+          : '-',
+      Rect.fromLTWH(totalX + totalW * .56, sumTop + 34, totalW * .40, adjH),
+      16,
+      bold: true,
+      right: true,
+    );
+    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .52, adjH), 15, bold: true);
+    _text(c, '-', Rect.fromLTWH(totalX + totalW * .56, sumTop + 61, totalW * .40, adjH), 16, bold: true, right: true);
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;

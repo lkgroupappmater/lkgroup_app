@@ -141,8 +141,8 @@ class _UnloadingListManagementScreenState
     final font = pw.Font.helvetica();
     final bold = pw.Font.helveticaBold();
 
-    const rowsPerColumn = 27;
-    const groups = 5;
+    const rowsPerColumn = 34;
+    const groups = 6;
     const perPage = rowsPerColumn * groups;
 
     final doc = pw.Document();
@@ -158,7 +158,7 @@ class _UnloadingListManagementScreenState
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(18),
+          margin: const pw.EdgeInsets.all(12),
           build: (_) => pw.Column(
             children: [
               pw.Text(
@@ -168,7 +168,7 @@ class _UnloadingListManagementScreenState
                   fontSize: 13,
                 ),
               ),
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: 5),
               pw.Expanded(
                 child: pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -176,7 +176,7 @@ class _UnloadingListManagementScreenState
                     return pw.Expanded(
                       child: pw.Padding(
                         padding: pw.EdgeInsets.only(
-                          right: group == groups - 1 ? 0 : 5,
+                          right: group == groups - 1 ? 0 : 3,
                         ),
                         child: pw.Column(
                           children: List.generate(rowsPerColumn, (line) {
@@ -197,7 +197,7 @@ class _UnloadingListManagementScreenState
                                 pw.Expanded(
                                   flex: flex,
                                   child: pw.Container(
-                                    height: 18.2,
+                                    height: 14.0,
                                     alignment: pw.Alignment.center,
                                     decoration: pw.BoxDecoration(
                                       color: warning
@@ -212,7 +212,7 @@ class _UnloadingListManagementScreenState
                                       text,
                                       style: pw.TextStyle(
                                         font: font,
-                                        fontSize: 8.5,
+                                        fontSize: 7.5,
                                       ),
                                     ),
                                   ),
