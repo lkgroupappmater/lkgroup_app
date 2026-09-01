@@ -343,7 +343,11 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         doc.addPage(pw.Page(
           pageFormat:PdfPageFormat.a4,
           margin:pw.EdgeInsets.zero,
-          build:(_)=>pw.Image(image,fit:pw.BoxFit.fill),
+          build:(_)=>pw.Transform.scale(
+            scale:1.025,
+            alignment:pw.Alignment.topCenter,
+            child:pw.Image(image,fit:pw.BoxFit.fill),
+          ),
         ));
       }
       final bytes=await doc.save();
