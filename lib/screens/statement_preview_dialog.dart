@@ -718,8 +718,21 @@ class _DigitalStatementPainter extends CustomPainter {
     final actualDiscountPercent = freight.lines
         .map((line) => line.discountPercent)
         .fold<double>(0, (best, value) => value > best ? value : best);
-    final actualDiscountPctText =
-        actualDiscountPercent > 0 ? '${pctText(actualDiscountPercent)}%' : '';
+    final noteDiscountMatch = RegExp(r'([0-9]+(?:\.[0-9]+)?)%\s*적용')
+        .firstMatch(displayAutoNotes);
+    final noteDiscountPercent =
+        double.tryParse(noteDiscountMatch?.group(1) ?? '') ?? 0;
+    final actualDiscountPctText = actualDiscountPercent > 0
+        ? '${pctText(actualDiscountPercent)}%'
+        : (noteDiscountPercent > 0
+            ? '${noteDiscountPercent.toStringAsFixed(
+                (noteDiscountPercent - noteDiscountPercent.roundToDouble())
+                            .abs() <
+                        .001
+                    ? 0
+                    : 2,
+              )}%'
+            : '');
     final discountLabel = actualDiscountPctText.isEmpty
         ? '할인'
         : '할인 $actualDiscountPctText';

@@ -257,7 +257,11 @@ class FreightService {
         .eq('active', true)
         .limit(500);
 
-    Map<String, dynamic>? allRouteMatch;
+    Map<String, dynamic>? bestRouteMatch;
+    Map<String, dynamic>? bestAllMatch;
+    var bestRouteRank = 9999;
+    var bestAllRank = 9999;
+
     for (final raw in rows) {
       final row = Map<String, dynamic>.from(raw);
       final ruleRoute = '${row['route_key'] ?? ''}'.trim();
@@ -265,38 +269,65 @@ class FreightService {
       if (!_phoneMatches(normalizedPhone, '${row['phone'] ?? ''}')) {
         continue;
       }
-      if (!_nameMatches(
-        name,
-        [
-          '${row['customer_name'] ?? ''}',
-          '${row['company_name'] ?? ''}',
-        ],
-      )) {
-        continue;
+
+      final candidates = [
+        '${row['customer_name'] ?? ''}',
+        '${row['company_name'] ?? ''}',
+      ];
+      var rank = 9999;
+      for (final candidate in candidates) {
+        if (candidate.trim().isEmpty) continue;
+        final candidateRank = _nameMatchRank(name, candidate);
+        if (candidateRank < rank) rank = candidateRank;
       }
-      if (ruleRoute == routeKey) return row;
-      allRouteMatch ??= row;
+      if (rank >= 9999) continue;
+
+      if (ruleRoute == routeKey) {
+        if (rank < bestRouteRank) {
+          bestRouteRank = rank;
+          bestRouteMatch = row;
+        }
+      } else if (rank < bestAllRank) {
+        bestAllRank = rank;
+        bestAllMatch = row;
+      }
     }
-    return allRouteMatch;
+    return bestRouteMatch ?? bestAllMatch;
+  }
+
+  static List<String> _nameTokens(String value) => value
+      .replaceAll(RegExp(r'[\?\*]+'), '/')
+      .split(RegExp(r'[/,;|()]+'))
+      .map((e) => e.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '))
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+
+  static int _nameMatchRank(String value, String candidate) {
+    final a = _nameTokens(value).toSet();
+    final b = _nameTokens(candidate).toSet();
+    if (a.isEmpty || b.isEmpty) return 9999;
+
+    final overlap = a.intersection(b);
+    if (overlap.isEmpty) return 9999;
+
+    if (a.length == b.length && a.containsAll(b) && b.containsAll(a)) {
+      return 0;
+    }
+    if (a.containsAll(b)) return 10 + (a.length - b.length);
+    if (b.containsAll(a)) return 30 - b.length.clamp(0, 20);
+    return 50 - overlap.length.clamp(0, 20);
   }
 
   static bool _nameMatches(
     String value,
     Iterable<String> candidates,
-  ) {
-    final target =
-        value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-    if (target.isEmpty) return false;
-    return candidates.any(
-      (candidate) =>
-          candidate.trim().isNotEmpty &&
-          candidate
-                  .trim()
-                  .toLowerCase()
-                  .replaceAll(RegExp(r'\s+'), ' ') ==
-              target,
-    );
-  }
+  ) =>
+      candidates.any(
+        (candidate) =>
+            candidate.trim().isNotEmpty &&
+            _nameMatchRank(value, candidate) < 9999,
+      );
 
   static bool _phoneMatches(String a, String b) {
     final aa = _digits(a);

@@ -1245,21 +1245,16 @@ class ExcelImportService {
     String clean(String raw) {
       var text = raw.trim();
       text = text
-          .replaceAll(RegExp(r'customer\\s*list', caseSensitive: false), '')
-          .replaceAll(RegExp(r'discount\\s*list', caseSensitive: false), '')
-          .replaceAll(RegExp(r'customer\\s*discount', caseSensitive: false), '')
+          .replaceAll(RegExp(r'customer\s*list', caseSensitive: false), '')
+          .replaceAll(RegExp(r'discount\s*list', caseSensitive: false), '')
+          .replaceAll(RegExp(r'customer\s*discount', caseSensitive: false), '')
           .replaceAll('고객 리스트', '')
           .replaceAll('고객리스트', '')
           .replaceAll('할인 고객 리스트', '')
           .replaceAll('할인고객리스트', '')
           .replaceAll('할인 고객', '')
           .replaceAll('할인고객', '')
-          .replaceAll(RegExp(r'\\s+'), ' ')
-          .trim();
-
-      text = text
-          .replaceFirst(RegExp(r'\\s+고객$'), '')
-          .replaceFirst(RegExp(r'\\s+list$', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       return text;
     }
@@ -1268,13 +1263,12 @@ class ExcelImportService {
       final key = raw
           .trim()
           .toLowerCase()
-          .replaceAll(RegExp(r'[\\s_./()-]+'), '');
+          .replaceAll(RegExp(r'[\s_./()-]+'), '');
       const generic = <String>{
         '할인',
         '할인율',
         '할인금액',
         '할인액',
-        '할인적용',
         'discount',
         'discountrate',
         'discountamount',
@@ -1292,72 +1286,52 @@ class ExcelImportService {
       return generic.contains(key);
     }
 
-    int semanticScore(String raw) {
+    bool looksLikeGroup(String raw) {
       final v = raw.trim().toLowerCase();
-      if (v.isEmpty || isGeneric(v)) return -9999;
+      if (v.isEmpty || isGeneric(v)) return false;
       if (_isCustomerNameHeader(v) ||
           _isDiscountHeader(v) ||
           _isPhoneHeader(v)) {
-        return -9999;
+        return false;
       }
-
-      var score = 0;
-      const strong = <String>[
-        '라선협',
-        '지상사',
-        '협의회',
-        '회원사',
-        '법인장',
-        '지인',
-        '아파트',
-        '기업',
-        '특별',
-        '파트너',
-        '협력사',
-        '임직원',
-      ];
-      for (final token in strong) {
-        if (v.contains(token)) score += 100;
-      }
-      if (v.contains('할인')) score += 20;
-      if (v.contains('협')) score += 15;
-
-      if (RegExp(r'^\\d+(\\.\\d+)?%?$').hasMatch(v)) return -9999;
-      if (RegExp(r'^\\+?\\d[\\d\\s-]{6,}$').hasMatch(v)) return -9999;
-
-      return score;
+      return v.contains('라선협') ||
+          v.contains('지상사') ||
+          v.contains('협의회') ||
+          v.contains('회원사') ||
+          v.contains('법인장') ||
+          v.contains('지인') ||
+          v.contains('아파트') ||
+          v.contains('기업') ||
+          v.contains('특별') ||
+          v.contains('파트너') ||
+          v.contains('협력사') ||
+          v.contains('할인');
     }
 
-    String best = '';
-    var bestScore = -9999;
+    // Discount tables are side-by-side in Row data.
+    // Search only the current table's local band so a neighboring
+    // discount title can never be selected.
+    final minRow = headerRow - 12 < 0 ? 0 : headerRow - 12;
+    final startCol = customerColumn - 1 < 0 ? 0 : customerColumn - 1;
 
-    final minRow = headerRow - 20 < 0 ? 0 : headerRow - 20;
     for (var rr = headerRow; rr >= minRow; rr--) {
       final row = sheet[rr];
       if (row.isEmpty) continue;
-      final startCol = customerColumn - 10 < 0 ? 0 : customerColumn - 10;
-      final endCol = customerColumn + 10 < row.length
-          ? customerColumn + 10
+      final endCol = customerColumn + 6 < row.length
+          ? customerColumn + 6
           : row.length - 1;
 
       for (var cc = startCol; cc <= endCol; cc++) {
         final raw = row[cc].trim();
-        final semantic = semanticScore(raw);
-        if (semantic < 0) continue;
-
-        final distance =
-            (headerRow - rr).abs() * 2 + (customerColumn - cc).abs();
-        final score = semantic - distance;
-        if (score > bestScore) {
-          final cleaned = clean(raw);
-          if (cleaned.isNotEmpty && !isGeneric(cleaned)) {
-            best = cleaned;
-            bestScore = score;
-          }
+        if (!looksLikeGroup(raw)) continue;
+        final cleaned = clean(raw);
+        if (cleaned.isNotEmpty && !isGeneric(cleaned)) {
+          return cleaned;
         }
       }
     }
-    return best;
+
+    return '';
   }
 
   Future<int> _importStatementShareRules(
