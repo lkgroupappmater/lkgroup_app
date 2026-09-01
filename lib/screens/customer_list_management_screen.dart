@@ -152,16 +152,19 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   }
 
   Future<Uint8List> _renderPage(List<Map<String,dynamic>> rows,{required int page,required int pages}) async {
-    const w=1600.0, headerH=82.0, colH=48.0, rowH=38.0, footerH=42.0;
-    final h=headerH+colH+rowH*rows.length+footerH;
+    const w=1120.0, topH=110.0, headerH=76.0, colH=46.0, rowH=31.0, footerH=18.0;
+    final pageHeaderH = page == 0 ? headerH : 0.0;
+    final h=topH+pageHeaderH+colH+rowH*rows.length+footerH;
     final rec=ui.PictureRecorder(); final c=Canvas(rec);
     c.drawRect(Rect.fromLTWH(0,0,w,h),Paint()..color=Colors.white);
     final line=Paint()..color=const Color(0xFF7890A4)..style=PaintingStyle.stroke..strokeWidth=1;
     final fill=Paint()..color=const Color(0xFFE7F0F7);
-    _paintText(c,_title,Rect.fromLTWH(0,8,w,52),30,bold:true);
-    _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(0,52,w,25),14);
-    final y0=headerH;
-    final xs=<double>[0,150,500,790,970,1120,1600];
+    if(page==0){
+      _paintText(c,_title,Rect.fromLTWH(0,topH+4,w,48),28,bold:true);
+      _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(0,topH+48,w,22),13);
+    }
+    final y0=topH+pageHeaderH;
+    final xs=<double>[0,120,365,575,695,785,1120];
     final heads=['영수증 번호','고객명/회사명','연락처','구획(Zone)','수량','비고'];
     for(var i=0;i<heads.length;i++){
       final r=Rect.fromLTRB(xs[i],y0,xs[i+1],y0+colH);
@@ -203,14 +206,14 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     if(_rows.isEmpty||_saving)return;
     setState(()=>_saving=true);
     try{
-      const perPage=36;
+      const perPage=32;
       final pages=(_rows.length/perPage).ceil();
       final doc=pw.Document();
       for(var p=0;p<pages;p++){
         final slice=_rows.skip(p*perPage).take(perPage).toList(growable:false);
         final png=await _renderPage(slice,page:p,pages:pages);
         final image=pw.MemoryImage(png);
-        doc.addPage(pw.Page(pageFormat:PdfPageFormat.a4.landscape,margin:const pw.EdgeInsets.all(10),
+        doc.addPage(pw.Page(pageFormat:PdfPageFormat.a4,margin:const pw.EdgeInsets.fromLTRB(10,4,10,4),
           build:(_)=>pw.Center(child:pw.Image(image,fit:pw.BoxFit.contain))));
       }
       final bytes=await doc.save();
