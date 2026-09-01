@@ -428,6 +428,30 @@ function routeReceiptPrefix(routeKey: string): string {
   return map[routeKey] ?? '';
 }
 
+function insertWorksheetExtensionBlock(
+  sheetXml: string,
+  block: string,
+  marker = '',
+): string {
+  if (marker && sheetXml.includes(marker)) return sheetXml;
+
+  // ECMA-376 worksheet child order matters.  conditionalFormatting / dataValidations
+  // must be placed after sheetData and before the later print/drawing/ext sections.
+  const laterTags = [
+    'dataValidations', 'hyperlinks', 'printOptions', 'pageMargins', 'pageSetup',
+    'headerFooter', 'rowBreaks', 'colBreaks', 'customProperties', 'cellWatches',
+    'ignoredErrors', 'smartTags', 'drawing', 'legacyDrawing', 'legacyDrawingHF',
+    'picture', 'oleObjects', 'controls', 'webPublishItems', 'tableParts', 'extLst',
+  ];
+  let at = -1;
+  for (const tag of laterTags) {
+    const idx = sheetXml.indexOf(`<${tag}`);
+    if (idx >= 0 && (at < 0 || idx < at)) at = idx;
+  }
+  if (at >= 0) return `${sheetXml.substring(0, at)}${block}${sheetXml.substring(at)}`;
+  return sheetXml.replace('</worksheet>', `${block}</worksheet>`);
+}
+
 function applyDeliveryColorConditionalFormatting(
   files: Record<string, Uint8Array>,
   routeKey: string,
@@ -437,24 +461,49 @@ function applyDeliveryColorConditionalFormatting(
   if (!files[stylesPath]) return;
 
   let styles = strFromU8(files[stylesPath]);
-  const dxfMatch = styles.match(/<dxfs\b([^>]*)count="(\d+)"([^>]*)>([\s\S]*?)<\/dxfs>/);
-  if (!dxfMatch) return;
-  const baseDxf = Number(dxfMatch[2] ?? 0);
-  const fills = [
-    'FFFFC000',
-    'FF5B9BD5',
-    'FF92D050',
-    'FFFFFF00',
-  ];
+  const fills = ['FFFFC000', 'FF5B9BD5', 'FF92D050', 'FFFFFF00'];
+
+  // Excel templates can have either <dxfs count="0"/> or <dxfs ...>...</dxfs>.
+  // Handle both forms and append valid differential fills.  A broken dxfId is what
+  // makes Excel repair the workbook or render delivery cells as black.
+  let baseDxf = 0;
+  const fullDxfs = styles.match(/<dxfs\b([^>]*)count="(\d+)"([^>]*)>([\s\S]*?)<\/dxfs>/);
+  const emptyDxfs = styles.match(/<dxfs\b([^>]*)count="(\d+)"([^>]*)\/>/);
   const extraDxfs = fills.map((rgb) =>
-    '<dxf><fill><patternFill patternType="solid"><fgColor rgb="' + rgb +
-    '"/><bgColor indexed="64"/></patternFill></fill></dxf>'
+    `<dxf><fill><patternFill patternType="solid"><fgColor rgb="${rgb}"/><bgColor rgb="${rgb}"/></patternFill></fill></dxf>`
   ).join('');
-  styles = styles.replace(
-    dxfMatch[0],
-    `<dxfs${dxfMatch[1]}count="${baseDxf + fills.length}"${dxfMatch[3]}>${dxfMatch[4]}${extraDxfs}</dxfs>`,
-  );
+
+  if (fullDxfs) {
+    baseDxf = Number(fullDxfs[2] ?? 0);
+    styles = styles.replace(
+      fullDxfs[0],
+      `<dxfs${fullDxfs[1]}count="${baseDxf + fills.length}"${fullDxfs[3]}>${fullDxfs[4]}${extraDxfs}</dxfs>`,
+    );
+  } else if (emptyDxfs) {
+    baseDxf = Number(emptyDxfs[2] ?? 0);
+    styles = styles.replace(
+      emptyDxfs[0],
+      `<dxfs${emptyDxfs[1]}count="${baseDxf + fills.length}"${emptyDxfs[3]}>${extraDxfs}</dxfs>`,
+    );
+  } else {
+    // styles.xml schema order: dxfs comes before tableStyles/colors/extLst.
+    const block = `<dxfs count="${fills.length}">${extraDxfs}</dxfs>`;
+    const idx = styles.search(/<(tableStyles|colors|extLst)\b/);
+    styles = idx >= 0
+      ? `${styles.substring(0, idx)}${block}${styles.substring(idx)}`
+      : styles.replace('</styleSheet>', `${block}</styleSheet>`);
+    baseDxf = 0;
+  }
   files[stylesPath] = strToU8(styles);
+
+  const makeRules = (formulaFor: (label: string) => string, priorityBase: number) => [
+    { label: '시내배송(선결제)', dxf: baseDxf + 3 },
+    { label: '시내배송', dxf: baseDxf + 2 },
+    { label: '지방배송(선결제)', dxf: baseDxf + 1 },
+    { label: '지방배송', dxf: baseDxf + 0 },
+  ].map((r, i) =>
+    `<cfRule type="expression" dxfId="${r.dxf}" priority="${priorityBase + i + 1}" stopIfTrue="1"><formula>${escXml(formulaFor(r.label))}</formula></cfRule>`
+  ).join('');
 
   const prefix = routeReceiptPrefix(routeKey).toUpperCase();
   const workbook = strFromU8(files['xl/workbook.xml']);
@@ -466,75 +515,28 @@ function applyDeliveryColorConditionalFormatting(
     const sheetPath = workbookSheetPath(files, sheetName);
     if (!sheetPath || !files[sheetPath]) continue;
     let xml = strFromU8(files[sheetPath]);
-    if (xml.includes('SEARCH(&quot;시내배송(선결제)&quot;')) continue;
-
-    const maxPriority = Math.max(
-      0,
-      ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)]
-        .map((m) => Number(m[1] ?? 0)),
+    if (xml.includes('LK_STATEMENT_DELIVERY_COLOR_V2')) continue;
+    const maxPriority = Math.max(0, ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)].map((m) => Number(m[1] ?? 0)));
+    const rules = makeRules(
+      (label) => `OR(IFERROR(ISNUMBER(SEARCH("${label}",$A$18)),FALSE),IFERROR(ISNUMBER(SEARCH("${label}",$F$18)),FALSE))`,
+      maxPriority,
     );
-    const check = (label: string) =>
-      `OR(IFERROR(ISNUMBER(SEARCH("${label}",$A$18)),FALSE),IFERROR(ISNUMBER(SEARCH("${label}",$F$18)),FALSE))`;
-    const rules = [
-      { label: '시내배송(선결제)', dxf: baseDxf + 3 },
-      { label: '시내배송', dxf: baseDxf + 2 },
-      { label: '지방배송(선결제)', dxf: baseDxf + 1 },
-      { label: '지방배송', dxf: baseDxf + 0 },
-    ].map((r, i) =>
-      `<cfRule type="expression" dxfId="${r.dxf}" priority="${maxPriority + i + 1}" stopIfTrue="1"><formula>${escXml(check(r.label))}</formula></cfRule>`
-    ).join('');
-    const block = `<conditionalFormatting sqref="A18:E24 F18:K24">${rules}</conditionalFormatting>`;
-
-    if (xml.includes('<dataValidations ')) {
-      xml = xml.replace('<dataValidations ', `${block}<dataValidations `);
-    } else if (xml.includes('<pageMargins ')) {
-      xml = xml.replace('<pageMargins ', `${block}<pageMargins `);
-    } else {
-      xml = xml.replace('</worksheet>', `${block}</worksheet>`);
-    }
+    const block = `<!--LK_STATEMENT_DELIVERY_COLOR_V2--><conditionalFormatting sqref="A18:E24 F18:K24">${rules}</conditionalFormatting>`;
+    xml = insertWorksheetExtensionBlock(xml, block, 'LK_STATEMENT_DELIVERY_COLOR_V2');
     files[sheetPath] = strToU8(xml);
   }
+
   const customerPath = workbookSheetPath(files, '고객 리스트');
   if (customerPath && files[customerPath]) {
-    let customerXml = strFromU8(files[customerPath]);
-    if (!customerXml.includes('LK_CUSTOMER_LIST_DELIVERY_COLOR')) {
-      const maxPriority = Math.max(
-        0,
-        ...[...customerXml.matchAll(/<cfRule\\b[^>]*priority="(\\d+)"/g)]
-          .map((m) => Number(m[1] ?? 0)),
-      );
-      const rules = [
-        { label: '시내배송(선결제)', dxf: baseDxf + 3 },
-        { label: '시내배송', dxf: baseDxf + 2 },
-        { label: '지방배송(선결제)', dxf: baseDxf + 1 },
-        { label: '지방배송', dxf: baseDxf + 0 },
-      ].map((r, i) =>
-        `<cfRule type="expression" dxfId="${r.dxf}" priority="${maxPriority + i + 1}" stopIfTrue="1">` +
-        `<formula>${escXml(`$E4="${r.label}"`)}</formula></cfRule>`
-      ).join('');
-      const block =
-        `<!--LK_CUSTOMER_LIST_DELIVERY_COLOR-->` +
-        `<conditionalFormatting sqref="E4:E150">${rules}</conditionalFormatting>`;
-      if (customerXml.includes('<dataValidations ')) {
-        customerXml = customerXml.replace(
-          '<dataValidations ',
-          `${block}<dataValidations `,
-        );
-      } else if (customerXml.includes('<pageMargins ')) {
-        customerXml = customerXml.replace(
-          '<pageMargins ',
-          `${block}<pageMargins `,
-        );
-      } else {
-        customerXml = customerXml.replace(
-          '</worksheet>',
-          `${block}</worksheet>`,
-        );
-      }
-      files[customerPath] = strToU8(customerXml);
+    let xml = strFromU8(files[customerPath]);
+    if (!xml.includes('LK_CUSTOMER_LIST_DELIVERY_COLOR_V2')) {
+      const maxPriority = Math.max(0, ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)].map((m) => Number(m[1] ?? 0)));
+      const rules = makeRules((label) => `$E4="${label}"`, maxPriority);
+      const block = `<!--LK_CUSTOMER_LIST_DELIVERY_COLOR_V2--><conditionalFormatting sqref="E4:E150">${rules}</conditionalFormatting>`;
+      xml = insertWorksheetExtensionBlock(xml, block, 'LK_CUSTOMER_LIST_DELIVERY_COLOR_V2');
+      files[customerPath] = strToU8(xml);
     }
   }
-
 }
 
 function normalizePhone(value: unknown): string {
@@ -652,6 +654,43 @@ function upgradeZoneQuantityFormulas(
 
   files[path] = strToU8(xml);
 }
+function setFormulaCellPreservingStyle(
+  sheetXml: string,
+  ref: string,
+  formula: string,
+): string {
+  const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
+  const column = ref.match(/^[A-Z]+/)?.[0] ?? '';
+  if (!rowNumber || !column) return sheetXml;
+  const rowRe = new RegExp(`<row\\b[^>]*r="${rowNumber}"[^>]*>[\\s\\S]*?<\\/row>`);
+  const rowMatch = sheetXml.match(rowRe);
+  if (!rowMatch) return sheetXml;
+  const rowXml = rowMatch[0];
+  const cellRe = new RegExp(`<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`);
+  const existing = rowXml.match(cellRe);
+  const attrs = existing ? `${existing[1] ?? ''}${existing[2] ?? ''}` : '';
+  const styleMatch = attrs.match(/\bs="([^"]+)"/);
+  const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
+  const replacement = `<c r="${ref}"${style}><f>${escXml(formula)}</f></c>`;
+  let nextRow = rowXml;
+  if (existing) {
+    nextRow = rowXml.replace(cellRe, () => replacement);
+  } else {
+    const targetIndex = columnIndex(column);
+    const cells = [...rowXml.matchAll(/<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g)];
+    let inserted = false;
+    for (const m of cells) {
+      if (columnIndex(m[1]) > targetIndex && m.index != null) {
+        nextRow = `${rowXml.substring(0, m.index)}${replacement}${rowXml.substring(m.index)}`;
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) nextRow = rowXml.replace('</row>', `${replacement}</row>`);
+  }
+  return sheetXml.replace(rowXml, () => nextRow);
+}
+
 function seedCustomerListFromShipments(
   files: Record<string, Uint8Array>,
   shipments: Record<string, unknown>[],
@@ -741,6 +780,14 @@ function seedCustomerListFromShipments(
       xml = setStringCellInSheet(xml, `C${rowNumber}`, '102');
     } else if (isDeliveryF || isNamedF) {
       xml = setStringCellInSheet(xml, `C${rowNumber}`, 'F');
+    } else {
+      // Ordinary customers MUST keep the BASE Excel quantity formula.
+      // Only explicit fixed/delivery exceptions above are allowed to overwrite C.
+      xml = setFormulaCellPreservingStyle(
+        xml,
+        `C${rowNumber}`,
+        `IF(B${rowNumber}="","",IF(F${rowNumber}<=10,"A",IF(F${rowNumber}<=20,"B",IF(F${rowNumber}<=30,"C","F"))))`,
+      );
     }
 
     let signature = '';
@@ -870,7 +917,8 @@ function enableDynamicReceiptSelector(
   // 없으면 OOXML 순서상 pageMargins 바로 앞에 dataValidations를 삽입합니다.
   const selector =
     '<dataValidation type="list" allowBlank="1" showErrorMessage="1" ' +
-    'showInputMessage="1" sqref="N2">' +
+    'showInputMessage="1" promptTitle="영수증 번호 선택" ' +
+    'prompt="여기를 눌러 LKS 번호를 선택하세요." sqref="N2">' +
     '<formula1>INDIRECT(&quot;&apos;고객 리스트&apos;!$A$4:$A$150&quot;)</formula1>' +
     '</dataValidation>';
 
@@ -905,6 +953,24 @@ function enableDynamicReceiptSelector(
   }
 
   files[path] = strToU8(xml);
+
+  // LK_PATCH200_FULLCALC: force Excel to recalculate linked totals/formulas on first open.
+  const workbookPath = 'xl/workbook.xml';
+  if (files[workbookPath]) {
+    let workbookXml = strFromU8(files[workbookPath]);
+    if (/<calcPr\b/.test(workbookXml)) {
+      workbookXml = workbookXml.replace(/<calcPr\b([^>]*)\/?>(?:<\/calcPr>)?/, (m, attrs) => {
+        const clean = String(attrs ?? '')
+          .replace(/\sfullCalcOnLoad="[^"]*"/g, '')
+          .replace(/\sforceFullCalc="[^"]*"/g, '')
+          .replace(/\scalcMode="[^"]*"/g, '');
+        return `<calcPr${clean} calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>`;
+      });
+    } else {
+      workbookXml = workbookXml.replace('</workbook>', '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>');
+    }
+    files[workbookPath] = strToU8(workbookXml);
+  }
 }
 function blankValueCellInSheet(
   sheetXml: string,
@@ -1827,7 +1893,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     }
     files['xl/workbook.xml'] = strToU8(workbookXml);
 
-    const encoded = zipSync(files, { level: 6 });
+    // PATCH200B: XLSX is already a ZIP archive.  Level 6 compression can push the
+    // Supabase Edge worker over its compute limit on the large multi-sheet BASE files.
+    // Level 1 keeps the workbook fully compatible while drastically reducing CPU time.
+    const encoded = zipSync(files, { level: 1 });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const exportPath =
       `${routeKey}/${shipmentYear}/${voyageToken}/${stamp}_${outputFileName}`;
