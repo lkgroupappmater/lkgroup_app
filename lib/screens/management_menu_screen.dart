@@ -15,6 +15,7 @@ import 'quote_request_management_screen.dart';
 import 'schedule_management_screen.dart';
 import 'discount_management_screen.dart';
 import 'local_delivery_management_screen.dart';
+import 'unloading_list_management_screen.dart';
 import 'voyage_total_management_screen.dart';
 
 class ManagementMenuScreen extends StatefulWidget {
@@ -151,6 +152,11 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
           'icon': Icons.campaign_outlined,
           'page': NoticeManagementScreen(user: user),
         },
+        {
+          'label': '하역 자료 관리',
+          'icon': Icons.view_column_outlined,
+          'page': const UnloadingListManagementScreen(),
+        },
       ]);
     }
 
@@ -163,7 +169,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
 
     items.addAll([
       {
-        'label': '화물 데이타 엑셀 업로드',
+        'label': '화물 데이타 엑셀 업로드 및 Update',
         'icon': Icons.upload_file_outlined,
         'page': const ExcelUploadScreen(),
       },
