@@ -560,9 +560,9 @@ class _DigitalQuotationPainter extends CustomPainter {
       ('특별할인', sumTop + 34),
       ('세금 계산서(VAT)', sumTop + 61),
     ]) {
-      _text(c, row.$1, Rect.fromLTWH(totalX + 12, row.$2, totalW * .44, adjH), 16, bold: true);
-      _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, row.$2, totalW * .20, adjH), 16, bold: true, center: true);
-      _text(c, '-', Rect.fromLTWH(totalX + totalW * .72, row.$2, totalW * .24, adjH), 16, bold: true, right: true);
+      _text(c, row.$1, Rect.fromLTWH(totalX + 12, row.$2, totalW * .48, adjH), 16, bold: true);
+      _text(c, '-', Rect.fromLTWH(totalX + totalW * .58, row.$2, totalW * .18, adjH), 16, bold: true, center: true);
+      _text(c, '-', Rect.fromLTWH(totalX + totalW * .78, row.$2, totalW * .18, adjH), 16, bold: true, right: true);
     }
 
     final finalTop = sumTop + 92;
@@ -572,24 +572,24 @@ class _DigitalQuotationPainter extends CustomPainter {
         19, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFCE48A));
-    _text(c, 'USD    ' + MoneyFormat.usd(usd),
+    _text(c, 'USD     ${MoneyFormat.usd(usd)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, center: true);
+        20, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFFC21A));
-    _text(c, 'KIP    ' + MoneyFormat.kip(usd * rates.appliedKip),
+    _text(c, 'KIP     ${MoneyFormat.kip(usd * rates.appliedKip)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, center: true);
+        20, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF91D18B));
-    _text(c, 'THB    ' + MoneyFormat.thb(usd * rates.appliedThb),
+    _text(c, 'THB     ${MoneyFormat.thb(usd * rates.appliedThb)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, center: true);
+        20, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF23B6D8));
-    _text(c, 'KRW    ' + MoneyFormat.krw(usd * rates.appliedKrw),
+    _text(c, 'KRW     ${MoneyFormat.krw(usd * rates.appliedKrw)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, center: true);
+        20, bold: true, right: true);
     final payTop = sumTop + 204;
     const payGap = 4.0;
     final payW = (w - payGap * 3) / 4;

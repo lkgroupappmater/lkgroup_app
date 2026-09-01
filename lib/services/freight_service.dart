@@ -194,7 +194,6 @@ class FreightService {
     required String name,
     required String phone,
   }) async {
-    final normalizedPhone = _digits(phone);
     if (!SupabaseConfig.isConfigured || name.trim().isEmpty) {
       return null;
     }
@@ -264,7 +263,7 @@ class FreightService {
       final row = Map<String, dynamic>.from(raw);
       final ruleRoute = '${row['route_key'] ?? ''}'.trim();
       if (ruleRoute != 'all' && ruleRoute != routeKey) continue;
-      if (!_phoneMatches(normalizedPhone, '${row['phone'] ?? ''}')) {
+      if (!_phoneMatches(phone, '${row['phone'] ?? ''}')) {
         continue;
       }
 
