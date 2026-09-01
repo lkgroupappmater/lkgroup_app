@@ -53,6 +53,7 @@ class QuotationPreviewDialog extends StatefulWidget {
     required this.result,
     required this.rates,
     this.extraCosts = const <ExtraCostItem>[],
+    this.discountPercent = 0,
   });
 
   final String routeLabel;
@@ -61,6 +62,7 @@ class QuotationPreviewDialog extends StatefulWidget {
   final ExchangeRateSettings rates;
 
   final List<ExtraCostItem> extraCosts;
+  final double discountPercent;
   @override
   State<QuotationPreviewDialog> createState() => _QuotationPreviewDialogState();
 }
@@ -142,6 +144,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         result: widget.result,
         rates: widget.rates,
         extraCosts: widget.extraCosts,
+        discountPercent: widget.discountPercent,
         issuedAt: _issuedAt,
         logo: _logo!,
         qrUsd: _qrUsd!,
@@ -352,6 +355,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     required this.result,
     required this.rates,
     required this.extraCosts,
+    required this.discountPercent,
     required this.issuedAt,
     required this.logo,
     required this.qrUsd,
@@ -366,6 +370,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
   final List<ExtraCostItem> extraCosts;
+  final double discountPercent;
   final DateTime issuedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
@@ -457,7 +462,7 @@ class _DigitalQuotationPainter extends CustomPainter {
         final extra = extraCosts[extraIndex];
         _text(
           c,
-          extra.name,
+          '${extra.name}${extra.discountApplies && safeDiscountPercent > 0 ? ' (할인)' : ''}',
           Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
           17,
           bold: true,
@@ -515,13 +520,20 @@ class _DigitalQuotationPainter extends CustomPainter {
     final totalVolume = boxes.fold<double>(0, (v, b) => v + b.result.volumeWeightKg);
     final extraTotal =
         extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final usd = result.totalUsd + extraTotal;
+    final discountableExtra = extraCosts
+        .where((e) => e.discountApplies)
+        .fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final grossUsd = result.totalUsd + extraTotal;
+    final safeDiscountPercent = discountPercent.clamp(0, 100).toDouble();
+    final discountBase = result.totalUsd + discountableExtra;
+    final discountAmount = discountBase * safeDiscountPercent / 100;
+    final usd = grossUsd - discountAmount;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(usd),
+      13: MoneyFormat.usd(grossUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -555,14 +567,35 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
+    final discountLabel = safeDiscountPercent > 0
+        ? '${safeDiscountPercent.toStringAsFixed(safeDiscountPercent == safeDiscountPercent.roundToDouble() ? 0 : 1)}%'
+        : '-';
+    final discountValue =
+        safeDiscountPercent > 0 ? '-${MoneyFormat.usd(discountAmount)}' : '-';
+
+    _text(c, '할인',
+        Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .48, adjH),
+        16, bold: true);
+    _text(c, discountLabel,
+        Rect.fromLTWH(totalX + totalW * .58, sumTop + 7, totalW * .18, adjH),
+        16, bold: true, center: true);
+    _text(c, discountValue,
+        Rect.fromLTWH(totalX + totalW * .78, sumTop + 7, totalW * .18, adjH),
+        16, bold: true, right: true);
+
     for (final row in <(String, double)>[
-      ('할인', sumTop + 7),
       ('특별할인', sumTop + 34),
       ('세금 계산서(VAT)', sumTop + 61),
     ]) {
-      _text(c, row.$1, Rect.fromLTWH(totalX + 12, row.$2, totalW * .48, adjH), 16, bold: true);
-      _text(c, '-', Rect.fromLTWH(totalX + totalW * .58, row.$2, totalW * .18, adjH), 16, bold: true, center: true);
-      _text(c, '-', Rect.fromLTWH(totalX + totalW * .78, row.$2, totalW * .18, adjH), 16, bold: true, right: true);
+      _text(c, row.$1,
+          Rect.fromLTWH(totalX + 12, row.$2, totalW * .48, adjH),
+          16, bold: true);
+      _text(c, '-',
+          Rect.fromLTWH(totalX + totalW * .58, row.$2, totalW * .18, adjH),
+          16, bold: true, center: true);
+      _text(c, '-',
+          Rect.fromLTWH(totalX + totalW * .78, row.$2, totalW * .18, adjH),
+          16, bold: true, right: true);
     }
 
     final finalTop = sumTop + 92;

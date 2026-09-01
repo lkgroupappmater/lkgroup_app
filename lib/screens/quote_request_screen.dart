@@ -44,6 +44,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   String _selectedRoute = _transportRoutes.first;
   final List<_BoxEntry> _boxes = [_BoxEntry()];
   final List<ExtraCostItem> _extraCosts = <ExtraCostItem>[];
+  double _manualDiscountPercent = 0;
   QuoteFreightResult? _calculation;
   ExchangeRateSettings? _calculationRates;
   List<Map<String, dynamic>> _specialQuotes = const [];
@@ -73,6 +74,67 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         _calculation = null;
         _calculationRates = null;
       });
+
+  Future<void> _setQuoteDiscountPercent() async {
+    final controller = TextEditingController(
+      text: _manualDiscountPercent == 0
+          ? ''
+          : _manualDiscountPercent.toStringAsFixed(
+              _manualDiscountPercent == _manualDiscountPercent.roundToDouble()
+                  ? 0
+                  : 1,
+            ),
+    );
+    final apply = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('할인율 적용'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: '할인율 (%)',
+                hintText: '예: 20',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  controller.text = '0';
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('할인 해제'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('적용'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (apply && mounted) {
+      final value = double.tryParse(controller.text.trim()) ?? 0;
+      if (value < 0 || value > 100) {
+        _message('할인율은 0~100% 범위로 입력해 주세요.');
+      } else {
+        setState(() => _manualDiscountPercent = value);
+      }
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    controller.dispose();
+  }
 
   Future<void> _addQuoteExtraCost() async {
     final nameController = TextEditingController();
@@ -309,6 +371,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         result: calculation,
         rates: rates,
         extraCosts: List<ExtraCostItem>.unmodifiable(_extraCosts),
+        discountPercent: _manualDiscountPercent,
       ),
     );
   }
@@ -645,18 +708,54 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             ),
           ),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _addQuoteExtraCost,
-            icon: const Icon(Icons.add_card_outlined, size: 18),
-            label: const Text('기타 비용 추가 (+\$)',
-                style: TextStyle(fontSize: 13)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.navyPrimary,
-              side: const BorderSide(color: AppColors.navyPrimary),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _addQuoteExtraCost,
+                  icon: const Icon(Icons.add_card_outlined, size: 18),
+                  label: const Text(
+                    '기타 비용 추가 (+\$)',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navyPrimary,
+                    side: const BorderSide(color: AppColors.navyPrimary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _setQuoteDiscountPercent,
+                  icon: const Icon(Icons.percent, size: 18),
+                  label: Text(
+                    _manualDiscountPercent > 0
+                        ? '할인 ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 1)}%'
+                        : '할인율 (%)',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _manualDiscountPercent > 0
+                        ? Colors.deepOrange
+                        : AppColors.navyPrimary,
+                    side: BorderSide(
+                      color: _manualDiscountPercent > 0
+                          ? Colors.deepOrange
+                          : AppColors.navyPrimary,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
           ),
           if (_extraCosts.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -668,6 +767,27 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Tooltip(
+                      message: '이 기타 비용에도 현재 할인율 적용',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: entry.value.discountApplies,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (v) => setState(() {
+                              _extraCosts[entry.key] = ExtraCostItem(
+                                id: entry.value.id,
+                                name: entry.value.name,
+                                amountUsd: entry.value.amountUsd,
+                                discountApplies: v ?? false,
+                              );
+                            }),
+                          ),
+                          const Text('할인', style: TextStyle(fontSize: 11)),
+                        ],
+                      ),
+                    ),
                     Text('\$${entry.value.amountUsd.toStringAsFixed(2)}'),
                     IconButton(
                       tooltip: '삭제',
@@ -784,7 +904,14 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final rates = _calculationRates;
     final extraTotal =
         _extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final finalUsd = result.totalUsd + extraTotal;
+    final discountableExtra = _extraCosts
+        .where((e) => e.discountApplies)
+        .fold<double>(0, (sum, e) => sum + e.amountUsd);
+    final grossUsd = result.totalUsd + extraTotal;
+    final discountBase = result.totalUsd + discountableExtra;
+    final discountAmount =
+        discountBase * (_manualDiscountPercent.clamp(0, 100) / 100);
+    final finalUsd = grossUsd - discountAmount;
     final kip = rates == null ? null : finalUsd * rates.appliedKip;
     final thb = rates == null ? null : finalUsd * rates.appliedThb;
     final krw = rates == null ? null : finalUsd * rates.appliedKrw;
@@ -831,7 +958,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     children: [
                       Expanded(
                         child: Text(
-                          '기타 비용 · ${e.name}',
+                          '기타 비용 · ${e.name}${e.discountApplies && _manualDiscountPercent > 0 ? ' · 할인 적용' : ''}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -850,6 +977,21 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (_manualDiscountPercent > 0) ...[
+                    Text(
+                      '할인 전  USD \$${grossUsd.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      '할인 ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 1)}%  -\$${discountAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                  ],
                   Text(
                     '총 운임  USD \$${finalUsd.toStringAsFixed(2)}',
                     style: const TextStyle(

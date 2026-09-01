@@ -109,7 +109,11 @@ class _UnloadingListManagementScreenState
       RegExp(r'[\?\*]{2,}').hasMatch(value);
 
   bool _needsAttention(Map<String, dynamic> row) {
+    // Locked cargo is never highlighted.
     if (row['data_locked'] == true) return false;
+
+    // Manual ? uncertainty uses the same yellow highlight as auto uncertainty.
+    if (row['manual_uncertain'] == true) return true;
 
     final name = '${row['consignee_name'] ?? ''}'.trim();
     final phone = '${row['consignee_phone'] ?? ''}'.trim();
