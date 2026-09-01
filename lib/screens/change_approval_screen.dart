@@ -70,6 +70,28 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           await UnknownRecipientService.instance.listAutoUnmatchedForAdmin();
       final incomplete =
           await UnknownRecipientService.instance.listIncompleteForAdmin();
+      final manualUncertain =
+          await ShipmentService.instance.listManualUncertainForAdmin();
+      final incompleteById=<String,Map<String,dynamic>>{
+        for(final row in incomplete)
+          '${row['shipment_id'] ?? row['id'] ?? ''}': row,
+      };
+      for(final row in manualUncertain){
+        final id='${row['id'] ?? ''}';
+        if(id.isEmpty)continue;
+        final existing=incompleteById[id];
+        if(existing!=null){
+          existing['manual_uncertain']=true;
+          existing['reason'] ??= '관리자 수동 불확실 표시';
+        }else{
+          final copy=Map<String,dynamic>.from(row);
+          copy['shipment_id']=id;
+          copy['manual_uncertain']=true;
+          copy['reason']='관리자 수동 불확실 표시';
+          incomplete.add(copy);
+          incompleteById[id]=copy;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _requests = rows;
@@ -391,8 +413,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
     if (save) {
       try {
+        final reviewedShipmentId='${row['shipment_id'] ?? row['id'] ?? ''}';
         await UnknownRecipientService.instance.reviewIncomplete(
-          shipmentId: '${row['shipment_id'] ?? row['id'] ?? ''}',
+          shipmentId: reviewedShipmentId,
           invoiceNumber: invoice.text,
           consigneeName: name.text,
           consigneePhone: phone.text,
@@ -400,6 +423,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           notes: notes.text,
           lock: lock,
         );
+        if(row['manual_uncertain']==true){
+          await ShipmentService.instance.setManualUncertain(
+            reviewedShipmentId,
+            false,
+          );
+        }
         if (mounted) {
           _message(
             lock
@@ -440,9 +469,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                     ),
                   ),
                 ),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 2,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
                       onPressed: () => _reviewIncomplete(row, lock: false),
@@ -458,6 +486,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                         style: TextStyle(fontSize: 11),
                       ),
                     ),
+                    const SizedBox(width: 6),
                     FilledButton.icon(
                       onPressed: () => _reviewIncomplete(row, lock: true),
                       style: FilledButton.styleFrom(

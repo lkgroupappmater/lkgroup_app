@@ -193,6 +193,28 @@ class ShipmentService {
     await SupabaseService.client.from('shipments').update(changes).eq('id', id);
   }
 
+  Future<void> setManualUncertain(String id, bool value) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final numericId = int.tryParse(id.trim());
+    if (numericId == null) throw StateError('화물 ID가 올바르지 않습니다.');
+    await SupabaseService.client
+        .from('shipments')
+        .update({'manual_uncertain': value})
+        .eq('id', numericId);
+  }
+
+  Future<List<Map<String, dynamic>>> listManualUncertainForAdmin() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final raw = await SupabaseService.client
+        .from('shipments')
+        .select()
+        .eq('manual_uncertain', true)
+        .order('shipment_year', ascending: false)
+        .order('voyage', ascending: false)
+        .order('box_number');
+    return List<Map<String, dynamic>>.from(raw as List);
+  }
+
   Future<void> adminUpdateBoxNumber({
     required String shipmentId,
     required String boxNumber,

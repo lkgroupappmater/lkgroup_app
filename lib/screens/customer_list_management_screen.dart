@@ -263,27 +263,31 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
     const left=26.0;
     const right=1094.0;
-    final xs=<double>[left,145,390,505,760,840,right];
+    final xs=<double>[left,145,370,480,790,860,right];
     final heads=['영수증 번호','고객명/회사명','구획(Zone)','박스 번호','수량','서명(Sign)'];
 
     for(var i=0;i<heads.length;i++){
       final r=Rect.fromLTRB(xs[i],y,xs[i+1],y+colH);
       c.drawRect(r,headerFill);
       c.drawRect(r,line);
-      _paintText(c,heads[i],r,18,bold:true);
+      _paintText(c,heads[i],r,15,bold:true);
     }
     y+=colH;
 
     for(final row in rows){
-      final boxLines=_boxLines(row);
+      final receiptText='${row['receipt']??''}'.trim();
+      final nameText='${row['name']??''}'.replaceAll(RegExp(r'\s+'),'');
+      final isPark=nameText.startsWith('박성호') ||
+          RegExp(r'(^|[^0-9])100([^0-9]|$)').hasMatch(receiptText);
+      final boxLines=isPark ? const <String>[''] : _boxLines(row);
       final rowH=unitH*boxLines.length;
       final delivery='${row['delivery']??''}';
       final values=<String>[
-        '${row['receipt']??''}',
+        receiptText,
         '${row['name']??''}',
         '${row['zone']??''}',
         '',
-        '${row['quantity']??''}',
+        isPark ? '' : '${row['quantity']??''}',
         delivery,
       ];
 
@@ -298,12 +302,12 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         if(i==3){
           for(var b=0;b<boxLines.length;b++){
             final br=Rect.fromLTRB(xs[i],y+unitH*b,xs[i+1],y+unitH*(b+1));
-            _paintText(c,boxLines[b],br,22,bold:false,align:TextAlign.center);
+            _paintText(c,boxLines[b],br,18,bold:false,align:TextAlign.center);
           }
         }else{
           final size=i==1
-              ? 30.0
-              : (i==5 ? 24.0 : 28.0);
+              ? 24.0
+              : (i==5 ? 19.0 : 22.0);
           _paintText(
             c,
             values[i],

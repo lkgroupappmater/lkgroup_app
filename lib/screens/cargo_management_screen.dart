@@ -1580,6 +1580,25 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     }
   }
 
+  Future<void> _toggleManualUncertain(Map<String, dynamic> item) async {
+    if (!_isAdmin || _busy) return;
+    final id='${item['id']}';
+    final current=item['manual_uncertain']==true;
+    setState(()=>_busy=true);
+    try {
+      await ShipmentService.instance.setManualUncertain(id,!current);
+      if(!mounted)return;
+      setState(()=>item['manual_uncertain']=!current);
+      _message(!current
+          ? '불확실 화물로 표시했습니다. 변경 승인 관리에서 확인할 수 있습니다.'
+          : '불확실 표시를 해제했습니다.');
+    } catch(error) {
+      _message('불확실 표시 처리 실패: $error');
+    } finally {
+      if(mounted)setState(()=>_busy=false);
+    }
+  }
+
   Future<void> _toggleShipmentLock(Map<String, dynamic> item) async {
     if (!_isAdmin || _busy) return;
     final id = '${item['id']}';
@@ -2612,6 +2631,34 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                             color: item['data_locked'] == true
                                 ? Colors.red
                                 : Colors.white,
+                          ),
+                        ),
+                      ),
+                    if (_isAdmin) const SizedBox(height: 8),
+                    if (_isAdmin)
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: item['manual_uncertain'] == true
+                              ? Colors.yellow
+                              : Colors.white,
+                          border: Border.all(color: Colors.black54),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: item['manual_uncertain'] == true
+                              ? '불확실 표시 해제'
+                              : '불확실 화물 표시',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _busy
+                              ? null
+                              : () => _toggleManualUncertain(item),
+                          icon: const Icon(
+                            Icons.question_mark,
+                            size: 20,
+                            color: Colors.black,
                           ),
                         ),
                       ),
