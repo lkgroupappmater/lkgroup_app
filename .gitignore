@@ -46,3 +46,17 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# LKGroup local/dev housekeeping
+node_modules/
+.artifacts/
+*.bak_before_patch*
+*.bak_before_*
+/APPLY_*.ps1
+/apply_patch*.ps1
+/PATCH*_apply.py
+/README_PATCH*.txt
+/Patch*.zip
+/patch[0-9]*/
+/scripts/apply_*.ps1
+/CLEANUP198_before_*.txt
