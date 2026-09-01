@@ -77,12 +77,47 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         final first=e.value.first;
         final qty=e.value.fold<num>(0,(a,r)=>a+_num(r['quantity']));
         final notes=e.value.map((r)=>'${r['special_note_auto']??''}'.trim()).where((v)=>v.isNotEmpty).toSet().join(' / ');
+        final boxes=e.value
+            .map((r)=>'${r['box_number']??''}'.trim())
+            .where((v)=>v.isNotEmpty)
+            .toSet()
+            .toList(growable:false);
+        final delivery=_deliveryOnlyLabel(notes);
         result.add({
           'receipt':e.key,'name':'${first['consignee_name']??''}'.trim(),
           'phone':'${first['consignee_phone']??''}'.trim(),'zone':'${first['unloading_zone']??''}'.trim(),
-          'note':notes,'rows':e.value.length,'quantity':qty,
+          'note':notes,'delivery':delivery,'boxes':boxes,'rows':e.value.length,'quantity':qty,
         });
       }
+      int receiptNo(String v){
+        final m=RegExp(r'(\d+)').firstMatch(v);
+        return m==null ? 999999 : (int.tryParse(m.group(1)!) ?? 999999);
+      }
+      bool isUnknownReceipt(Map<String,dynamic> row){
+        final receipt='${row['receipt']??''}'.trim().toUpperCase();
+        final name='${row['name']??''}'.trim();
+        final hasNumber=RegExp(r'\d+').hasMatch(receipt);
+        return !hasNumber ||
+            receipt.contains('XX') ||
+            name.contains('수취인 불명') ||
+            name.contains('수취인불명') ||
+            name.contains('미확인');
+      }
+      bool isPark100(Map<String,dynamic> row){
+        final receipt='${row['receipt']??''}'.trim();
+        final name='${row['name']??''}'.replaceAll(RegExp(r'\s+'),'');
+        return receiptNo(receipt)==100 || name.startsWith('박성호');
+      }
+      result.sort((a,b){
+        final au=isUnknownReceipt(a), bu=isUnknownReceipt(b);
+        if(au!=bu)return au?1:-1; // unknown is absolute last
+        final ap=isPark100(a), bp=isPark100(b);
+        if(ap!=bp)return ap?1:-1; // Park/LKS100 sits immediately before unknown
+        final aa=receiptNo('${a['receipt']??''}');
+        final bb=receiptNo('${b['receipt']??''}');
+        if(aa!=bb)return aa.compareTo(bb);
+        return '${a['receipt']??''}'.compareTo('${b['receipt']??''}');
+      });
       if(!mounted)return;
       setState((){_rows=result;_loading=false;});
     }catch(e){_fail('고객 리스트 조회 실패: $e');}
@@ -123,6 +158,57 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     }catch(e){_fail('수정 실패: $e');}
   }
 
+  String _deliveryOnlyLabel(String text) {
+    final t=text.replaceAll(RegExp(r'\s+'),' ');
+    if(t.contains('지방배송(선결제)')) return '지방배송(선결제)';
+    if(t.contains('시내배송(선결제)')) return '시내배송(선결제)';
+    if(t.contains('지방배송')) return '지방배송';
+    if(t.contains('시내배송')) return '시내배송';
+    return '';
+  }
+
+  Color? _deliveryFill(String label) {
+    switch(label) {
+      case '지방배송': return const Color(0xFFFFC000);
+      case '지방배송(선결제)': return const Color(0xFF5B9BD5);
+      case '시내배송': return const Color(0xFF92D050);
+      case '시내배송(선결제)': return const Color(0xFFFFFF00);
+      default: return null;
+    }
+  }
+
+  List<String> _boxLines(Map<String,dynamic> row) {
+    final boxes=((row['boxes'] as List?) ?? const [])
+        .map((e)=>'$e'.trim()).where((e)=>e.isNotEmpty).toList(growable:false);
+    if(boxes.isEmpty) return const [''];
+    final out=<String>[];
+    for(var i=0;i<boxes.length;i+=10){
+      out.add(boxes.skip(i).take(10).join(', '));
+    }
+    return out;
+  }
+
+  int _rowUnits(Map<String,dynamic> row) => _boxLines(row).length.clamp(1, 999);
+
+  List<List<Map<String,dynamic>>> _printPages() {
+    const unitsPerPage=25;
+    final pages=<List<Map<String,dynamic>>>[];
+    var current=<Map<String,dynamic>>[];
+    var used=0;
+    for(final row in _rows){
+      final units=_rowUnits(row);
+      if(current.isNotEmpty && used+units>unitsPerPage){
+        pages.add(current);
+        current=<Map<String,dynamic>>[];
+        used=0;
+      }
+      current.add(row);
+      used+=units;
+    }
+    if(current.isNotEmpty) pages.add(current);
+    return pages;
+  }
+
   Widget _selector<T>({required String label,required T? value,required List<T> items,
     required String Function(T) text,required ValueChanged<T?> onChanged}) {
     return DropdownButtonFormField<T>(
@@ -152,38 +238,78 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   }
 
   Future<Uint8List> _renderPage(List<Map<String,dynamic>> rows,{required int page,required int pages}) async {
-    const w=1120.0, topH=110.0, headerH=76.0, colH=46.0, rowH=31.0, footerH=18.0;
-    final pageHeaderH = page == 0 ? headerH : 0.0;
-    final h=topH+pageHeaderH+colH+rowH*rows.length+footerH;
-    final rec=ui.PictureRecorder(); final c=Canvas(rec);
+    const w=1120.0, h=1584.0;
+    const topMargin=50.0;
+    const titleH=54.0;
+    const colH=44.0;
+    const unitH=56.0;
+
+    final rec=ui.PictureRecorder();
+    final c=Canvas(rec);
     c.drawRect(Rect.fromLTWH(0,0,w,h),Paint()..color=Colors.white);
-    final line=Paint()..color=const Color(0xFF7890A4)..style=PaintingStyle.stroke..strokeWidth=1;
-    final fill=Paint()..color=const Color(0xFFE7F0F7);
+
+    final line=Paint()
+      ..color=const Color(0xFF7890A4)
+      ..style=PaintingStyle.stroke
+      ..strokeWidth=1;
+    final headerFill=Paint()..color=const Color(0xFFE7F0F7);
+
+    var y=topMargin;
     if(page==0){
-      _paintText(c,_title,Rect.fromLTWH(0,topH+4,w,48),28,bold:true);
-      _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(0,topH+48,w,22),13);
+      _paintText(c,_title,Rect.fromLTWH(26,y,w-52,36),22,bold:true);
+      _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(26,y+34,w-52,18),11);
+      y+=titleH;
     }
-    final y0=topH+pageHeaderH;
-    final xs=<double>[0,120,365,575,695,785,1120];
-    final heads=['영수증 번호','고객명/회사명','연락처','구획(Zone)','수량','비고'];
+
+    const left=26.0;
+    const right=1094.0;
+    final xs=<double>[left,145,390,505,760,840,right];
+    final heads=['영수증 번호','고객명/회사명','구획(Zone)','박스 번호','수량','서명(Sign)'];
+
     for(var i=0;i<heads.length;i++){
-      final r=Rect.fromLTRB(xs[i],y0,xs[i+1],y0+colH);
-      c.drawRect(r,fill); c.drawRect(r,line); _paintText(c,heads[i],r,17,bold:true);
+      final r=Rect.fromLTRB(xs[i],y,xs[i+1],y+colH);
+      c.drawRect(r,headerFill);
+      c.drawRect(r,line);
+      _paintText(c,heads[i],r,14,bold:true);
     }
-    for(var n=0;n<rows.length;n++){
-      final row=rows[n]; final y=y0+colH+n*rowH;
-      final vals=['${row['receipt']}','${row['name']}','${row['phone']}','${row['zone']}',
-        '${row['quantity']}','${row['note']}'];
-      for(var i=0;i<vals.length;i++){
+    y+=colH;
+
+    for(final row in rows){
+      final boxLines=_boxLines(row);
+      final rowH=unitH*boxLines.length;
+      final delivery='${row['delivery']??''}';
+      final values=<String>[
+        '${row['receipt']??''}',
+        '${row['name']??''}',
+        '${row['zone']??''}',
+        '',
+        '${row['quantity']??''}',
+        delivery,
+      ];
+
+      for(var i=0;i<values.length;i++){
         final r=Rect.fromLTRB(xs[i],y,xs[i+1],y+rowH);
+        if(i==5){
+          final fill=_deliveryFill(delivery);
+          if(fill!=null)c.drawRect(r,Paint()..color=fill);
+        }
         c.drawRect(r,line);
-        _paintText(c,vals[i],r,i==0||i==3?16:14,bold:i==0||i==3,
-          align:(i==1||i==5)?TextAlign.left:TextAlign.center);
+
+        if(i==3){
+          for(var b=0;b<boxLines.length;b++){
+            final br=Rect.fromLTRB(xs[i],y+unitH*b,xs[i+1],y+unitH*(b+1));
+            _paintText(c,boxLines[b],br,11,bold:false,align:TextAlign.center);
+          }
+        }else{
+          final size=i==1 ? 15.0 : (i==5 ? 12.0 : 14.0);
+          _paintText(c,values[i],r,size,bold:i==0||i==1||i==2,align:TextAlign.center);
+        }
       }
+      y+=rowH;
     }
-    final fy=y0+colH+rows.length*rowH;
-    _paintText(c,'LK GROUP · 고객 리스트 관리 출력',Rect.fromLTWH(0,fy,w,footerH),13);
-    final pic=rec.endRecording(); final img=await pic.toImage(w.toInt(),h.toInt());
+
+    final pic=rec.endRecording();
+    final img=await pic.toImage(w.toInt(),h.toInt());
     final bd=await img.toByteData(format:ui.ImageByteFormat.png);
     if(bd==null)throw StateError('PNG 생성 실패');
     return bd.buffer.asUint8List();
@@ -193,7 +319,9 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     if(_rows.isEmpty||_saving)return;
     setState(()=>_saving=true);
     try{
-      final bytes=await _renderPage(_rows,page:0,pages:1);
+      final pageRows=_printPages();
+      if(pageRows.isEmpty)return;
+      final bytes=await _renderPage(pageRows.first,page:0,pages:pageRows.length);
       final name='${(_route??'LK').toUpperCase()}_${_year}_${_voyage}_CUSTOMER_LIST.png';
       final path=await FilePicker.saveFile(dialogTitle:'고객 리스트 이미지 저장',fileName:name,bytes:bytes,
         mimeType:'image/png',type:FileType.custom,allowedExtensions:const ['png']);
@@ -206,15 +334,17 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     if(_rows.isEmpty||_saving)return;
     setState(()=>_saving=true);
     try{
-      const perPage=32;
-      final pages=(_rows.length/perPage).ceil();
+      final pageRows=_printPages();
+      final pages=pageRows.length;
       final doc=pw.Document();
       for(var p=0;p<pages;p++){
-        final slice=_rows.skip(p*perPage).take(perPage).toList(growable:false);
-        final png=await _renderPage(slice,page:p,pages:pages);
+        final png=await _renderPage(pageRows[p],page:p,pages:pages);
         final image=pw.MemoryImage(png);
-        doc.addPage(pw.Page(pageFormat:PdfPageFormat.a4,margin:const pw.EdgeInsets.fromLTRB(10,4,10,4),
-          build:(_)=>pw.Center(child:pw.Image(image,fit:pw.BoxFit.contain))));
+        doc.addPage(pw.Page(
+          pageFormat:PdfPageFormat.a4,
+          margin:pw.EdgeInsets.zero,
+          build:(_)=>pw.Image(image,fit:pw.BoxFit.fill),
+        ));
       }
       final bytes=await doc.save();
       final name='${(_route??'LK').toUpperCase()}_${_year}_${_voyage}_CUSTOMER_LIST.pdf';
