@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_colors.dart';
 import '../core/route_catalog.dart';
@@ -27,6 +28,7 @@ class _UnloadingListManagementScreenState
   String? _voyage;
   bool _busy = true;
   bool _saving = false;
+  bool _highlightLocked = true;
 
   List<String> get _routes => _batches
       .map((e) => e.route)
@@ -89,6 +91,27 @@ class _UnloadingListManagementScreenState
         year: _year!,
         voyage: _voyage!,
       );
+
+      // admin_excel_bulk_rows may not expose the Patch194 manual_uncertain
+      // column. Enrich it directly from shipments so ? always reaches PDF.
+      try {
+        final manualRaw = await Supabase.instance.client
+            .from('shipments')
+            .select('id')
+            .eq('manual_uncertain', true);
+        final manualIds = List<Map<String, dynamic>>.from(manualRaw as List)
+            .map((e) => '${e['id'] ?? ''}')
+            .where((e) => e.isNotEmpty)
+            .toSet();
+        for (final row in rows) {
+          if (manualIds.contains('${row['id'] ?? ''}')) {
+            row['manual_uncertain'] = true;
+          }
+        }
+      } catch (_) {
+        // Keep existing RPC data if direct enrichment is unavailable.
+      }
+
       rows.sort((a, b) => _boxOrder(a).compareTo(_boxOrder(b)));
       if (!mounted) return;
       setState(() => _rows = rows);
@@ -109,10 +132,13 @@ class _UnloadingListManagementScreenState
       RegExp(r'[\?\*]{2,}').hasMatch(value);
 
   bool _needsAttention(Map<String, dynamic> row) {
-    // Locked cargo is never highlighted.
-    if (row['data_locked'] == true) return false;
+    final locked = row['data_locked'] == true;
 
-    // Manual ? uncertainty uses the same yellow highlight as auto uncertainty.
+    // F/Y option: when ON, every locked cargo is yellow in unloading PDF.
+    // When OFF, locked cargo is excluded from yellow as in the old rule.
+    if (locked) return _highlightLocked;
+
+    // Manual ? uncertainty is yellow regardless of auto-detection.
     if (row['manual_uncertain'] == true) return true;
 
     final name = '${row['consignee_name'] ?? ''}'.trim();
@@ -360,10 +386,25 @@ class _UnloadingListManagementScreenState
             ),
             const SizedBox(height: 14),
             if (_busy) const LinearProgressIndicator(),
-            if (!_busy && _voyage != null)
+            if (!_busy && _voyage != null) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text(
+                  '잠금 물품 노란색 표시',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  _highlightLocked ? 'Y · 잠금 화물도 노란색' : 'F · 잠금 화물은 노란색 제외',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                value: _highlightLocked,
+                onChanged: (v) => setState(() => _highlightLocked = v),
+              ),
               Text(
                 '화물 ${_rows.length}건 · 노란색 확인 필요 ${_rows.where(_needsAttention).length}건',
               ),
+            ],
             const SizedBox(height: 10),
             FilledButton.icon(
               onPressed: _rows.isEmpty || _saving ? null : _savePdf,
@@ -376,7 +417,7 @@ class _UnloadingListManagementScreenState
             const Text(
               '정상 이름이 포함되어 있어도 **, ***, ?? 같은 확인표시가 섞여 있으면 '
               '정상 영수번호는 유지하고 하역 자료에서만 노란색으로 표시합니다. '
-              '관리자가 확인 후 잠금한 화물은 노란색에서 제외됩니다.',
+              '수동 ? 표시 화물은 노란색으로 표시되며, 잠금 화물의 노란색 표시는 위 F/Y 스위치로 선택할 수 있습니다.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,

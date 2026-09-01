@@ -545,10 +545,18 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalVolume = freight.lines.fold<double>(0, (v, f) => v + f.volumeWeight);
     final extraTotal =
         extraCosts.fold<double>(0, (sum, e) => sum + e.amountUsd);
-    final baseDiscountPercent = freight.grossTotalUsd <= 0
-        ? 0.0
-        : (freight.discountTotalUsd / freight.grossTotalUsd)
-            .clamp(0.0, 1.0);
+    // Use the actual discount rule from FreightService lines first.
+    // Important: when freight is $0, gross/discount ratio is 0/0-ish and
+    // previously made a checked extra cost receive no discount at all.
+    final lineBaseDiscountPercent = freight.lines
+        .map((line) => line.discountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+    final baseDiscountPercent = lineBaseDiscountPercent > 0
+        ? lineBaseDiscountPercent
+        : (freight.grossTotalUsd <= 0
+            ? 0.0
+            : (freight.discountTotalUsd / freight.grossTotalUsd)
+                .clamp(0.0, 1.0));
     final discountableExtraTotal = extraCosts
         .where((e) => e.discountApplies)
         .fold<double>(0, (sum, e) => sum + e.amountUsd);
