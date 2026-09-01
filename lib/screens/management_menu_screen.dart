@@ -17,6 +17,7 @@ import 'local_delivery_management_screen.dart';
 import 'unloading_list_management_screen.dart';
 import 'voyage_total_management_screen.dart';
 
+import './customer_list_management_screen.dart';
 class ManagementMenuScreen extends StatefulWidget {
   const ManagementMenuScreen({
     super.key,
@@ -155,6 +156,23 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
           'label': '하역 자료 관리',
           'icon': Icons.view_column_outlined,
           'page': const UnloadingListManagementScreen(),
+        },
+      ]);
+items.addAll([
+        {
+          'label': '선적 일정 관리',
+          'icon': Icons.calendar_month,
+          'page': ScheduleManagementScreen(user: user),
+        },
+        {
+          'label': '공지 및 안내 관리',
+          'icon': Icons.campaign_outlined,
+          'page': NoticeManagementScreen(user: user),
+        },
+        {
+          'label': '고객 리스트',
+          'icon': Icons.view_column_outlined,
+          'page': const CustomerListManagementScreen(),
         },
       ]);
     }
