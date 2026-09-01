@@ -494,6 +494,47 @@ function applyDeliveryColorConditionalFormatting(
     }
     files[sheetPath] = strToU8(xml);
   }
+  const customerPath = workbookSheetPath(files, '고객 리스트');
+  if (customerPath && files[customerPath]) {
+    let customerXml = strFromU8(files[customerPath]);
+    if (!customerXml.includes('LK_CUSTOMER_LIST_DELIVERY_COLOR')) {
+      const maxPriority = Math.max(
+        0,
+        ...[...customerXml.matchAll(/<cfRule\\b[^>]*priority="(\\d+)"/g)]
+          .map((m) => Number(m[1] ?? 0)),
+      );
+      const rules = [
+        { label: '시내배송(선결제)', dxf: baseDxf + 3 },
+        { label: '시내배송', dxf: baseDxf + 2 },
+        { label: '지방배송(선결제)', dxf: baseDxf + 1 },
+        { label: '지방배송', dxf: baseDxf + 0 },
+      ].map((r, i) =>
+        `<cfRule type="expression" dxfId="${r.dxf}" priority="${maxPriority + i + 1}" stopIfTrue="1">` +
+        `<formula>${escXml(`$E4="${r.label}"`)}</formula></cfRule>`
+      ).join('');
+      const block =
+        `<!--LK_CUSTOMER_LIST_DELIVERY_COLOR-->` +
+        `<conditionalFormatting sqref="E4:E150">${rules}</conditionalFormatting>`;
+      if (customerXml.includes('<dataValidations ')) {
+        customerXml = customerXml.replace(
+          '<dataValidations ',
+          `${block}<dataValidations `,
+        );
+      } else if (customerXml.includes('<pageMargins ')) {
+        customerXml = customerXml.replace(
+          '<pageMargins ',
+          `${block}<pageMargins `,
+        );
+      } else {
+        customerXml = customerXml.replace(
+          '</worksheet>',
+          `${block}</worksheet>`,
+        );
+      }
+      files[customerPath] = strToU8(customerXml);
+    }
+  }
+
 }
 
 function normalizePhone(value: unknown): string {
@@ -614,36 +655,109 @@ function upgradeZoneQuantityFormulas(
 function seedCustomerListFromShipments(
   files: Record<string, Uint8Array>,
   shipments: Record<string, unknown>[],
+  routeKey: string,
+  voyage: string,
 ): void {
   const path = workbookSheetPath(files, '고객 리스트');
   if (!path || !files[path]) return;
-
   let xml = strFromU8(files[path]);
+  const strings = sharedStrings(files);
+  const prefix = routeReceiptPrefix(routeKey);
+  const voyageNumber = String(voyage)
+    .replace(/^V/i, '')
+    .replace(/항차$/u, '')
+    .trim();
 
-  // A열에 이미 영수번호가 준비되어 있는 템플릿 구조를 그대로 사용합니다.
-  // 해당 영수번호 행의 B열(이름)을 직접 넣어 수식 재계산 전에도 즉시 보이게 하고,
-  // C열 구획은 기존 수식/값을 보존합니다.
-  const byReceipt = new Map<string, Record<string, unknown>>();
+  if (routeKey === 'kr_la_sea') {
+    xml = setStringCellInSheet(
+      xml,
+      'A1',
+      `Kor-Lao Sea ${voyageNumber}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)`,
+    );
+  }
+
+  const groups = new Map<string, Record<string, unknown>[]>();
   for (const shipment of shipments) {
     const receipt = String(shipment.receipt_number ?? '').trim();
-    if (receipt && !byReceipt.has(receipt)) byReceipt.set(receipt, shipment);
+    if (!receipt) continue;
+    const key = receipt.toUpperCase();
+    const list = groups.get(key) ?? [];
+    list.push(shipment);
+    groups.set(key, list);
   }
+
+  const compactName = (value: unknown) =>
+    String(value ?? '')
+      .replace(/[\s/,_()\-]+/g, '')
+      .toLowerCase();
+
+  const fixed102Names = [
+    '박성호','정석진','이동현','정민주','박상욱',
+    '박상용','임홍식','진정우','최현석',
+  ];
 
   for (const rowMatch of xml.matchAll(
     /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
   )) {
     const rowNumber = Number(rowMatch[1]);
-    if (rowNumber < 4) continue;
+    if (rowNumber < 4 || rowNumber > 150) continue;
     const rowXml = rowMatch[0];
-    const aRe = new RegExp(`<c\\b[^>]*r="A${rowNumber}"[^>]*>[\\s\\S]*?<\\/c>`);
+    const aRe = new RegExp(
+      `<c\\b[^>]*r="A${rowNumber}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`,
+    );
     const aMatch = rowXml.match(aRe);
     if (!aMatch) continue;
-    const receipt = cellText(aMatch[0], sharedStrings(files)).trim();
+
+    let receipt = cellText(aMatch[0], strings).trim();
+    if (/\bxx\s*$/i.test(receipt) && prefix) {
+      receipt = `${prefix} XX`;
+      xml = setStringCellInSheet(xml, `A${rowNumber}`, receipt);
+    }
     if (!receipt) continue;
-    const shipment = byReceipt.get(receipt);
-    if (!shipment) continue;
-    const name = String(shipment.consignee_name ?? '').trim();
+
+    const rows = groups.get(receipt.toUpperCase());
+    if (!rows?.length) continue;
+
+    const first = rows[0];
+    const name = String(first.consignee_name ?? '').trim();
     if (name) xml = setStringCellInSheet(xml, `B${rowNumber}`, name);
+
+    const note = rows
+      .map((x) => String(x.special_note_auto ?? '').trim())
+      .filter(Boolean)
+      .join(' / ');
+    const normalizedName = compactName(name);
+
+    const isDeliveryF =
+      note.includes('지방배송') || note.includes('시내배송');
+    const isNamedF =
+      normalizedName.startsWith('김요셉') ||
+      normalizedName.startsWith('뷰티판다');
+    const isFixed102 = fixed102Names.some(
+      (fixed) => normalizedName.startsWith(compactName(fixed)),
+    );
+
+    // Normal customers KEEP the original Excel A/B/C/F formula.
+    // Only explicit business-rule exceptions override Area Categorized.
+    if (isFixed102) {
+      xml = setStringCellInSheet(xml, `C${rowNumber}`, '102');
+    } else if (isDeliveryF || isNamedF) {
+      xml = setStringCellInSheet(xml, `C${rowNumber}`, 'F');
+    }
+
+    let signature = '';
+    if (note.includes('지방배송(선결제)')) {
+      signature = '지방배송(선결제)';
+    } else if (note.includes('시내배송(선결제)')) {
+      signature = '시내배송(선결제)';
+    } else if (note.includes('지방배송')) {
+      signature = '지방배송';
+    } else if (note.includes('시내배송')) {
+      signature = '시내배송';
+    }
+    if (signature) {
+      xml = setStringCellInSheet(xml, `E${rowNumber}`, signature);
+    }
   }
 
   files[path] = strToU8(xml);
@@ -1614,7 +1728,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       });
     }
     // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
-    seedCustomerListFromShipments(files, enrichedShipments);
+    seedCustomerListFromShipments(files, enrichedShipments, routeKey, voyage);
     upgradeZoneQuantityFormulas(files);
     // 한 장의 기존 명세서에서 N2 영수번호를 선택해 전체 내용을 바꾸는 동적 명세서 기반.
     enableDynamicReceiptSelector(

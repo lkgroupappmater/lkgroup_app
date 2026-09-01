@@ -555,12 +555,15 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
     final adjH = 25.0;
-    _text(c, '할인', Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 7, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, '특별할인', Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 34, totalW * .44, adjH), 16, bold: true, right: true);
-    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .46, adjH), 16, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, sumTop + 61, totalW * .44, adjH), 16, bold: true, right: true);
+    for (final row in <(String, double)>[
+      ('할인', sumTop + 7),
+      ('특별할인', sumTop + 34),
+      ('세금 계산서(VAT)', sumTop + 61),
+    ]) {
+      _text(c, row.$1, Rect.fromLTWH(totalX + 12, row.$2, totalW * .44, adjH), 16, bold: true);
+      _text(c, '-', Rect.fromLTWH(totalX + totalW * .52, row.$2, totalW * .20, adjH), 16, bold: true, center: true);
+      _text(c, '-', Rect.fromLTWH(totalX + totalW * .72, row.$2, totalW * .24, adjH), 16, bold: true, right: true);
+    }
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;
