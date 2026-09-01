@@ -726,7 +726,12 @@ class ExcelImportService {
         final sourceNo = currentSourceNo!;
         final profileSourceNo =
             section.type == 'city' ? 10000 + sourceNo : sourceNo;
-        final profileKey = '${section.type ?? 'legacy'}|$sourceNo';
+
+        // DB conflict key is (route_key, source_no), so the in-memory key MUST
+        // be the same identity. Using section/type in the Dart key allowed two
+        // rows with the same final source_no into one bulk UPSERT, causing
+        // SQLSTATE 21000: ON CONFLICT DO UPDATE ... row a second time.
+        final profileKey = '$profileSourceNo';
         final customerName = rowCustomer.isNotEmpty ? rowCustomer : currentCustomerName;
         final alternateName = rowAlternate.isNotEmpty ? rowAlternate : currentAlternateName;
         final companyName = rowCompany.isNotEmpty ? rowCompany : currentCompanyName;
@@ -793,10 +798,17 @@ class ExcelImportService {
         .delete()
         .eq('route_key', routeKey);
 
-    await SupabaseService.client.from('local_delivery_profiles').upsert(
-          bySourceNo.values.toList(growable: false),
-          onConflict: 'route_key,source_no',
-        );
+    // Defensive one-row UPSERT: even if a future BASE layout produces
+    // rows that normalize to the same DB key, PostgreSQL will never receive
+    // duplicate conflict targets in the same INSERT statement.
+    for (final profile in bySourceNo.values) {
+      await SupabaseService.client
+          .from('local_delivery_profiles')
+          .upsert(
+            profile,
+            onConflict: 'route_key,source_no',
+          );
+    }
 
     // Patch167: do not run a global shipment refresh here.
     // importBytes() runs one batch-scoped finalizer after shipment upsert.
