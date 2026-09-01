@@ -617,43 +617,56 @@ function upgradeZoneQuantityFormulas(
 
   let xml = strFromU8(files[path]);
 
-  // 기존 구획 판정용 F열은 G:DL에 조회된 "화물번호 개수"만 셌습니다.
-  // 따라서 1개 화물번호에 수량 100개가 들어와도 1개로 판단했습니다.
-  //
-  // 새 방식:
-  // 같은 영수번호의 '물품 입고 내역' I열(수량)을 합산합니다.
-  // - S001 / 수량 1 + S002 / 수량 1 = 2개
-  // - S001 / 수량 100 = 100개
-  // 두 입력 방식 모두 동일하게 처리됩니다.
-  //
-  // 기존 Zone 기준표(C117:D120 등)는 그대로 유지합니다.
-  for (let row = 4; row <= 114; row++) {
-    const ref = `F${row}`;
-    const cellRe = new RegExp(
-      `<c\\b([^>]*)r="${ref}"([^>]*)>([\\s\\S]*?)<\\/c>`,
-    );
-    const match = xml.match(cellRe);
-    if (!match) continue;
-
-    const body = match[3] ?? '';
-    if (!/<f\\b/.test(body)) continue;
-
-    const formula =
-      `SUMIF('물품 입고 내역'!$N$6:$N$1005,$A${row},'물품 입고 내역'!$I$6:$I$1005)`;
-
-    const newBody = body.replace(
-      /<f\b[^>]*>[\s\S]*?<\/f>/,
-      `<f>${formula}</f>`,
-    );
-
-    xml = xml.replace(
-      match[0],
-      `<c${match[1]}r="${ref}"${match[2]}>${newBody}</c>`,
-    );
-  }
+  // PATCH200C: one-pass rewrite. The old implementation rescanned/copied the whole
+  // worksheet up to 111 times and could exceed the Edge CPU budget.
+  xml = xml.replace(
+    /<c\b([^>]*)r="F(\d+)"([^>]*)>([\s\S]*?)<\/c>/g,
+    (full, before, rowText, after, body) => {
+      const row = Number(rowText);
+      if (row < 4 || row > 114 || !/<f\b/.test(String(body))) return full;
+      const formula =
+        `SUMIF('물품 입고 내역'!$N$6:$N$1005,$A${row},'물품 입고 내역'!$I$6:$I$1005)`;
+      const nextBody = String(body).replace(
+        /<f\b[^>]*>[\s\S]*?<\/f>/,
+        `<f>${formula}</f>`,
+      );
+      return `<c${before}r="F${row}"${after}>${nextBody}</c>`;
+    },
+  );
 
   files[path] = strToU8(xml);
 }
+
+function setFormulaCellInRowFast(
+  rowXml: string,
+  rowNumber: number,
+  column: string,
+  formula: string,
+): string {
+  const ref = `${column}${rowNumber}`;
+  const cellRe = new RegExp(
+    `<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`,
+  );
+  const existing = rowXml.match(cellRe);
+  const attrs = existing ? `${existing[1] ?? ''}${existing[2] ?? ''}` : '';
+  const styleMatch = attrs.match(/\\bs="([^"]+)"/);
+  const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
+  const replacement = `<c r="${ref}"${style}><f>${escXml(formula)}</f></c>`;
+
+  if (existing) return rowXml.replace(cellRe, () => replacement);
+
+  const targetIndex = columnIndex(column);
+  const cells = [...rowXml.matchAll(
+    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+  )];
+  for (const match of cells) {
+    if (columnIndex(match[1]) > targetIndex && match.index != null) {
+      return `${rowXml.substring(0, match.index)}${replacement}${rowXml.substring(match.index)}`;
+    }
+  }
+  return rowXml.replace('</row>', `${replacement}</row>`);
+}
+
 function setFormulaCellPreservingStyle(
   sheetXml: string,
   ref: string,
@@ -699,6 +712,7 @@ function seedCustomerListFromShipments(
 ): void {
   const path = workbookSheetPath(files, '고객 리스트');
   if (!path || !files[path]) return;
+
   let xml = strFromU8(files[path]);
   const strings = sharedStrings(files);
   const prefix = routeReceiptPrefix(routeKey);
@@ -727,46 +741,56 @@ function seedCustomerListFromShipments(
 
   const compactName = (value: unknown) =>
     String(value ?? '').replace(/[\s/,_()\-]+/g, '').toLowerCase();
-
   const fixed102Names = [
     '박성호','정석진','이동현','정민주','박상욱',
     '박상용','임홍식','진정우','최현석',
   ];
 
-  for (const rowMatch of xml.matchAll(
-    /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
-  )) {
-    const rowNumber = Number(rowMatch[1]);
-    if (rowNumber < 4 || rowNumber > 150) continue;
-    const rowXml = rowMatch[0];
+  const rowRe = /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g;
+  xml = xml.replace(rowRe, (rowXml, rowText) => {
+    const rowNumber = Number(rowText);
+    if (rowNumber < 4 || rowNumber > 150) return rowXml;
+
     const aRe = new RegExp(
       `<c\\b[^>]*r="A${rowNumber}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`,
     );
-    const aMatch = rowXml.match(aRe);
-    if (!aMatch) continue;
+    const aMatch = String(rowXml).match(aRe);
+    if (!aMatch) return rowXml;
 
     let receipt = cellText(aMatch[0], strings).trim();
+    let nextRow = String(rowXml);
+
     if (/\bxx\s*$/i.test(receipt) && prefix) {
       receipt = `${prefix} XX`;
-      xml = setStringCellInSheet(xml, `A${rowNumber}`, receipt);
+      nextRow = updateCell(nextRow, rowNumber, 'A', receipt, 'text');
     }
-    if (!receipt) continue;
+    if (!receipt) return nextRow;
 
     const rows = groups.get(receipt.toUpperCase());
-    if (!rows?.length) continue;
+    if (!rows?.length) {
+      // Even empty/unused normal receipt slots keep their BASE Zone formula.
+      if (!/\bxx\s*$/i.test(receipt)) {
+        nextRow = setFormulaCellInRowFast(
+          nextRow,
+          rowNumber,
+          'C',
+          `IF(B${rowNumber}="","",IF(F${rowNumber}<=10,"A",IF(F${rowNumber}<=20,"B",IF(F${rowNumber}<=30,"C","F"))))`,
+        );
+      }
+      return nextRow;
+    }
 
     const first = rows[0];
     const name = String(first.consignee_name ?? '').trim();
-    if (name) xml = setStringCellInSheet(xml, `B${rowNumber}`, name);
+    if (name) nextRow = updateCell(nextRow, rowNumber, 'B', name, 'text');
 
-    const note = rows
-      .map((x) => String(x.special_note_auto ?? '').trim())
-      .filter(Boolean)
-      .join(' / ');
+    const note = [...new Set(
+      rows
+        .map((x) => String(x.special_note_auto ?? '').trim())
+        .filter(Boolean),
+    )].join(' / ');
     const normalizedName = compactName(name);
-
-    const isDeliveryF =
-      note.includes('지방배송') || note.includes('시내배송');
+    const isDeliveryF = note.includes('지방배송') || note.includes('시내배송');
     const isNamedF =
       normalizedName.startsWith('김요셉') ||
       normalizedName.startsWith('뷰티판다');
@@ -774,18 +798,15 @@ function seedCustomerListFromShipments(
       (fixed) => normalizedName.startsWith(compactName(fixed)),
     );
 
-    // Keep the original A/B/C/F Excel formula for ordinary customers.
-    // Override ONLY explicit business exceptions.
     if (isFixed102) {
-      xml = setStringCellInSheet(xml, `C${rowNumber}`, '102');
+      nextRow = updateCell(nextRow, rowNumber, 'C', '102', 'text');
     } else if (isDeliveryF || isNamedF) {
-      xml = setStringCellInSheet(xml, `C${rowNumber}`, 'F');
+      nextRow = updateCell(nextRow, rowNumber, 'C', 'F', 'text');
     } else {
-      // Ordinary customers MUST keep the BASE Excel quantity formula.
-      // Only explicit fixed/delivery exceptions above are allowed to overwrite C.
-      xml = setFormulaCellPreservingStyle(
-        xml,
-        `C${rowNumber}`,
+      nextRow = setFormulaCellInRowFast(
+        nextRow,
+        rowNumber,
+        'C',
         `IF(B${rowNumber}="","",IF(F${rowNumber}<=10,"A",IF(F${rowNumber}<=20,"B",IF(F${rowNumber}<=30,"C","F"))))`,
       );
     }
@@ -801,9 +822,11 @@ function seedCustomerListFromShipments(
       signature = '시내배송';
     }
     if (signature) {
-      xml = setStringCellInSheet(xml, `E${rowNumber}`, signature);
+      nextRow = updateCell(nextRow, rowNumber, 'E', signature, 'text');
     }
-  }
+
+    return nextRow;
+  });
 
   files[path] = strToU8(xml);
 }
@@ -1771,7 +1794,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       `${prefix}_${shipmentYear}_${voyageToken}_SHIPMENTS.xlsx`;
 
     const original = new Uint8Array(await templateBlob.arrayBuffer());
+    console.log('[EXCEL200C] unzip start', original.byteLength);
     const files = unzipSync(original);
+    console.log('[EXCEL200C] unzip done');
 
     const targetPath = workbookSheetPath(files, '물품 입고 내역');
     const strings = sharedStrings(files);
@@ -1896,7 +1921,13 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // PATCH200B: XLSX is already a ZIP archive.  Level 6 compression can push the
     // Supabase Edge worker over its compute limit on the large multi-sheet BASE files.
     // Level 1 keeps the workbook fully compatible while drastically reducing CPU time.
-    const encoded = zipSync(files, { level: 1 });
+    // PATCH200C: Supabase Edge has a very small per-request CPU budget.
+    // The workbook is already only a few MB compressed; recompressing every OOXML part
+    // is the single most expensive synchronous step. Store-only ZIP is valid XLSX and
+    // dramatically lowers CPU usage.
+    console.log('[EXCEL200C] zip start');
+    const encoded = zipSync(files, { level: 0 });
+    console.log('[EXCEL200C] zip done', encoded.byteLength);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const exportPath =
       `${routeKey}/${shipmentYear}/${voyageToken}/${stamp}_${outputFileName}`;
