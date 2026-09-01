@@ -832,7 +832,6 @@ class _DigitalStatementPainter extends CustomPainter {
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;
-    final labelW = totalW * .46;
     _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
     _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
         19, bold: true, center: true);
