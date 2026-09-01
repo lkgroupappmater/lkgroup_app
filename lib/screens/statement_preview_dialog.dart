@@ -742,44 +742,93 @@ class _DigitalStatementPainter extends CustomPainter {
     final specialDiscountUsd =
         isSpecialDiscount ? totalDiscountUsd : 0.0;
 
+    // Three clear columns: label | percent (~2/3) | amount (far right).
+    const adjustmentFont = 15.0;
+    final labelW = totalW * .46;
+    final percentX = totalX + totalW * .54;
+    final percentW = totalW * .18;
+    final amountX = totalX + totalW * .74;
+    final amountW = totalW * .22;
+
     _text(
       c,
-      discountLabel,
-      Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .52, adjH),
-      15,
+      '할인',
+      Rect.fromLTWH(totalX + 12, sumTop + 7, labelW, adjH),
+      adjustmentFont,
       bold: true,
     );
     _text(
       c,
-      regularDiscountUsd > 0
+      !isSpecialDiscount && actualDiscountPctText.isNotEmpty
+          ? actualDiscountPctText
+          : '-',
+      Rect.fromLTWH(percentX, sumTop + 7, percentW, adjH),
+      adjustmentFont,
+      bold: true,
+      center: true,
+    );
+    _text(
+      c,
+      !isSpecialDiscount && actualDiscountPctText.isNotEmpty
           ? '-${MoneyFormat.usd(regularDiscountUsd)}'
           : '-',
-      Rect.fromLTWH(totalX + totalW * .56, sumTop + 7, totalW * .40, adjH),
-      16,
+      Rect.fromLTWH(amountX, sumTop + 7, amountW, adjH),
+      adjustmentFont,
       bold: true,
       right: true,
+    );
+
+    _text(
+      c,
+      '특별할인',
+      Rect.fromLTWH(totalX + 12, sumTop + 34, labelW, adjH),
+      adjustmentFont,
+      bold: true,
     );
     _text(
       c,
       isSpecialDiscount && actualDiscountPctText.isNotEmpty
-          ? '$discountGroupText $actualDiscountPctText'
-          : '특별할인',
-      Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .52, adjH),
-      15,
+          ? actualDiscountPctText
+          : '-',
+      Rect.fromLTWH(percentX, sumTop + 34, percentW, adjH),
+      adjustmentFont,
+      bold: true,
+      center: true,
+    );
+    _text(
+      c,
+      isSpecialDiscount && actualDiscountPctText.isNotEmpty
+          ? '-${MoneyFormat.usd(specialDiscountUsd)}'
+          : '-',
+      Rect.fromLTWH(amountX, sumTop + 34, amountW, adjH),
+      adjustmentFont,
+      bold: true,
+      right: true,
+    );
+
+    _text(
+      c,
+      '세금 계산서(VAT)',
+      Rect.fromLTWH(totalX + 12, sumTop + 61, labelW, adjH),
+      adjustmentFont,
       bold: true,
     );
     _text(
       c,
-      specialDiscountUsd > 0
-          ? '-${MoneyFormat.usd(specialDiscountUsd)}'
-          : '-',
-      Rect.fromLTWH(totalX + totalW * .56, sumTop + 34, totalW * .40, adjH),
-      16,
+      '-',
+      Rect.fromLTWH(percentX, sumTop + 61, percentW, adjH),
+      adjustmentFont,
+      bold: true,
+      center: true,
+    );
+    _text(
+      c,
+      '-',
+      Rect.fromLTWH(amountX, sumTop + 61, amountW, adjH),
+      adjustmentFont,
       bold: true,
       right: true,
     );
-    _text(c, '세금 계산서(VAT)', Rect.fromLTWH(totalX + 12, sumTop + 61, totalW * .52, adjH), 15, bold: true);
-    _text(c, '-', Rect.fromLTWH(totalX + totalW * .56, sumTop + 61, totalW * .40, adjH), 16, bold: true, right: true);
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;

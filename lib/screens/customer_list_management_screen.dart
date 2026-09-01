@@ -16,22 +16,22 @@ class _CustomerListManagementScreenState
   String? _route;
   int? _year;
   String? _voyage;
-  List<Map<String, dynamic>> _batchRows = const [];
+  List<Map<String, dynamic>> _batches = const [];
   List<Map<String, dynamic>> _rows = const [];
 
   List<String> get _routes => {
-        for (final r in _batchRows) '${r['route'] ?? ''}'.trim(),
+        for (final r in _batches) '${r['route'] ?? ''}'.trim(),
       }.where((e) => e.isNotEmpty).toList()
         ..sort();
 
   List<int> get _years => {
-        for (final r in _batchRows)
+        for (final r in _batches)
           if ((r['shipment_year'] as num?)?.toInt() case final int y) y,
       }.toList()
         ..sort((a, b) => b.compareTo(a));
 
   List<String> get _voyages => {
-        for (final r in _batchRows)
+        for (final r in _batches)
           if (_route == '${r['route'] ?? ''}'.trim() &&
               _year == (r['shipment_year'] as num?)?.toInt())
             '${r['voyage'] ?? ''}'.trim(),
@@ -60,7 +60,7 @@ class _CustomerListManagementScreenState
           .toList(growable: false);
       if (!mounted) return;
       setState(() {
-        _batchRows = all;
+        _batches = all;
         _route = _routes.isNotEmpty ? _routes.first : null;
         _year = _years.isNotEmpty ? _years.first : null;
         _voyage = _voyages.isNotEmpty ? _voyages.first : null;
@@ -82,7 +82,7 @@ class _CustomerListManagementScreenState
       final raw = await SupabaseService.client
           .from('shipments')
           .select(
-            'receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number,locked',
+            'receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number',
           )
           .eq('route', _route!)
           .eq('shipment_year', _year!)
@@ -116,7 +116,6 @@ class _CustomerListManagementScreenState
           'zone': '${first['unloading_zone'] ?? ''}'.trim(),
           'note': notes,
           'count': entry.value.length,
-          'locked': entry.value.every((e) => e['locked'] == true),
         });
       }
 
@@ -158,9 +157,6 @@ class _CustomerListManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final routes = _routes;
-    final years = _years;
-    final voyages = _voyages;
     return Scaffold(
       appBar: AppBar(title: const Text('고객 리스트')),
       body: Padding(
@@ -172,7 +168,7 @@ class _CustomerListManagementScreenState
                 _selector<String>(
                   label: '운송 경로',
                   value: _route,
-                  items: routes,
+                  items: _routes,
                   text: (v) => v,
                   onChanged: (v) {
                     setState(() {
@@ -187,7 +183,7 @@ class _CustomerListManagementScreenState
                 _selector<int>(
                   label: '년도',
                   value: _year,
-                  items: years,
+                  items: _years,
                   text: (v) => '$v년',
                   onChanged: (v) {
                     setState(() {
@@ -201,7 +197,7 @@ class _CustomerListManagementScreenState
                 _selector<String>(
                   label: '항차',
                   value: _voyage,
-                  items: voyages,
+                  items: _voyages,
                   text: (v) => v.endsWith('항차') ? v : '$v항차',
                   onChanged: (v) {
                     setState(() => _voyage = v);
@@ -256,7 +252,6 @@ class _CustomerListManagementScreenState
                               if ('${r['phone']}'.isNotEmpty) '${r['phone']}',
                               'Zone ${r['zone']}',
                               '${r['count']}건',
-                              if (r['locked'] == true) '잠금/확정',
                               if (note.isNotEmpty) note,
                             ].join(' · '),
                             maxLines: 2,

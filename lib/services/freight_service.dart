@@ -195,9 +195,7 @@ class FreightService {
     required String phone,
   }) async {
     final normalizedPhone = _digits(phone);
-    if (!SupabaseConfig.isConfigured ||
-        name.trim().isEmpty ||
-        normalizedPhone.isEmpty) {
+    if (!SupabaseConfig.isConfigured || name.trim().isEmpty) {
       return null;
     }
 
@@ -332,13 +330,20 @@ class FreightService {
   static bool _phoneMatches(String a, String b) {
     final aa = _digits(a);
     final bb = _digits(b);
-    if (aa.isEmpty || bb.isEmpty) return false;
-    if (aa == bb) return true;
-    if (aa.length >= 8 && bb.length >= 8) {
-      return aa.substring(aa.length - 8) ==
-          bb.substring(bb.length - 8);
+    if (aa.isNotEmpty && bb.isNotEmpty) {
+      if (aa == bb) return true;
+      if (aa.length >= 8 && bb.length >= 8) {
+        return aa.substring(aa.length - 8) ==
+            bb.substring(bb.length - 8);
+      }
+      return false;
     }
-    return false;
+
+    // Some confirmed BASE identities use a non-numeric token such as CEO.
+    // This is still a strong phone/identity match: exact token on both sides.
+    final rawA = a.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    final rawB = b.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    return rawA.isNotEmpty && rawA == rawB;
   }
 
   static String _digits(String value) =>

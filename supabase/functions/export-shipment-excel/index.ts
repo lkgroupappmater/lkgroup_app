@@ -687,9 +687,7 @@ function seedCustomerListFromShipments(
   }
 
   const compactName = (value: unknown) =>
-    String(value ?? '')
-      .replace(/[\s/,_()\-]+/g, '')
-      .toLowerCase();
+    String(value ?? '').replace(/[\s/,_()\-]+/g, '').toLowerCase();
 
   const fixed102Names = [
     '박성호','정석진','이동현','정민주','박상욱',
@@ -737,8 +735,8 @@ function seedCustomerListFromShipments(
       (fixed) => normalizedName.startsWith(compactName(fixed)),
     );
 
-    // Normal customers KEEP the original Excel A/B/C/F formula.
-    // Only explicit business-rule exceptions override Area Categorized.
+    // Keep the original A/B/C/F Excel formula for ordinary customers.
+    // Override ONLY explicit business exceptions.
     if (isFixed102) {
       xml = setStringCellInSheet(xml, `C${rowNumber}`, '102');
     } else if (isDeliveryF || isNamedF) {
