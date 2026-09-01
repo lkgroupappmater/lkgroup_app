@@ -389,6 +389,8 @@ class _DigitalQuotationPainter extends CustomPainter {
 
   @override
   void paint(Canvas c, Size size) {
+    final safeDiscountPercent =
+        discountPercent.clamp(0, 100).toDouble();
     final w = size.width;
     final h = size.height;
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
@@ -524,7 +526,6 @@ class _DigitalQuotationPainter extends CustomPainter {
         .where((e) => e.discountApplies)
         .fold<double>(0, (sum, e) => sum + e.amountUsd);
     final grossUsd = result.totalUsd + extraTotal;
-    final safeDiscountPercent = discountPercent.clamp(0, 100).toDouble();
     final discountBase = result.totalUsd + discountableExtra;
     final discountAmount = discountBase * safeDiscountPercent / 100;
     final usd = grossUsd - discountAmount;
