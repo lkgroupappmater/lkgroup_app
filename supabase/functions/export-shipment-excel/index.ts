@@ -627,7 +627,7 @@ function upgradeZoneQuantityFormulas(
       const formula =
         `SUMIF('물품 입고 내역'!$N$6:$N$1005,$A${row},'물품 입고 내역'!$I$6:$I$1005)`;
       const nextBody = String(body).replace(
-        /<f\b[^>]*>[\s\S]*?<\/f>/,
+        /<f\b[^>]*(?:\/>|>[\s\S]*?<\/f>)/,
         `<f>${formula}</f>`,
       );
       return `<c${before}r="F${row}"${after}>${nextBody}</c>`;
