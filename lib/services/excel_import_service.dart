@@ -1192,7 +1192,7 @@ class ExcelImportService {
           v.contains('특별');
     }
 
-    for (var rr = headerRow; rr >= 0 && rr >= headerRow - 3; rr--) {
+    for (var rr = headerRow; rr >= 0 && rr >= headerRow - 12; rr--) {
       final row = sheet[rr];
       final start = customerColumn - 4 < 0 ? 0 : customerColumn - 4;
       final end = customerColumn + 6 < row.length

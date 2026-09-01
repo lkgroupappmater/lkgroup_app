@@ -588,21 +588,42 @@ class _DigitalStatementPainter extends CustomPainter {
         .where((value) => value.isNotEmpty && value != '기타 할인')
         .toSet()
         .toList(growable: false);
+    final freightDiscountPercent = freight.lines
+        .map((line) => line.discountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+
+    String pctText(double value) {
+      final p = value * 100;
+      return (p - p.roundToDouble()).abs() < .001
+          ? p.toStringAsFixed(0)
+          : p.toStringAsFixed(2);
+    }
+
     var displayAutoNotes = autoNotes;
-    if (freightGroups.length == 1 &&
-        displayAutoNotes.contains(RegExp(r'(^| / )할인\s+[0-9.]+% 적용'))) {
-      final group = freightGroups.first;
-      final genericDiscount = RegExp(r'(^| / )할인\s+([0-9.]+% 적용)');
-      final match = genericDiscount.firstMatch(displayAutoNotes);
-      if (match != null) {
-        final replacement =
-            '${match.group(1) ?? ''}$group 할인 ${match.group(2) ?? ''}';
-        displayAutoNotes = displayAutoNotes.replaceRange(
-          match.start,
-          match.end,
-          replacement,
+    if (freightDiscountPercent > 0) {
+      final group = freightGroups.isEmpty ? '할인' : freightGroups.first;
+      final phrase = group.contains('할인')
+          ? '$group ${pctText(freightDiscountPercent)}% 적용'
+          : '$group 할인 ${pctText(freightDiscountPercent)}% 적용';
+      final parts = displayAutoNotes.isEmpty
+          ? <String>[]
+          : displayAutoNotes.split(' / ').map((e) => e.trim()).toList();
+      final oldDiscount = parts.indexWhere(
+        (e) => e.contains('할인') && e.contains('% 적용'),
+      );
+      if (oldDiscount >= 0) {
+        parts[oldDiscount] = phrase;
+      } else {
+        final delivery = parts.indexWhere(
+          (e) => e.contains('지방배송') || e.contains('시내배송'),
         );
+        if (delivery >= 0) {
+          parts.insert(delivery, phrase);
+        } else {
+          parts.add(phrase);
+        }
       }
+      displayAutoNotes = parts.where((e) => e.isNotEmpty).join(' / ');
     }
     final remarkText = displayAutoNotes.isEmpty
         ? docText.remark
@@ -672,6 +693,15 @@ class _DigitalStatementPainter extends CustomPainter {
           (value) => value.isNotEmpty,
           orElse: () => '',
         );
+    final actualDiscountPercent = freight.lines
+        .map((line) => line.discountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+    final actualDiscountPctText =
+        actualDiscountPercent > 0 ? '${pctText(actualDiscountPercent)}%' : '';
+    final discountLabel = actualDiscountPctText.isEmpty
+        ? '할인'
+        : '${discountGroupText.isEmpty ? '할인' : discountGroupText} '
+            '$actualDiscountPctText';
     final isSpecialDiscount = discountGroupText.contains('특별');
     final regularDiscountUsd =
         isSpecialDiscount ? 0.0 : totalDiscountUsd;
@@ -680,7 +710,7 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _text(
       c,
-      discountPercentText.isEmpty ? '할인' : '할인 $discountPercentText',
+      discountLabel,
       Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .52, adjH),
       15,
       bold: true,
@@ -697,9 +727,9 @@ class _DigitalStatementPainter extends CustomPainter {
     );
     _text(
       c,
-      discountPercentText.isEmpty
-          ? '특별할인'
-          : '특별할인 $discountPercentText',
+      isSpecialDiscount && actualDiscountPctText.isNotEmpty
+          ? '$discountGroupText $actualDiscountPctText'
+          : '특별할인',
       Rect.fromLTWH(totalX + 12, sumTop + 34, totalW * .52, adjH),
       15,
       bold: true,

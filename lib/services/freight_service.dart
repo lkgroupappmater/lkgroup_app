@@ -103,15 +103,17 @@ class FreightService {
       final phone = '${row['consignee_phone'] ?? ''}';
       final year = _intOrNull(row['shipment_year'] ?? row['year']);
       final voyage = '${row['voyage'] ?? ''}';
+      final receiptNumber = '${row['receipt_number'] ?? ''}'.trim();
 
       final cacheKey =
-          '$routeKey|${year ?? ''}|$voyage|${_digits(phone)}|${name.trim().toLowerCase()}';
+          '$routeKey|${year ?? ''}|$voyage|$receiptNumber|${_digits(phone)}|${name.trim().toLowerCase()}';
       final override = overrideCache.containsKey(cacheKey)
           ? overrideCache[cacheKey]
           : await _customerOverride(
               routeKey: routeKey,
               year: year,
               voyage: voyage,
+              receiptNumber: receiptNumber,
               name: name,
               phone: phone,
             );
@@ -188,6 +190,7 @@ class FreightService {
     required String routeKey,
     required int? year,
     required String voyage,
+    required String receiptNumber,
     required String name,
     required String phone,
   }) async {
@@ -196,6 +199,32 @@ class FreightService {
         name.trim().isEmpty ||
         normalizedPhone.isEmpty) {
       return null;
+    }
+
+    if (year != null && receiptNumber.isNotEmpty) {
+      try {
+        final rawManual = await SupabaseService.client.rpc(
+          'get_receipt_discount_override',
+          params: {
+            'p_route_key': routeKey,
+            'p_year': year,
+            'p_voyage': voyage,
+            'p_receipt_number': receiptNumber,
+          },
+        );
+        if (rawManual is Map) {
+          final manual = Map<String, dynamic>.from(rawManual);
+          if (manual['id'] != null) {
+            return {
+              'id': manual['id'],
+              'discount_percent': manual['discount_percent'] ?? 0,
+              'group_name': manual['discount_name'] ?? '특별할인',
+              'customer_name': name,
+              'source_detail': '영수번호 수동 할인',
+            };
+          }
+        }
+      } catch (_) {}
     }
 
     // Patch123+: Customer Group의 개인명+회사명 물량을 같은 항차에서 합산해

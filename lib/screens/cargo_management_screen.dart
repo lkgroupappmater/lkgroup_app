@@ -8,6 +8,7 @@ import '../services/shipment_service.dart';
 import '../services/freight_service.dart';
 import '../services/shipment_filter_options_service.dart';
 import '../services/receipt_extra_cost_service.dart';
+import '../services/receipt_discount_service.dart';
 import 'shipment_manual_add_screen.dart';
 import 'notice_management_screen.dart';
 import 'schedule_management_screen.dart';
@@ -1925,6 +1926,140 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     });
   }
 
+  Future<void> _showReceiptDiscountDialog(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (rows.isEmpty || !(_isAdmin || _isStaff)) return;
+    final first = rows.first;
+    final routeKey =
+        RouteCatalog.formRouteKeyFor('${first['route'] ?? ''}'.trim());
+    final year = (first['shipment_year'] as num?)?.toInt();
+    final voyage = '${first['voyage'] ?? ''}'.trim();
+    final receipt = '${first['receipt_number'] ?? ''}'.trim();
+    if (routeKey.isEmpty || year == null || voyage.isEmpty || receipt.isEmpty) {
+      _message('할인을 연결할 영수번호 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    var current = await ReceiptDiscountService.instance.get(
+      routeKey: routeKey,
+      year: year,
+      voyage: voyage,
+      receiptNumber: receipt,
+    );
+    if (!mounted) return;
+
+    final discountName =
+        TextEditingController(text: current?.discountName ?? '특별할인');
+    final percent = TextEditingController(
+      text: current == null
+          ? ''
+          : (current.discountPercent * 100)
+              .toStringAsFixed(2)
+              .replaceFirst(RegExp(r'\.00$'), ''),
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('$receipt · 할인 적용'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (current != null)
+                  Text(
+                    '현재: ${current!.discountName} '
+                    '${(current!.discountPercent * 100).toStringAsFixed(2).replaceFirst(RegExp(r'\.00$'), '')}%',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: discountName,
+                  decoration: const InputDecoration(
+                    labelText: '할인명 / 단체명',
+                    hintText: '예: 라선협, 기업 할인, 특별할인',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: percent,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: '할인율',
+                    suffixText: '%',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (current != null)
+              TextButton.icon(
+                onPressed: () async {
+                  await ReceiptDiscountService.instance.delete(
+                    routeKey: routeKey,
+                    year: year,
+                    voyage: voyage,
+                    receiptNumber: receipt,
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  _message('$receipt 할인 적용을 삭제했습니다.');
+                },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('삭제'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('닫기'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                final value = double.tryParse(percent.text.trim());
+                if (value == null || value < 0 || value > 100) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('할인율은 0~100 사이로 입력해 주세요.')),
+                  );
+                  return;
+                }
+                await ReceiptDiscountService.instance.save(
+                  routeKey: routeKey,
+                  year: year,
+                  voyage: voyage,
+                  receiptNumber: receipt,
+                  discountName: discountName.text.trim().isEmpty
+                      ? '특별할인'
+                      : discountName.text.trim(),
+                  discountPercent: value / 100,
+                );
+                current = await ReceiptDiscountService.instance.get(
+                  routeKey: routeKey,
+                  year: year,
+                  voyage: voyage,
+                  receiptNumber: receipt,
+                );
+                if (dialogContext.mounted) setDialogState(() {});
+                _message('$receipt 할인 적용 완료');
+              },
+              icon: const Icon(Icons.percent),
+              label: Text(current == null ? '적용' : '수정 저장'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    discountName.dispose();
+    percent.dispose();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _showReceiptExtraCostDialog(
     List<Map<String, dynamic>> rows,
   ) async {
@@ -2308,6 +2443,45 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         ? null
                         : () => _editReceiptGroupCustomer(rows),
                     icon: const Icon(Icons.edit_note_outlined, size: 20),
+                  ),
+                if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
+                  FutureBuilder<ReceiptDiscountOverride?>(
+                    future: ReceiptDiscountService.instance.get(
+                      routeKey: RouteCatalog.formRouteKeyFor(
+                        '${first['route'] ?? ''}',
+                      ),
+                      year: (first['shipment_year'] as num?)?.toInt() ?? 0,
+                      voyage: '${first['voyage'] ?? ''}'.trim(),
+                      receiptNumber: receipt,
+                    ),
+                    builder: (context, snapshot) {
+                      final rule = snapshot.data;
+                      final pct = rule == null
+                          ? ''
+                          : '${(rule.discountPercent * 100).toStringAsFixed(2).replaceFirst(RegExp(r'\.00$'), '')}%';
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (pct.isNotEmpty)
+                            Text(
+                              pct,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navyPrimary,
+                              ),
+                            ),
+                          IconButton(
+                            tooltip: rule == null ? '할인 적용' : '할인 편집 / 삭제',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _busy
+                                ? null
+                                : () => _showReceiptDiscountDialog(rows),
+                            icon: const Icon(Icons.percent, size: 21),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
                   FutureBuilder<List<ExtraCostItem>>(

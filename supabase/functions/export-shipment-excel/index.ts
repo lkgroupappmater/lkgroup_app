@@ -1198,7 +1198,7 @@ function appendDocumentAutomationBlock(
       paidBy.includes('prepaid');
     const isKoreaPrepaid = koreaMarker && prepaidMarker;
     const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (isKoreaPrepaid ? 'province_prepaid_kr' : 'province')) : '';
-    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address, d.paid_by].filter(Boolean).join(', ') : '';
+    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address].filter(Boolean).join(', ') : '';
     const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
     const extra = extraMap.get(receipt) ?? 0;
     const discountRate = receiptDiscountRates.get(receipt) ?? 0;

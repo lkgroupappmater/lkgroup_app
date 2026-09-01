@@ -173,7 +173,6 @@ class LocalDeliveryRule {
       tel,
       localCompany,
       destinationAddress,
-      paidBy,
     ].where((e) => e.trim().isNotEmpty).join(', ');
   }
 }
@@ -223,19 +222,29 @@ class CustomerBenefitService {
     }
   }
 
-  static bool _nameMatches(
+  static int _nameMatchRank(String shipmentName, String candidateName) {
+    final a = _nameTokens(shipmentName).toSet();
+    final b = _nameTokens(candidateName).toSet();
+    if (a.isEmpty || b.isEmpty) return 9999;
+    final overlap = a.intersection(b);
+    if (overlap.isEmpty) return 9999;
+    if (a.length == b.length && a.containsAll(b) && b.containsAll(a)) return 0;
+    if (a.containsAll(b)) return 10 + (a.length - b.length);
+    if (b.containsAll(a)) return 30 - b.length.clamp(0, 20);
+    return 50 - overlap.length.clamp(0, 20);
+  }
+
+  static int _bestNameRank(
     String shipmentName,
     Iterable<String> candidates,
   ) {
-    final shipmentTokens = _nameTokens(shipmentName).toSet();
-    if (shipmentTokens.isEmpty) return false;
-
+    var best = 9999;
     for (final value in candidates) {
       if (value.trim().isEmpty) continue;
-      final candidateTokens = _nameTokens(value).toSet();
-      if (shipmentTokens.any(candidateTokens.contains)) return true;
+      final rank = _nameMatchRank(shipmentName, value);
+      if (rank < best) best = rank;
     }
-    return false;
+    return best;
   }
 
   Future<List<DiscountRule>> listDiscountRules() async {
@@ -378,19 +387,26 @@ class CustomerBenefitService {
         .order('preferred', ascending: false)
         .order('source_no')
         .limit(500);
+    LocalDeliveryRule? bestRule;
+    var bestRank = 9999;
+    var bestSource = 1 << 30;
     for (final raw in rows) {
       final rule =
           LocalDeliveryRule.fromMap(Map<String, dynamic>.from(raw));
       if (!_phoneMatches(phone, rule.phone)) continue;
-      if (!_nameMatches(
+      final rank = _bestNameRank(
         name,
         [rule.customerName, rule.alternateName, rule.companyName],
-      )) {
-        continue;
+      );
+      if (rank >= 9999) continue;
+      final source = rule.sourceNo ?? (1 << 30);
+      if (rank < bestRank || (rank == bestRank && source < bestSource)) {
+        bestRule = rule;
+        bestRank = rank;
+        bestSource = source;
       }
-      return rule;
     }
-    return null;
+    return bestRule;
   }
 
   Future<String> inlandTextForRows(
