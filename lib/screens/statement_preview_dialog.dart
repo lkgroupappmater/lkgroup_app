@@ -744,7 +744,7 @@ class _DigitalStatementPainter extends CustomPainter {
 
     // Three clear columns: label | percent (~2/3) | amount (far right).
     const adjustmentFont = 15.0;
-    final adjustmentLabelW = totalW * .46;
+    final adjustmentColumnLabelW = totalW * .46;
     final percentX = totalX + totalW * .54;
     final percentW = totalW * .18;
     final amountX = totalX + totalW * .74;
@@ -753,7 +753,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(
       c,
       '할인',
-      Rect.fromLTWH(totalX + 12, sumTop + 7, adjustmentLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 7, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
@@ -781,7 +781,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(
       c,
       '특별할인',
-      Rect.fromLTWH(totalX + 12, sumTop + 34, adjustmentLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 34, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
@@ -809,7 +809,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(
       c,
       '세금 계산서(VAT)',
-      Rect.fromLTWH(totalX + 12, sumTop + 61, adjustmentLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 61, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
@@ -831,7 +831,8 @@ class _DigitalStatementPainter extends CustomPainter {
     );
 
     final finalTop = sumTop + 92;
-    final adjustmentLabelW = totalW * .46;
+    final labelW = totalW * .38;
+    final labelW = totalW * .46;
     _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
     _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
         19, bold: true, center: true);
