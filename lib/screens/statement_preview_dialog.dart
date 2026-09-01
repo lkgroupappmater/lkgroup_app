@@ -592,10 +592,17 @@ class _DigitalStatementPainter extends CustomPainter {
     if (freightGroups.length == 1 &&
         displayAutoNotes.contains(RegExp(r'(^| / )할인\s+[0-9.]+% 적용'))) {
       final group = freightGroups.first;
-      displayAutoNotes = displayAutoNotes.replaceFirst(
-        RegExp(r'(^| / )할인\s+([0-9.]+% 적용)'),
-        (m) => '${m.group(1) ?? ''}$group 할인 ${m.group(2)}',
-      );
+      final genericDiscount = RegExp(r'(^| / )할인\s+([0-9.]+% 적용)');
+      final match = genericDiscount.firstMatch(displayAutoNotes);
+      if (match != null) {
+        final replacement =
+            '${match.group(1) ?? ''}$group 할인 ${match.group(2) ?? ''}';
+        displayAutoNotes = displayAutoNotes.replaceRange(
+          match.start,
+          match.end,
+          replacement,
+        );
+      }
     }
     final remarkText = displayAutoNotes.isEmpty
         ? docText.remark
