@@ -222,7 +222,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
   String get _title {
     final route = (_route ?? '').replaceAll('_', '-').toUpperCase();
-    return '$route ${_year ?? ''} ${_voyage ?? ''}항차 고객 리스트';
+    return '$route ${_year ?? ''} ${_voyage ?? ''}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)';
   }
 
   void _paintText(Canvas c,String text,Rect r,double size,{bool bold=false,TextAlign align=TextAlign.center}) {
@@ -239,7 +239,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
   Future<Uint8List> _renderPage(List<Map<String,dynamic>> rows,{required int page,required int pages}) async {
     const w=1120.0, h=1584.0;
-    const topMargin=50.0;
+    const topMargin=48.0;
     const titleH=54.0;
     const colH=44.0;
     const unitH=56.0;
@@ -270,7 +270,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       final r=Rect.fromLTRB(xs[i],y,xs[i+1],y+colH);
       c.drawRect(r,headerFill);
       c.drawRect(r,line);
-      _paintText(c,heads[i],r,14,bold:true);
+      _paintText(c,heads[i],r,18,bold:true);
     }
     y+=colH;
 
@@ -298,11 +298,20 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         if(i==3){
           for(var b=0;b<boxLines.length;b++){
             final br=Rect.fromLTRB(xs[i],y+unitH*b,xs[i+1],y+unitH*(b+1));
-            _paintText(c,boxLines[b],br,11,bold:false,align:TextAlign.center);
+            _paintText(c,boxLines[b],br,22,bold:false,align:TextAlign.center);
           }
         }else{
-          final size=i==1 ? 15.0 : (i==5 ? 12.0 : 14.0);
-          _paintText(c,values[i],r,size,bold:i==0||i==1||i==2,align:TextAlign.center);
+          final size=i==1
+              ? 30.0
+              : (i==5 ? 24.0 : 28.0);
+          _paintText(
+            c,
+            values[i],
+            r,
+            size,
+            bold:i==0||i==1||i==2||i==4||i==5,
+            align:TextAlign.center,
+          );
         }
       }
       y+=rowH;
