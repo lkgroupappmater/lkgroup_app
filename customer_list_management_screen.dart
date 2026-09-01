@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CustomerListManagementScreen extends StatefulWidget {
   const CustomerListManagementScreen({super.key});
@@ -41,7 +41,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
   Future<void> _loadBatches() async {
     try {
-      final raw=await SupabaseService.client.from('shipments')
+      final raw=await Supabase.instance.client.from('shipments')
           .select('route,shipment_year,voyage').isFilter('deletion_requested_at',null)
           .order('shipment_year',ascending:false);
       final all=(raw as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList(growable:false);
@@ -61,7 +61,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     if(_route==null||_year==null||_voyage==null)return;
     setState(()=>_loading=true);
     try {
-      final raw=await SupabaseService.client.from('shipments').select(
+      final raw=await Supabase.instance.client.from('shipments').select(
         'id,receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number,quantity'
       ).eq('route',_route!).eq('shipment_year',_year!).eq('voyage',_voyage!)
        .isFilter('deletion_requested_at',null).order('receipt_number').order('box_number');
@@ -114,7 +114,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     final nr=receipt.text.trim(), nz=zone.text.trim().toUpperCase();
     if(nr.isEmpty||nz.isEmpty)return;
     try{
-      await SupabaseService.client.from('shipments').update({
+      await Supabase.instance.client.from('shipments').update({
         'receipt_number':nr,'unloading_zone':nz,
       }).eq('route',_route!).eq('shipment_year',_year!).eq('voyage',_voyage!)
        .eq('receipt_number','${r['receipt']}').isFilter('deletion_requested_at',null);
@@ -152,15 +152,15 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   }
 
   Future<Uint8List> _renderPage(List<Map<String,dynamic>> rows,{required int page,required int pages}) async {
-    const w=1600.0, headerH=82.0, colH=48.0, rowH=38.0, footerH=42.0;
-    final h=headerH+colH+rowH*rows.length+footerH;
+    const w=1600.0, topH=72.0, headerH=82.0, colH=48.0, rowH=38.0, footerH=42.0;
+    final h=topH+headerH+colH+rowH*rows.length+footerH;
     final rec=ui.PictureRecorder(); final c=Canvas(rec);
     c.drawRect(Rect.fromLTWH(0,0,w,h),Paint()..color=Colors.white);
     final line=Paint()..color=const Color(0xFF7890A4)..style=PaintingStyle.stroke..strokeWidth=1;
     final fill=Paint()..color=const Color(0xFFE7F0F7);
-    _paintText(c,_title,Rect.fromLTWH(0,8,w,52),30,bold:true);
-    _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(0,52,w,25),14);
-    final y0=headerH;
+    _paintText(c,_title,Rect.fromLTWH(0,topH+8,w,52),30,bold:true);
+    _paintText(c,'${_rows.length}명  ·  ${page+1}/$pages',Rect.fromLTWH(0,topH+52,w,25),14);
+    final y0=topH+headerH;
     final xs=<double>[0,150,500,790,970,1120,1600];
     final heads=['영수증 번호','고객명/회사명','연락처','구획(Zone)','수량','비고'];
     for(var i=0;i<heads.length;i++){
@@ -203,7 +203,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     if(_rows.isEmpty||_saving)return;
     setState(()=>_saving=true);
     try{
-      const perPage=36;
+      const perPage=30;
       final pages=(_rows.length/perPage).ceil();
       final doc=pw.Document();
       for(var p=0;p<pages;p++){

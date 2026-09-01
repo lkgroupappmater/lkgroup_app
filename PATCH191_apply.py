@@ -13,9 +13,9 @@ checks=[
 ('receipt zone edit',"'receipt_number':nr,'unloading_zone':nz" in s),
 ('bottom buttons',"'이미지 저장'" in s and "'PDF 저장 / 프린트'" in s),
 ]
-print('PATCH191 VERIFY'); bad=[]
+print('PATCH191B VERIFY'); bad=[]
 for n,o in checks:
  print(('[OK] ' if o else '[FAIL] ')+n)
  if not o: bad.append(n)
 if bad: raise SystemExit('VERIFY FAILED: '+', '.join(bad))
-print('PATCH191 VERIFIED OK')
+print('PATCH191B VERIFIED OK')
