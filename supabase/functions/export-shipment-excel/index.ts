@@ -461,7 +461,10 @@ function applyDeliveryColorConditionalFormatting(
   if (!files[stylesPath]) return;
 
   let styles = strFromU8(files[stylesPath]);
-  const fills = ['FFFFC000', 'FF5B9BD5', 'FF92D050', 'FFFFFF00'];
+  // Medium-light fills: black text remains readable, but the delivery area
+  // is visually clear enough on screen/print.
+  // Order: province / province-prepaid / city / city-prepaid.
+  const fills = ['FFFFC000', 'FF9DC3E6', 'FFA9D18E', 'FFFFD966'];
 
   // Excel templates can have either <dxfs count="0"/> or <dxfs ...>...</dxfs>.
   // Handle both forms and append valid differential fills.  A broken dxfId is what
@@ -515,14 +518,37 @@ function applyDeliveryColorConditionalFormatting(
     const sheetPath = workbookSheetPath(files, sheetName);
     if (!sheetPath || !files[sheetPath]) continue;
     let xml = strFromU8(files[sheetPath]);
-    if (xml.includes('LK_STATEMENT_DELIVERY_COLOR_V2')) continue;
+
+    // V2 colored both Remark(left) and Delivery(center).
+    // V3 correctly stopped coloring Remark, but it tried to detect the delivery
+    // label from F18 itself. In the real template F18 is not the reliable source,
+    // so the delivery color disappeared.
+    //
+    // V4 uses the already-correct Remark text A18 ONLY AS THE CONDITION SOURCE,
+    // while applying fill ONLY to the middle Delivery area F:K.
+    xml = xml.replace(
+      /<!--LK_STATEMENT_DELIVERY_COLOR_V2--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,
+      '',
+    );
+    xml = xml.replace(
+      /<!--LK_STATEMENT_DELIVERY_COLOR_V3--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,
+      '',
+    );
+    if (xml.includes('LK_STATEMENT_DELIVERY_COLOR_V4')) {
+      files[sheetPath] = strToU8(xml);
+      continue;
+    }
+
     const maxPriority = Math.max(0, ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)].map((m) => Number(m[1] ?? 0)));
     const rules = makeRules(
-      (label) => `OR(IFERROR(ISNUMBER(SEARCH("${label}",$A$18)),FALSE),IFERROR(ISNUMBER(SEARCH("${label}",$F$18)),FALSE))`,
+      (label) => `IFERROR(ISNUMBER(SEARCH("${label}",$A$18)),FALSE)`,
       maxPriority,
     );
-    const block = `<!--LK_STATEMENT_DELIVERY_COLOR_V2--><conditionalFormatting sqref="A18:E24 F18:K24">${rules}</conditionalFormatting>`;
-    xml = insertWorksheetExtensionBlock(xml, block, 'LK_STATEMENT_DELIVERY_COLOR_V2');
+
+    // Remark A:E = NEVER colored.
+    // Delivery F:K = colored from the delivery keyword already present in Remark.
+    const block = `<!--LK_STATEMENT_DELIVERY_COLOR_V4--><conditionalFormatting sqref="F18:K24">${rules}</conditionalFormatting>`;
+    xml = insertWorksheetExtensionBlock(xml, block, 'LK_STATEMENT_DELIVERY_COLOR_V4');
     files[sheetPath] = strToU8(xml);
   }
 
@@ -551,17 +577,34 @@ function assignReceiptNumbers(
   const prefix = runtimeReceiptPrefix.trim() || routeReceiptPrefix(routeKey);
   if (!prefix) return shipments;
 
+  const unknownReceipt =
+    routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
+      ? `${prefix} XX`
+      : `${prefix}XX`;
+  const normalizedShipments = shipments.map((shipment) =>
+    shipment.recipient_unknown === true
+      ? {
+          ...shipment,
+          receipt_number: unknownReceipt,
+          unloading_zone: 'F',
+        }
+      : shipment
+  );
+
   // 이름 + 전화번호가 같으면 같은 영수번호를 사용합니다.
   const groupToReceipt = new Map<string, string>();
   let next = 1;
 
   // 기존 영수번호가 있으면 우선 그대로 유지하고 다음 번호 계산.
-  for (const shipment of shipments) {
+  for (const shipment of normalizedShipments) {
     const existing = String(shipment.receipt_number ?? '').trim();
     const hasIdentity =
       String(shipment.consignee_name ?? '').trim() !== '' &&
       normalizePhone(shipment.consignee_phone) !== '';
-    const recoverableXx = hasIdentity && /\bXX\s*$/i.test(existing);
+    const recoverableXx =
+      shipment.recipient_unknown !== true &&
+      hasIdentity &&
+      /\bXX\s*$/i.test(existing);
     if (existing && !recoverableXx) {
       const m = existing.match(/(\d+)\s*$/);
       if (m) next = Math.max(next, Number(m[1]) + 1);
@@ -570,11 +613,15 @@ function assignReceiptNumbers(
     }
   }
 
-  return shipments.map((shipment) => {
+  return normalizedShipments.map((shipment) => {
     const existing = String(shipment.receipt_number ?? '').trim();
     const name = String(shipment.consignee_name ?? '').trim();
     const phone = normalizePhone(shipment.consignee_phone);
-    const recoverableXx = name !== '' && phone !== '' && /\bXX\s*$/i.test(existing);
+    const recoverableXx =
+      shipment.recipient_unknown !== true &&
+      name !== '' &&
+      phone !== '' &&
+      /\bXX\s*$/i.test(existing);
     if (existing && !recoverableXx) return shipment;
 
     const key = `${name.toLowerCase()}|${phone}`;
@@ -649,7 +696,7 @@ function setFormulaCellInRowFast(
   );
   const existing = rowXml.match(cellRe);
   const attrs = existing ? `${existing[1] ?? ''}${existing[2] ?? ''}` : '';
-  const styleMatch = attrs.match(/\\bs="([^"]+)"/);
+  const styleMatch = attrs.match(/\bs="([^"]+)"/);
   const style = styleMatch ? ` s="${styleMatch[1]}"` : '';
   const replacement = `<c r="${ref}"${style}><f>${escXml(formula)}</f></c>`;
 
@@ -798,7 +845,9 @@ function seedCustomerListFromShipments(
       (fixed) => normalizedName.startsWith(compactName(fixed)),
     );
 
-    if (isFixed102) {
+    if (/\bxx\s*$/i.test(receipt)) {
+      nextRow = updateCell(nextRow, rowNumber, 'C', 'F', 'text');
+    } else if (isFixed102) {
       nextRow = updateCell(nextRow, rowNumber, 'C', '102', 'text');
     } else if (isDeliveryF || isNamedF) {
       nextRow = updateCell(nextRow, rowNumber, 'C', 'F', 'text');
@@ -1385,11 +1434,72 @@ function appendDocumentAutomationBlock(
     const first = rows[0];
     const name = String(first.consignee_name ?? '').trim();
     const phone = String(first.consignee_phone ?? '').trim();
-    const d = deliveries.find(x => {
-      if (!phoneMatch(phone, x.phone)) return false;
-      const target = normalizeName(name);
-      return [x.customer_name,x.alternate_name,x.company_name].some(v => normalizeName(v) === target && target !== '');
-    });
+    const compactName = (v: unknown) =>
+      normalizeName(v).replace(/[\s/,_()\-*?]+/g, '');
+    const nameTokens = (v: unknown) =>
+      String(v ?? '')
+        .toLowerCase()
+        .split(/[\s/,_()\-*?]+/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+    const shipmentCompact = compactName(name);
+    const shipmentTokens = new Set(nameTokens(name));
+
+    const rankedDeliveries = deliveries
+      .filter(x => phoneMatch(phone, x.phone))
+      .map((x, index) => {
+        const candidateNames = [
+          x.customer_name,
+          x.alternate_name,
+          x.company_name,
+        ].filter(v => String(v ?? '').trim() !== '');
+
+        let nameRank = 0;
+        for (const candidateName of candidateNames) {
+          const candidateCompact = compactName(candidateName);
+          if (shipmentCompact && candidateCompact === shipmentCompact) {
+            nameRank = Math.max(nameRank, 300);
+            continue;
+          }
+
+          const candidateTokens = nameTokens(candidateName);
+          const overlap = candidateTokens.filter(token =>
+            shipmentTokens.has(token),
+          ).length;
+          if (overlap > 0) {
+            nameRank = Math.max(nameRank, 100 + overlap);
+          }
+        }
+
+        const hasDestination =
+          String(x.destination_address ?? '').trim() !== '';
+        const preferred = x.preferred === true;
+        const sourceNo = Number(x.source_no ?? 999999);
+
+        return {
+          row: x,
+          index,
+          nameRank,
+          hasDestination,
+          preferred,
+          sourceNo: Number.isFinite(sourceNo) ? sourceNo : 999999,
+        };
+      })
+      .filter(x => x.nameRank > 0)
+      .sort((a, b) =>
+        b.nameRank - a.nameRank ||
+        Number(b.hasDestination) - Number(a.hasDestination) ||
+        Number(b.preferred) - Number(a.preferred) ||
+        a.sourceNo - b.sourceNo ||
+        a.index - b.index
+      );
+
+    // Customer/name matching remains the first boundary.
+    // Local company + Destination pairing is resolved inside the SAME
+    // customer/source block when BASE Excel is imported.
+    // Do NOT jump to another same-phone profile merely because it has an address.
+    const d = rankedDeliveries[0]?.row;
     const paidBy = String(d?.paid_by ?? '').toLowerCase();
     const koreaMarker =
       paidBy.includes('\uD55C\uAD6D') || paidBy.includes('korea');
@@ -1450,6 +1560,139 @@ function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): 
   return sheetXml.replace(rowXml, updatedRow);
 }
 
+function withWrapTextXf(xfXml: string): string {
+  const setApplyAlignment = (openTag: string): string => {
+    if (/\bapplyAlignment="/.test(openTag)) {
+      return openTag.replace(/\bapplyAlignment="[^"]*"/, 'applyAlignment="1"');
+    }
+    return openTag.replace(/>$/, ' applyAlignment="1">');
+  };
+
+  const setWrap = (alignmentTag: string): string => {
+    if (/\bwrapText="/.test(alignmentTag)) {
+      return alignmentTag.replace(/\bwrapText="[^"]*"/, 'wrapText="1"');
+    }
+    if (/\/>$/.test(alignmentTag)) {
+      return alignmentTag.replace(/\/>$/, ' wrapText="1"/>');
+    }
+    return alignmentTag.replace(/>$/, ' wrapText="1">');
+  };
+
+  if (/^<xf\b[^>]*\/>$/.test(xfXml)) {
+    const open = xfXml.replace(/\/>$/, '>');
+    const fixedOpen = setApplyAlignment(open);
+    return `${fixedOpen}<alignment wrapText="1"/></xf>`;
+  }
+
+  let out = xfXml;
+  const openMatch = out.match(/^<xf\b[^>]*>/);
+  if (openMatch) {
+    out = `${setApplyAlignment(openMatch[0])}${out.substring(openMatch[0].length)}`;
+  }
+
+  const alignmentSelf = out.match(/<alignment\b[^>]*\/>/);
+  if (alignmentSelf) {
+    return out.replace(alignmentSelf[0], setWrap(alignmentSelf[0]));
+  }
+
+  const alignmentOpen = out.match(/<alignment\b[^>]*>/);
+  if (alignmentOpen) {
+    return out.replace(alignmentOpen[0], setWrap(alignmentOpen[0]));
+  }
+
+  return out.replace('</xf>', '<alignment wrapText="1"/></xf>');
+}
+
+function applyStatementWrapText(
+  files: Record<string, Uint8Array>,
+  routeKey: string,
+): void {
+  const prefix = routeReceiptPrefix(routeKey);
+  if (!prefix) return;
+
+  const stylesPath = 'xl/styles.xml';
+  if (!files[stylesPath]) return;
+
+  let styles = strFromU8(files[stylesPath]);
+  const cellXfsMatch = styles.match(
+    /<cellXfs\b([^>]*)count="(\d+)"([^>]*)>([\s\S]*?)<\/cellXfs>/,
+  );
+  if (!cellXfsMatch) return;
+
+  const xfList = [...cellXfsMatch[4].matchAll(
+    /<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g,
+  )].map(m => m[0]);
+  if (xfList.length === 0) return;
+
+  const workbook = strFromU8(files['xl/workbook.xml']);
+  const prefixUpper = prefix.toUpperCase();
+  const sheetNames = [...workbook.matchAll(
+    /<sheet\b[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"[^>]*\/?>/g,
+  )]
+    .map(m => m[1])
+    .filter(name => name.toUpperCase().startsWith(prefixUpper));
+
+  const wrapStyleMap = new Map<number, number>();
+  const appendedXfs: string[] = [];
+
+  const wrappedStyleFor = (styleIndex: number): number => {
+    const safeIndex =
+      styleIndex >= 0 && styleIndex < xfList.length ? styleIndex : 0;
+    const cached = wrapStyleMap.get(safeIndex);
+    if (cached != null) return cached;
+
+    const newIndex = xfList.length + appendedXfs.length;
+    appendedXfs.push(withWrapTextXf(xfList[safeIndex]));
+    wrapStyleMap.set(safeIndex, newIndex);
+    return newIndex;
+  };
+
+  for (const sheetName of sheetNames) {
+    const path = workbookSheetPath(files, sheetName);
+    if (!path || !files[path]) continue;
+
+    let xml = strFromU8(files[path]);
+
+    // Remark A:E and Delivery F:K display area.
+    // Preserve existing fills/fonts/borders/alignment; clone only to add wrapText.
+    xml = xml.replace(
+      /<c\b([^>]*)r="([A-K])(1[89]|2[0-4])"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
+      (full, before, column, rowText, after, body) => {
+        const attrs = `${before ?? ''}${after ?? ''}`;
+        const styleMatch = attrs.match(/\bs="(\d+)"/);
+        const oldStyle = Number(styleMatch?.[1] ?? 0);
+        const newStyle = wrappedStyleFor(oldStyle);
+
+        let newAttrs = attrs;
+        if (styleMatch) {
+          newAttrs = newAttrs.replace(/\bs="\d+"/, ` s="${newStyle}"`);
+        } else {
+          newAttrs = `${newAttrs} s="${newStyle}"`;
+        }
+
+        const cleanAttrs = newAttrs.trim();
+        const attrPrefix = cleanAttrs ? ` ${cleanAttrs}` : '';
+
+        if (body == null) {
+          return `<c${attrPrefix} r="${column}${rowText}"/>`;
+        }
+        return `<c${attrPrefix} r="${column}${rowText}">${body}</c>`;
+      },
+    );
+
+    files[path] = strToU8(xml);
+  }
+
+  if (appendedXfs.length === 0) return;
+
+  const nextBody = `${cellXfsMatch[4]}${appendedXfs.join('')}`;
+  styles = styles.replace(
+    cellXfsMatch[0],
+    `<cellXfs${cellXfsMatch[1]}count="${xfList.length + appendedXfs.length}"${cellXfsMatch[3]}>${nextBody}</cellXfs>`,
+  );
+  files[stylesPath] = strToU8(styles);
+}
+
 function wireStatementAutomationFormulas(
   files: Record<string, Uint8Array>,
   routeKey: string,
@@ -1481,7 +1724,7 @@ function wireStatementAutomationFormulas(
   let remarkRef = '';
   let inlandRef = '';
   const cellPattern = new RegExp(
-    '<c\\b[^>]*r="([A-Z]+\\d+)"[^>]*>[\\s\\S]*?<\\/c>',
+    '<c\\b[^>]*?r="([A-Z]+\\d+)"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)',
     'g',
   );
 
@@ -1633,7 +1876,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: shipments, error: shipmentError } = await admin
       .from('shipments')
       .select(
-        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,notes,special_note_auto,received_at,created_at',
+        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,recipient_unknown,notes,special_note_auto,received_at,created_at',
       )
       .eq('route', shipmentRouteLabel)
       .eq('shipment_year', shipmentYear)
@@ -1671,15 +1914,26 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       const receipt = String(shipment.receipt_number ?? '').trim();
       const original = (shipments ?? []).find((row) => Number(row.id) === id);
       const originalReceipt = String(original?.receipt_number ?? '').trim();
+      const originalZone = String(original?.unloading_zone ?? '').trim();
       const originalWasRecoverableXx =
         /\bXX\s*$/i.test(originalReceipt) &&
         String(shipment.consignee_name ?? '').trim() !== '' &&
         normalizePhone(shipment.consignee_phone) !== '' &&
         !/\bXX\s*$/i.test(receipt);
-      if (id && receipt && (!originalReceipt || originalWasRecoverableXx)) {
+      const trueUnknownNeedsRepair =
+        shipment.recipient_unknown === true &&
+        (originalReceipt !== receipt || originalZone !== 'F');
+      if (
+        id &&
+        receipt &&
+        (!originalReceipt || originalWasRecoverableXx || trueUnknownNeedsRepair)
+      ) {
+        const updateValues = shipment.recipient_unknown === true
+          ? { receipt_number: receipt, unloading_zone: 'F' }
+          : { receipt_number: receipt };
         const { error: receiptUpdateError } = await admin
           .from('shipments')
-          .update({ receipt_number: receipt })
+          .update(updateValues)
           .eq('id', id);
         if (receiptUpdateError) throw receiptUpdateError;
       }
@@ -1828,6 +2082,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyage,
     );
     wireStatementAutomationFormulas(files, routeKey);
+    applyStatementWrapText(files, routeKey);
     applyDeliveryColorConditionalFormatting(files, routeKey);
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
     addStatementLanguageSelector(files, routeKey);

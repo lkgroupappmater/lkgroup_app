@@ -31,24 +31,30 @@ class _DeliveryRowStyle {
   const _DeliveryRowStyle({
     this.greenColumns = const <int>{},
     this.yellowColumns = const <int>{},
+    this.orangeColumns = const <int>{},
   });
 
   final Set<int> greenColumns;
   final Set<int> yellowColumns;
+  final Set<int> orangeColumns;
 
   bool get isCity => greenColumns.isNotEmpty;
 
-  bool preferredFor(int? companyColumn, int? destinationColumn) {
-    if (yellowColumns.isEmpty) return false;
-    if (companyColumn != null && yellowColumns.contains(companyColumn)) {
-      return true;
+  int priorityFor(int? companyColumn, int? destinationColumn) {
+    bool has(Set<int> columns) {
+      if (companyColumn != null && columns.contains(companyColumn)) return true;
+      if (destinationColumn != null && columns.contains(destinationColumn)) return true;
+      return companyColumn == null && destinationColumn == null && columns.isNotEmpty;
     }
-    if (destinationColumn != null &&
-        yellowColumns.contains(destinationColumn)) {
-      return true;
-    }
-    return companyColumn == null && destinationColumn == null;
+
+    // BASE 업무 우선순위: 노란색 > 주황색 > 흰색(기본).
+    if (has(yellowColumns)) return 3;
+    if (has(orangeColumns)) return 2;
+    return 1;
   }
+
+  bool preferredFor(int? companyColumn, int? destinationColumn) =>
+      priorityFor(companyColumn, destinationColumn) == 3;
 }
 
 class ExcelImportService {
@@ -687,84 +693,177 @@ class ExcelImportService {
     }
 
     final bySourceNo = <String, Map<String, dynamic>>{};
-    for (final section in sections) {
-      int? currentSourceNo;
-      String currentCustomerName = '';
-      String currentAlternateName = '';
-      String currentCompanyName = '';
-      String currentPhoneDisplay = '';
-      bool currentPrepaid = false;
 
+    for (final section in sections) {
       int? col(String key) => section.columns[key];
 
+      int? parseSourceNo(List<String> row) {
+        final raw = valueAt(row, col('source_no'));
+        if (raw.isEmpty) return null;
+        return int.tryParse(raw.replaceAll(RegExp(r'[^0-9]'), ''));
+      }
+
+      final blocks = <({int sourceNo, List<int> rowIndexes})>[];
+      int? activeSourceNo;
+      List<int> activeRows = <int>[];
+
+      void flushBlock() {
+        if (activeSourceNo == null || activeRows.isEmpty) return;
+        blocks.add((
+          sourceNo: activeSourceNo!,
+          rowIndexes: List<int>.from(activeRows),
+        ));
+        activeRows = <int>[];
+      }
+
       for (var rr = section.headerRow + 1; rr < section.endRow; rr++) {
-        final row = sheet[rr];
-        if (row.every((cell) => cell.trim().isEmpty)) continue;
+        final row = sheet![rr];
         if (sectionType(row) != null) break;
 
-        final sourceRaw = valueAt(row, col('source_no'));
-        final parsedSource = int.tryParse(sourceRaw.replaceAll(RegExp(r'[^0-9]'), ''));
-        final rowCustomer = valueAt(row, col('customer_name'));
-        final rowAlternate = valueAt(row, col('alternate_name'));
-        final rowCompany = valueAt(row, col('customer_company'));
-        final rowPhone = valueAt(row, col('phone'));
-        final payAdvance = valueAt(row, col('pay_in_advance'));
-
-        // No.가 있는 행이 한 고객의 대표행이고, 다음 No. 전까지는 같은 고객의
-        // 대체 배송업체/목적지 행으로 간주합니다.
+        final parsedSource = parseSourceNo(row);
         if (parsedSource != null) {
-          currentSourceNo = parsedSource;
-          currentCustomerName = rowCustomer;
-          currentAlternateName = rowAlternate;
-          currentCompanyName = rowCompany;
-          currentPhoneDisplay = rowPhone;
-          currentPrepaid = hasPrepaidMarker(payAdvance);
-        } else if (currentSourceNo == null) {
-          continue;
+          if (activeSourceNo != null && parsedSource != activeSourceNo) {
+            flushBlock();
+          }
+          activeSourceNo = parsedSource;
         }
 
-        final sourceNo = currentSourceNo!;
+        if (activeSourceNo == null) continue;
+        if (row.every((cell) => cell.trim().isEmpty)) continue;
+        activeRows.add(rr);
+      }
+      flushBlock();
+
+      for (final block in blocks) {
+        final sourceNo = block.sourceNo;
         final profileSourceNo =
             section.type == 'city' ? 10000 + sourceNo : sourceNo;
-
-        // DB conflict key is (route_key, source_no), so the in-memory key MUST
-        // be the same identity. Using section/type in the Dart key allowed two
-        // rows with the same final source_no into one bulk UPSERT, causing
-        // SQLSTATE 21000: ON CONFLICT DO UPDATE ... row a second time.
         final profileKey = '$profileSourceNo';
-        final customerName = rowCustomer.isNotEmpty ? rowCustomer : currentCustomerName;
-        final alternateName = rowAlternate.isNotEmpty ? rowAlternate : currentAlternateName;
-        final companyName = rowCompany.isNotEmpty ? rowCompany : currentCompanyName;
-        final phoneDisplay = rowPhone.isNotEmpty ? rowPhone : currentPhoneDisplay;
+
+        String firstNonEmpty(String key) {
+          for (final rr in block.rowIndexes) {
+            final value = valueAt(sheet![rr], col(key));
+            if (value.isNotEmpty) return value;
+          }
+          return '';
+        }
+
+        final customerName = firstNonEmpty('customer_name');
+        final alternateName = firstNonEmpty('alternate_name');
+        final companyName = firstNonEmpty('customer_company');
+        final phoneDisplay = firstNonEmpty('phone');
         final normalizedPhone = _digits(phoneDisplay);
-        final localCompany = valueAt(row, col('local_company'));
-        final destination = valueAt(row, col('destination'));
-        final rawPaidBy = valueAt(row, col('paid_by'));
-        final notes = valueAt(row, col('notes'));
 
-        final fallbackText = [payAdvance, destination, rawPaidBy, notes].join(' ');
-        final prepaid = currentPrepaid || hasPrepaidMarker(fallbackText);
-        // C열 Pay in advance가 있으면 그 값을 최우선으로 사용합니다.
-        // 구형 자료 호환용으로 Destination/Paid by의 선결제/선결재/prepaid도 보조 판정.
-        // 단, 일반적인 '선불' 단어만으로는 선결제로 승격하지 않습니다.
-        final paidBy = prepaid ? '선결제' : rawPaidBy;
-
-        final rowStyle = styles[rr] ?? const _DeliveryRowStyle();
-        final rowText = row.join(' ').toLowerCase();
-        final isCity = section.type == 'city' ||
-            (section.type == null &&
-                (rowStyle.isCity || rowText.contains('시내배송') ||
-                    rowText.contains('시내 배송') || rowText.contains('city')));
-        final preferred = rowStyle.preferredFor(
-          col('local_company') ?? (row.length > 5 ? 5 : null),
-          col('destination') ?? (row.length > 6 ? 6 : null),
-        );
-
-        if (customerName.isEmpty && alternateName.isEmpty && companyName.isEmpty) {
+        if (customerName.isEmpty &&
+            alternateName.isEmpty &&
+            companyName.isEmpty) {
           continue;
         }
 
-        final profile = <String, dynamic>{
+        final blockPayAdvance = firstNonEmpty('pay_in_advance');
+        final isCityBySection = section.type == 'city';
+
+        final candidates =
+            <({
+              int rowIndex,
+              String localCompany,
+              String destination,
+              String rawPaidBy,
+              String notes,
+              bool isCity,
+              int priority,
+            })>[];
+
+        for (final rr in block.rowIndexes) {
+          final row = sheet![rr];
+          final localCompany = valueAt(row, col('local_company'));
+          final destination = valueAt(row, col('destination'));
+          final rawPaidBy = valueAt(row, col('paid_by'));
+          final notes = valueAt(row, col('notes'));
+
+          if (localCompany.isEmpty && destination.isEmpty) continue;
+
+          final rowStyle = styles[rr] ?? const _DeliveryRowStyle();
+          final rowText = row.join(' ').toLowerCase();
+          final isCity = isCityBySection ||
+              (section.type == null &&
+                  (rowStyle.isCity ||
+                      rowText.contains('시내배송') ||
+                      rowText.contains('시내 배송') ||
+                      rowText.contains('city')));
+
+          final priority = rowStyle.priorityFor(
+            col('local_company') ?? (row.length > 5 ? 5 : null),
+            col('destination') ?? (row.length > 6 ? 6 : null),
+          );
+
+          candidates.add((
+            rowIndex: rr,
+            localCompany: localCompany,
+            destination: destination,
+            rawPaidBy: rawPaidBy,
+            notes: notes,
+            isCity: isCity,
+            priority: priority,
+          ));
+        }
+
+        if (candidates.isEmpty) continue;
+
+        final provinceCandidates =
+            candidates.where((c) => !c.isCity).toList(growable: false);
+        final cityCandidates =
+            candidates.where((c) => c.isCity).toList(growable: false);
+
+        late final ({
+          int rowIndex,
+          String localCompany,
+          String destination,
+          String rawPaidBy,
+          String notes,
+          bool isCity,
+          int priority,
+        }) chosen;
+
+        if (isCityBySection) {
+          chosen = cityCandidates.isNotEmpty
+              ? cityCandidates.first
+              : candidates.first;
+        } else {
+          final pool =
+              provinceCandidates.isNotEmpty ? provinceCandidates : candidates;
+
+          final withDestination =
+              pool.where((c) => c.destination.trim().isNotEmpty).toList();
+
+          if (withDestination.isNotEmpty) {
+            withDestination.sort((a, b) {
+              final priorityCompare = b.priority.compareTo(a.priority);
+              if (priorityCompare != 0) return priorityCompare;
+              return a.rowIndex.compareTo(b.rowIndex);
+            });
+            chosen = withDestination.first;
+          } else {
+            chosen = pool.first;
+          }
+        }
+
+        final chosenRow = sheet![chosen.rowIndex];
+        final chosenPayAdvance = valueAt(chosenRow, col('pay_in_advance'));
+        final fallbackText = [
+          blockPayAdvance,
+          chosenPayAdvance,
+          chosen.destination,
+          chosen.rawPaidBy,
+          chosen.notes,
+        ].join(' ');
+
+        final prepaid = hasPrepaidMarker(blockPayAdvance) ||
+            hasPrepaidMarker(fallbackText);
+        final paidBy = prepaid ? '선결제' : chosen.rawPaidBy;
+        final preferred = chosen.priority == 3;
+
+        bySourceNo[profileKey] = <String, dynamic>{
           'route_key': routeKey,
           'source_no': profileSourceNo,
           'customer_name': customerName,
@@ -772,22 +871,17 @@ class ExcelImportService {
           'company_name': companyName,
           'phone': normalizedPhone,
           'phone_display': phoneDisplay,
-          'delivery_type': isCity ? 'city' : 'province',
-          'local_company': localCompany,
-          'destination_address': destination,
+          'delivery_type': chosen.isCity ? 'city' : 'province',
+          'local_company': chosen.localCompany,
+          'destination_address': chosen.destination,
           'paid_by': paidBy,
-          'notes': notes,
+          'notes': chosen.notes,
           'preferred': preferred,
           'active': normalizedPhone.isNotEmpty &&
-              (customerName.isNotEmpty || alternateName.isNotEmpty || companyName.isNotEmpty),
+              (customerName.isNotEmpty ||
+                  alternateName.isNotEmpty ||
+                  companyName.isNotEmpty),
         };
-
-        final existing = bySourceNo[profileKey];
-        // 같은 고객의 여러 후보행은 기존 정책대로 preferred(노란색)가 있으면 우선,
-        // 없으면 대표행을 유지합니다. 고객 identity/Pay in advance는 대표행에서 승계됩니다.
-        if (existing == null || (preferred && existing['preferred'] != true)) {
-          bySourceNo[profileKey] = profile;
-        }
       }
     }
 
@@ -1027,9 +1121,13 @@ class ExcelImportService {
         for (final fill in fillPattern.allMatches(fillsBody)) {
           final body = fill.group(1) ?? '';
           final rgb = RegExp(
-            r'<fgColor\b[^>]*\brgb="([0-9A-Fa-f]{6,8})"',
-            caseSensitive: false,
-          ).firstMatch(body)?.group(1);
+                r'<fgColor\b[^>]*\brgb="([0-9A-Fa-f]{6,8})"',
+                caseSensitive: false,
+              ).firstMatch(body)?.group(1) ??
+              RegExp(
+                r'<bgColor\b[^>]*\brgb="([0-9A-Fa-f]{6,8})"',
+                caseSensitive: false,
+              ).firstMatch(body)?.group(1);
           fillColors.add(rgb?.toUpperCase());
         }
       }
@@ -1073,6 +1171,7 @@ class ExcelImportService {
       for (final rowMatch in rowPattern.allMatches(sheetXml)) {
         final green = <int>{};
         final yellow = <int>{};
+        final orange = <int>{};
         final rowXml = rowMatch.group(1) ?? '';
 
         for (final cellMatch in cellPattern.allMatches(rowXml)) {
@@ -1106,13 +1205,42 @@ class ExcelImportService {
               : rgb.toUpperCase();
 
           if (rgb6 == '92D050') green.add(column);
-          if (rgb6 == 'FFFF00') yellow.add(column);
+
+          // BASE 파일에서 사용된 원색/연한색 모두 허용.
+          // 정확히 알려진 색 + RGB 범위 판정으로 약간 다른 색조도 인식합니다.
+          final rgbValue = int.tryParse(rgb6, radix: 16);
+          final r = rgbValue == null ? 0 : (rgbValue >> 16) & 0xFF;
+          final g = rgbValue == null ? 0 : (rgbValue >> 8) & 0xFF;
+          final b = rgbValue == null ? 0 : rgbValue & 0xFF;
+
+          final looksYellow =
+              const {'FFFF00', 'FFD966', 'FFF2CC', 'FFE699'}
+                  .contains(rgb6) ||
+              (r >= 225 && g >= 190 && b <= 170);
+
+          final looksOrange =
+              const {
+                'FFC000',
+                'F4B183',
+                'F8CBAD',
+                'FCE4D6',
+                'ED7D31',
+                'F4B084',
+              }.contains(rgb6) ||
+              (r >= 220 && g >= 105 && g < 205 && b <= 175);
+
+          if (looksYellow) {
+            yellow.add(column);
+          } else if (looksOrange) {
+            orange.add(column);
+          }
         }
 
-        if (green.isNotEmpty || yellow.isNotEmpty) {
+        if (green.isNotEmpty || yellow.isNotEmpty || orange.isNotEmpty) {
           result[rowOrdinal] = _DeliveryRowStyle(
             greenColumns: Set<int>.unmodifiable(green),
             yellowColumns: Set<int>.unmodifiable(yellow),
+            orangeColumns: Set<int>.unmodifiable(orange),
           );
         }
         rowOrdinal++;
