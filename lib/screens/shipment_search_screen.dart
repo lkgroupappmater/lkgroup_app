@@ -3,6 +3,7 @@ import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/cargo_ui_strings.dart';
 import '../core/route_catalog.dart';
+import '../core/shipment_period_labels.dart';
 import '../core/money_format.dart';
 import '../models/app_user.dart';
 import '../services/freight_service.dart';
@@ -49,6 +50,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   String _t(String key) => AppStrings.get(widget.language, key);
   String _l(String korean) => CargoUiStrings.get(widget.language, korean);
+  String _routeText(dynamic value) => RouteCatalog.localizedLabel(
+        '${value ?? ''}'.trim(),
+        widget.language,
+      );
 
   bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
   bool get _showZone => widget.currentUser?.role == UserRole.admin || widget.currentUser?.role == UserRole.staff;
@@ -224,7 +229,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${row['route'] ?? ''} / '
+                    '${_routeText(row['route'])} / '
                     '${_localizedYearValue(row['shipment_year'])} / '
                     '${_localizedVoyageValue(row['voyage'])}\n'
                     '${_l('화물번호')}: ${row['box_number'] ?? ''}\n'
@@ -319,8 +324,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           SnackBar(
             content: Text(
               isAdmin
-                  ? '수취인 정보를 반영했습니다.'
-                  : '관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.',
+                  ? _l('수취인 정보를 반영했습니다.')
+                  : _l('관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.'),
             ),
           ),
         );
@@ -331,8 +336,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           SnackBar(
             content: Text(
               isAdmin
-                  ? '수취인 정보 적용 실패: $error'
-                  : '본인 화물 확인 요청 실패: $error',
+                  ? '${_l('수취인 정보 적용 실패')}: $error'
+                  : '${_l('본인 화물 확인 요청 실패')}: $error',
             ),
           ),
         );
@@ -565,7 +570,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         _selectedIds.clear();
       });
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('화물 조회 실패: $error')));
+          .showSnackBar(SnackBar(content: Text('${_l('화물 조회 실패')}: $error')));
     }
   }
 
@@ -629,7 +634,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('운임 계산 실패: $error')));
+          .showSnackBar(SnackBar(content: Text('${_l('운임 계산 실패')}: $error')));
     }
   }
 
@@ -780,7 +785,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   items: _availableYears
                       .map((v) => DropdownMenuItem(
                             value: v,
-                            child: Text(v == '전체' ? _t('all') : v),
+                            child: Text(_localizedYearValue(v)),
                           ))
                       .toList(),
                   onChanged: (v) {
@@ -802,7 +807,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   items: _availableVoyages
                       .map((v) => DropdownMenuItem(
                             value: v,
-                            child: Text(v == '전체' ? _t('all') : v),
+                            child: Text(_localizedVoyageValue(v)),
                           ))
                       .toList(),
                   onChanged: (v) {
@@ -915,7 +920,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               shrinkWrap: true,
               children: [
                 Text(
-                  '${rows.first['route']} · ${rows.first['shipment_year']}년 · ${_voyageLabel(rows.first['voyage'])}',
+                  '${_routeText(rows.first['route'])} · ${_localizedYearValue(rows.first['shipment_year'])} · ${_localizedVoyageValue(rows.first['voyage'])}',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
@@ -944,7 +949,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('그룹 운임 계산 실패: $error')));
+            .showSnackBar(SnackBar(content: Text('${_l('그룹 운임 계산 실패')}: $error')));
       }
     }
   }
@@ -1005,7 +1010,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   ),
                   Expanded(
                     child: Text(
-                      '${first['route']} · ${first['shipment_year']}년도 · ${_voyageLabel(first['voyage'])}',
+                      '${_routeText(first['route'])} · ${_localizedYearValue(first['shipment_year'])} · ${_localizedVoyageValue(first['voyage'])}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         color: AppColors.navyPrimary,
@@ -1223,25 +1228,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   String _localizedYearValue(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    if (text.isEmpty) return '';
-    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (widget.language == AppLanguage.korean || digits.isEmpty) {
-      return text.endsWith('년도') ? text : '${text}년도';
-    }
-    return widget.language == AppLanguage.lao ? 'ປີ $digits' : digits;
+    return ShipmentPeriodLabels.year(value, widget.language);
   }
 
   String _localizedVoyageValue(dynamic value) {
-    final text = '${value ?? ''}'.trim();
-    if (text.isEmpty) return '';
-    final plain = text.replaceFirst(RegExp(r'항차$'), '');
-    if (widget.language == AppLanguage.korean) {
-      return text.endsWith('항차') ? text : '${text}항차';
-    }
-    return widget.language == AppLanguage.lao
-        ? 'ຖ້ຽວ $plain'
-        : 'Voyage $plain';
+    return ShipmentPeriodLabels.voyage(value, widget.language);
   }
 
   InputDecoration _dropDecoration(String label, IconData icon) => InputDecoration(
@@ -1347,4 +1338,3 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
-

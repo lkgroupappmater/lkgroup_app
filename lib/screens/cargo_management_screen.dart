@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/cargo_ui_strings.dart';
 import '../core/route_catalog.dart';
+import '../core/shipment_period_labels.dart';
 import '../core/money_format.dart';
 import '../models/app_user.dart';
 import '../services/shipment_service.dart';
@@ -76,6 +77,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   bool get _isManager => _isAdmin || _isStaff || _isPartner;
   bool get _canSaveDirectly => _isManager;
   String _l(String korean) => CargoUiStrings.get(widget.language, korean);
+  String _lf(String korean, Map<String, Object?> values) =>
+      CargoUiStrings.format(widget.language, korean, values);
+  String _routeText(dynamic value) => RouteCatalog.localizedLabel(
+        '${value ?? ''}'.trim(),
+        widget.language,
+      );
   List<String> get _availableYears {
     final years =
         ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, _route);
@@ -178,17 +185,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         final add = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            content: const Text(
-              '검색 하신 화물 데이타가 없습니다. 화물을 추가 하시겠습니다.',
+            content: Text(
+              _l('검색한 화물이 없습니다. 화물을 추가하시겠습니까?'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('화물 추가 입력'),
+                child: Text(_l('화물 추가 입력')),
               ),
             ],
           ),
@@ -206,7 +213,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         }
       }
     } catch (error) {
-      _message('화물 검색 실패: $error');
+      _message('${_l('화물 검색 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -326,11 +333,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   Future<void> _showStatement() async {
     if (_isPartner) {
-      _message('협력/파트너 계정은 명세서를 조회할 수 없습니다.');
+      _message(_l('협력/파트너 계정은 명세서를 조회할 수 없습니다.'));
       return;
     }
     if (_selectedIds.isEmpty) {
-      _message('명세서를 확인할 화물을 선택해 주세요.');
+      _message(_l('명세서를 확인할 화물을 선택해 주세요.'));
       return;
     }
 
@@ -341,12 +348,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
     final receipt = '${selected.first['receipt_number'] ?? ''}'.trim();
     if (receipt.isEmpty) {
-      _message('선택한 화물에 영수번호가 없습니다.');
+      _message(_l('선택한 화물에 영수번호가 없습니다.'));
       return;
     }
     if (selected.any((row) =>
         '${row['receipt_number'] ?? ''}'.trim() != receipt)) {
-      _message('명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.');
+      _message(_l('명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.'));
       return;
     }
 
@@ -354,7 +361,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final year = (selected.first['shipment_year'] as num?)?.toInt();
     final voyage = '${selected.first['voyage'] ?? ''}';
     if (route.isEmpty || year == null || voyage.isEmpty) {
-      _message('명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.');
+      _message(_l('명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.'));
       return;
     }
 
@@ -373,11 +380,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     List<Map<String, dynamic>>? scopeRows,
   }) async {
     if (_isPartner) {
-      _message('협력/파트너 계정은 명세서를 출력할 수 없습니다.');
+      _message(_l('협력/파트너 계정은 명세서를 출력할 수 없습니다.'));
       return;
     }
     if (_selectedIds.isEmpty) {
-      _message('PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.');
+      _message(_l('PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.'));
       return;
     }
     final source = scopeRows ?? _results;
@@ -385,7 +392,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         .where((row) => _selectedIds.contains('${row['id']}'))
         .toList(growable: false);
     if (selected.isEmpty) {
-      _message('이 항차에서 체크된 화물이 없습니다.');
+      _message(_l('이 항차에서 체크된 화물이 없습니다.'));
       return;
     }
     await showDialog<void>(
@@ -397,7 +404,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     if (_selectedIds.isEmpty) return;
     final changes = _canSaveDirectly ? _managerChanges() : _memberChanges();
     if (changes.isEmpty) {
-      _message('수정할 내용을 입력해 주세요.');
+      _message(_l('수정할 내용을 입력해 주세요.'));
       return;
     }
 
@@ -421,17 +428,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         for (final id in _selectedIds) {
           await ShipmentService.instance.updateRow(id, changes);
         }
-        _message('선택한 화물 정보를 저장했습니다.');
+        _message(_l('선택한 화물 정보를 저장했습니다.'));
         await _reloadCurrentRows();
       } else {
         await ShipmentService.instance.requestChanges(
           shipmentIds: _selectedIds.toList(),
           changes: changes,
         );
-        _message('관리자에게 화물 정보 수정 요청을 보냈습니다.');
+        _message(_l('관리자에게 화물 정보 수정 요청을 보냈습니다.'));
       }
     } catch (error) {
-      _message('화물 정보 처리 실패: $error');
+      _message('${_l('화물 정보 처리 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -445,7 +452,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       if (!mounted) return;
       setState(() => _pendingDeletions = rows);
     } catch (error) {
-      _message('화물 삭제 대기 목록 불러오기 실패: $error');
+      _message('${_l('화물 삭제 대기 목록 불러오기 실패')}: $error');
     }
   }
 
@@ -455,19 +462,21 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('화물 삭제'),
+        title: Text(_l('화물 삭제')),
         content: Text(
-          '$box 화물을 삭제 대기로 이동하시겠습니까?\n\n'
-          '삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.',
+          _lf(
+            '{box} 화물을 삭제 대기로 이동하시겠습니까?\n\n삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.',
+            {'box': box},
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('삭제 대기'),
+            child: Text(_l('삭제 대기')),
           ),
         ],
       ),
@@ -484,9 +493,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             .toList(growable: false);
       });
       await _loadPendingDeletions();
-      _message('$box 화물을 삭제 대기로 이동했습니다.');
+      _message(_lf('{box} 화물을 삭제 대기로 이동했습니다.', {'box': box}));
     } catch (error) {
-      _message('화물 삭제 대기 처리 실패: $error');
+      _message('${_l('화물 삭제 대기 처리 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -498,10 +507,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     try {
       await ShipmentService.instance.cancelShipmentDeletion(id);
       await _loadPendingDeletions();
-      _message('화물 삭제를 취소했습니다.');
+      _message(_l('화물 삭제를 취소했습니다.'));
       if (_searched) await _search();
     } catch (error) {
-      _message('삭제 취소 실패: $error');
+      _message('${_l('삭제 취소 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -513,19 +522,21 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('화물 바로 삭제'),
+        title: Text(_l('화물 바로 삭제')),
         content: Text(
-          '$box 화물을 바로 삭제하시겠습니까?\n\n'
-          '바로 삭제 후에는 앱에서 복구할 수 없습니다.',
+          _lf(
+            '{box} 화물을 바로 삭제하시겠습니까?\n\n바로 삭제 후에는 앱에서 복구할 수 없습니다.',
+            {'box': box},
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('바로 삭제'),
+            child: Text(_l('바로 삭제')),
           ),
         ],
       ),
@@ -536,9 +547,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     try {
       await ShipmentService.instance.deleteShipmentNow(id);
       await _loadPendingDeletions();
-      _message('$box 화물을 바로 삭제했습니다.');
+      _message(_lf('{box} 화물을 바로 삭제했습니다.', {'box': box}));
     } catch (error) {
-      _message('화물 바로 삭제 실패: $error');
+      _message('${_l('화물 바로 삭제 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -579,11 +590,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   style: const TextStyle(fontSize: 12),
                 ),
                 Text(
-                  '영수번호/구획: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
+                  '${_l('영수번호/구획')}: ${receipt.isEmpty ? '-' : receipt} / ${zone.isEmpty ? '-' : zone}',
                   style: const TextStyle(fontSize: 12),
                 ),
                 Text(
-                  '${item['route'] ?? ''} · ${item['shipment_year'] ?? ''}년 · ${_voyageLabel(item['voyage'])}',
+                  '${_routeText(item['route'])} · ${_localizedYear('${item['shipment_year'] ?? ''}년')} · ${_localizedVoyage(_voyageLabel(item['voyage']))}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -592,28 +603,28 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            _infoRow('화물번호', '${item['box_number'] ?? ''}'),
-            _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-            _infoRow('화물개수', '$quantity개'),
+            _infoRow(_l('화물번호'), '${item['box_number'] ?? ''}'),
+            _infoRow(_l('송장번호'), '${item['invoice_number'] ?? ''}'),
+            _infoRow(_l('화물개수'), '$quantity${_l('개')}'),
             _infoRow(
-              '무게 / 크기',
+              _l('무게 / 크기'),
               '${_weightOneDecimal(item['weight_kg'])} kg / $size',
             ),
-            _infoRow('입고날짜', receivedDate),
+            _infoRow(_l('입고날짜'), receivedDate),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _busy ? null : () => _cancelDeletion(item),
-                    child: const Text('삭제 취소'),
+                    child: Text(_l('삭제 취소')),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton(
                     onPressed: _busy ? null : () => _deleteNow(item),
-                    child: const Text('바로 삭제'),
+                    child: Text(_l('바로 삭제')),
                   ),
                 ),
               ],
@@ -657,12 +668,18 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       {
         'label': _l('선적 일정 관리'),
         'icon': Icons.calendar_month,
-        'page': ScheduleManagementScreen(user: widget.user),
+        'page': ScheduleManagementScreen(
+          user: widget.user,
+          language: widget.language,
+        ),
       },
       {
         'label': _l('공지사항 관리'),
         'icon': Icons.campaign_outlined,
-        'page': NoticeManagementScreen(user: widget.user),
+        'page': NoticeManagementScreen(
+          user: widget.user,
+          language: widget.language,
+        ),
       },
       {
         'label': _l('화물 종합 관리'),
@@ -764,11 +781,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   Future<void> _showSelectedStatementChoice() async {
     if (_isPartner) {
-      _message('협력/파트너 계정은 명세서를 조회할 수 없습니다.');
+      _message(_l('협력/파트너 계정은 명세서를 조회할 수 없습니다.'));
       return;
     }
     if (_selectedIds.isEmpty) {
-      _message('확인 할 고객을 선택 하시오');
+      _message(_l('확인할 고객을 선택해 주세요.'));
       return;
     }
 
@@ -776,7 +793,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         .where((row) => _selectedIds.contains('${row['id']}'))
         .toList(growable: false);
     if (selected.isEmpty) {
-      _message('확인 할 고객을 선택 하시오');
+      _message(_l('확인할 고객을 선택해 주세요.'));
       return;
     }
 
@@ -793,8 +810,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         title: Text(_l('명세서 발급')),
         content: Text(
           singleReceipt
-              ? '선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.'
-              : '복수 고객/영수번호 명세서는 PDF로만 발급됩니다.',
+              ? _l('선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.')
+              : _l('복수 고객/영수번호 명세서는 PDF로만 발급됩니다.'),
         ),
         actions: [
           TextButton(
@@ -956,7 +973,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ),
                 ),
                 subtitle: Text(
-                  widget.user.roleLabel,
+                  widget.user.role.localizedLabel(widget.language),
                   style: const TextStyle(color: Colors.white70),
                 ),
               ),
@@ -1266,17 +1283,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
 
   Future<void> _showAddShipmentRowDialog() async {
     if (_route == '전체' || _year == '전체' || _voyage == '전체') {
-      _message('박스를 추가하려면 운송 경로, 년도, 항차를 각각 선택해 주세요.');
+      _message(_l('박스를 추가하려면 운송 경로, 년도, 항차를 각각 선택해 주세요.'));
       return;
     }
     final year = int.tryParse(_year.replaceAll(RegExp(r'[^0-9]'), ''));
     if (year == null) {
-      _message('년도를 확인해 주세요.');
+      _message(_l('년도를 확인해 주세요.'));
       return;
     }
     final prefix = RouteCatalog.boxPrefixFor(_route);
     if (prefix.isEmpty) {
-      _message('선택한 운송 경로의 박스번호 형식을 확인할 수 없습니다.');
+      _message(_l('선택한 운송 경로의 박스번호 형식을 확인할 수 없습니다.'));
       return;
     }
 
@@ -1290,7 +1307,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         prefix: prefix,
       );
     } catch (error) {
-      if (mounted) _message('다음 박스번호 확인 실패: $error');
+      if (mounted) _message('${_l('다음 박스번호 확인 실패')}: $error');
       if (mounted) setState(() => _busy = false);
       return;
     }
@@ -1363,10 +1380,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           widthCm: num.tryParse(width.text.trim()),
           heightCm: num.tryParse(height.text.trim()),
         );
-        _message('$nextBox 박스 행을 추가했습니다.');
+        _message(_lf('{box} 박스 행을 추가했습니다.', {'box': nextBox}));
         await _search();
       } catch (error) {
-        _message('박스 행 추가 실패: $error');
+        _message('${_l('박스 행 추가 실패')}: $error');
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -1436,8 +1453,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   },
                   icon: const Icon(Icons.receipt_long_outlined, size: 18),
                   label: Text(
-                    '${first['route']} · ${first['shipment_year']}년도 · '
-                    '${_voyageLabel(first['voyage'])} ($receiptCount건)',
+                    '${_routeText(first['route'])} · ${_localizedYear('${first['shipment_year']}년')} · '
+                    '${_localizedVoyage(_voyageLabel(first['voyage']))} ($receiptCount${_l('건')})',
                   ),
                 ),
               );
@@ -1478,7 +1495,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   Future<void> _editCheckedGroup(List<Map<String, dynamic>> rows) async {
     final selected = _checkedRowsInGroup(rows);
     if (selected.isEmpty) {
-      _message('편집할 화물을 먼저 체크해 주세요.');
+      _message(_l('편집할 화물을 먼저 체크해 주세요.'));
       return;
     }
     final one = selected.length == 1 ? selected.first : null;
@@ -1499,11 +1516,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (selected.length > 1)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    '여러 화물 편집 시 입력한 항목만 선택 화물 전체에 적용됩니다.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    _l('여러 화물 편집 시 입력한 항목만 선택 화물 전체에 적용됩니다.'),
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   ),
                 ),
               TextField(controller: name, decoration: InputDecoration(labelText: _l('이름/수령인'))),
@@ -1537,17 +1554,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       if (_isManager && n(height.text) != null) changes['height_cm'] = n(height.text);
 
       if (changes.isEmpty) {
-        _message('수정할 내용을 입력해 주세요.');
+        _message(_l('수정할 내용을 입력해 주세요.'));
       } else {
         setState(() => _busy = true);
         try {
           for (final row in selected) {
             await ShipmentService.instance.updateRow('${row['id']}', changes);
           }
-          _message('선택한 화물 정보를 저장했습니다.');
+          _message(_l('선택한 화물 정보를 저장했습니다.'));
           await _search();
         } catch (error) {
-          _message('화물 편집 실패: $error');
+          _message('${_l('화물 편집 실패')}: $error');
         } finally {
           if (mounted) setState(() => _busy = false);
         }
@@ -1564,14 +1581,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   Future<void> _deleteCheckedGroup(List<Map<String, dynamic>> rows) async {
     final selected = _checkedRowsInGroup(rows);
     if (selected.isEmpty) {
-      _message('삭제할 화물을 먼저 체크해 주세요.');
+      _message(_l('삭제할 화물을 먼저 체크해 주세요.'));
       return;
     }
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(_l('선택 화물 삭제 대기')),
-        content: Text('${selected.length}건을 삭제 대기로 이동하시겠습니까?'),
+        content: Text(_lf(
+          '{count}건을 삭제 대기로 이동하시겠습니까?',
+          {'count': selected.length},
+        )),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_l('삭제 대기'))),
@@ -1588,9 +1608,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       }
       await _loadPendingDeletions();
       await _search();
-      _message('${selected.length}건을 삭제 대기로 이동했습니다.');
+      _message(_lf(
+        '{count}건을 삭제 대기로 이동했습니다.',
+        {'count': selected.length},
+      ));
     } catch (error) {
-      _message('그룹 삭제 처리 실패: $error');
+      _message('${_l('그룹 삭제 처리 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1606,10 +1629,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       if(!mounted)return;
       setState(()=>item['manual_uncertain']=!current);
       _message(!current
-          ? '불확실 화물로 표시했습니다. 변경 승인 관리에서 확인할 수 있습니다.'
-          : '불확실 표시를 해제했습니다.');
+          ? _l('불확실 화물로 표시했습니다. 변경 승인 관리에서 확인할 수 있습니다.')
+          : _l('불확실 표시를 해제했습니다.'));
     } catch(error) {
-      _message('불확실 표시 처리 실패: $error');
+      _message('${_l('불확실 표시 처리 실패')}: $error');
     } finally {
       if(mounted)setState(()=>_busy=false);
     }
@@ -1627,9 +1650,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       );
       if (!mounted) return;
       setState(() => item['data_locked'] = !current);
-      _message(!current ? '화물 데이터를 잠금했습니다.' : '화물 데이터 잠금을 해제했습니다.');
+      _message(!current
+          ? _l('화물 데이터를 잠금했습니다.')
+          : _l('화물 데이터 잠금을 해제했습니다.'));
     } catch (error) {
-      _message('화물 잠금 처리 실패: $error');
+      _message('${_l('화물 잠금 처리 실패')}: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1655,7 +1680,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          '${first['receipt_number'] ?? ''} 고객 정보 편집',
+          '${first['receipt_number'] ?? ''} · ${_l('고객 정보 편집')}',
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1688,7 +1713,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '이 영수번호에 묶인 ${rows.length}개 화물에 동일하게 적용됩니다.',
+                _lf(
+                  '이 영수번호에 묶인 {count}개 화물에 동일하게 적용됩니다.',
+                  {'count': rows.length},
+                ),
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textSecondary,
@@ -1726,11 +1754,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           );
         }
         if (mounted) {
-          _message('${rows.length}개 화물의 고객 정보를 수정했습니다.');
+          _message(_lf(
+            '{count}개 화물의 고객 정보를 수정했습니다.',
+            {'count': rows.length},
+          ));
           await _search();
         }
       } catch (error) {
-        _message('고객 단위 편집 실패: $error');
+        _message('${_l('고객 단위 편집 실패')}: $error');
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -1849,11 +1880,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           changes,
         );
         if (mounted) {
-          _message('중량 / 크기 정보를 저장했습니다.');
+          _message(_l('중량 / 크기 정보를 저장했습니다.'));
           await _search();
         }
       } catch (error) {
-        _message('중량 / 크기 편집 실패: $error');
+        _message('${_l('중량 / 크기 편집 실패')}: $error');
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -1881,7 +1912,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(
-            '${rows.first['route']} · '
+            '${_routeText(rows.first['route'])} · '
             '${_localizedYear('${rows.first['shipment_year']}')} · '
             '${_localizedVoyage(_voyageLabel(rows.first['voyage']))}',
           ),
@@ -1937,7 +1968,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
     } catch (error) {
-      _message('그룹 명세서/운임 로딩 실패: $error');
+      _message('${_l('그룹 명세서/운임 로딩 실패')}: $error');
     }
   }
 
@@ -1985,7 +2016,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final voyage = '${first['voyage'] ?? ''}'.trim();
     final receipt = '${first['receipt_number'] ?? ''}'.trim();
     if (routeKey.isEmpty || year == null || voyage.isEmpty || receipt.isEmpty) {
-      _message('할인을 연결할 영수번호 정보를 확인할 수 없습니다.');
+      _message(_l('할인을 연결할 영수번호 정보를 확인할 수 없습니다.'));
       return;
     }
 
@@ -2057,7 +2088,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     receiptNumber: receipt,
                   );
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
-                  _message('$receipt 할인 적용을 삭제했습니다.');
+                  _message(_lf(
+                    '{receipt} 할인 적용을 삭제했습니다.',
+                    {'receipt': receipt},
+                  ));
                 },
                 icon: const Icon(Icons.delete_outline),
                 label: Text(_l('삭제')),
@@ -2094,7 +2128,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   receiptNumber: receipt,
                 );
                 if (dialogContext.mounted) setDialogState(() {});
-                _message('$receipt 할인 적용 완료');
+                _message(_lf(
+                  '{receipt} 할인 적용 완료',
+                  {'receipt': receipt},
+                ));
               },
               icon: const Icon(Icons.percent),
               label: Text(_l(current == null ? '적용' : '수정 저장')),
@@ -2120,7 +2157,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final voyage = '${first['voyage'] ?? ''}'.trim();
     final receipt = '${first['receipt_number'] ?? ''}'.trim();
     if (route.isEmpty || year == null || voyage.isEmpty || receipt.isEmpty) {
-      _message('기타 비용을 연결할 영수번호 정보를 확인할 수 없습니다.');
+      _message(_l('기타 비용을 연결할 영수번호 정보를 확인할 수 없습니다.'));
       return;
     }
 
@@ -2309,7 +2346,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      '${first['route']} · ${first['shipment_year']}년도 · ${_voyageLabel(first['voyage'])}',
+                      '${_routeText(first['route'])} · ${_localizedYear('${first['shipment_year']}년')} · ${_localizedVoyage(_voyageLabel(first['voyage']))}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         color: AppColors.navyPrimary,
@@ -2766,7 +2803,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    _infoRow(_l('운송 경로'), '${item['route'] ?? ''}'),
+                    _infoRow(_l('운송 경로'), _routeText(item['route'])),
                     _infoRow(
                       _l('년도 / 항차'),
                       '${_localizedYear('${item['shipment_year'] ?? ''}')} / '
@@ -2843,17 +2880,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   }
 
   String _localizedYear(String value) {
-    if (value == '전체') return _l('전체');
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty || widget.language == AppLanguage.korean) return value;
-    return widget.language == AppLanguage.lao ? 'ປີ $digits' : digits;
+    return ShipmentPeriodLabels.year(value, widget.language);
   }
 
   String _localizedVoyage(String value) {
-    if (value == '전체') return _l('전체');
-    final plain = value.replaceFirst(RegExp(r'항차$'), '');
-    if (widget.language == AppLanguage.korean) return value;
-    return widget.language == AppLanguage.lao ? 'ຖ້ຽວ $plain' : 'Voyage $plain';
+    return ShipmentPeriodLabels.voyage(value, widget.language);
   }
 
   Widget _infoRow(String label, String value) => Padding(
@@ -2876,8 +2907,3 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
-
-
-
-
-

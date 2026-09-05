@@ -149,9 +149,16 @@ class RouteCatalog {
           ? AppStrings.get(language, 'all')
           : displayName;
     }
+
+    // Route names are operational keys, so translate them locally instead of
+    // relying on an AI-generated database value. This also covers new routes
+    // that follow the existing "country -> country + mode" naming convention.
+    final parsed = _localizedKoreanRoute(displayName, language);
+    if (parsed != null) return parsed;
+
     RouteDefinition? route;
     for (final item in definitions) {
-      if (item.displayName == displayName) {
+      if (item.displayName == displayName || item.routeKey == displayName) {
         route = item;
         break;
       }
@@ -185,6 +192,60 @@ class RouteCatalog {
     };
     return (language == AppLanguage.lao ? lao : english)[route.routeKey] ??
         displayName;
+  }
+
+  static String? _localizedKoreanRoute(
+    String displayName,
+    AppLanguage language,
+  ) {
+    final normalized = displayName
+        .trim()
+        .replaceAll('→', '->')
+        .replaceAll(RegExp(r'\s*->\s*'), '->')
+        .replaceAll(RegExp(r'\s+'), ' ');
+    final match = RegExp(
+      r'^(한국|라오스|태국|베트남|중국|캄보디아)->(한국|라오스|태국|베트남|중국|캄보디아)\s+(해상|항공 특송|항공|육로)$',
+    ).firstMatch(normalized);
+    if (match == null) return null;
+
+    const englishCountries = <String, String>{
+      '한국': 'Korea',
+      '라오스': 'Laos',
+      '태국': 'Thailand',
+      '베트남': 'Vietnam',
+      '중국': 'China',
+      '캄보디아': 'Cambodia',
+    };
+    const laoCountries = <String, String>{
+      '한국': 'ເກົາຫຼີ',
+      '라오스': 'ລາວ',
+      '태국': 'ໄທ',
+      '베트남': 'ຫວຽດນາມ',
+      '중국': 'ຈີນ',
+      '캄보디아': 'ກຳປູເຈຍ',
+    };
+    const englishModes = <String, String>{
+      '해상': 'Sea Freight',
+      '항공': 'Air Freight',
+      '항공 특송': 'Air Express',
+      '육로': 'Land Transport',
+    };
+    const laoModes = <String, String>{
+      '해상': 'ທາງເຮືອ',
+      '항공': 'ທາງອາກາດ',
+      '항공 특송': 'ດ່ວນທາງອາກາດ',
+      '육로': 'ທາງບົກ',
+    };
+
+    final origin = match.group(1)!;
+    final destination = match.group(2)!;
+    final mode = match.group(3)!;
+    if (language == AppLanguage.lao) {
+      return '${laoCountries[origin]} → ${laoCountries[destination]} '
+          '${laoModes[mode]}';
+    }
+    return '${englishCountries[origin]} → ${englishCountries[destination]} '
+        '${englishModes[mode]}';
   }
 
   static void applyDatabaseDefinitions(List<Map<String, dynamic>> rows) {

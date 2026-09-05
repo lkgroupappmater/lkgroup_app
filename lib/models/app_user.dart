@@ -1,4 +1,5 @@
 // lib/models/app_user.dart
+import '../core/app_language.dart';
 
 enum UserRole { guest, member, staff, partner, admin }
 
@@ -16,6 +17,25 @@ extension UserRoleExtension on UserRole {
       case UserRole.admin:
         return '관리자(총괄)';
     }
+  }
+
+  String localizedLabel(AppLanguage language) {
+    if (language == AppLanguage.korean) return label;
+    const english = <UserRole, String>{
+      UserRole.guest: 'Guest',
+      UserRole.member: 'Member',
+      UserRole.staff: 'Administrator (Staff)',
+      UserRole.partner: 'Partner',
+      UserRole.admin: 'Super Administrator',
+    };
+    const lao = <UserRole, String>{
+      UserRole.guest: 'ຜູ້ເຂົ້າຊົມ',
+      UserRole.member: 'ສະມາຊິກທົ່ວໄປ',
+      UserRole.staff: 'ຜູ້ບໍລິຫານ (ພະນັກງານ)',
+      UserRole.partner: 'ຄູ່ຮ່ວມງານ',
+      UserRole.admin: 'ຜູ້ບໍລິຫານສູງສຸດ',
+    };
+    return (language == AppLanguage.lao ? lao : english)[this] ?? label;
   }
 
   bool get isLoggedIn => this != UserRole.guest;

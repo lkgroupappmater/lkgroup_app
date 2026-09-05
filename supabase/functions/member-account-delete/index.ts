@@ -25,7 +25,11 @@ const makeCode = () => {
 };
 
 const tombstoneEmail = (userId: string) =>
-  `deleted.${userId}.${Date.now()}@lkgroup.trading`;
+  `deleted.${userId}.${Date.now()}@lkgrouptrading.com`;
+
+const resendFrom = () =>
+  Deno.env.get("RESEND_FROM_EMAIL")?.trim() ||
+  "LK Group <auth@mail.lkgrouptrading.com>";
 
 const deletionEmailHtml = (code: string) => `
 <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#222">
@@ -122,7 +126,7 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "LK Group <auth@lkgroup.trading>",
+          from: resendFrom(),
           to: [email],
           subject: "[LK Group] 회원 탈퇴 인증 코드",
           html: deletionEmailHtml(code),

@@ -35,6 +35,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/company_logo_transparent.png
+    - assets/images/company_splash_logo.png
     - assets/quotation_forms/
     - assets/statement_forms/
     - assets/images/company_logo.png

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../core/app_language.dart';
+import '../core/route_catalog.dart';
 import 'ai_assistant_service.dart';
 
 class ContentService {
@@ -303,11 +304,34 @@ class ContentService {
         <String, dynamic>{
           ...row,
           for (final field in fields)
-            field: '${row['${field}_$suffix'] ?? ''}'.trim().isEmpty
-                ? row[field]
-                : row['${field}_$suffix'],
+            field: _localizedField(row, field, suffix, language),
         },
     ];
+  }
+
+  static dynamic _localizedField(
+    Map<String, dynamic> row,
+    String field,
+    String suffix,
+    AppLanguage language,
+  ) {
+    final source = '${row[field] ?? ''}'.trim();
+    if (field == 'route') {
+      final bundled = RouteCatalog.localizedLabel(source, language);
+      if (bundled != source) return bundled;
+    }
+
+    final translated = '${row['${field}_$suffix'] ?? ''}'.trim();
+    if (translated.isEmpty) return row[field];
+
+    // A malformed batch translation previously joined notice/schedule body
+    // text into a short title or route. Never render that as a home-card label.
+    if ((field == 'title' || field == 'route') &&
+        (translated.contains('\n') ||
+            translated.length > source.length * 8 + 80)) {
+      return row[field];
+    }
+    return row['${field}_$suffix'];
   }
 
   static Future<Map<String, dynamic>> _withTranslations(

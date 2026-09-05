@@ -19,6 +19,18 @@ class CargoUiStrings {
     }
   }
 
+  static String format(
+    AppLanguage language,
+    String korean,
+    Map<String, Object?> values,
+  ) {
+    var result = get(language, korean);
+    for (final entry in values.entries) {
+      result = result.replaceAll('{${entry.key}}', '${entry.value ?? ''}');
+    }
+    return result;
+  }
+
   static const Map<String, String> _english = {
     '전체': 'All',
     '확인': 'OK',
@@ -165,6 +177,99 @@ class CargoUiStrings {
         'When you find your cargo, tap it to enter your name and phone and request verification.',
     '이름/연락처': 'Name / Phone',
     '수취인 불명': 'Unknown Recipient',
+    '검색한 화물이 없습니다. 화물을 추가하시겠습니까?':
+        'No cargo was found. Would you like to add cargo?',
+    '화물 검색 실패': 'Cargo search failed',
+    '화물 조회 실패': 'Could not load cargo',
+    '운임 계산 실패': 'Freight calculation failed',
+    '그룹 운임 계산 실패': 'Group freight calculation failed',
+    '협력/파트너 계정은 명세서를 조회할 수 없습니다.':
+        'Partner accounts cannot view statements.',
+    '협력/파트너 계정은 명세서를 출력할 수 없습니다.':
+        'Partner accounts cannot export statements.',
+    '명세서를 확인할 화물을 선택해 주세요.':
+        'Select cargo to view its statement.',
+    '선택한 화물에 영수번호가 없습니다.':
+        'The selected cargo has no receipt number.',
+    '명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.':
+        'Select cargo with the same receipt number (customer).',
+    '명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.':
+        'The statement route, year, or voyage could not be identified.',
+    'PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.':
+        'Select cargo before creating a statement PDF.',
+    '이 항차에서 체크된 화물이 없습니다.':
+        'No cargo is selected for this voyage.',
+    '수정할 내용을 입력해 주세요.': 'Enter the information to change.',
+    '선택한 화물 정보를 저장했습니다.':
+        'The selected cargo information was saved.',
+    '관리자에게 화물 정보 수정 요청을 보냈습니다.':
+        'The cargo change request was sent to an administrator.',
+    '화물 정보 처리 실패': 'Cargo update failed',
+    '화물 삭제 대기 목록 불러오기 실패':
+        'Could not load cargo pending deletion',
+    '{box} 화물을 삭제 대기로 이동하시겠습니까?\n\n삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.':
+        'Move cargo {box} to pending deletion?\n\nYou can cancel or delete it immediately from Pending Cargo Deletion below.',
+    '{box} 화물을 삭제 대기로 이동했습니다.':
+        'Cargo {box} was moved to pending deletion.',
+    '화물 삭제 대기 처리 실패': 'Could not move cargo to pending deletion',
+    '화물 삭제를 취소했습니다.': 'Cargo deletion was cancelled.',
+    '삭제 취소 실패': 'Could not cancel deletion',
+    '{box} 화물을 바로 삭제하시겠습니까?\n\n바로 삭제 후에는 앱에서 복구할 수 없습니다.':
+        'Delete cargo {box} now?\n\nIt cannot be restored in the app after deletion.',
+    '{box} 화물을 바로 삭제했습니다.': 'Cargo {box} was deleted.',
+    '화물 바로 삭제 실패': 'Could not delete cargo',
+    '확인할 고객을 선택해 주세요.': 'Select a customer to continue.',
+    '선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.':
+        'Choose a statement format for the selected customer or receipt.',
+    '복수 고객/영수번호 명세서는 PDF로만 발급됩니다.':
+        'Statements for multiple customers or receipts are available only as PDF.',
+    '박스를 추가하려면 운송 경로, 년도, 항차를 각각 선택해 주세요.':
+        'Select a route, year, and voyage before adding a box.',
+    '년도를 확인해 주세요.': 'Check the year.',
+    '선택한 운송 경로의 박스번호 형식을 확인할 수 없습니다.':
+        'The box-number format for the selected route could not be identified.',
+    '다음 박스번호 확인 실패': 'Could not determine the next box number',
+    '{box} 박스 행을 추가했습니다.': 'Box row {box} was added.',
+    '박스 행 추가 실패': 'Could not add the box row',
+    '편집할 화물을 먼저 체크해 주세요.': 'Select cargo to edit.',
+    '여러 화물 편집 시 입력한 항목만 선택 화물 전체에 적용됩니다.':
+        'When editing multiple cargo items, only entered fields are applied to all selected items.',
+    '화물 편집 실패': 'Could not edit cargo',
+    '삭제할 화물을 먼저 체크해 주세요.': 'Select cargo to delete.',
+    '{count}건을 삭제 대기로 이동하시겠습니까?':
+        'Move {count} item(s) to pending deletion?',
+    '{count}건을 삭제 대기로 이동했습니다.':
+        '{count} item(s) were moved to pending deletion.',
+    '그룹 삭제 처리 실패': 'Could not process group deletion',
+    '불확실 화물로 표시했습니다. 변경 승인 관리에서 확인할 수 있습니다.':
+        'Marked as uncertain cargo. Review it in Change Approvals.',
+    '불확실 표시를 해제했습니다.': 'The uncertain flag was cleared.',
+    '불확실 표시 처리 실패': 'Could not update the uncertain flag',
+    '화물 데이터를 잠금했습니다.': 'Cargo data was locked.',
+    '화물 데이터 잠금을 해제했습니다.': 'Cargo data was unlocked.',
+    '화물 잠금 처리 실패': 'Could not update the cargo lock',
+    '고객 정보 편집': 'Edit Customer Information',
+    '이 영수번호에 묶인 {count}개 화물에 동일하게 적용됩니다.':
+        'The change applies to all {count} cargo item(s) under this receipt.',
+    '{count}개 화물의 고객 정보를 수정했습니다.':
+        'Customer information was updated for {count} cargo item(s).',
+    '고객 단위 편집 실패': 'Could not update the customer group',
+    '중량 / 크기 정보를 저장했습니다.': 'Weight and dimensions were saved.',
+    '중량 / 크기 편집 실패': 'Could not update weight and dimensions',
+    '그룹 명세서/운임 로딩 실패':
+        'Could not load the group statement or freight',
+    '할인을 연결할 영수번호 정보를 확인할 수 없습니다.':
+        'The receipt information required for the discount is unavailable.',
+    '{receipt} 할인 적용을 삭제했습니다.':
+        'The discount for {receipt} was deleted.',
+    '{receipt} 할인 적용 완료': 'The discount for {receipt} was applied.',
+    '기타 비용을 연결할 영수번호 정보를 확인할 수 없습니다.':
+        'The receipt information required for the extra cost is unavailable.',
+    '수취인 정보를 반영했습니다.': 'Recipient information was applied.',
+    '관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.':
+        'Your cargo verification and correction request was sent to an administrator.',
+    '수취인 정보 적용 실패': 'Could not apply recipient information',
+    '본인 화물 확인 요청 실패': 'Could not send the cargo verification request',
   };
 
   static const Map<String, String> _lao = {
@@ -313,5 +418,92 @@ class CargoUiStrings {
         'ເມື່ອພົບສິນຄ້າຂອງທ່ານ ໃຫ້ແຕະເພື່ອປ້ອນຊື່ແລະເບີໂທ ແລ້ວສົ່ງຄຳຂໍກວດສອບ.',
     '이름/연락처': 'ຊື່ / ເບີໂທ',
     '수취인 불명': 'ບໍ່ຮູ້ຜູ້ຮັບ',
+    '검색한 화물이 없습니다. 화물을 추가하시겠습니까?':
+        'ບໍ່ພົບສິນຄ້າ. ຕ້ອງການເພີ່ມສິນຄ້າບໍ?',
+    '화물 검색 실패': 'ຄົ້ນຫາສິນຄ້າບໍ່ສຳເລັດ',
+    '화물 조회 실패': 'ໂຫຼດຂໍ້ມູນສິນຄ້າບໍ່ສຳເລັດ',
+    '운임 계산 실패': 'ຄຳນວນຄ່າຂົນສົ່ງບໍ່ສຳເລັດ',
+    '그룹 운임 계산 실패': 'ຄຳນວນຄ່າຂົນສົ່ງຂອງກຸ່ມບໍ່ສຳເລັດ',
+    '협력/파트너 계정은 명세서를 조회할 수 없습니다.':
+        'ບັນຊີຄູ່ຮ່ວມງານບໍ່ສາມາດເບິ່ງໃບລາຍການໄດ້.',
+    '협력/파트너 계정은 명세서를 출력할 수 없습니다.':
+        'ບັນຊີຄູ່ຮ່ວມງານບໍ່ສາມາດສົ່ງອອກໃບລາຍການໄດ້.',
+    '명세서를 확인할 화물을 선택해 주세요.':
+        'ກະລຸນາເລືອກສິນຄ້າເພື່ອເບິ່ງໃບລາຍການ.',
+    '선택한 화물에 영수번호가 없습니다.':
+        'ສິນຄ້າທີ່ເລືອກບໍ່ມີເລກໃບຮັບ.',
+    '명세서는 같은 영수번호(고객)의 화물끼리 선택해 주세요.':
+        'ກະລຸນາເລືອກສິນຄ້າທີ່ມີເລກໃບຮັບດຽວກັນ.',
+    '명세서의 운송경로/년도/항차 정보를 확인할 수 없습니다.':
+        'ບໍ່ສາມາດກວດສອບເສັ້ນທາງ, ປີ ຫຼື ຖ້ຽວຂອງໃບລາຍການໄດ້.',
+    'PDF로 저장할 명세서의 화물을 먼저 체크해 주세요.':
+        'ກະລຸນາເລືອກສິນຄ້າກ່ອນສ້າງ PDF.',
+    '이 항차에서 체크된 화물이 없습니다.':
+        'ບໍ່ມີສິນຄ້າທີ່ເລືອກໃນຖ້ຽວນີ້.',
+    '수정할 내용을 입력해 주세요.': 'ກະລຸນາປ້ອນຂໍ້ມູນທີ່ຈະແກ້ໄຂ.',
+    '선택한 화물 정보를 저장했습니다.':
+        'ບັນທຶກຂໍ້ມູນສິນຄ້າທີ່ເລືອກແລ້ວ.',
+    '관리자에게 화물 정보 수정 요청을 보냈습니다.':
+        'ສົ່ງຄຳຂໍແກ້ໄຂຂໍ້ມູນສິນຄ້າໃຫ້ຜູ້ບໍລິຫານແລ້ວ.',
+    '화물 정보 처리 실패': 'ປັບປຸງຂໍ້ມູນສິນຄ້າບໍ່ສຳເລັດ',
+    '화물 삭제 대기 목록 불러오기 실패': 'ໂຫຼດລາຍການລໍຖ້າລົບບໍ່ສຳເລັດ',
+    '{box} 화물을 삭제 대기로 이동하시겠습니까?\n\n삭제 대기 중에는 아래 "화물 삭제 대기"에서 취소하거나 바로 삭제할 수 있습니다.':
+        'ຍ້າຍສິນຄ້າ {box} ໄປລໍຖ້າລົບບໍ?\n\nສາມາດຍົກເລີກ ຫຼື ລົບທັນທີໄດ້ໃນລາຍການລໍຖ້າລົບ.',
+    '{box} 화물을 삭제 대기로 이동했습니다.': 'ຍ້າຍສິນຄ້າ {box} ໄປລໍຖ້າລົບແລ້ວ.',
+    '화물 삭제 대기 처리 실패': 'ຍ້າຍສິນຄ້າໄປລໍຖ້າລົບບໍ່ສຳເລັດ',
+    '화물 삭제를 취소했습니다.': 'ຍົກເລີກການລົບສິນຄ້າແລ້ວ.',
+    '삭제 취소 실패': 'ຍົກເລີກການລົບບໍ່ສຳເລັດ',
+    '{box} 화물을 바로 삭제하시겠습니까?\n\n바로 삭제 후에는 앱에서 복구할 수 없습니다.':
+        'ລົບສິນຄ້າ {box} ທັນທີບໍ?\n\nຫຼັງຈາກລົບແລ້ວບໍ່ສາມາດກູ້ຄືນໃນແອັບໄດ້.',
+    '{box} 화물을 바로 삭제했습니다.': 'ລົບສິນຄ້າ {box} ແລ້ວ.',
+    '화물 바로 삭제 실패': 'ລົບສິນຄ້າບໍ່ສຳເລັດ',
+    '확인할 고객을 선택해 주세요.': 'ກະລຸນາເລືອກລູກຄ້າ.',
+    '선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.':
+        'ກະລຸນາເລືອກຮູບແບບໃບລາຍການຂອງລູກຄ້າ ຫຼື ເລກໃບຮັບທີ່ເລືອກ.',
+    '복수 고객/영수번호 명세서는 PDF로만 발급됩니다.':
+        'ໃບລາຍການຫຼາຍລູກຄ້າ ຫຼື ຫຼາຍເລກໃບຮັບສ້າງໄດ້ເປັນ PDF ເທົ່ານັ້ນ.',
+    '박스를 추가하려면 운송 경로, 년도, 항차를 각각 선택해 주세요.':
+        'ກະລຸນາເລືອກເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວກ່ອນເພີ່ມກ່ອງ.',
+    '년도를 확인해 주세요.': 'ກະລຸນາກວດສອບປີ.',
+    '선택한 운송 경로의 박스번호 형식을 확인할 수 없습니다.':
+        'ບໍ່ສາມາດກວດສອບຮູບແບບເລກກ່ອງຂອງເສັ້ນທາງນີ້ໄດ້.',
+    '다음 박스번호 확인 실패': 'ກວດຫາເລກກ່ອງຖັດໄປບໍ່ສຳເລັດ',
+    '{box} 박스 행을 추가했습니다.': 'ເພີ່ມແຖວກ່ອງ {box} ແລ້ວ.',
+    '박스 행 추가 실패': 'ເພີ່ມແຖວກ່ອງບໍ່ສຳເລັດ',
+    '편집할 화물을 먼저 체크해 주세요.': 'ກະລຸນາເລືອກສິນຄ້າທີ່ຈະແກ້ໄຂ.',
+    '여러 화물 편집 시 입력한 항목만 선택 화물 전체에 적용됩니다.':
+        'ເມື່ອແກ້ໄຂຫຼາຍລາຍການ ຈະນຳໃຊ້ສະເພາະຂໍ້ມູນທີ່ປ້ອນໃຫ້ທຸກລາຍການທີ່ເລືອກ.',
+    '화물 편집 실패': 'ແກ້ໄຂສິນຄ້າບໍ່ສຳເລັດ',
+    '삭제할 화물을 먼저 체크해 주세요.': 'ກະລຸນາເລືອກສິນຄ້າທີ່ຈະລົບ.',
+    '{count}건을 삭제 대기로 이동하시겠습니까?': 'ຍ້າຍ {count} ລາຍການໄປລໍຖ້າລົບບໍ?',
+    '{count}건을 삭제 대기로 이동했습니다.': 'ຍ້າຍ {count} ລາຍການໄປລໍຖ້າລົບແລ້ວ.',
+    '그룹 삭제 처리 실패': 'ຈັດການການລົບກຸ່ມບໍ່ສຳເລັດ',
+    '불확실 화물로 표시했습니다. 변경 승인 관리에서 확인할 수 있습니다.':
+        'ໝາຍເປັນສິນຄ້າບໍ່ແນ່ນອນແລ້ວ. ກວດໄດ້ໃນການອະນຸມັດການປ່ຽນແປງ.',
+    '불확실 표시를 해제했습니다.': 'ຍົກເລີກໝາຍບໍ່ແນ່ນອນແລ້ວ.',
+    '불확실 표시 처리 실패': 'ປັບປຸງໝາຍບໍ່ແນ່ນອນບໍ່ສຳເລັດ',
+    '화물 데이터를 잠금했습니다.': 'ລັອກຂໍ້ມູນສິນຄ້າແລ້ວ.',
+    '화물 데이터 잠금을 해제했습니다.': 'ປົດລັອກຂໍ້ມູນສິນຄ້າແລ້ວ.',
+    '화물 잠금 처리 실패': 'ປັບປຸງການລັອກສິນຄ້າບໍ່ສຳເລັດ',
+    '고객 정보 편집': 'ແກ້ໄຂຂໍ້ມູນລູກຄ້າ',
+    '이 영수번호에 묶인 {count}개 화물에 동일하게 적용됩니다.':
+        'ການປ່ຽນແປງຈະນຳໃຊ້ກັບສິນຄ້າ {count} ລາຍການໃນເລກໃບຮັບນີ້.',
+    '{count}개 화물의 고객 정보를 수정했습니다.':
+        'ອັບເດດຂໍ້ມູນລູກຄ້າສຳລັບສິນຄ້າ {count} ລາຍການແລ້ວ.',
+    '고객 단위 편집 실패': 'ອັບເດດກຸ່ມລູກຄ້າບໍ່ສຳເລັດ',
+    '중량 / 크기 정보를 저장했습니다.': 'ບັນທຶກນ້ຳໜັກ ແລະ ຂະໜາດແລ້ວ.',
+    '중량 / 크기 편집 실패': 'ແກ້ໄຂນ້ຳໜັກ ແລະ ຂະໜາດບໍ່ສຳເລັດ',
+    '그룹 명세서/운임 로딩 실패': 'ໂຫຼດໃບລາຍການ ຫຼື ຄ່າຂົນສົ່ງຂອງກຸ່ມບໍ່ສຳເລັດ',
+    '할인을 연결할 영수번호 정보를 확인할 수 없습니다.':
+        'ບໍ່ມີຂໍ້ມູນເລກໃບຮັບສຳລັບສ່ວນຫຼຸດ.',
+    '{receipt} 할인 적용을 삭제했습니다.': 'ລົບສ່ວນຫຼຸດຂອງ {receipt} ແລ້ວ.',
+    '{receipt} 할인 적용 완료': 'ນຳໃຊ້ສ່ວນຫຼຸດໃຫ້ {receipt} ແລ້ວ.',
+    '기타 비용을 연결할 영수번호 정보를 확인할 수 없습니다.':
+        'ບໍ່ມີຂໍ້ມູນເລກໃບຮັບສຳລັບຄ່າໃຊ້ຈ່າຍອື່ນ.',
+    '수취인 정보를 반영했습니다.': 'ນຳໃຊ້ຂໍ້ມູນຜູ້ຮັບແລ້ວ.',
+    '관리자에게 본인 화물 확인 및 정정 요청을 보냈습니다.':
+        'ສົ່ງຄຳຂໍກວດສອບ ແລະ ແກ້ໄຂສິນຄ້າໃຫ້ຜູ້ບໍລິຫານແລ້ວ.',
+    '수취인 정보 적용 실패': 'ນຳໃຊ້ຂໍ້ມູນຜູ້ຮັບບໍ່ສຳເລັດ',
+    '본인 화물 확인 요청 실패': 'ສົ່ງຄຳຂໍກວດສອບສິນຄ້າບໍ່ສຳເລັດ',
   };
 }

@@ -52,10 +52,18 @@ node_modules/
 .artifacts/
 *.bak_before_patch*
 *.bak_before_*
+/patch_files/
+/sample excel files.zip
+/*.patch
+/PATCH*.py
+/PATCH*.tmp
+/CLEAN_*.ps1
+/REPORT_*.ps1
 /APPLY_*.ps1
 /apply_patch*.ps1
 /PATCH*_apply.py
 /README_PATCH*.txt
+/README_CLEANUP*.txt
 /Patch*.zip
 /patch[0-9]*/
 /scripts/apply_*.ps1

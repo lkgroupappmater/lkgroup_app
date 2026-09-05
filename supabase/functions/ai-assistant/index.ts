@@ -86,7 +86,9 @@ Deno.serve(async (req) => {
         instructions:
           'You are LK Group Trading\'s translation engine. Translate every '
           + `item to ${targetLabel}. Preserve names, numbers, dates, route `
-          + 'codes and line breaks. Do not add explanations. Return only the '
+          + `codes and line breaks. Return exactly ${texts.length} translated `
+          + 'items in the same order. Never merge items or move text from one '
+          + 'item into another. Do not add explanations. Return only the '
           + 'required JSON.',
         input: JSON.stringify({ texts }),
         text: {
@@ -99,6 +101,8 @@ Deno.serve(async (req) => {
               properties: {
                 translations: {
                   type: 'array',
+                  minItems: texts.length,
+                  maxItems: texts.length,
                   items: { type: 'string' },
                 },
               },

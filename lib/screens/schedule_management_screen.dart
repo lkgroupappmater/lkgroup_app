@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../core/shipment_period_labels.dart';
+import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../services/content_service.dart';
 import '../utils/form_validators.dart';
 
 class ScheduleManagementScreen extends StatefulWidget {
-  const ScheduleManagementScreen({super.key, required this.user});
+  const ScheduleManagementScreen({
+    super.key,
+    required this.user,
+    this.language = AppLanguage.korean,
+  });
   final AppUser user;
+  final AppLanguage language;
 
   @override
   State<ScheduleManagementScreen> createState() =>
@@ -25,6 +33,16 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
   }
 
   String _text(Map<String, dynamic> row, String key) => '${row[key] ?? ''}';
+  String _u(String korean) => UiLocalizations.get(widget.language, korean);
+  String _uf(String korean, Map<String, Object?> values) =>
+      UiLocalizations.format(widget.language, korean, values);
+  String _ue(String prefix, Object error) =>
+      UiLocalizations.error(widget.language, prefix, error);
+  String? _validation(String? value) => value == null ? null : _u(value);
+  String _yearLabel(String value) =>
+      ShipmentPeriodLabels.year(value, widget.language);
+  String _voyageLabel(String value) =>
+      ShipmentPeriodLabels.voyage(value, widget.language);
 
   Future<void> _load() async {
     try {
@@ -37,7 +55,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _message('일정 조회 실패: $e');
+      _message(_ue('일정 조회 실패', e));
     }
   }
 
@@ -50,34 +68,33 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('선적 일정 삭제 확인'),
-        content: const Text(
-          '삭제하면 홈 화면에서는 즉시 보이지 않습니다.\n'
-          '삭제된 자료는 30일 동안 임시 보관 후 완전히 삭제됩니다.',
-        ),
+        title: Text(_u('선적 일정 삭제 확인')),
+        content: Text(_u(
+          '삭제하면 홈 화면에서는 즉시 보이지 않습니다.\n삭제된 자료는 30일 동안 임시 보관 후 완전히 삭제됩니다.',
+        )),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('확인')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(_u('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(_u('확인'))),
         ],
       ),
     );
     if (ok != true) return;
     try {
       await ContentService.requestScheduleDeletion(_text(row, 'id'));
-      _message('삭제 대기중으로 변경했습니다. 30일 후 완전히 삭제됩니다.');
+      _message(_u('삭제 대기중으로 변경했습니다. 30일 후 완전히 삭제됩니다.'));
       await _load();
     } catch (e) {
-      _message('삭제 요청 실패: $e');
+      _message(_ue('삭제 요청 실패', e));
     }
   }
 
   Future<void> _restore(Map<String, dynamic> row) async {
     try {
       await ContentService.restoreSchedule(_text(row, 'id'));
-      _message('삭제를 취소했습니다. 홈 화면에 다시 표시됩니다.');
+      _message(_u('삭제를 취소했습니다. 홈 화면에 다시 표시됩니다.'));
       await _load();
     } catch (e) {
-      _message('삭제 취소 실패: $e');
+      _message(_ue('삭제 취소 실패', e));
     }
   }
 
@@ -85,21 +102,21 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('바로 삭제'),
-        content: const Text('임시 보관 기간을 무시하고 DB에서 완전히 삭제할까요?'),
+        title: Text(_u('바로 삭제')),
+        content: Text(_u('임시 보관 기간을 무시하고 DB에서 완전히 삭제할까요?')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('바로 삭제')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(_u('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(_u('바로 삭제'))),
         ],
       ),
     );
     if (ok != true) return;
     try {
       await ContentService.hardDeleteSchedule(_text(row, 'id'));
-      _message('선적 일정을 완전히 삭제했습니다.');
+      _message(_u('선적 일정을 완전히 삭제했습니다.'));
       await _load();
     } catch (e) {
-      _message('바로 삭제 실패: $e');
+      _message(_ue('바로 삭제 실패', e));
     }
   }
 
@@ -123,7 +140,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? '선적 일정 추가' : '선적 일정 편집'),
+          title: Text(_u(existing == null ? '선적 일정 추가' : '선적 일정 편집')),
           content: Form(
             key: formKey,
             autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -133,70 +150,89 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     initialValue: route,
-                    decoration: const InputDecoration(labelText: '운송 경로'),
+                    decoration: InputDecoration(labelText: _u('운송 경로')),
                     items: RouteCatalog.routes
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .map((e) => DropdownMenuItem(
+                              value: e,
+                              child: Text(RouteCatalog.localizedLabel(
+                                e,
+                                widget.language,
+                              )),
+                            ))
                         .toList(),
                     onChanged: (v) => setDialogState(() => route = v ?? route),
                   ),
                   DropdownButtonFormField<String>(
                     initialValue: year,
-                    decoration: const InputDecoration(labelText: '년도'),
+                    decoration: InputDecoration(labelText: _u('년도')),
                     items: const ['2026년', '2027년', '2028년']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .map((e) => DropdownMenuItem(
+                              value: e,
+                              child: Text(_yearLabel(e)),
+                            ))
                         .toList(),
                     onChanged: (v) => setDialogState(() => year = v ?? year),
                   ),
                   TextFormField(
                     controller: voyage,
-                    decoration: const InputDecoration(
-                      labelText: '항차',
-                      hintText: '예: 17항차',
+                    decoration: InputDecoration(
+                      labelText: _u('항차'),
+                      hintText: _u('예: 17항차'),
                     ),
-                    validator: (v) => FormValidators.requiredText(v, '항차'),
+                    validator: (v) => _validation(
+                      FormValidators.requiredText(v, '항차'),
+                    ),
                   ),
                   TextFormField(
                     controller: from,
-                    decoration: const InputDecoration(
-                      labelText: '출발지',
-                      hintText: '예: 인천 국제 공항',
+                    decoration: InputDecoration(
+                      labelText: _u('출발지'),
+                      hintText: _u('예: 인천 국제 공항'),
                     ),
-                    validator: (v) => FormValidators.requiredText(v, '출발지'),
+                    validator: (v) => _validation(
+                      FormValidators.requiredText(v, '출발지'),
+                    ),
                   ),
                   TextFormField(
                     controller: to,
-                    decoration: const InputDecoration(
-                      labelText: '도착지',
-                      hintText: '예: 라오스 왓따이 공항',
+                    decoration: InputDecoration(
+                      labelText: _u('도착지'),
+                      hintText: _u('예: 라오스 왓따이 공항'),
                     ),
-                    validator: (v) => FormValidators.requiredText(v, '도착지'),
+                    validator: (v) => _validation(
+                      FormValidators.requiredText(v, '도착지'),
+                    ),
                   ),
                   TextFormField(
                     controller: close,
                     keyboardType: TextInputType.datetime,
-                    decoration: const InputDecoration(
-                      labelText: '접수 마감일',
-                      hintText: '예: 2026-09-03',
-                      helperText: '20260903으로 입력해도 작성 시 2026-09-03으로 자동 변환됩니다.',
+                    decoration: InputDecoration(
+                      labelText: _u('접수 마감일'),
+                      hintText: '2026-09-03',
+                      helperText: _u('20260903으로 입력해도 작성 시 2026-09-03으로 자동 변환됩니다.'),
                     ),
-                    validator: (v) => FormValidators.date(v, required: true),
+                    validator: (v) => _validation(
+                      FormValidators.date(v, required: true),
+                    ),
                   ),
                   TextFormField(
                     controller: eta,
                     keyboardType: TextInputType.datetime,
-                    decoration: const InputDecoration(
-                      labelText: '도착 예정일',
-                      hintText: '예: 2026-09-04',
-                      helperText: 'YYYY-MM-DD 또는 YYYYMMDD 형식',
+                    decoration: InputDecoration(
+                      labelText: _u('도착 예정일'),
+                      hintText: '2026-09-04',
+                      helperText: _u('YYYY-MM-DD 또는 YYYYMMDD 형식'),
                     ),
-                    validator: (v) => FormValidators.date(v, required: true),
+                    validator: (v) => _validation(
+                      FormValidators.date(v, required: true),
+                    ),
                   ),
                   TextFormField(
                     controller: detail,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: '상세 내용 또는 추가 내용',
-                      hintText: '예: 출항/도착 일정은 현지 사정에 따라 변경될 수 있습니다.',
+                    decoration: InputDecoration(
+                      labelText: _u('상세 내용 또는 추가 내용'),
+                      hintText: _u('예: 출항/도착 일정은 현지 사정에 따라 변경될 수 있습니다.'),
                     ),
                   ),
                 ],
@@ -206,7 +242,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('취소'),
+              child: Text(_u('취소')),
             ),
             FilledButton(
               onPressed: () async {
@@ -233,10 +269,10 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                   await _load();
                 } catch (e) {
-                  _message('${existing == null ? '작성' : '저장'} 실패: $e');
+                  _message(_ue(existing == null ? '작성 실패' : '저장 실패', e));
                 }
               },
-              child: Text(existing == null ? '작성' : '저장'),
+              child: Text(_u(existing == null ? '작성' : '저장')),
             ),
           ],
         ),
@@ -255,7 +291,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('선적 일정 목록 관리'),
+          title: Text(_u('선적 일정 목록 관리')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -263,7 +299,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _showEditor(),
           icon: const Icon(Icons.add),
-          label: const Text('일정 추가'),
+          label: Text(_u('일정 추가')),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -273,7 +309,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     if (_items.isEmpty)
-                      const Card(child: ListTile(title: Text('등록된 선적 일정이 없습니다.'))),
+                      Card(child: ListTile(title: Text(_u('등록된 선적 일정이 없습니다.')))),
                     ..._items.map((row) {
                       final pending = _text(row, 'deletion_status') == 'pending';
                       return Card(
@@ -283,16 +319,21 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                             children: [
                               ListTile(
                                 title: Text(
-                                  '${_text(row, 'route')} · ${_text(row, 'year')} ${_text(row, 'voyage')}',
+                                  '${RouteCatalog.localizedLabel(_text(row, 'route'), widget.language)} · '
+                                  '${_yearLabel(_text(row, 'year'))} '
+                                  '${_voyageLabel(_text(row, 'voyage'))}',
                                 ),
                                 subtitle: Text(
                                   '${_text(row, 'origin')} → ${_text(row, 'destination')}\n'
-                                  '마감: ${_text(row, 'booking_close_date')} · 도착예정: ${_text(row, 'estimated_arrival_date')}\n'
+                                  '${_uf('마감: {close} · 도착예정: {arrival}', {
+                                    'close': _text(row, 'booking_close_date'),
+                                    'arrival': _text(row, 'estimated_arrival_date'),
+                                  })}\n'
                                   '${_text(row, 'detail')}',
                                 ),
                                 isThreeLine: true,
                                 trailing: pending
-                                    ? const Chip(label: Text('삭제 대기중'))
+                                    ? Chip(label: Text(_u('삭제 대기중')))
                                     : Wrap(
                                         children: [
                                           IconButton(
@@ -312,14 +353,14 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                                     Expanded(
                                       child: OutlinedButton(
                                         onPressed: () => _restore(row),
-                                        child: const Text('삭제 취소'),
+                                        child: Text(_u('삭제 취소')),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: FilledButton(
                                         onPressed: () => _hardDelete(row),
-                                        child: const Text('바로 삭제'),
+                                        child: Text(_u('바로 삭제')),
                                       ),
                                     ),
                                   ],

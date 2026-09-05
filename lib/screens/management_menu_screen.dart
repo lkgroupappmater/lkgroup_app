@@ -201,12 +201,18 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
         {
           'label': _m('선적 일정 관리'),
           'icon': Icons.calendar_month,
-          'page': ScheduleManagementScreen(user: user),
+          'page': ScheduleManagementScreen(
+            user: user,
+            language: widget.language,
+          ),
         },
         {
           'label': _m('공지 및 안내 관리'),
           'icon': Icons.campaign_outlined,
-          'page': NoticeManagementScreen(user: user),
+          'page': NoticeManagementScreen(
+            user: user,
+            language: widget.language,
+          ),
         },
         {
           'label': _m('하역 자료 관리'),
@@ -324,7 +330,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
                   ),
                 ),
                 subtitle: Text(
-                  user.roleLabel,
+                  user.role.localizedLabel(widget.language),
                   style: const TextStyle(color: Colors.white70),
                 ),
               ),

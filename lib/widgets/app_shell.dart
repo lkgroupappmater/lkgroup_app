@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
+import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import 'cargo_flow_app_bar.dart';
 import '../screens/dashboard_home_screen.dart';
@@ -169,7 +170,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('알림 조회 실패: $error')));
+          .showSnackBar(SnackBar(
+        content: Text(UiLocalizations.error(
+          _language,
+          '알림 조회 실패',
+          error,
+        )),
+      ));
     }
   }
 
@@ -212,7 +219,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _popupShownForCurrentBatch = false;
     });
     ScaffoldMessenger.of(context)
-        .showSnackBar(TextSnackBar('${user.name}님 로그인되었습니다.'));
+        .showSnackBar(TextSnackBar(UiLocalizations.format(
+          _language,
+          '{name}님 로그인되었습니다.',
+          {'name': user.name},
+        )));
     _refreshNotifications(showPopup: true);
   }
 

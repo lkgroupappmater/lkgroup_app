@@ -6,6 +6,7 @@ import '../config/supabase_config.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../core/ui_localizations.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
@@ -52,6 +53,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   bool _movingCargo = false;
 
   String _t(String key) => AppStrings.get(widget.language, key);
+  String _u(String korean) => UiLocalizations.get(widget.language, korean);
+  String _uf(String korean, Map<String, Object?> values) =>
+      UiLocalizations.format(widget.language, korean, values);
+  String _ue(String prefix, Object error) =>
+      UiLocalizations.error(widget.language, prefix, error);
 
   bool get _isLoggedIn => !SupabaseConfig.isConfigured ||
       Supabase.instance.client.auth.currentUser != null;
@@ -90,7 +96,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final apply = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('할인율 적용'),
+            title: Text(_u('할인율 적용')),
             content: TextField(
               controller: controller,
               autofocus: true,
@@ -98,11 +104,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
               ],
-              decoration: const InputDecoration(
-                labelText: '할인율 (%)',
-                hintText: '예: 20',
+              decoration: InputDecoration(
+                labelText: _u('할인율 (%)'),
+                hintText: _u('예: 20'),
                 suffixText: '%',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
             actions: [
@@ -111,15 +117,15 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   controller.text = '0';
                   Navigator.pop(dialogContext, true);
                 },
-                child: const Text('할인 해제'),
+                child: Text(_u('할인 해제')),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_u('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('적용'),
+                child: Text(_u('적용')),
               ),
             ],
           ),
@@ -129,7 +135,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     if (apply && mounted) {
       final value = double.tryParse(controller.text.trim()) ?? 0;
       if (value < 0 || value > 100) {
-        _message('할인율은 0~100% 범위로 입력해 주세요.');
+        _message(_u('할인율은 0~100% 범위로 입력해 주세요.'));
       } else {
         setState(() => _manualDiscountPercent = value);
       }
@@ -145,16 +151,16 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final added = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('기타 비용 추가'),
+        title: Text(_u('기타 비용 추가')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
-                labelText: '비용 이름',
-                hintText: '예: 통관비용, 보관료, 기타 수수료',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: _u('비용 이름'),
+                hintText: _u('예: 통관비용, 보관료, 기타 수수료'),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 10),
@@ -165,10 +171,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
               ],
-              decoration: const InputDecoration(
-                labelText: '금액 (USD)',
+              decoration: InputDecoration(
+                labelText: _u('금액 (USD)'),
                 prefixText: '\$ ',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
@@ -176,7 +182,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_u('취소')),
           ),
           ElevatedButton(
             onPressed: () {
@@ -184,15 +190,15 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               final amount = double.tryParse(amountController.text.trim());
               if (name.isEmpty || amount == null || amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('비용 이름과 0보다 큰 USD 금액을 입력해 주세요.'),
+                  SnackBar(
+                    content: Text(_u('비용 이름과 0보다 큰 USD 금액을 입력해 주세요.')),
                   ),
                 );
                 return;
               }
               Navigator.pop(dialogContext, true);
             },
-            child: const Text('추가'),
+            child: Text(_u('추가')),
           ),
         ],
       ),
@@ -238,12 +244,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('로그인 필요'),
-        content: const Text('운임 확인 및 견적 요청은 회원 로그인 후 이용하실 수 있습니다.'),
+        title: Text(_u('로그인 필요')),
+        content: Text(_u('운임 확인 및 견적 요청은 회원 로그인 후 이용하실 수 있습니다.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('취소'),
+            child: Text(_u('취소')),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -254,7 +260,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               Navigator.pop(dialogContext);
               widget.onRequestLogin?.call();
             },
-            child: const Text('회원 로그인'),
+            child: Text(_u('회원 로그인')),
           ),
         ],
       ),
@@ -276,7 +282,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       final height = double.tryParse(box.height);
       final quantity = int.tryParse(box.quantity) ?? 1;
       if (weight == null || width == null || length == null || height == null) {
-        _message('선택한 박스의 무게와 가로·세로·높이를 모두 입력해 주세요.');
+        _message(_u('선택한 박스의 무게와 가로·세로·높이를 모두 입력해 주세요.'));
         return;
       }
       selected.add(QuoteBoxInput(
@@ -290,7 +296,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       ));
     }
     if (selected.isEmpty) {
-      _message('운임을 확인할 박스를 하나 이상 선택해 주세요.');
+      _message(_u('운임을 확인할 박스를 하나 이상 선택해 주세요.'));
       return;
     }
 
@@ -307,7 +313,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         _calculationRates = rates;
       });
     } catch (error) {
-      _message('$error\n대량 혹은 특수 견적 요청을 이용해 주세요.');
+      _message('${_ue('견적 요청 처리 실패', error)}\n'
+          '${_u('대량 혹은 특수 견적 요청을 이용해 주세요.')}');
     }
   }
 
@@ -328,12 +335,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               .eq('id', user.id)
               .maybeSingle();
           if ('${profile?['role'] ?? ''}' == 'partner') {
-            _message('협력/파트너사는 견적서 보기 권한이 없습니다.');
+            _message(_u('협력/파트너사는 견적서 보기 권한이 없습니다.'));
             return;
           }
         }
       } catch (error) {
-        _message('견적서 권한 확인 실패: $error');
+        _message(_ue('견적서 권한 확인 실패', error));
         return;
       }
     }
@@ -389,7 +396,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       setState(() => _specialQuotes = rows);
       widget.onNotificationsChanged?.call();
     } catch (error) {
-      if (mounted) _message('견적 요청 조회 실패: $error');
+      if (mounted) _message(_ue('견적 요청 조회 실패', error));
     } finally {
       if (mounted) setState(() => _loadingQuotes = false);
     }
@@ -411,7 +418,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? '대량 혹은 특수 견적 요청' : '견적 요청 수정'),
+          title: Text(_u(existing == null
+              ? '대량 혹은 특수 견적 요청'
+              : '견적 요청 수정')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -419,12 +428,19 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 DropdownButtonFormField<String>(
                   value: route,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '운송 경로',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: _u('운송 경로'),
+                    border: const OutlineInputBorder(),
                   ),
                   items: _transportRoutes
-                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v,
+                          child: Text(
+                            RouteCatalog.localizedLabel(v, widget.language),
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) {
                     if (v != null) setDialogState(() => route = v);
@@ -433,9 +449,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '제목',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: _u('제목'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -443,17 +459,17 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   controller: contentCtrl,
                   minLines: 4,
                   maxLines: 8,
-                  decoration: const InputDecoration(
-                    labelText: '내용',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: _u('내용'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: contactCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '기타 연락처',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: _u('기타 연락처'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -462,19 +478,19 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('취소'),
+              child: Text(_u('취소')),
             ),
             ElevatedButton(
               onPressed: () {
                 if (titleCtrl.text.trim().isEmpty || contentCtrl.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('제목과 내용을 입력해 주세요.')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(_u('제목과 내용을 입력해 주세요.')),
+                  ));
                   return;
                 }
                 Navigator.pop(dialogContext, true);
               },
-              child: Text(existing == null ? '견적 요청' : '수정 저장'),
+              child: Text(_u(existing == null ? '견적 요청' : '수정 저장')),
             ),
           ],
         ),
@@ -490,7 +506,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             content: contentCtrl.text.trim(),
             otherContact: contactCtrl.text.trim(),
           );
-          _message('견적 요청을 보냈습니다.');
+          _message(_u('견적 요청을 보냈습니다.'));
         } else {
           await QuoteService.instance.updateSpecialQuote(
             quoteId: _int(existing['id']),
@@ -499,11 +515,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             content: contentCtrl.text.trim(),
             otherContact: contactCtrl.text.trim(),
           );
-          _message('견적 요청을 수정했습니다.');
+          _message(_u('견적 요청을 수정했습니다.'));
         }
         await _loadSpecialQuotes();
       } catch (error) {
-        _message('견적 요청 처리 실패: $error');
+        _message(_ue('견적 요청 처리 실패', error));
       }
     }
     titleCtrl.dispose();
@@ -516,24 +532,24 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final send = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('추가 회신'),
+        title: Text(_u('추가 회신')),
         content: TextField(
           controller: ctrl,
           minLines: 3,
           maxLines: 7,
-          decoration: const InputDecoration(
-            labelText: '추가 내용',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: _u('추가 내용'),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_u('취소')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('송부'),
+            child: Text(_u('송부')),
           ),
         ],
       ),
@@ -546,20 +562,20 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         );
         await _loadSpecialQuotes();
       } catch (error) {
-        _message('추가 회신 실패: $error');
+        _message(_ue('추가 회신 실패', error));
       }
     }
     ctrl.dispose();
   }
 
   Future<void> _requestDelete(Map<String, dynamic> quote) async {
-    final ok = await _confirm('견적 요청을 삭제하시겠습니까?');
+    final ok = await _confirm(_u('견적 요청을 삭제하시겠습니까?'));
     if (!ok) return;
     try {
       await QuoteService.instance.requestDelete(_int(quote['id']));
       await _loadSpecialQuotes();
     } catch (error) {
-      _message('삭제 처리 실패: $error');
+      _message(_ue('삭제 처리 실패', error));
     }
   }
 
@@ -568,18 +584,18 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       await QuoteService.instance.cancelDelete(_int(quote['id']));
       await _loadSpecialQuotes();
     } catch (error) {
-      _message('삭제 취소 실패: $error');
+      _message(_ue('삭제 취소 실패', error));
     }
   }
 
   Future<void> _deleteNow(Map<String, dynamic> quote) async {
-    final ok = await _confirm('지금 목록에서 삭제하시겠습니까?');
+    final ok = await _confirm(_u('지금 목록에서 삭제하시겠습니까?'));
     if (!ok) return;
     try {
       await QuoteService.instance.deleteNow(_int(quote['id']));
       await _loadSpecialQuotes();
     } catch (error) {
-      _message('바로 삭제 실패: $error');
+      _message(_ue('바로 삭제 실패', error));
     }
   }
 
@@ -591,11 +607,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('취소'),
+              child: Text(_u('취소')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('확인'),
+              child: Text(_u('확인')),
             ),
           ],
         ),
@@ -775,7 +791,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Tooltip(
-                      message: '이 기타 비용에도 현재 할인율 적용',
+                      message: _u('이 기타 비용에도 현재 할인율 적용'),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -932,7 +948,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              result.route,
+              RouteCatalog.localizedLabel(result.route, widget.language),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AppColors.navyPrimary,
@@ -946,7 +962,26 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   children: [
                     Expanded(
                       child: Text(
-                        '박스 ${line.index} · 청구중량 ${line.chargeableWeightKg.toStringAsFixed(2)}kg · 단가 \$${line.ratePerKg.toStringAsFixed(2)}${line.movingCargoSurchargeUsd > 0 ? ' · 이삿짐 통관 +\$${line.movingCargoSurchargeUsd.toStringAsFixed(2)}' : ''}${line.boxPackingSurchargeUsd > 0 ? ' · 박스 포장 +\$${line.boxPackingSurchargeUsd.toStringAsFixed(2)}' : ''}',
+                        _uf(
+                          '박스 {index} · 청구중량 {weight}kg · 단가 USD {rate}{moving}{packing}',
+                          {
+                            'index': line.index,
+                            'weight': line.chargeableWeightKg.toStringAsFixed(2),
+                            'rate': '\$${line.ratePerKg.toStringAsFixed(2)}',
+                            'moving': line.movingCargoSurchargeUsd > 0
+                                ? _uf(' · 이삿짐 통관 +\${amount}', {
+                                    'amount': line.movingCargoSurchargeUsd
+                                        .toStringAsFixed(2),
+                                  })
+                                : '',
+                            'packing': line.boxPackingSurchargeUsd > 0
+                                ? _uf(' · 박스 포장 +\${amount}', {
+                                    'amount': line.boxPackingSurchargeUsd
+                                        .toStringAsFixed(2),
+                                  })
+                                : '',
+                          },
+                        ),
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
@@ -967,7 +1002,13 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     children: [
                       Expanded(
                         child: Text(
-                          '기타 비용 · ${e.name}${e.discountApplies && _manualDiscountPercent > 0 ? ' · 할인 적용' : ''}',
+                          _uf('기타 비용 · {name}{discount}', {
+                            'name': e.name,
+                            'discount': e.discountApplies &&
+                                    _manualDiscountPercent > 0
+                                ? _u(' · 할인 적용')
+                                : '',
+                          }),
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
@@ -988,11 +1029,21 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 children: [
                   if (_manualDiscountPercent > 0) ...[
                     Text(
-                      '할인 전  USD \$${grossUsd.toStringAsFixed(2)}',
+                      _uf('할인 전  USD {amount}', {
+                        'amount': '\$${grossUsd.toStringAsFixed(2)}',
+                      }),
                       style: const TextStyle(fontSize: 12),
                     ),
                     Text(
-                      '할인 ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 1)}%  -\$${discountAmount.toStringAsFixed(2)}',
+                      _uf('할인 {percent}%  -{amount}', {
+                        'percent': _manualDiscountPercent.toStringAsFixed(
+                          _manualDiscountPercent ==
+                                  _manualDiscountPercent.roundToDouble()
+                              ? 0
+                              : 1,
+                        ),
+                        'amount': '\$${discountAmount.toStringAsFixed(2)}',
+                      }),
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1002,7 +1053,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                     const SizedBox(height: 3),
                   ],
                   Text(
-                    '총 운임  USD \$${finalUsd.toStringAsFixed(2)}',
+                    _uf('총 운임  USD {amount}', {
+                      'amount': '\$${finalUsd.toStringAsFixed(2)}',
+                    }),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1037,9 +1090,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFFFB74D)),
               ),
-              child: const Text(
-                '운임은 USD 기준이며, 이외 화폐는 가견적 안내시의 환율 기준이므로, 최종 운임 책정시의 환율변동으로 인한 운임 차이가 발생할수 있으니, 참고용으로만 확인 부탁 드립니다.',
-                style: TextStyle(
+              child: Text(
+                _u('운임은 USD 기준이며, 이외 화폐는 가견적 안내시의 환율 기준이므로, 최종 운임 책정시의 환율변동으로 인한 운임 차이가 발생할수 있으니, 참고용으로만 확인 부탁 드립니다.'),
+                style: const TextStyle(
                   fontSize: 12,
                   height: 1.45,
                   color: Color(0xFFE65100),
@@ -1076,24 +1129,35 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   ),
                 ),
                 Text(
-                  deletePending
+                  _u(deletePending
                       ? '삭제 대기'
                       : hasReply
                           ? '회신 완료'
                           : adminViewed
                               ? '관리자 확인'
-                              : '확인 전',
+                              : '확인 전'),
                   style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Text('${quote['route'] ?? ''}', style: const TextStyle(fontSize: 12)),
+            Text(
+              RouteCatalog.localizedLabel(
+                '${quote['route'] ?? ''}',
+                widget.language,
+              ),
+              style: const TextStyle(fontSize: 12),
+            ),
             const SizedBox(height: 8),
             Text('${quote['content'] ?? ''}'),
             if ('${quote['other_contact'] ?? ''}'.trim().isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text('기타 연락처: ${quote['other_contact']}', style: const TextStyle(fontSize: 12)),
+              Text(
+                _uf('기타 연락처: {contact}', {
+                  'contact': quote['other_contact'],
+                }),
+                style: const TextStyle(fontSize: 12),
+              ),
             ],
             if (messages.isNotEmpty) ...[
               const Divider(height: 22),
@@ -1109,29 +1173,29 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   if (deletePending) ...[
                     OutlinedButton(
                       onPressed: () => _cancelDelete(quote),
-                      child: const Text('삭제 취소'),
+                      child: Text(_u('삭제 취소')),
                     ),
                     ElevatedButton(
                       onPressed: () => _deleteNow(quote),
-                      child: const Text('바로 삭제'),
+                      child: Text(_u('바로 삭제')),
                     ),
                   ] else if (!adminViewed) ...[
                     TextButton(
                       onPressed: () => _openSpecialQuoteForm(existing: quote),
-                      child: const Text('수정'),
+                      child: Text(_u('수정')),
                     ),
                     TextButton(
                       onPressed: () => _requestDelete(quote),
-                      child: const Text('삭제'),
+                      child: Text(_u('삭제')),
                     ),
                   ] else if (hasReply) ...[
                     OutlinedButton(
                       onPressed: () => _addReply(quote),
-                      child: const Text('추가 회신'),
+                      child: Text(_u('추가 회신')),
                     ),
                     TextButton(
                       onPressed: () => _requestDelete(quote),
-                      child: const Text('삭제'),
+                      child: Text(_u('삭제')),
                     ),
                   ],
                 ],
@@ -1156,7 +1220,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(admin ? '관리자 회신' : '추가 회신',
+          Text(_u(admin ? '관리자 회신' : '추가 회신'),
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
           const SizedBox(height: 3),
           Text('${message['message'] ?? ''}', style: const TextStyle(fontSize: 13)),
@@ -1440,4 +1504,3 @@ class QuoteRequestScreen extends StatelessWidget {
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
-

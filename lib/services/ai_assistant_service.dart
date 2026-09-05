@@ -56,10 +56,14 @@ class AiAssistantService {
       final translated = body is Map && body['translations'] is List
           ? List<dynamic>.from(body['translations'] as List)
           : const <dynamic>[];
+      if (translated.length != chunk.length) {
+        throw StateError(
+          'AI translation returned ${translated.length} items for '
+          '${chunk.length} inputs.',
+        );
+      }
       for (var offset = 0; offset < chunk.length; offset++) {
-        final value = offset < translated.length
-            ? '${translated[offset]}'.trim()
-            : chunk[offset];
+        final value = '${translated[offset]}'.trim();
         final safeValue = value.isEmpty ? chunk[offset] : value;
         final originalIndex = missingIndexes[start + offset];
         output[originalIndex] = safeValue;

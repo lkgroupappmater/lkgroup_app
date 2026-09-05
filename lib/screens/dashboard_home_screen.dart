@@ -2,6 +2,9 @@
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
+import '../core/route_catalog.dart';
+import '../core/shipment_period_labels.dart';
+import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../services/ai_assistant_service.dart';
 import '../services/content_service.dart';
@@ -111,6 +114,9 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   }
 
   String _t(String key) => AppStrings.get(widget.language, key);
+  String _u(String korean) => UiLocalizations.get(widget.language, korean);
+  String _uf(String korean, Map<String, Object?> values) =>
+      UiLocalizations.format(widget.language, korean, values);
 
   String _contactLabel(ContactLink link) {
     if (widget.language == AppLanguage.korean) return link.label;
@@ -157,9 +163,18 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       final scheduleItems = schedules
           .map(
             (r) => _ScheduleItem(
-              route: '${r['route'] ?? ''}',
-              year: '${r['year'] ?? r['shipment_year'] ?? ''}',
-              voyage: '${r['voyage'] ?? ''}',
+              route: RouteCatalog.localizedLabel(
+                '${r['route'] ?? ''}',
+                widget.language,
+              ),
+              year: ShipmentPeriodLabels.year(
+                r['year'] ?? r['shipment_year'],
+                widget.language,
+              ),
+              voyage: ShipmentPeriodLabels.voyage(
+                r['voyage'],
+                widget.language,
+              ),
               departure: _dateOnly(
                 r['booking_close_date'] ??
                     r['closing_date'] ??
@@ -218,14 +233,20 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   void _openSchedule() => _open(
         context,
         _isManager
-            ? ScheduleManagementScreen(user: widget.currentUser!)
+            ? ScheduleManagementScreen(
+                user: widget.currentUser!,
+                language: widget.language,
+              )
             : ShipmentScheduleScreen(language: widget.language),
       );
 
   void _openNotice() => _open(
         context,
         _isManager
-            ? NoticeManagementScreen(user: widget.currentUser!)
+            ? NoticeManagementScreen(
+                user: widget.currentUser!,
+                language: widget.language,
+              )
             : NoticeListScreen(language: widget.language),
       );
 
@@ -238,7 +259,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           child: Text(
             '${_t('booking_close')}: ${item.departure}\n'
             '${_t('arrival_expected')}: ${item.arrival}\n'
-            '상태: ${item.status}'
+            '${_uf('상태: {status}', {'status': _u(item.status)})}'
             '${item.detail.trim().isEmpty ? '' : '\n\n${item.detail}'}',
           ),
         ),
@@ -279,11 +300,11 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(_contactLabel(link)),
-          content: const Text('대표번호 링크는 추후 관리자 설정이 필요합니다.'),
+          content: Text(_u('대표번호 링크는 추후 관리자 설정이 필요합니다.')),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('닫기'),
+              child: Text(_t('close')),
             ),
           ],
         ),
@@ -303,8 +324,11 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               mode: LaunchMode.externalApplication,
             );
           });
-          return const AlertDialog(
-            content: Text('참여 코드 9112', textAlign: TextAlign.center),
+          return AlertDialog(
+            content: Text(
+              _u('참여 코드 9112'),
+              textAlign: TextAlign.center,
+            ),
           );
         },
       );
@@ -314,7 +338,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
     final uri = Uri.tryParse(link.placeholder);
     if (uri == null ||
         !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      _message('링크를 열 수 없습니다.');
+      _message(_u('링크를 열 수 없습니다.'));
     }
   }
 
@@ -424,8 +448,10 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       );
 
   Widget _scheduleCard(_ScheduleItem item) {
-    final color =
-        item.status == '운송 중' ? AppColors.accent : AppColors.primary;
+    final inTransit = item.status == '운송 중' ||
+        item.status == 'In Transit' ||
+        item.status == 'ກຳລັງຂົນສົ່ງ';
+    final color = inTransit ? AppColors.accent : AppColors.primary;
 
     return InkWell(
       onTap: () => _showScheduleDetail(item),
@@ -455,6 +481,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                 children: [
                   Text(
                     '${item.route} · ${item.year} · ${item.voyage}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -465,6 +493,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                   Text(
                     '${_t('booking_close')}: ${item.departure}  '
                     '${_t('arrival_expected')}: ${item.arrival}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -481,7 +511,9 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                item.status,
+                _u(item.status),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -523,6 +555,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               Expanded(
                 child: Text(
                   item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.primary,
