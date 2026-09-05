@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 
-import '../core/route_catalog.dart';
+import 'excel_file_metadata.dart';
 import 'excel_import_service.dart';
 import 'global_notice_service.dart';
 
@@ -54,11 +54,11 @@ class ExcelImportQueueService extends ChangeNotifier {
   Future<bool> pickAndEnqueueOne() async {
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
-      allowedExtensions: ['xlsx'],
+      allowedExtensions: ExcelFileMetadataParser.supportedExtensions,
     );
     if (picked == null) return false;
 
-    final meta = _parseFileMeta(picked.name);
+    final meta = ExcelFileMetadataParser.tryParse(picked.name);
     if (meta == null) {
       _jobs.insert(
         0,
@@ -73,7 +73,8 @@ class ExcelImportQueueService extends ChangeNotifier {
           ..status = ExcelImportJobStatus.failed
           ..progress = 1
           ..message =
-              '파일명 확인 필요 · 예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx',
+              '파일명 확인 필요 · 경로(LKS/KR_LA_SEA), 연도(2026), '
+              '항차(V08/08항차)가 들어가야 합니다. 설명 문구는 자유롭게 추가할 수 있습니다.',
       );
       notifyListeners();
       return false;
@@ -84,9 +85,9 @@ class ExcelImportQueueService extends ChangeNotifier {
       id: '${DateTime.now().microsecondsSinceEpoch}-${picked.name}',
       fileName: picked.name,
       bytes: bytes,
-      routeLabel: meta.$1,
-      year: meta.$2,
-      voyage: meta.$3,
+      routeLabel: meta.routeLabel,
+      year: meta.year,
+      voyage: meta.voyage,
     );
     _jobs.insert(0, job);
     notifyListeners();
@@ -161,22 +162,4 @@ class ExcelImportQueueService extends ChangeNotifier {
     notifyListeners();
   }
 
-  static (String, int, String)? _parseFileMeta(String fileName) {
-    final match = RegExp(
-      r'^([A-Z]{2}_[A-Z]{2}_(?:SEA|AIR|AIR_EXP|LAND))_(\d{4})_V(\d{2})_SHIPMENTS\.XLSX$',
-      caseSensitive: false,
-    ).firstMatch(fileName.trim());
-    if (match == null) return null;
-
-    final prefix = match.group(1)!.toUpperCase();
-    final key = RouteCatalog.keyFromFileName('${prefix}_');
-    if (key == null) return null;
-
-    return (
-      RouteCatalog.labelForKey(key),
-      int.parse(match.group(2)!),
-      match.group(3)!,
-    );
-  }
 }
-

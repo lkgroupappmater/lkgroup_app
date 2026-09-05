@@ -51,6 +51,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   bool _loadingQuotes = false;
   bool _movingCargo = false;
 
+  String _t(String key) => AppStrings.get(widget.language, key);
+
   bool get _isLoggedIn => !SupabaseConfig.isConfigured ||
       Supabase.instance.client.auth.currentUser != null;
 
@@ -613,9 +615,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       child: ListView(
         padding: const EdgeInsets.all(14),
         children: [
-          const _SectionLabel('운송 경로 선택'),
+          _SectionLabel(_t('route')),
           const SizedBox(height: 8),
           _RouteDropdown(
+            language: widget.language,
             value: _selectedRoute,
             items: _transportRoutes,
             onChanged: (v) {
@@ -645,7 +648,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(child: _SectionLabel('박스 정보 입력')),
+              Expanded(child: _SectionLabel(_t('box_information'))),
               Flexible(
                 flex: 3,
                 child: Wrap(
@@ -663,14 +666,16 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                         }),
                         visualDensity: VisualDensity.compact,
                       ),
-                      const Text('이삿짐', style: TextStyle(fontSize: 12)),
+                      Text(_t('moving_goods'),
+                          style: const TextStyle(fontSize: 12)),
                     ],
                     Checkbox(
                       value: allSelected,
                       onChanged: (v) => _setAllBoxes(v ?? false),
                       visualDensity: VisualDensity.compact,
                     ),
-                    const Text('전체 박스 선택', style: TextStyle(fontSize: 12)),
+                    Text(_t('select_all_boxes'),
+                        style: const TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -679,6 +684,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           const SizedBox(height: 8),
           ..._boxes.asMap().entries.map(
                 (e) => _BoxRow(
+                  language: widget.language,
                   index: e.key,
                   entry: e.value,
                   canDelete: _boxes.length > 1,
@@ -699,7 +705,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           OutlinedButton.icon(
             onPressed: _addBox,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('박스 추가', style: TextStyle(fontSize: 13)),
+            label: Text(_t('add_box'),
+                style: const TextStyle(fontSize: 13)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.navyPrimary,
               side: const BorderSide(color: AppColors.navyPrimary),
@@ -714,9 +721,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                 child: OutlinedButton.icon(
                   onPressed: _addQuoteExtraCost,
                   icon: const Icon(Icons.add_card_outlined, size: 18),
-                  label: const Text(
-                    '기타 비용 추가 (+\$)',
-                    style: TextStyle(fontSize: 13),
+                  label: Text(
+                    '${_t('extra_cost')} (+\$)',
+                    style: const TextStyle(fontSize: 13),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navyPrimary,
@@ -735,8 +742,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   icon: const Icon(Icons.percent, size: 18),
                   label: Text(
                     _manualDiscountPercent > 0
-                        ? '할인 ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 1)}%'
-                        : '할인율 (%)',
+                        ? '${_t('discount')} ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 1)}%'
+                        : '${_t('discount')} (%)',
                     style: const TextStyle(fontSize: 13),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -784,13 +791,14 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                               );
                             }),
                           ),
-                          const Text('할인', style: TextStyle(fontSize: 11)),
+                          Text(_t('discount'),
+                              style: const TextStyle(fontSize: 11)),
                         ],
                       ),
                     ),
                     Text('\$${entry.value.amountUsd.toStringAsFixed(2)}'),
                     IconButton(
-                      tooltip: '삭제',
+                      tooltip: _t('delete'),
                       onPressed: () =>
                           setState(() => _extraCosts.removeAt(entry.key)),
                       icon: const Icon(Icons.close, size: 18),
@@ -815,9 +823,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text(
-                      '운임 확인',
-                      style: TextStyle(
+                    child: Text(
+                      _t('freight_check'),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -832,9 +840,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   child: OutlinedButton.icon(
                     onPressed: _showQuotationPreview,
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text(
-                      '견적서 보기',
-                      style: TextStyle(
+                    label: Text(
+                      _t('view_quote'),
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -861,7 +869,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             child: OutlinedButton.icon(
               onPressed: () => _openSpecialQuoteForm(),
               icon: const Icon(Icons.star_outline, size: 18),
-              label: const Text('대량 혹은 특수 견적 요청', style: TextStyle(fontSize: 14)),
+              label: Text(_t('bulk_quote'),
+                  style: const TextStyle(fontSize: 14)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.tagOrange,
                 side: const BorderSide(color: AppColors.tagOrange),
@@ -875,7 +884,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
           ],
           if (_specialQuotes.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const _SectionLabel('견적 요청 내역'),
+            _SectionLabel(_t('quote_history')),
             const SizedBox(height: 8),
             ..._specialQuotes.map(_specialQuoteCard),
           ],
@@ -1166,7 +1175,13 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
 }
 
 class _RouteDropdown extends StatelessWidget {
-  const _RouteDropdown({required this.value, required this.items, required this.onChanged});
+  const _RouteDropdown({
+    required this.language,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+  final AppLanguage language;
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
@@ -1188,7 +1203,12 @@ class _RouteDropdown extends StatelessWidget {
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w500,
             ),
-            items: items.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+            items: items
+                .map((r) => DropdownMenuItem(
+                      value: r,
+                      child: Text(RouteCatalog.localizedLabel(r, language)),
+                    ))
+                .toList(),
             onChanged: onChanged,
           ),
         ),
@@ -1197,6 +1217,7 @@ class _RouteDropdown extends StatelessWidget {
 
 class _BoxRow extends StatelessWidget {
   const _BoxRow({
+    required this.language,
     required this.index,
     required this.entry,
     required this.canDelete,
@@ -1207,6 +1228,7 @@ class _BoxRow extends StatelessWidget {
     required this.onChanged,
   });
 
+  final AppLanguage language;
   final int index;
   final _BoxEntry entry;
   final bool canDelete;
@@ -1215,6 +1237,8 @@ class _BoxRow extends StatelessWidget {
   final bool showBoxPacking;
   final ValueChanged<bool> onBoxPackingChanged;
   final VoidCallback onChanged;
+
+  String _t(String key) => AppStrings.get(language, key);
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1236,7 +1260,7 @@ class _BoxRow extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 Text(
-                  '박스 ${index + 1}',
+                  '${_t('box')} ${index + 1}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1250,7 +1274,8 @@ class _BoxRow extends StatelessWidget {
                     onChanged: (v) => onBoxPackingChanged(v ?? false),
                     visualDensity: VisualDensity.compact,
                   ),
-                  const Text('박스 포장', style: TextStyle(fontSize: 11)),
+                  Text(_t('box_packing'),
+                      style: const TextStyle(fontSize: 11)),
                 ],
                 const Spacer(),
                 if (canDelete)
@@ -1266,7 +1291,7 @@ class _BoxRow extends StatelessWidget {
               child: Row(
                 children: [
                   _CompactField(
-                    label: '무게(kg)',
+                    label: _t('weight'),
                     initial: entry.weight,
                     onChanged: (v) {
                       entry.weight = v;
@@ -1277,7 +1302,7 @@ class _BoxRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   _CompactField(
-                    label: '가로(cm)',
+                    label: _t('width'),
                     initial: entry.width,
                     onChanged: (v) {
                       entry.width = v;
@@ -1288,7 +1313,7 @@ class _BoxRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   _CompactField(
-                    label: '세로(cm)',
+                    label: _t('length'),
                     initial: entry.length,
                     onChanged: (v) {
                       entry.length = v;
@@ -1299,7 +1324,7 @@ class _BoxRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   _CompactField(
-                    label: '높이(cm)',
+                    label: _t('height'),
                     initial: entry.height,
                     onChanged: (v) {
                       entry.height = v;
@@ -1310,7 +1335,7 @@ class _BoxRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   _CompactField(
-                    label: '수량',
+                    label: _t('quantity'),
                     initial: entry.quantity,
                     onChanged: (v) {
                       entry.quantity = v;
@@ -1406,18 +1431,13 @@ class QuoteRequestScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: AppColors.navyPrimary,
           foregroundColor: AppColors.white,
-          title: const Text(
-            '운임 확인 및 견적 요청',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          title: Text(
+            AppStrings.get(language, 'quote_title'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           elevation: 0,
         ),
         body: QuoteRequestBody(language: language, onRequestLogin: onRequestLogin),
       );
 }
-
-
-
-
-
 

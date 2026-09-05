@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
+import '../core/cargo_ui_strings.dart';
 import '../core/route_catalog.dart';
 import '../core/money_format.dart';
 import '../models/app_user.dart';
@@ -24,11 +26,13 @@ class CargoManagementScreen extends StatefulWidget {
   const CargoManagementScreen({
     super.key,
     required this.user,
+    this.language = AppLanguage.korean,
     this.onBack,
     this.initialSelectedIds = const <String>[],
   });
 
   final AppUser user;
+  final AppLanguage language;
   final VoidCallback? onBack;
   final List<String> initialSelectedIds;
 
@@ -71,6 +75,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   bool get _isPartner => widget.user.role == UserRole.partner;
   bool get _isManager => _isAdmin || _isStaff || _isPartner;
   bool get _canSaveDirectly => _isManager;
+  String _l(String korean) => CargoUiStrings.get(widget.language, korean);
   List<String> get _availableYears {
     final years =
         ShipmentFilterOptionsService.instance.yearsFor(_filterBatches, _route);
@@ -650,25 +655,25 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   Widget _managementSection() {
     final items = <Map<String, Object>>[
       {
-        'label': '선적 일정 관리',
+        'label': _l('선적 일정 관리'),
         'icon': Icons.calendar_month,
         'page': ScheduleManagementScreen(user: widget.user),
       },
       {
-        'label': '공지사항 관리',
+        'label': _l('공지사항 관리'),
         'icon': Icons.campaign_outlined,
         'page': NoticeManagementScreen(user: widget.user),
       },
       {
-        'label': '화물 종합 관리',
+        'label': _l('화물 종합 관리'),
         'icon': Icons.inventory_2_outlined,
-        'page': CargoManagementScreen(user: widget.user),
+        'page': CargoManagementScreen(user: widget.user, language: widget.language),
       },
     ];
 
     if (_isAdmin || _isStaff) {
       items.add({
-        'label': '엑셀 화물 업로드',
+        'label': _l('엑셀 화물 업로드'),
         'icon': Icons.upload_file_outlined,
         'page': const ExcelUploadScreen(),
       });
@@ -677,22 +682,22 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     if (_isAdmin) {
       items.addAll([
         {
-          'label': '회원 종합 관리',
+          'label': _l('회원 종합 관리'),
           'icon': Icons.people_alt_outlined,
           'page': const MemberManagementScreen(),
         },
         {
-          'label': '변경 승인 관리',
+          'label': _l('변경 승인 관리'),
           'icon': Icons.fact_check_outlined,
           'page': const ChangeApprovalScreen(),
         },
         {
-          'label': '견적 요청 관리',
+          'label': _l('견적 요청 관리'),
           'icon': Icons.request_quote_outlined,
           'page': const QuoteRequestManagementScreen(),
         },
         {
-          'label': '기준 환율 입력',
+          'label': _l('기준 환율 입력'),
           'icon': Icons.currency_exchange,
           'page': const ExchangeRateScreen(),
         },
@@ -702,9 +707,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '통합 관리',
-          style: TextStyle(
+        Text(
+          _l('통합 관리'),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: AppColors.primary,
@@ -738,13 +743,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          _filterChip('박스번호', _showBoxSearch,
+          _filterChip(_l('박스번호'), _showBoxSearch,
               (v) => setState(() => _showBoxSearch = v)),
-          _filterChip('송장번호', _showInvoiceSearch,
+          _filterChip(_l('송장번호'), _showInvoiceSearch,
               (v) => setState(() => _showInvoiceSearch = v)),
-          _filterChip('이름', _showNameSearch,
+          _filterChip(_l('이름'), _showNameSearch,
               (v) => setState(() => _showNameSearch = v)),
-          _filterChip('연락처', _showPhoneSearch,
+          _filterChip(_l('연락처'), _showPhoneSearch,
               (v) => setState(() => _showPhoneSearch = v)),
         ],
       );
@@ -785,7 +790,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('명세서 발급'),
+        title: Text(_l('명세서 발급')),
         content: Text(
           singleReceipt
               ? '선택한 고객/영수번호의 명세서 발급 형식을 선택해 주세요.'
@@ -794,13 +799,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           if (singleReceipt)
             OutlinedButton.icon(
               onPressed: () => Navigator.pop(dialogContext, 'image'),
               icon: const Icon(Icons.image_outlined, size: 18),
-              label: const Text('이미지'),
+              label: Text(_l('이미지')),
             ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(dialogContext, 'pdf'),
@@ -857,7 +862,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '전체',
+                          _l('전체'),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -891,8 +896,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         const SizedBox(height: 2),
                         Text(
                           _selectedIds.isEmpty
-                              ? '명세서'
-                              : '명세서 · ${_selectedIds.length}개 선택',
+                              ? _l('명세서')
+                              : '${_l('명세서')} · ${_selectedIds.length}${_l('개')}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -927,7 +932,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 child: TextButton.icon(
                   onPressed: widget.onBack,
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('계정으로 돌아가기'),
+                  label: Text(_l('계정으로 돌아가기')),
                 ),
               ),
             Card(
@@ -944,7 +949,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       : null,
                 ),
                 title: Text(
-                  widget.user.name.isEmpty ? '회원' : widget.user.name,
+                  widget.user.name.isEmpty ? _l('회원') : widget.user.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -961,7 +966,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '화물 관리',
+                  _l('화물 관리'),
                   style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
@@ -977,9 +982,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               value: _route,
-              decoration: _decoration('운송 경로', Icons.route),
+              decoration: _decoration(_l('운송 경로'), Icons.route),
               items: routeLabels
-                  .map((route) => DropdownMenuItem(value: route, child: Text(route)))
+                  .map((route) => DropdownMenuItem(
+                        value: route,
+                        child: Text(route == '전체'
+                            ? _l('전체')
+                            : RouteCatalog.localizedLabel(route, widget.language)),
+                      ))
                   .toList(),
               onChanged: (value) {
                 if (value != null) {
@@ -998,9 +1008,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _year,
-                    decoration: _decoration('년도', Icons.calendar_today),
+                    decoration: _decoration(_l('년도'), Icons.calendar_today),
                     items: _availableYears
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .map((v) => DropdownMenuItem(
+                              value: v,
+                              child: Text(_localizedYear(v)),
+                            ))
                         .toList(),
                     onChanged: (v) {
                       if (v != null) {
@@ -1016,9 +1029,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _voyage,
-                    decoration: _decoration('항차', Icons.confirmation_number_outlined),
+                    decoration: _decoration(_l('항차'), Icons.confirmation_number_outlined),
                     items: _availableVoyages
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .map((v) => DropdownMenuItem(
+                              value: v,
+                              child: Text(_localizedVoyage(v)),
+                            ))
                         .toList(),
                     onChanged: (v) {
                       if (v != null) setState(() => _voyage = v);
@@ -1041,8 +1057,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       ],
                 decoration: _decoration(
                   RouteCatalog.boxExampleFor(_route).isEmpty
-                      ? '박스번호'
-                      : '박스번호 (예: ${RouteCatalog.boxExampleFor(_route)})',
+                      ? _l('박스번호')
+                      : '${_l('박스번호')} (${widget.language == AppLanguage.english ? 'e.g.' : widget.language == AppLanguage.lao ? 'ຕົວຢ່າງ' : '예'}: ${RouteCatalog.boxExampleFor(_route)})',
                   Icons.inventory_2_outlined,
                 ).copyWith(
                   prefixText: RouteCatalog.boxPrefixFor(_route).isEmpty
@@ -1059,14 +1075,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               const SizedBox(height: 10),
               TextField(
                 controller: _invoiceController,
-                decoration: _decoration('송장번호', Icons.receipt_long_outlined),
+                decoration: _decoration(_l('송장번호'), Icons.receipt_long_outlined),
               ),
             ],
             if (!_isManager || _showNameSearch) ...[
               const SizedBox(height: 10),
               TextField(
                 controller: _nameController,
-                decoration: _decoration('이름/라오스 수령인', Icons.person_outline),
+                decoration: _decoration(_l('이름/라오스 수령인'), Icons.person_outline),
               ),
             ],
             if (!_isManager || _showPhoneSearch) ...[
@@ -1074,7 +1090,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _decoration('연락처', Icons.phone_outlined),
+                decoration: _decoration(_l('연락처'), Icons.phone_outlined),
               ),
             ],
             const SizedBox(height: 10),
@@ -1087,7 +1103,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _busy ? null : _search,
                         icon: const Icon(Icons.search),
-                        label: Text(_busy ? '검색 중...' : '화물 검색'),
+                        label: Text(_l(_busy ? '검색 중...' : '화물 검색')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -1102,7 +1118,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _busy ? null : () => _openManualAdd(),
                         icon: const Icon(Icons.add_box_outlined),
-                        label: const Text('화물 추가 입력'),
+                        label: Text(_l('화물 추가 입력')),
                       ),
                     ),
                   ),
@@ -1114,7 +1130,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _busy ? null : _search,
                   icon: const Icon(Icons.search),
-                  label: Text(_busy ? '검색 중...' : '화물 검색'),
+                  label: Text(_l(_busy ? '검색 중...' : '화물 검색')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -1124,7 +1140,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             if (_searched) ...[
               const SizedBox(height: 16),
               Text(
-                '화물 정보 (${_results.length}건)',
+                '${_l('화물 정보')} (${_results.length}${_l('건')})',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -1134,9 +1150,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             ],
             if (false && _selectedIds.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text(
-                '선택한 화물 정보 수정',
-                style: TextStyle(
+              Text(
+                _l('선택한 화물 정보 수정'),
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
@@ -1149,7 +1165,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   inputFormatters: <TextInputFormatter>[
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
                   ],
-                  decoration: _decoration('박스번호', Icons.inventory_2_outlined).copyWith(
+                  decoration: _decoration(_l('박스번호'), Icons.inventory_2_outlined).copyWith(
                     prefixText: _selectedBoxPrefix(),
                     prefixStyle: const TextStyle(
                       fontWeight: FontWeight.w700,
@@ -1161,35 +1177,35 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _editNameController,
-                decoration: _decoration('이름/라오스 수령인', Icons.person_outline),
+                decoration: _decoration(_l('이름/라오스 수령인'), Icons.person_outline),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _editPhoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _decoration('연락처', Icons.phone_outlined),
+                decoration: _decoration(_l('연락처'), Icons.phone_outlined),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _editNoteController,
                 maxLines: 3,
-                decoration: _decoration('기타 내용', Icons.edit_note_outlined),
+                decoration: _decoration(_l('기타 내용'), Icons.edit_note_outlined),
               ),
               if (_isManager) ...[
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(child: _numberField(_weightController, '무게(kg)')),
+                    Expanded(child: _numberField(_weightController, _l('무게(kg)'))),
                     const SizedBox(width: 8),
-                    Expanded(child: _numberField(_lengthController, '가로(cm)')),
+                    Expanded(child: _numberField(_lengthController, _l('가로(cm)'))),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(child: _numberField(_widthController, '세로(cm)')),
+                    Expanded(child: _numberField(_widthController, _l('세로(cm)'))),
                     const SizedBox(width: 8),
-                    Expanded(child: _numberField(_heightController, '높이(cm)')),
+                    Expanded(child: _numberField(_heightController, _l('높이(cm)'))),
                   ],
                 ),
               ],
@@ -1197,29 +1213,29 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               ElevatedButton.icon(
                 onPressed: _busy ? null : _save,
                 icon: const Icon(Icons.save),
-                label: Text(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청'),
+                label: Text(_l(_canSaveDirectly ? '화물 정보 저장' : '화물 정보 수정 요청')),
               ),              const SizedBox(height: 8),
               if (!_isPartner)
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _showBatchStatementPdf,
                   icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: const Text('체크 명세서 PDF'),
+                  label: Text(_l('체크 명세서 PDF')),
                 ),
             ],
             if (_isManager) ...[
               const SizedBox(height: 24),
-              const Text(
-                '화물 삭제 대기',
-                style: TextStyle(
+              Text(
+                _l('화물 삭제 대기'),
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: 6),
               if (_pendingDeletions.isEmpty)
-                const Text(
-                  '삭제 대기 중인 화물이 없습니다.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                Text(
+                  _l('삭제 대기 중인 화물이 없습니다.'),
+                  style: const TextStyle(color: AppColors.textSecondary),
                 )
               else
                 ..._pendingDeletions.map(_pendingDeletionCard),
@@ -1293,7 +1309,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('박스 추가 (행 추가)'),
+        title: Text(_l('박스 추가 (행 추가)')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1301,30 +1317,30 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               TextField(
                 readOnly: true,
                 controller: TextEditingController(text: nextBox),
-                decoration: const InputDecoration(labelText: '박스번호'),
+                decoration: InputDecoration(labelText: _l('박스번호')),
               ),
-              TextField(controller: invoice, decoration: const InputDecoration(labelText: '송장번호')),
-              TextField(controller: name, decoration: const InputDecoration(labelText: '이름/라오스 수령인')),
-              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처')),
-              TextField(controller: notes, decoration: const InputDecoration(labelText: '기타 내용')),
+              TextField(controller: invoice, decoration: InputDecoration(labelText: _l('송장번호'))),
+              TextField(controller: name, decoration: InputDecoration(labelText: _l('이름/라오스 수령인'))),
+              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: _l('연락처'))),
+              TextField(controller: notes, decoration: InputDecoration(labelText: _l('기타 내용'))),
               Row(children: [
-                Expanded(child: TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '무게(kg)'))),
+                Expanded(child: TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('무게(kg)')))),
                 const SizedBox(width: 8),
-                Expanded(child: TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '가로(cm)'))),
+                Expanded(child: TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('가로(cm)')))),
               ]),
               Row(children: [
-                Expanded(child: TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '세로(cm)'))),
+                Expanded(child: TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('세로(cm)')))),
                 const SizedBox(width: 8),
-                Expanded(child: TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '높이(cm)'))),
+                Expanded(child: TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('높이(cm)')))),
               ]),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('추가'),
+            child: Text(_l('추가')),
           ),
         ],
       ),
@@ -1398,7 +1414,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('검색 결과 명세서 (${_results.length}건)'),
+        title: Text('${_l('검색 결과 명세서')} (${_results.length}${_l('건')})'),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView(
@@ -1431,7 +1447,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('닫기'),
+            child: Text(_l('닫기')),
           ),
         ],
       ),
@@ -1477,7 +1493,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final save = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('화물 편집 (${selected.length}건)'),
+        title: Text('${_l('화물 편집')} (${selected.length}${_l('건')})'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1490,21 +1506,21 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   ),
                 ),
-              TextField(controller: name, decoration: const InputDecoration(labelText: '이름/수령인')),
-              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처')),
-              TextField(controller: notes, decoration: const InputDecoration(labelText: '기타 내용')),
+              TextField(controller: name, decoration: InputDecoration(labelText: _l('이름/수령인'))),
+              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: _l('연락처'))),
+              TextField(controller: notes, decoration: InputDecoration(labelText: _l('기타 내용'))),
               if (_isManager) ...[
-                TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '무게(kg)')),
-                TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '가로(cm)')),
-                TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '세로(cm)')),
-                TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '높이(cm)')),
+                TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('무게(kg)'))),
+                TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('가로(cm)'))),
+                TextField(controller: width, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('세로(cm)'))),
+                TextField(controller: height, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('높이(cm)'))),
               ],
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('화물 정보 저장')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_l('화물 정보 저장'))),
         ],
       ),
     );
@@ -1554,11 +1570,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('선택 화물 삭제 대기'),
+        title: Text(_l('선택 화물 삭제 대기')),
         content: Text('${selected.length}건을 삭제 대기로 이동하시겠습니까?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('삭제 대기')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_l('삭제 대기'))),
         ],
       ),
     );
@@ -1647,8 +1663,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             children: [
               TextField(
                 controller: name,
-                decoration: const InputDecoration(
-                  labelText: '이름 / 회사명',
+                decoration: InputDecoration(
+                  labelText: _l('이름 / 회사명'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1656,8 +1672,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               TextField(
                 controller: phone,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: '연락처',
+                decoration: InputDecoration(
+                  labelText: _l('연락처'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1665,8 +1681,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               TextField(
                 controller: notes,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: '기타 내용',
+                decoration: InputDecoration(
+                  labelText: _l('기타 내용'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1684,11 +1700,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('일괄 저장'),
+            child: Text(_l('일괄 저장')),
           ),
         ],
       ),
@@ -1745,7 +1761,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final save = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('${item['box_number'] ?? ''} 중량 / 크기 편집'),
+        title: Text(
+          '${item['box_number'] ?? ''} · ${_l('중량 / 크기 편집')}',
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1754,8 +1772,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 controller: weight,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: '중량 (kg)',
+                decoration: InputDecoration(
+                  labelText: _l('중량 (kg)'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1767,8 +1785,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       controller: length,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: '가로 (cm)',
+                      decoration: InputDecoration(
+                        labelText: _l('가로 (cm)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1779,8 +1797,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       controller: width,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: '세로 (cm)',
+                      decoration: InputDecoration(
+                        labelText: _l('세로 (cm)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1792,8 +1810,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 controller: height,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: '높이 (cm)',
+                decoration: InputDecoration(
+                  labelText: _l('높이 (cm)'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1803,11 +1821,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('저장'),
+            child: Text(_l('저장')),
           ),
         ],
       ),
@@ -1863,25 +1881,33 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(
-            '${rows.first['route']} · ${rows.first['shipment_year']}년 · ${_voyageLabel(rows.first['voyage'])}',
+            '${rows.first['route']} · '
+            '${_localizedYear('${rows.first['shipment_year']}')} · '
+            '${_localizedVoyage(_voyageLabel(rows.first['voyage']))}',
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('그룹 전체 운임', style: TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  _l('그룹 전체 운임'),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 6),
-                Text('박스 ${rows.length}건'),
+                Text('${_l('박스')} ${rows.length}${_l('건')}'),
                 Text('USD  \$${freight.totalUsd.toStringAsFixed(2)}'),
                 Text('KIP  ${freight.totalKip.toStringAsFixed(0)}'),
                 Text('THB  ${freight.totalThb.toStringAsFixed(1)}'),
                 Text('KRW  ${freight.totalKrw.toStringAsFixed(0)}'),
                 const Divider(),
                 if (receipts.isEmpty)
-                  const Text('명세서를 열 수 있는 영수번호가 없습니다.')
+                  Text(_l('명세서를 열 수 있는 영수번호가 없습니다.'))
                 else ...[
-                  const Text('영수번호별 명세서', style: TextStyle(fontWeight: FontWeight.w800)),
+                  Text(
+                    _l('영수번호별 명세서'),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   const SizedBox(height: 4),
                   ...receipts.map((receipt) => OutlinedButton(
                     onPressed: () async {
@@ -1896,14 +1922,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         ),
                       );
                     },
-                    child: Text('$receipt 명세서 보기'),
+                    child: Text('$receipt · ${_l('명세서 보기')}'),
                   )),
                 ],
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('닫기')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(_l('닫기')),
+            ),
           ],
         ),
       );
@@ -1969,7 +1998,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     if (!mounted) return;
 
     final discountName =
-        TextEditingController(text: current?.discountName ?? '특별할인');
+        TextEditingController(text: current?.discountName ?? _l('특별할인'));
     final percent = TextEditingController(
       text: current == null
           ? ''
@@ -1982,7 +2011,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('$receipt · 할인 적용'),
+          title: Text('$receipt · ${_l('할인 적용')}'),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -1990,17 +2019,17 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               children: [
                 if (current != null)
                   Text(
-                    '현재: ${current!.discountName} '
+                    '${_l('현재')}: ${current!.discountName} '
                     '${(current!.discountPercent * 100).toStringAsFixed(2).replaceFirst(RegExp(r'\.00$'), '')}%',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: discountName,
-                  decoration: const InputDecoration(
-                    labelText: '추가 할인명',
-                    hintText: '예: 지인 할인, 서비스 할인',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: _l('추가 할인명'),
+                    hintText: _l('예: 지인 할인, 서비스 할인'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2008,10 +2037,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   controller: percent,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: '할인율',
+                  decoration: InputDecoration(
+                    labelText: _l('할인율'),
                     suffixText: '%',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -2031,18 +2060,20 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   _message('$receipt 할인 적용을 삭제했습니다.');
                 },
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('삭제'),
+                label: Text(_l('삭제')),
               ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('닫기'),
+              child: Text(_l('닫기')),
             ),
             FilledButton.icon(
               onPressed: () async {
                 final value = double.tryParse(percent.text.trim());
                 if (value == null || value < 0 || value > 100) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('할인율은 0~100 사이로 입력해 주세요.')),
+                    SnackBar(
+                      content: Text(_l('할인율은 0~100 사이로 입력해 주세요.')),
+                    ),
                   );
                   return;
                 }
@@ -2052,7 +2083,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   voyage: voyage,
                   receiptNumber: receipt,
                   discountName: discountName.text.trim().isEmpty
-                      ? '추가 할인'
+                      ? _l('추가 할인')
                       : discountName.text.trim(),
                   discountPercent: value / 100,
                 );
@@ -2066,7 +2097,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 _message('$receipt 할인 적용 완료');
               },
               icon: const Icon(Icons.percent),
-              label: Text(current == null ? '적용' : '수정 저장'),
+              label: Text(_l(current == null ? '적용' : '수정 저장')),
             ),
           ],
         ),
@@ -2120,7 +2151,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
           }
 
           return AlertDialog(
-            title: Text('$receipt · 기타 비용 (+\$)'),
+            title: Text('$receipt · ${_l('기타 비용')} (+\$)'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -2135,13 +2166,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                           title: Text(e.name),
                           subtitle: Text(
                             '\$${e.amountUsd.toStringAsFixed(2)}'
-                            '${e.discountApplies ? ' · 할인 적용' : ''}',
+                            '${e.discountApplies ? ' · ${_l('할인 적용')}' : ''}',
                           ),
                           trailing: Wrap(
                             spacing: 4,
                             children: [
                               IconButton(
-                                tooltip: '수정',
+                                tooltip: _l('편집'),
                                 onPressed: () {
                                   setDialogState(() => editingId = e.id);
                                   name.text = e.name;
@@ -2153,7 +2184,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                                 icon: const Icon(Icons.edit_outlined, size: 19),
                               ),
                               IconButton(
-                                tooltip: '삭제',
+                                tooltip: _l('삭제'),
                                 onPressed: e.id == null
                                     ? null
                                     : () async {
@@ -2171,10 +2202,10 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                     ],
                     TextField(
                       controller: name,
-                      decoration: const InputDecoration(
-                        labelText: '비용 이름',
-                        hintText: '예: 통관비용, 보관료',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: _l('비용 이름'),
+                        hintText: _l('예: 통관비용, 보관료'),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -2182,20 +2213,21 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       controller: amount,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: '금액 (USD)',
+                      decoration: InputDecoration(
+                        labelText: _l('금액 (USD)'),
                         prefixText: '\$ ',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                       value: discountApplies,
-                      title: const Text('할인 적용'),
-                      subtitle: const Text(
-                        '체크 시 해당 고객의 할인율을 이 기타 비용에도 적용합니다. '
-                        '기본은 미체크입니다.',
+                      title: Text(_l('할인 적용')),
+                      subtitle: Text(
+                        _l(
+                          '체크 시 해당 고객의 할인율을 이 기타 비용에도 적용합니다. 기본은 미체크입니다.',
+                        ),
                       ),
                       onChanged: (v) => setDialogState(
                         () => discountApplies = v == true,
@@ -2208,14 +2240,16 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('닫기'),
+                child: Text(_l('닫기')),
               ),
               FilledButton.icon(
                 onPressed: () async {
                   final value = double.tryParse(amount.text.trim());
                   if (name.text.trim().isEmpty || value == null || value < 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('비용 이름과 금액을 확인해 주세요.')),
+                      SnackBar(
+                        content: Text(_l('비용 이름과 금액을 확인해 주세요.')),
+                      ),
                     );
                     return;
                   }
@@ -2238,7 +2272,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   await reload();
                 },
                 icon: const Icon(Icons.add_card_outlined, size: 18),
-                label: Text(editingId == null ? '추가' : '수정 저장'),
+                label: Text(_l(editingId == null ? '추가' : '수정 저장')),
               ),
             ],
           );
@@ -2285,13 +2319,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   ),
                   if (_isManager)
                     IconButton(
-                      tooltip: '선택 화물 편집',
+                      tooltip: _l('선택 화물 편집'),
                       onPressed: _busy ? null : () => _editCheckedGroup(rows),
                       icon: const Icon(Icons.edit_outlined, size: 19),
                     ),
                   if (_isManager)
                     IconButton(
-                      tooltip: '선택 화물 삭제',
+                      tooltip: _l('선택 화물 삭제'),
                       onPressed: _busy ? null : () => _deleteCheckedGroup(rows),
                       icon: const Icon(Icons.delete_outline, size: 19),
                     ),
@@ -2324,7 +2358,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     final deliveryColor = switch (deliveryLabel) {
       '지방배송(선결제)' => const Color(0xFF5B9BD5),
       '지방배송' => const Color(0xFFFFC000),
-      '시내배송(선결제)' => const Color(0xFFFFFF00),
+      '시내배송(선결제)' => const Color(0xFFD6B18A),
       '시내배송' => const Color(0xFF92D050),
       _ => Colors.transparent,
     };
@@ -2378,9 +2412,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       Text.rich(
                         TextSpan(
                           children: [
-                            const TextSpan(
-                              text: '영수번호/구획: ',
-                              style: TextStyle(
+                            TextSpan(
+                              text: '${_l('영수번호/구획')}: ',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),
@@ -2423,7 +2457,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                             ),
                           ),
                           child: Text(
-                            deliveryLabel,
+                            _l(deliveryLabel),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
@@ -2434,15 +2468,15 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       Text.rich(
                         TextSpan(
                           children: [
-                            const TextSpan(
-                              text: '총 개수: ',
-                              style: TextStyle(
+                            TextSpan(
+                              text: '${_l('총 개수')}: ',
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),
                             ),
                             TextSpan(
-                              text: '$totalQty개',
+                              text: '$totalQty${_l('개')}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.navyPrimary,
@@ -2456,7 +2490,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
                   IconButton(
-                    tooltip: '고객 단위 편집',
+                    tooltip: _l('고객 단위 편집'),
                     visualDensity: VisualDensity.compact,
                     onPressed: _busy
                         ? null
@@ -2491,7 +2525,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                               ),
                             ),
                           IconButton(
-                            tooltip: rule == null ? '할인 적용' : '할인 편집 / 삭제',
+                            tooltip: _l(rule == null ? '할인 적용' : '할인 편집 / 삭제'),
                             visualDensity: VisualDensity.compact,
                             onPressed: _busy
                                 ? null
@@ -2528,7 +2562,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                               ),
                             ),
                           IconButton(
-                            tooltip: '기타 비용 (+\$)',
+                            tooltip: '${_l('기타 비용')} (+\$)',
                             visualDensity: VisualDensity.compact,
                             onPressed: _busy
                                 ? null
@@ -2579,14 +2613,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _infoRow('화물번호', '${item['box_number'] ?? ''}'),
-                  _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                  _infoRow('화물개수', '$quantity개'),
+                  _infoRow(_l('화물번호'), '${item['box_number'] ?? ''}'),
+                  _infoRow(_l('송장번호'), '${item['invoice_number'] ?? ''}'),
+                  _infoRow(_l('화물개수'), '$quantity${_l('개')}'),
                   _infoRow(
-                    '무게 / 크기',
+                    _l('무게 / 크기'),
                     '${_weightOneDecimal(item['weight_kg'])} kg / $size',
                   ),
-                  _infoRow('입고날짜', receivedDate),
+                  _infoRow(_l('입고날짜'), receivedDate),
                 ],
               ),
             ),
@@ -2597,7 +2631,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: '편집',
+                      tooltip: _l('편집'),
                       visualDensity: VisualDensity.compact,
                       onPressed: _busy
                           ? null
@@ -2617,8 +2651,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         ),
                         child: IconButton(
                           padding: EdgeInsets.zero,
-                          tooltip:
-                              item['data_locked'] == true ? '잠금 해제' : '잠금',
+                          tooltip: _l(
+                              item['data_locked'] == true ? '잠금 해제' : '잠금'),
                           visualDensity: VisualDensity.compact,
                           onPressed: _busy
                               ? null
@@ -2648,9 +2682,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         ),
                         child: IconButton(
                           padding: EdgeInsets.zero,
-                          tooltip: item['manual_uncertain'] == true
+                          tooltip: _l(item['manual_uncertain'] == true
                               ? '불확실 표시 해제'
-                              : '불확실 화물 표시',
+                              : '불확실 화물 표시'),
                           visualDensity: VisualDensity.compact,
                           onPressed: _busy
                               ? null
@@ -2705,7 +2739,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '박스번호: ${item['box_number'] ?? ''} / 박스개수: ${quantity}개 / 입고 날짜: $receivedDate',
+                            '${_l('박스번호')}: ${item['box_number'] ?? ''} / '
+                            '${_l('화물개수')}: $quantity${_l('개')} / '
+                            '${_l('입고날짜')}: $receivedDate',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: AppColors.navyPrimary,
@@ -2725,30 +2761,31 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                                     await _editCheckedGroup([item]);
                                   },
                             icon: const Icon(Icons.edit_outlined, size: 17),
-                            label: const Text('편집'),
+                            label: Text(_l('편집')),
                           ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    _infoRow('운송 경로', '${item['route'] ?? ''}'),
+                    _infoRow(_l('운송 경로'), '${item['route'] ?? ''}'),
                     _infoRow(
-                      '년도 / 항차',
-                      '${item['shipment_year'] ?? ''} / ${_voyageLabel(item['voyage'])}',
+                      _l('년도 / 항차'),
+                      '${_localizedYear('${item['shipment_year'] ?? ''}')} / '
+                      '${_localizedVoyage(_voyageLabel(item['voyage']))}',
                     ),
-                    _infoRow('송장번호', '${item['invoice_number'] ?? ''}'),
-                    _infoRow('수령인 / 회사명', nameCompany),
-                    _infoRow('연락처', '${item['consignee_phone'] ?? ''}'),
+                    _infoRow(_l('송장번호'), '${item['invoice_number'] ?? ''}'),
+                    _infoRow(_l('수령인 / 회사명'), nameCompany),
+                    _infoRow(_l('연락처'), '${item['consignee_phone'] ?? ''}'),
                     _infoRow(
-                      '무게 / 크기',
+                      _l('무게 / 크기'),
                       '${_weightOneDecimal(item['weight_kg'])} kg / $size',
                     ),
                     if (_isAdmin || _isStaff)
                       _infoRow(
-                        '영수번호 / 구획',
+                        _l('영수번호 / 구획'),
                         '$receipt / ${zone.isEmpty ? '-' : zone}',
                       )
                     else
-                      _infoRow('영수번호', receipt),
+                      _infoRow(_l('영수번호'), receipt),
                     if (_isManager) ...[
                       const SizedBox(height: 8),
                       Align(
@@ -2756,7 +2793,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                         child: TextButton.icon(
                           onPressed: _busy ? null : () => _requestDeletion(item),
                           icon: const Icon(Icons.delete_outline),
-                          label: const Text('삭제'),
+                          label: Text(_l('삭제')),
                         ),
                       ),
                     ],
@@ -2805,6 +2842,20 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
     return text.endsWith('항차') ? text : '$text항차';
   }
 
+  String _localizedYear(String value) {
+    if (value == '전체') return _l('전체');
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty || widget.language == AppLanguage.korean) return value;
+    return widget.language == AppLanguage.lao ? 'ປີ $digits' : digits;
+  }
+
+  String _localizedVoyage(String value) {
+    if (value == '전체') return _l('전체');
+    final plain = value.replaceFirst(RegExp(r'항차$'), '');
+    if (widget.language == AppLanguage.korean) return value;
+    return widget.language == AppLanguage.lao ? 'ຖ້ຽວ $plain' : 'Voyage $plain';
+  }
+
   Widget _infoRow(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
@@ -2825,16 +2876,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         ),
       );
 }
-
-
-
-
-
-
-
-
-
-
 
 
 

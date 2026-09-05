@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as image_lib;
 
 import '../core/money_format.dart';
 import '../core/route_catalog.dart';
@@ -23,6 +24,27 @@ String _s(dynamic value) => '${value ?? ''}'.trim();
 String _fmtWeight(double v) {
   if ((v - v.roundToDouble()).abs() < .001) return v.toStringAsFixed(0);
   return v.toStringAsFixed(2);
+}
+
+Future<Uint8List> _encodeJpeg(
+  ui.Image source, {
+  int quality = 86,
+}) async {
+  final data = await source.toByteData(format: ui.ImageByteFormat.rawRgba);
+  if (data == null) throw StateError('명세서 이미지 변환에 실패했습니다.');
+  final pixels = data.buffer.asUint8List(
+    data.offsetInBytes,
+    data.lengthInBytes,
+  );
+  final bitmap = image_lib.Image.fromBytes(
+    width: source.width,
+    height: source.height,
+    bytes: pixels.buffer,
+    bytesOffset: pixels.offsetInBytes,
+    numChannels: 4,
+    order: image_lib.ChannelOrder.rgba,
+  );
+  return image_lib.encodeJpg(bitmap, quality: quality);
 }
 
 
@@ -184,6 +206,29 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     return data.buffer.asUint8List();
   }
 
+  Future<Uint8List> _renderPdfImage() async {
+    if (_freight == null || _logo == null) {
+      throw StateError('명세서 데이터가 준비되지 않았습니다.');
+    }
+    // PDF embeds JPEG directly. This avoids retaining a decoded high-resolution
+    // PNG for every statement and substantially lowers Android heap usage.
+    const scale = .9;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(scale);
+    _painter.paint(canvas, Size(_docWidth, _docHeight));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(
+      (_docWidth * scale).round(),
+      (_docHeight * scale).round(),
+    );
+    picture.dispose();
+    try {
+      return await _encodeJpeg(image);
+    } finally {
+      image.dispose();
+    }
+  }
+
   Future<void> _saveImage() async {
     setState(() => _saving = true);
     try {
@@ -217,9 +262,9 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   Future<void> _savePdf() async {
     setState(() => _saving = true);
     try {
-      final png = await _renderPng();
+      final encodedImage = await _renderPdfImage();
       final pdf = await DocumentPdfExport.statementTwoUp(
-        png,
+        encodedImage,
         sourceWidth: _docWidth,
         sourceHeight: _docHeight,
       );
@@ -687,7 +732,7 @@ class _DigitalStatementPainter extends CustomPainter {
     if (deliveryNote.contains('지방배송(선결제)')) {
       deliveryColor = const Color(0xFF5B9BD5);
     } else if (deliveryNote.contains('시내배송(선결제)')) {
-      deliveryColor = const Color(0xFFFFFF00);
+      deliveryColor = const Color(0xFFD6B18A);
     } else if (deliveryNote.contains('지방배송')) {
       deliveryColor = const Color(0xFFFFC000);
     } else if (deliveryNote.contains('시내배송')) {
@@ -1127,7 +1172,7 @@ class StatementDocumentRenderer {
     return frame.image;
   }
 
-  static Future<Uint8List> _renderOne(
+  static Future<({Uint8List bytes, double width, double height})> _renderOne(
     StatementRenderRequest request,
     List<ui.Image> assets,
   ) async {
@@ -1148,17 +1193,20 @@ class StatementDocumentRenderer {
     );
     final inland = await CustomerBenefitService.instance
         .inlandTextForRows(request.routeLabel, rows);
-    final visibleRows = rows.length + 1 < 10 ? 10 : rows.length + 1;
-    final docHeight = 1120.0 + (visibleRows - 10) * 32;
-    const docWidth = 1800.0;
-    const scale = 1.35;
-
     final extraCosts = await ReceiptExtraCostService.instance.list(
       route: request.routeLabel,
       year: request.year,
       voyage: request.voyage,
       receiptNumber: request.receiptNumber,
     );
+    final visibleRows = rows.length + extraCosts.length + 1 < 10
+        ? 10
+        : rows.length + extraCosts.length + 1;
+    final docHeight = 1120.0 + (visibleRows - 10) * 32;
+    const docWidth = 1800.0;
+    // 1440px wide JPEG is clear for an A4 half-page while using a fraction of
+    // the heap required by the previous 2430px PNG.
+    const scale = .8;
 
     final painter = _DigitalStatementPainter(
       routeLabel: request.routeLabel,
@@ -1185,10 +1233,12 @@ class StatementDocumentRenderer {
       (docHeight * scale).round(),
     );
     picture.dispose();
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
-    if (data == null) throw StateError('명세서 PNG 생성 실패');
-    return data.buffer.asUint8List();
+    try {
+      final bytes = await _encodeJpeg(image, quality: 84);
+      return (bytes: bytes, width: docWidth, height: docHeight);
+    } finally {
+      image.dispose();
+    }
   }
 
   static Future<Uint8List> renderBatchPdf(
@@ -1204,11 +1254,16 @@ class StatementDocumentRenderer {
       _asset('assets/images/bank_accounts_strip.png'),
     ]);
     try {
-      final pages = <Uint8List>[];
+      final batch = StatementPdfBatchBuilder();
       for (final request in requests) {
-        pages.add(await _renderOne(request, assets));
+        final rendered = await _renderOne(request, assets);
+        batch.addStatement(
+          rendered.bytes,
+          sourceWidth: rendered.width,
+          sourceHeight: rendered.height,
+        );
       }
-      return DocumentPdfExport.batchStatements(pages);
+      return batch.save();
     } finally {
       for (final image in assets) {
         image.dispose();
@@ -1216,5 +1271,3 @@ class StatementDocumentRenderer {
     }
   }
 }
-
-

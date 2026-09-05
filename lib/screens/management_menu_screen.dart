@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
 import '../models/app_user.dart';
 import '../services/admin_management_status_service.dart';
 import 'change_approval_screen.dart';
@@ -23,10 +24,12 @@ class ManagementMenuScreen extends StatefulWidget {
     super.key,
     required this.user,
     required this.onOpenCargoManagement,
+    this.language = AppLanguage.korean,
   });
 
   final AppUser user;
   final VoidCallback onOpenCargoManagement;
+  final AppLanguage language;
 
   @override
   State<ManagementMenuScreen> createState() => _ManagementMenuScreenState();
@@ -37,6 +40,50 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
 
   bool get _isAdmin => widget.user.role == UserRole.admin;
   bool get _isStaff => widget.user.role == UserRole.staff;
+
+  String _m(String korean) {
+    if (widget.language == AppLanguage.korean) return korean;
+    const english = <String, String>{
+      '선적 일정 관리': 'Shipping Schedule',
+      '공지 및 안내 관리': 'Notices',
+      '하역 자료 관리': 'Unloading Data',
+      '고객 리스트': 'Customer List',
+      '화물 종합 관리': 'Cargo Management',
+      '화물 데이타 엑셀 파일 관리': 'Cargo Excel Files',
+      '추가 기능 개발': 'Additional Features',
+      '회원 종합 관리': 'Member Management',
+      '화물 내용 변경 승인 관리': 'Change Approvals',
+      '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)': 'Bulk Excel Management\n(Edit lock, zone & receipt)',
+      '할인 적용 관리': 'Discounts',
+      '시내.지방 배송 관리': 'Local Delivery',
+      '항차별 총액 관리': 'Voyage Totals',
+      '견적 요청 관리': 'Quote Requests',
+      '기준 환율 입력': 'Exchange Rates',
+      '회원': 'Member',
+      '통합 관리': 'Management',
+    };
+    const lao = <String, String>{
+      '선적 일정 관리': 'ຕາຕະລາງຂົນສົ່ງ',
+      '공지 및 안내 관리': 'ແຈ້ງການ',
+      '하역 자료 관리': 'ຂໍ້ມູນລົງສິນຄ້າ',
+      '고객 리스트': 'ລາຍຊື່ລູກຄ້າ',
+      '화물 종합 관리': 'ຈັດການສິນຄ້າ',
+      '화물 데이타 엑셀 파일 관리': 'ໄຟລ໌ Excel ສິນຄ້າ',
+      '추가 기능 개발': 'ຟັງຊັນເພີ່ມເຕີມ',
+      '회원 종합 관리': 'ຈັດການສະມາຊິກ',
+      '화물 내용 변경 승인 관리': 'ອະນຸມັດການປ່ຽນແປງ',
+      '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)': 'ຈັດການ Excel ຈຳນວນຫຼາຍ',
+      '할인 적용 관리': 'ຈັດການສ່ວນລົດ',
+      '시내.지방 배송 관리': 'ຈັດການຈັດສົ່ງພາຍໃນ',
+      '항차별 총액 관리': 'ຍອດລວມແຕ່ລະຖ້ຽວ',
+      '견적 요청 관리': 'ຄຳຂໍໃບສະເໜີລາຄາ',
+      '기준 환율 입력': 'ອັດຕາແລກປ່ຽນ',
+      '회원': 'ສະມາຊິກ',
+      '통합 관리': 'ການຈັດການ',
+    };
+    return (widget.language == AppLanguage.lao ? lao : english)[korean] ??
+        korean;
+  }
 
   @override
   void initState() {
@@ -78,6 +125,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
 
   Widget _menuLabel(Map<String, Object?> item) {
     final label = item['label']! as String;
+    final compactLabel = item['compactLabel'] == true;
     final menuKey = '${item['menuKey'] ?? ''}';
     final status = _status[menuKey];
     final count = status?.pendingCount ?? 0;
@@ -86,7 +134,15 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, textAlign: TextAlign.center),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: compactLabel ? 4 : null,
+          overflow: compactLabel ? TextOverflow.ellipsis : null,
+          style: compactLabel
+              ? const TextStyle(fontSize: 12, height: 1.12)
+              : null,
+        ),
         if (count > 0 || activity != null) ...[
           const SizedBox(height: 2),
           Wrap(
@@ -143,34 +199,24 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
     if (_isAdmin || _isStaff) {
       items.addAll([
         {
-          'label': '선적 일정 관리',
+          'label': _m('선적 일정 관리'),
           'icon': Icons.calendar_month,
           'page': ScheduleManagementScreen(user: user),
         },
         {
-          'label': '공지 및 안내 관리',
+          'label': _m('공지 및 안내 관리'),
           'icon': Icons.campaign_outlined,
           'page': NoticeManagementScreen(user: user),
         },
         {
-          'label': '하역 자료 관리',
+          'label': _m('하역 자료 관리'),
           'icon': Icons.view_column_outlined,
           'page': const UnloadingListManagementScreen(),
         },
       ]);
-items.addAll([
+      items.addAll([
         {
-          'label': '선적 일정 관리',
-          'icon': Icons.calendar_month,
-          'page': ScheduleManagementScreen(user: user),
-        },
-        {
-          'label': '공지 및 안내 관리',
-          'icon': Icons.campaign_outlined,
-          'page': NoticeManagementScreen(user: user),
-        },
-        {
-          'label': '고객 리스트',
+          'label': _m('고객 리스트'),
           'icon': Icons.view_column_outlined,
           'page': const CustomerListManagementScreen(),
         },
@@ -178,14 +224,14 @@ items.addAll([
     }
 
     items.add({
-      'label': '화물 종합 관리',
+      'label': _m('화물 종합 관리'),
       'icon': Icons.inventory_2_outlined,
       'menuKey': 'cargo_management',
       'action': widget.onOpenCargoManagement,
     });
 
     items.add({
-      'label': '화물 데이타 엑셀 파일 관리',
+      'label': _m('화물 데이타 엑셀 파일 관리'),
       'icon': Icons.folder_copy_outlined,
       'page': const ExcelExportScreen(),
     });
@@ -193,41 +239,42 @@ items.addAll([
     if (_isAdmin) {
       items.addAll([
         {
-          'label': '추가 기능 개발',
+          'label': _m('추가 기능 개발'),
           'icon': Icons.developer_mode_outlined,
           'page': const AdditionalFeatureDevelopmentScreen(),
         },
         {
-          'label': '회원 종합 관리',
+          'label': _m('회원 종합 관리'),
           'icon': Icons.people_alt_outlined,
           'menuKey': 'member_management',
           'page': const MemberManagementScreen(),
         },
         {
-          'label': '화물 내용 변경 승인 관리',
+          'label': _m('화물 내용 변경 승인 관리'),
           'icon': Icons.fact_check_outlined,
           'menuKey': 'change_approval',
           'page': const ChangeApprovalScreen(),
         },
         {
-          'label': '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)',
+          'label': _m('엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)'),
           'icon': Icons.table_view_outlined,
+          'compactLabel': true,
           'page': const ExcelBulkManagementScreen(),
         },
         {
-          'label': '할인 적용 관리',
+          'label': _m('할인 적용 관리'),
           'icon': Icons.percent_outlined,
           'menuKey': 'discount_management',
           'page': const DiscountManagementScreen(),
         },
         {
-          'label': '시내.지방 배송 관리',
+          'label': _m('시내.지방 배송 관리'),
           'icon': Icons.local_shipping_outlined,
           'menuKey': 'local_delivery_management',
           'page': const LocalDeliveryManagementScreen(),
         },
         {
-          'label': '항차별 총액 관리',
+          'label': _m('항차별 총액 관리'),
           'icon': Icons.analytics_outlined,
           'page': const VoyageTotalManagementScreen(),
         },
@@ -237,13 +284,13 @@ items.addAll([
     if (_isAdmin || _isStaff) {
       items.addAll([
         {
-          'label': '견적 요청 관리',
+          'label': _m('견적 요청 관리'),
           'icon': Icons.request_quote_outlined,
           'menuKey': 'quote_requests',
           'page': const QuoteRequestManagementScreen(),
         },
         {
-          'label': '기준 환율 입력',
+          'label': _m('기준 환율 입력'),
           'icon': Icons.currency_exchange,
           'page': const ExchangeRateScreen(),
         },
@@ -270,7 +317,7 @@ items.addAll([
                       : null,
                 ),
                 title: Text(
-                  user.name.isEmpty ? '회원' : user.name,
+                  user.name.isEmpty ? _m('회원') : user.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -283,9 +330,9 @@ items.addAll([
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              '통합 관리',
-              style: TextStyle(
+            Text(
+              _m('통합 관리'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,

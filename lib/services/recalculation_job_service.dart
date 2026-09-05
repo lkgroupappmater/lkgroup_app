@@ -73,7 +73,9 @@ class RecalculationJobService extends ChangeNotifier {
       await _stage(
         '영수번호·Zone·규칙 재계산',
         () => SupabaseService.client.rpc(
-          'admin_finalize_excel_batch_rules',
+          // The fast finalizer also runs the Excel-parity pass for masked
+          // recipients, delivery OR matching, fixed Zone, and batch remarks.
+          'admin_finalize_excel_batch_rules_fast',
           params: {
             'p_route': route,
             'p_year': year,

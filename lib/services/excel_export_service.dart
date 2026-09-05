@@ -1,6 +1,9 @@
 ﻿import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show DownloadBehavior;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/supabase_config.dart';
 import '../core/route_catalog.dart';
@@ -171,18 +174,53 @@ class ExcelExportService {
       throw StateError('생성된 Excel 정보를 받지 못했습니다.');
     }
 
+    final useSystemDownloader = kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    if (useSystemDownloader) {
+      // Large workbooks must not be materialized as one Uint8List on mobile.
+      // The OS/browser can stream a short-lived private download URL instead.
+      final signedUrl = await SupabaseService.client.storage
+          .from('shipment-excel-exports')
+          .createSignedUrl(
+            exportPath,
+            10 * 60,
+            download: DownloadBehavior.named(fileName),
+          );
+      final launched = await launchUrl(
+        Uri.parse(signedUrl),
+        mode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw StateError('휴대폰 다운로드 관리자를 열지 못했습니다.');
+      }
+      return ExcelExportResult(
+        saved: true,
+        fileName: fileName,
+        message: '휴대폰 다운로드 관리자로 Excel 저장을 시작했습니다.',
+      );
+    }
+
     final Uint8List bytes = await SupabaseService.client.storage
         .from('shipment-excel-exports')
         .download(exportPath);
+
+    final extension = fileName.toLowerCase().endsWith('.xlsm')
+        ? 'xlsm'
+        : 'xlsx';
+    final contentType = extension == 'xlsm'
+        ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
     final saveUri = await FilePicker.saveFile(
       dialogTitle: 'Excel 저장 위치 선택',
       fileName: fileName,
       bytes: bytes,
-      mimeType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      mimeType: contentType,
       type: FileType.custom,
-      allowedExtensions: const ['xlsx'],
+      allowedExtensions: [extension],
     );
 
     if (saveUri == null) {
@@ -201,6 +239,5 @@ class ExcelExportService {
     );
   }
 }
-
 
 

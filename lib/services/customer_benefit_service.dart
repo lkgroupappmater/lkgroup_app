@@ -103,6 +103,7 @@ class LocalDeliveryRule {
     required this.paidBy,
     required this.notes,
     required this.active,
+    this.preferred = false,
   });
 
   final int? id;
@@ -119,9 +120,18 @@ class LocalDeliveryRule {
   final String paidBy;
   final String notes;
   final bool active;
+  final bool preferred;
 
   bool get isCity => deliveryType == 'city';
   String get typeLabel => isCity ? '시내 배송' : '지방배송';
+  bool get isPrepaid {
+    final key = paidBy.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    return key.contains('선결제') ||
+        key.contains('선결재') ||
+        key.contains('선불') ||
+        key.contains('prepaid') ||
+        key.contains('payinadvance');
+  }
 
   factory LocalDeliveryRule.fromMap(Map<String, dynamic> map) =>
       LocalDeliveryRule(
@@ -139,6 +149,7 @@ class LocalDeliveryRule {
         paidBy: '${map['paid_by'] ?? ''}'.trim(),
         notes: '${map['notes'] ?? ''}'.trim(),
         active: map['active'] == true,
+        preferred: map['preferred'] == true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -157,8 +168,11 @@ class LocalDeliveryRule {
         'notes': notes.trim(),
         'active': active &&
             (customerName.trim().isNotEmpty ||
-                companyName.trim().isNotEmpty) &&
-            CustomerBenefitService.normalizePhone(phone).isNotEmpty,
+                alternateName.trim().isNotEmpty ||
+                companyName.trim().isNotEmpty ||
+                CustomerBenefitService.normalizePhone(phone).isNotEmpty) &&
+            (localCompany.trim().isNotEmpty ||
+                destinationAddress.trim().isNotEmpty),
       };
 
   String toStatementText() {
@@ -167,13 +181,14 @@ class LocalDeliveryRule {
     final displayNo = sourceNo == null
         ? null
         : (sourceNo! >= 10000 ? sourceNo! - 10000 : sourceNo!);
-    final no = displayNo == null ? '' : '($displayNo) ';
+    final no = displayNo == null ? '' : 'No. $displayNo';
     return <String>[
-      '$no$name'.trim(),
+      no,
+      name,
       tel,
       localCompany,
       destinationAddress,
-    ].where((e) => e.trim().isNotEmpty).join(', ');
+    ].where((e) => e.trim().isNotEmpty).join('\n');
   }
 }
 
@@ -195,6 +210,9 @@ class CustomerBenefitService {
       .toLowerCase()
       .replaceAll(RegExp(r'\s+'), ' ');
 
+  static String _normalizeFullName(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+
   static bool _phoneMatches(String a, String b) {
     final aa = normalizePhone(a);
     final bb = normalizePhone(b);
@@ -213,12 +231,14 @@ class CustomerBenefitService {
   static Iterable<String> _nameTokens(String value) sync* {
     final normalized = _normalizeName(value);
     if (normalized.isEmpty) return;
-    yield normalized;
+    if (!RegExp(r'[*?]').hasMatch(normalized)) yield normalized;
 
     // 실무 BASE 표기: 이경화/이경희, 이름,이름, 이름(보조명) 등.
     for (final part in normalized.split(RegExp(r'[/,;|()\\]+'))) {
       final token = _normalizeName(part);
-      if (token.isNotEmpty) yield token;
+      if (token.isNotEmpty && !RegExp(r'[*?]').hasMatch(token)) {
+        yield token;
+      }
     }
   }
 
@@ -230,8 +250,8 @@ class CustomerBenefitService {
     if (overlap.isEmpty) return 9999;
     if (a.length == b.length && a.containsAll(b) && b.containsAll(a)) return 0;
     if (a.containsAll(b)) return 10 + (a.length - b.length);
-    if (b.containsAll(a)) return 30 - b.length.clamp(0, 20);
-    return 50 - overlap.length.clamp(0, 20);
+    if (b.containsAll(a)) return 30 - b.length.clamp(0, 20).toInt();
+    return 50 - overlap.length.clamp(0, 20).toInt();
   }
 
   static int _bestNameRank(
@@ -373,8 +393,7 @@ class CustomerBenefitService {
     required String phone,
   }) async {
     if (!SupabaseConfig.isConfigured ||
-        name.trim().isEmpty ||
-        phone.trim().isEmpty) {
+        (name.trim().isEmpty && phone.trim().isEmpty)) {
       return null;
     }
     final routeKey = RouteCatalog.formRouteKeyFor(routeLabel);
@@ -388,21 +407,68 @@ class CustomerBenefitService {
         .order('source_no')
         .limit(500);
     LocalDeliveryRule? bestRule;
-    var bestRank = 9999;
+    var bestCategory = 9999;
+    var bestNameRank = 9999;
+    var bestPreferred = false;
+    var bestHasAddress = false;
     var bestSource = 1 << 30;
     for (final raw in rows) {
       final rule =
           LocalDeliveryRule.fromMap(Map<String, dynamic>.from(raw));
-      if (!_phoneMatches(phone, rule.phone)) continue;
-      final rank = _bestNameRank(
+      final phoneMatches = _phoneMatches(phone, rule.phone);
+      final nameRank = _bestNameRank(
         name,
         [rule.customerName, rule.alternateName, rule.companyName],
       );
-      if (rank >= 9999) continue;
+      final exactFullName = <String>[
+        rule.customerName,
+        rule.alternateName,
+        rule.companyName,
+      ].where((value) => value.trim().isNotEmpty).any(
+            (value) =>
+                _normalizeFullName(value) == _normalizeFullName(name),
+          );
+
+      // Prepaid delivery can change who pays, so it is selected only by an
+      // exact full-name match. Normal delivery may be recovered by a name
+      // token or by the phone number alone (for example Vang Vieng).
+      if (rule.isPrepaid && !exactFullName) continue;
+      if (!rule.isPrepaid && nameRank >= 9999 && !phoneMatches) continue;
+
+      final category = rule.isPrepaid
+          ? 0
+          : (exactFullName && phoneMatches
+              ? 10
+              : (exactFullName
+                  ? 20
+                  : (nameRank < 9999 && phoneMatches
+                      ? 30
+                      : (phoneMatches
+                          ? 100
+                          : (nameRank < 9999 ? 200 : 9999)))));
+      final hasAddress = rule.destinationAddress.trim().isNotEmpty;
       final source = rule.sourceNo ?? (1 << 30);
-      if (rank < bestRank || (rank == bestRank && source < bestSource)) {
+      if (category < bestCategory ||
+          (category == bestCategory && nameRank < bestNameRank) ||
+          (category == bestCategory &&
+              nameRank == bestNameRank &&
+              rule.preferred &&
+              !bestPreferred) ||
+          (category == bestCategory &&
+              nameRank == bestNameRank &&
+              rule.preferred == bestPreferred &&
+              hasAddress &&
+              !bestHasAddress) ||
+          (category == bestCategory &&
+              nameRank == bestNameRank &&
+              rule.preferred == bestPreferred &&
+              hasAddress == bestHasAddress &&
+              source < bestSource)) {
         bestRule = rule;
-        bestRank = rank;
+        bestCategory = category;
+        bestNameRank = nameRank;
+        bestPreferred = rule.preferred;
+        bestHasAddress = hasAddress;
         bestSource = source;
       }
     }

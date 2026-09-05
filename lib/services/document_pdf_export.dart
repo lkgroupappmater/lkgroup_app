@@ -19,57 +19,17 @@ class DocumentPdfExport {
   }
 
   static Future<Uint8List> statementTwoUp(
-    Uint8List pngBytes, {
+    Uint8List imageBytes, {
     required double sourceWidth,
     required double sourceHeight,
   }) async {
-    final pdf = pw.Document();
-    final image = pw.MemoryImage(pngBytes);
-
-    final pageW = PdfPageFormat.a4.width - 16;
-    final pageH = PdfPageFormat.a4.height - 16;
-    final projected = pageW * sourceHeight / sourceWidth;
-
-    if (projected <= pageH * .485) {
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-          build: (_) => pw.Column(
-            children: [
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-              pw.Container(
-                height: 24,
-                alignment: pw.Alignment.center,
-                child: pw.Container(height: .6, color: PdfColors.grey600),
-              ),
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      for (var i = 0; i < 2; i++) {
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-            build: (_) => pw.Center(child: pw.Image(image, fit: pw.BoxFit.contain)),
-          ),
-        );
-      }
-    }
-    return pdf.save();
+    final batch = StatementPdfBatchBuilder();
+    batch.addStatement(
+      imageBytes,
+      sourceWidth: sourceWidth,
+      sourceHeight: sourceHeight,
+    );
+    return batch.save();
   }
 
   static Future<Uint8List> _twoUp(
@@ -130,12 +90,34 @@ class DocumentPdfExport {
 
 
   static Future<Uint8List> batchStatements(
-    List<Uint8List> pngPages,
+    List<Uint8List> imagePages,
   ) async {
-    final pdf = pw.Document();
-    for (final bytes in pngPages) {
-      final image = pw.MemoryImage(bytes);
-      pdf.addPage(
+    final batch = StatementPdfBatchBuilder();
+    for (final bytes in imagePages) {
+      batch.addStatement(bytes, sourceWidth: 1800, sourceHeight: 1120);
+    }
+    return batch.save();
+  }
+}
+
+/// Incrementally assembles statement pages. Callers can render, add, and
+/// release one statement image at a time instead of keeping every PNG in a
+/// second list before PDF creation.
+class StatementPdfBatchBuilder {
+  final pw.Document _pdf = pw.Document();
+
+  void addStatement(
+    Uint8List imageBytes, {
+    required double sourceWidth,
+    required double sourceHeight,
+  }) {
+    final image = pw.MemoryImage(imageBytes);
+    final pageW = PdfPageFormat.a4.width - 16;
+    final pageH = PdfPageFormat.a4.height - 16;
+    final projected = pageW * sourceHeight / sourceWidth;
+
+    if (projected <= pageH * .485) {
+      _pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
@@ -162,8 +144,21 @@ class DocumentPdfExport {
           ),
         ),
       );
+      return;
     }
-    return pdf.save();
-  }
-}
 
+    for (var i = 0; i < 2; i++) {
+      _pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
+          build: (_) => pw.Center(
+            child: pw.Image(image, fit: pw.BoxFit.contain),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<Uint8List> save() => _pdf.save();
+}

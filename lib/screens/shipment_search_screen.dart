@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
+import '../core/cargo_ui_strings.dart';
 import '../core/route_catalog.dart';
 import '../core/money_format.dart';
 import '../models/app_user.dart';
@@ -45,6 +46,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   bool _loadingUnknownRecipients = false;
   bool _searched = false;
   final Set<String> _selectedIds = <String>{};
+
+  String _t(String key) => AppStrings.get(widget.language, key);
+  String _l(String korean) => CargoUiStrings.get(widget.language, korean);
 
   bool get _canSeeAll => widget.currentUser?.role.canSeeAllShipments == true;
   bool get _showZone => widget.currentUser?.role == UserRole.admin || widget.currentUser?.role == UserRole.staff;
@@ -137,7 +141,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('수취인 불명 화물 조회 실패: $error')),
+        SnackBar(
+          content: Text(
+            '${_l('수취인 불명 / 데이터 불문명 화물')} - '
+            '${_t('schedule_load_failed')}: $error',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loadingUnknownRecipients = false);
@@ -148,28 +157,36 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
-            SizedBox(width: 8),
+            const Icon(Icons.warning_amber_rounded, color: Colors.deepOrange),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '수취인 불명 화물 보관·처분 상세 안내',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                _l('수취인 불명 화물 보관·처분 상세 안내'),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ],
         ),
-        content: const Text(
-          '• 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 '
-          '보관료등 기타 추가 비용이 발생 할 수 있습니다.\n\n'
-          '• 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, '
-          '특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
+        content: Text(
+          widget.language == AppLanguage.english
+              ? '• Cargo left unclaimed for an extended period may incur storage and other fees.\n\n'
+                  '• Storage fees apply from one week after release (minimum USD 3/CBM/day). '
+                  'Cargo stored for more than two months without a valid reason may be disposed of.'
+              : widget.language == AppLanguage.lao
+                  ? '• ສິນຄ້າທີ່ບໍ່ມີຜູ້ຮັບເປັນເວລາດົນອາດມີຄ່າເກັບຮັກສາ ແລະ ຄ່າໃຊ້ຈ່າຍອື່ນ.\n\n'
+                      '• ຄ່າເກັບຮັກສາເລີ່ມຫຼັງຈາກປ່ອຍສິນຄ້າ 1 ອາທິດ (ຂັ້ນຕ່ຳ USD 3/CBM/ມື້). '
+                      'ສິນຄ້າທີ່ເກັບເກີນ 2 ເດືອນໂດຍບໍ່ມີເຫດຜົນອາດຖືກກຳຈັດ.'
+                  : '• 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 '
+                      '보관료등 기타 추가 비용이 발생 할 수 있습니다.\n\n'
+                      '• 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, '
+                      '특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('확인'),
+            child: Text(_l('확인')),
           ),
         ],
       ),
@@ -195,7 +212,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: Text(
-              isAdmin ? '수취인 불명 화물 정보 입력' : '본인 화물 확인 및 정정 요청',
+              _l(
+                isAdmin
+                    ? '수취인 불명 화물 정보 입력'
+                    : '본인 화물 확인 및 정정 요청',
+              ),
             ),
             content: SingleChildScrollView(
               child: Column(
@@ -203,10 +224,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${row['route'] ?? ''} / ${row['shipment_year'] ?? ''}년도 / '
-                    '${_voyageLabel(row['voyage'])}\n'
-                    '화물번호: ${row['box_number'] ?? ''}\n'
-                    '송장번호: ${row['invoice_number'] ?? ''}',
+                    '${row['route'] ?? ''} / '
+                    '${_localizedYearValue(row['shipment_year'])} / '
+                    '${_localizedVoyageValue(row['voyage'])}\n'
+                    '${_l('화물번호')}: ${row['box_number'] ?? ''}\n'
+                    '${_l('송장번호')}: ${row['invoice_number'] ?? ''}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                     ),
@@ -215,7 +237,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   TextField(
                     controller: name,
                     decoration: InputDecoration(
-                      labelText: isAdmin ? '수취인 이름 / 회사명' : '본인 이름',
+                      labelText:
+                          _l(isAdmin ? '수취인 이름 / 회사명' : '본인 이름'),
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -224,7 +247,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                     controller: phone,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
-                      labelText: isAdmin ? '연락처' : '본인 연락처',
+                      labelText: _l(isAdmin ? '연락처' : '본인 연락처'),
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -233,18 +256,23 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                     controller: note,
                     maxLines: 3,
                     decoration: InputDecoration(
-                      labelText: isAdmin ? '비고' : '확인 참고 내용 (선택)',
-                      hintText: isAdmin
-                          ? '필요한 경우 비고를 입력해 주세요.'
-                          : '물품 내용, 발송인 등 관리자 확인에 도움이 되는 내용을 입력해 주세요.',
+                      labelText:
+                          _l(isAdmin ? '비고' : '확인 참고 내용 (선택)'),
+                      hintText: _l(
+                        isAdmin
+                            ? '필요한 경우 비고를 입력해 주세요.'
+                            : '물품 내용, 발송인 등 관리자 확인에 도움이 되는 내용을 입력해 주세요.',
+                      ),
                       border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    isAdmin
-                        ? '관리자는 입력한 수취인 정보를 바로 반영하고 영수번호/구획을 다시 계산합니다.'
-                        : '요청 승인 후 수취인 정보가 반영되며 영수번호는 해당 항차 기준으로 처리됩니다.',
+                    _l(
+                      isAdmin
+                          ? '관리자는 입력한 수취인 정보를 바로 반영하고 영수번호/구획을 다시 계산합니다.'
+                          : '요청 승인 후 수취인 정보가 반영되며 영수번호는 해당 항차 기준으로 처리됩니다.',
+                    ),
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
@@ -256,11 +284,13 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(isAdmin ? '수취인 정보 적용' : '본인 화물 확인 요청'),
+                child: Text(
+                  _l(isAdmin ? '수취인 정보 적용' : '본인 화물 확인 요청'),
+                ),
               ),
             ],
           ),
@@ -332,10 +362,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           children: [
             const Icon(Icons.help_outline, color: AppColors.navyPrimary),
             const SizedBox(width: 7),
-            const Expanded(
+            Expanded(
               child: Text(
-                '수취인 불명 / 데이터 불문명 화물',
-                style: TextStyle(
+                _l('수취인 불명 / 데이터 불문명 화물'),
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navyPrimary,
@@ -348,18 +378,23 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 6),
               ),
-              child: const Text(
-                '상세 안내',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+              child: Text(
+                _l('상세 안내'),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
-          isAdmin
-              ? '관리자는 확인이 필요한 화물을 눌러 수취인 이름과 연락처를 바로 입력·수정할 수 있습니다.'
-              : '본인 화물이 확인되면 해당 화물을 눌러 이름과 연락처를 입력하고 확인 요청할 수 있습니다.',
+          _l(
+            isAdmin
+                ? '관리자는 확인이 필요한 화물을 눌러 수취인 이름과 연락처를 바로 입력·수정할 수 있습니다.'
+                : '본인 화물이 확인되면 해당 화물을 눌러 이름과 연락처를 입력하고 확인 요청할 수 있습니다.',
+          ),
           style: const TextStyle(
             fontSize: 11,
             color: AppColors.textSecondary,
@@ -374,11 +409,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             ),
           )
         else if (_unknownRecipientRows.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              '현재 확인이 필요한 수취인 불명 화물이 없습니다.',
-              style: TextStyle(color: AppColors.textSecondary),
+              _l('현재 확인이 필요한 수취인 불명 화물이 없습니다.'),
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           )
         else
@@ -427,7 +462,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$route / ${year}년도 / $voyage',
+                              '$route / ${_localizedYearValue(year)} / '
+                              '${_localizedVoyageValue(voyage)}',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
@@ -436,7 +472,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '화물번호: ${box.isEmpty ? '-' : box}',
+                              '${_l('화물번호')}: ${box.isEmpty ? '-' : box}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -444,21 +480,21 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '송장번호: ${invoice.isEmpty ? '-' : invoice}',
+                              '${_l('송장번호')}: ${invoice.isEmpty ? '-' : invoice}',
                               style: const TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '이름/연락처: '
-                              '${name.isEmpty ? '수취인 불명' : name} / '
+                              '${_l('이름/연락처')}: '
+                              '${name.isEmpty ? _l('수취인 불명') : name} / '
                               '${phone.isEmpty ? '-' : phone}',
                               style: const TextStyle(fontSize: 13),
                             ),
                             if (pending && !isAdmin) ...[
                               const SizedBox(height: 6),
-                              const Text(
-                                '확인 요청 대기',
-                                style: TextStyle(
+                              Text(
+                                _l('확인 요청 대기'),
+                                style: const TextStyle(
                                   fontSize: 11,
                                   color: Colors.orange,
                                   fontWeight: FontWeight.w800,
@@ -483,8 +519,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                             ),
                             child: Text(
                               isAdmin
-                                  ? '화물을 눌러\n정보 입력/수정'
-                                  : '화물을 눌러\n본인 확인 요청',
+                                  ? _l('화물을 눌러 정보 입력/수정')
+                                  : _l('화물을 눌러 본인 확인 요청'),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 10.5,
@@ -567,16 +603,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             child: ListView(
               shrinkWrap: true,
               children: [
-                const Text('운임 확인',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(_l('운임 확인'),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 ...result.lines.map((line) => ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                          '박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
+                          '${_l('박스번호')} ${line.boxNumber} · ${_l('송장번호')} ${line.invoiceNumber}'),
                       subtitle: Text(
-                          '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg'),
+                          '${_l('청구중량')} ${line.chargeableWeight.toStringAsFixed(2)}kg · ${_l('단가')} \$${line.rate.toStringAsFixed(2)}/kg'),
                       trailing: Text('\$${line.amountUsd.toStringAsFixed(2)}'),
                     )),
                 const Divider(),
@@ -661,21 +697,21 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 icon: allSelected
                     ? Icons.check_circle
                     : Icons.check_circle_outline,
-                label: '전체',
+                label: _l('전체'),
                 enabled: _results.isNotEmpty,
                 onTap: _toggleAll,
               ),
               divider(),
               action(
                 icon: Icons.price_check_outlined,
-                label: '운임 확인',
+                label: _l('운임 확인'),
                 enabled: _selectedIds.isNotEmpty,
                 onTap: _showFreight,
               ),
               divider(),
               action(
                 icon: Icons.inventory_2_outlined,
-                label: '화물 관리',
+                label: _l('화물 관리'),
                 enabled:
                     _selectedIds.isNotEmpty && widget.onManageSelected != null,
                 onTap: () => widget.onManageSelected!(
@@ -691,7 +727,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   @override
   Widget build(BuildContext context) {
     if (!widget.isLoggedIn) {
-      return _LoginRequiredView(onLogin: widget.onRequireLogin);
+      return _LoginRequiredView(
+        language: widget.language,
+        onLogin: widget.onRequireLogin,
+      );
     }
 
 
@@ -705,14 +744,19 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
           DropdownButtonFormField<int>(
             value: _selectedRoute,
             isExpanded: true,
-            decoration: _dropDecoration('운송 경로', Icons.route_outlined),
+            decoration: _dropDecoration(_t('route'), Icons.route_outlined),
             items: <DropdownMenuItem<int>>[
-              const DropdownMenuItem(value: -1, child: Text('전체')),
+              DropdownMenuItem(value: -1, child: Text(_t('all'))),
               ...List.generate(
                 routeLabels.length,
                 (index) => DropdownMenuItem(
                   value: index,
-                  child: Text(routeLabels[index]),
+                  child: Text(
+                    RouteCatalog.localizedLabel(
+                      routeLabels[index],
+                      widget.language,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -732,9 +776,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _year,
-                  decoration: _dropDecoration('년도', Icons.calendar_today),
+                  decoration: _dropDecoration(_t('year'), Icons.calendar_today),
                   items: _availableYears
-                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .map((v) => DropdownMenuItem(
+                            value: v,
+                            child: Text(v == '전체' ? _t('all') : v),
+                          ))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) {
@@ -751,9 +798,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                 child: DropdownButtonFormField<String>(
                   value: _voyage,
                   decoration: _dropDecoration(
-                      '항차', Icons.confirmation_number_outlined),
+                      _t('voyage'), Icons.confirmation_number_outlined),
                   items: _availableVoyages
-                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .map((v) => DropdownMenuItem(
+                            value: v,
+                            child: Text(v == '전체' ? _t('all') : v),
+                          ))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) setState(() => _voyage = v);
@@ -763,11 +813,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             ],
           ),
           const SizedBox(height: 10),
-          _input(_invoiceCtrl, '송장번호', Icons.tag_rounded),
+          _input(_invoiceCtrl, _t('invoice_number'), Icons.tag_rounded),
           const SizedBox(height: 10),
-          _input(_recipientCtrl, '이름/라오스 수령인', Icons.person_outline),
+          _input(_recipientCtrl, _t('recipient_name'), Icons.person_outline),
           const SizedBox(height: 10),
-          _input(_phoneCtrl, '연락처', Icons.phone_outlined,
+          _input(_phoneCtrl, _l('연락처'), Icons.phone_outlined,
               type: TextInputType.phone),
           const SizedBox(height: 16),
           SizedBox(
@@ -775,7 +825,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             child: ElevatedButton.icon(
               onPressed: _search,
               icon: const Icon(Icons.search_rounded),
-              label: const Text('화물 검색'),
+              label: Text(_t('cargo_search')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.navyPrimary,
                 foregroundColor: Colors.white,
@@ -785,16 +835,21 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
           const SizedBox(height: 18),
           if (_searched && _results.isEmpty)
-            const Center(child: Text('검색 결과가 없습니다.')),
+            Center(child: Text(_t('no_results'))),
           ..._groupedResultWidgets(),
           if (!_canSeeAll && _searched)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '일반 회원은 송장번호 뒤 4자리 이상, 정확한 이름 또는 연락처 뒤 8자리 기준으로 조회됩니다.',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                widget.language == AppLanguage.english
+                    ? 'Members can search with at least the last 4 invoice digits, an exact name, or the last 8 phone digits.'
+                    : widget.language == AppLanguage.lao
+                        ? 'ສະມາຊິກສາມາດຄົ້ນຫາດ້ວຍເລກໃບຂົນສົ່ງ 4 ຕົວທ້າຍ, ຊື່ທີ່ກົງກັນ ຫຼື ເບີໂທ 8 ຕົວທ້າຍ.'
+                        : '일반 회원은 송장번호 뒤 4자리 이상, 정확한 이름 또는 연락처 뒤 8자리 기준으로 조회됩니다.',
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
-            ),          _unknownRecipientSection(),
+            ),
+          _unknownRecipientSection(),
         ],
           ),
           if (_searched)
@@ -864,14 +919,14 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
-                const Text('그룹 전체 운임'),
+                Text(_l('그룹 전체 운임')),
                 const Divider(),
                 ...result.lines.map((line) => ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text('박스번호 ${line.boxNumber} · 송장번호 ${line.invoiceNumber}'),
+                      title: Text('${_l('박스번호')} ${line.boxNumber} · ${_l('송장번호')} ${line.invoiceNumber}'),
                       subtitle: Text(
-                        '청구중량 ${line.chargeableWeight.toStringAsFixed(2)}kg · 단가 \$${line.rate.toStringAsFixed(2)}/kg',
+                        '${_l('청구중량')} ${line.chargeableWeight.toStringAsFixed(2)}kg · ${_l('단가')} \$${line.rate.toStringAsFixed(2)}/kg',
                       ),
                       trailing: Text('\$${line.amountUsd.toStringAsFixed(2)}'),
                     )),
@@ -960,7 +1015,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                   TextButton.icon(
                     onPressed: () => _showGroupFreight(rows),
                     icon: const Icon(Icons.price_check_outlined, size: 17),
-                    label: const Text('운임'),
+                    label: Text(_t('quote')),
                   ),
                 ],
               ),
@@ -1031,9 +1086,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                       ),
                       Text.rich(
                         TextSpan(children: [
-                          const TextSpan(
-                            text: '영수번호/구획: ',
-                            style: TextStyle(
+                          TextSpan(
+                            text: '${_l('영수번호/구획')}: ',
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
@@ -1063,15 +1118,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                       ),
                       Text.rich(
                         TextSpan(children: [
-                          const TextSpan(
-                            text: '총 개수: ',
-                            style: TextStyle(
+                          TextSpan(
+                            text: '${_l('총 개수')}: ',
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
                           ),
                           TextSpan(
-                            text: '$totalQty개',
+                            text: '$totalQty${_l('개')}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               color: AppColors.navyPrimary,
@@ -1116,14 +1171,14 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _row('화물번호', '${r['box_number'] ?? ''}'),
-                  _row('송장번호', '${r['invoice_number'] ?? ''}'),
-                  _row('화물개수', '$quantity개'),
+                  _row(_l('화물번호'), '${r['box_number'] ?? ''}'),
+                  _row(_l('송장번호'), '${r['invoice_number'] ?? ''}'),
+                  _row(_l('화물개수'), '$quantity${_l('개')}'),
                   _row(
-                    '무게 / 크기',
+                    _l('무게 / 크기'),
                     '${_weightOneDecimal(r['weight_kg'])} kg / $size',
                   ),
-                  _row('입고날짜', receivedDate),
+                  _row(_l('입고날짜'), receivedDate),
                 ],
               ),
             ),
@@ -1165,6 +1220,28 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '';
     return text.endsWith('항차') ? text : '$text항차';
+  }
+
+  String _localizedYearValue(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '';
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (widget.language == AppLanguage.korean || digits.isEmpty) {
+      return text.endsWith('년도') ? text : '${text}년도';
+    }
+    return widget.language == AppLanguage.lao ? 'ປີ $digits' : digits;
+  }
+
+  String _localizedVoyageValue(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) return '';
+    final plain = text.replaceFirst(RegExp(r'항차$'), '');
+    if (widget.language == AppLanguage.korean) {
+      return text.endsWith('항차') ? text : '${text}항차';
+    }
+    return widget.language == AppLanguage.lao
+        ? 'ຖ້ຽວ $plain'
+        : 'Voyage $plain';
   }
 
   InputDecoration _dropDecoration(String label, IconData icon) => InputDecoration(
@@ -1217,7 +1294,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 }
 
 class _LoginRequiredView extends StatelessWidget {
-  const _LoginRequiredView({this.onLogin});
+  const _LoginRequiredView({
+    required this.language,
+    this.onLogin,
+  });
+  final AppLanguage language;
   final VoidCallback? onLogin;
 
   @override
@@ -1230,8 +1311,8 @@ class _LoginRequiredView extends StatelessWidget {
               const Icon(Icons.lock_outline,
                   size: 58, color: AppColors.navyPrimary),
               const SizedBox(height: 14),
-              const Text('로그인 후 화물 조회가 가능합니다.',
-                  style: TextStyle(
+              Text(AppStrings.get(language, 'login_required'),
+                  style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppColors.navyPrimary)),
@@ -1239,7 +1320,7 @@ class _LoginRequiredView extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onLogin,
                 icon: const Icon(Icons.login),
-                label: const Text('로그인 하기'),
+                label: Text(AppStrings.get(language, 'login')),
               ),
             ],
           ),
@@ -1266,11 +1347,4 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
-
-
-
-
-
-
-
 

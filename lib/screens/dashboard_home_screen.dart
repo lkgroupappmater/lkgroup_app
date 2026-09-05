@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../models/app_user.dart';
+import '../services/ai_assistant_service.dart';
 import '../services/content_service.dart';
 import 'notice_list_screen.dart';
 import 'shipment_schedule_screen.dart';
@@ -87,6 +88,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   List<_ScheduleItem> _visibleSchedules = <_ScheduleItem>[];
   List<_NoticeItem> _visibleNotices = <_NoticeItem>[];
   final _questionController = TextEditingController();
+  bool _consultationLoading = false;
+  String? _consultationAnswer;
 
   bool get _isManager =>
       widget.currentUser?.role == UserRole.staff ||
@@ -98,6 +101,42 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
     _loadContent();
   }
 
+  @override
+  void didUpdateWidget(covariant DashboardHomeBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.language != widget.language) {
+      _consultationAnswer = null;
+      _loadContent();
+    }
+  }
+
+  String _t(String key) => AppStrings.get(widget.language, key);
+
+  String _contactLabel(ContactLink link) {
+    if (widget.language == AppLanguage.korean) return link.label;
+    final isLao = widget.language == AppLanguage.lao;
+    switch (link.icon) {
+      case 'kakao_group':
+        return isLao ? 'ກຸ່ມ KakaoTalk LK Group' : 'LK Group KakaoTalk Group';
+      case 'kakao_open':
+        return isLao
+            ? 'ປຶກສາຜ່ານ Open KakaoTalk'
+            : 'Open KakaoTalk Consultation';
+      case 'kakao':
+        return isLao ? 'KakaoTalk ເບີຫຼັກ' : 'Main KakaoTalk';
+      case 'whatsapp':
+        final main = link.label.contains('대표번호');
+        if (isLao) return main ? 'WhatsApp ເບີຫຼັກ' : 'WhatsApp';
+        return main ? 'Main WhatsApp' : 'WhatsApp';
+      case 'naver':
+        return isLao ? 'ບລັອກ LK Group' : 'LK Group Blog';
+      case 'google_maps':
+        return isLao ? 'ສະຖານທີ່ສຳນັກງານ LK Group' : 'LK Group Office';
+      default:
+        return link.label;
+    }
+  }
+
   String _dateOnly(dynamic value) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) return '';
@@ -106,42 +145,51 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   Future<void> _loadContent() async {
     try {
-      final schedules = await ContentService.fetchSchedules();
-      final notices = await ContentService.fetchNotices();
+      if (_isManager) {
+        await ContentService.backfillMissingTranslations();
+      }
+      final results = await Future.wait<dynamic>(<Future<dynamic>>[
+        ContentService.fetchSchedules(language: widget.language),
+        ContentService.fetchNotices(language: widget.language),
+      ]);
+      final schedules = List<Map<String, dynamic>>.from(results[0] as List);
+      final notices = List<Map<String, dynamic>>.from(results[1] as List);
+      final scheduleItems = schedules
+          .map(
+            (r) => _ScheduleItem(
+              route: '${r['route'] ?? ''}',
+              year: '${r['year'] ?? r['shipment_year'] ?? ''}',
+              voyage: '${r['voyage'] ?? ''}',
+              departure: _dateOnly(
+                r['booking_close_date'] ??
+                    r['closing_date'] ??
+                    r['departure_date'],
+              ),
+              arrival: _dateOnly(
+                r['estimated_arrival_date'] ?? r['arrival_date'],
+              ),
+              status: '${r['status'] ?? '예정'}',
+              detail: '${r['detail'] ?? ''}',
+            ),
+          )
+          .toList();
+      final noticeItems = notices
+          .map(
+            (r) => _NoticeItem(
+              title: '${r['title'] ?? ''}',
+              date: _dateOnly(r['published_at'] ?? r['created_at']),
+              showDate: r['show_published_date'] != false,
+              content: '${r['content'] ?? ''}',
+              isNew: r['is_new'] == true,
+            ),
+          )
+          .toList();
+
       if (!mounted) return;
 
       setState(() {
-        _visibleSchedules = schedules
-            .map(
-              (r) => _ScheduleItem(
-                route: '${r['route'] ?? ''}',
-                year: '${r['year'] ?? r['shipment_year'] ?? ''}',
-                voyage: '${r['voyage'] ?? ''}',
-                departure: _dateOnly(
-                  r['booking_close_date'] ??
-                      r['closing_date'] ??
-                      r['departure_date'],
-                ),
-                arrival: _dateOnly(
-                  r['estimated_arrival_date'] ?? r['arrival_date'],
-                ),
-                status: '${r['status'] ?? '예정'}',
-                detail: '${r['detail'] ?? ''}',
-              ),
-            )
-            .toList();
-
-        _visibleNotices = notices
-            .map(
-              (r) => _NoticeItem(
-                title: '${r['title'] ?? ''}',
-                date: _dateOnly(r['published_at'] ?? r['created_at']),
-                showDate: r['show_published_date'] != false,
-                content: '${r['content'] ?? ''}',
-                isNew: r['is_new'] == true,
-              ),
-            )
-            .toList();
+        _visibleSchedules = scheduleItems;
+        _visibleNotices = noticeItems;
       });
     } catch (_) {
       // 실제 DB 데이터만 표시합니다.
@@ -171,25 +219,25 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         context,
         _isManager
             ? ScheduleManagementScreen(user: widget.currentUser!)
-            : const ShipmentScheduleScreen(),
+            : ShipmentScheduleScreen(language: widget.language),
       );
 
   void _openNotice() => _open(
         context,
         _isManager
             ? NoticeManagementScreen(user: widget.currentUser!)
-            : const NoticeListScreen(),
+            : NoticeListScreen(language: widget.language),
       );
 
   Future<void> _showScheduleDetail(_ScheduleItem item) async {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('선적 일정 상세'),
+        title: Text(_t('schedule')),
         content: SingleChildScrollView(
           child: Text(
-            '접수 마감: ${item.departure}\n'
-            '도착: ${item.arrival}\n'
+            '${_t('booking_close')}: ${item.departure}\n'
+            '${_t('arrival_expected')}: ${item.arrival}\n'
             '상태: ${item.status}'
             '${item.detail.trim().isEmpty ? '' : '\n\n${item.detail}'}',
           ),
@@ -197,7 +245,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('닫기'),
+            child: Text(_t('close')),
           ),
         ],
       ),
@@ -218,7 +266,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('닫기'),
+            child: Text(_t('close')),
           ),
         ],
       ),
@@ -230,7 +278,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(link.label),
+          title: Text(_contactLabel(link)),
           content: const Text('대표번호 링크는 추후 관리자 설정이 필요합니다.'),
           actions: [
             TextButton(
@@ -273,20 +321,40 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   void _message(String text) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(text)));
 
-  void _startConsultation() {
-    if (_questionController.text.trim().isEmpty) {
+  Future<void> _startConsultation() async {
+    if (widget.currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('질문을 입력해 주세요.')),
+        SnackBar(content: Text(_t('login_required'))),
       );
       return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('상담 요청이 접수되었습니다. 담당자가 확인 후 안내드리겠습니다.'),
-      ),
-    );
-    _questionController.clear();
+    if (_questionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('question_required'))),
+      );
+      return;
+    }
+    setState(() {
+      _consultationLoading = true;
+      _consultationAnswer = null;
+    });
+    try {
+      final answer = await AiAssistantService.consult(
+        question: _questionController.text,
+        language: widget.language,
+      );
+      if (!mounted) return;
+      setState(() => _consultationAnswer = answer);
+      _questionController.clear();
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _consultationAnswer =
+            '${_t('consult_failed')}\n${_t('staff_confirmation')}',
+      );
+    } finally {
+      if (mounted) setState(() => _consultationLoading = false);
+    }
   }
 
   @override
@@ -297,16 +365,16 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 118),
           children: [
             _sectionHeader(
-              '선적 일정',
-              _isManager ? '목록 관리' : '목록 자세히 보기',
+              _t('schedule'),
+              _isManager ? _t('list_manage') : _t('list_details'),
               _openSchedule,
             ),
             const SizedBox(height: 8),
             ..._visibleSchedules.map(_scheduleCard),
             const SizedBox(height: 14),
             _sectionHeader(
-              '공지 및 안내',
-              _isManager ? '목록 관리' : '목록 자세히 보기',
+              _t('notice'),
+              _isManager ? _t('list_manage') : _t('list_details'),
               _openNotice,
             ),
             const SizedBox(height: 8),
@@ -395,7 +463,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '접수 마감: ${item.departure}  도착: ${item.arrival}',
+                    '${_t('booking_close')}: ${item.departure}  '
+                    '${_t('arrival_expected')}: ${item.arrival}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -496,9 +565,9 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   Widget _contactSection() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '상담 및 연락처',
-            style: TextStyle(
+          Text(
+            _t('contact'),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
@@ -632,7 +701,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  link.label,
+                  _contactLabel(link),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -670,7 +739,9 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _consultationOpen ? '상담 닫기' : '상담하기',
+                  _consultationOpen
+                      ? _t('consult_close')
+                      : _t('consult_open'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -693,17 +764,17 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'AI 상담 준비 중',
-            style: TextStyle(
+          Text(
+            _t('ai_consult'),
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '운송 일정·운임·화물 조회·통관 안내 기본 답변을 준비하고 있습니다.',
-            style: TextStyle(
+          Text(
+            _t('ai_description'),
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
             ),
@@ -714,20 +785,46 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               Expanded(
                 child: TextField(
                   controller: _questionController,
-                  decoration: const InputDecoration(
-                    hintText: '질문을 입력하세요...',
+                  decoration: InputDecoration(
+                    hintText: _t('question_hint'),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               FilledButton(
-                onPressed: _startConsultation,
-                child: const Text('상담 시작'),
+                onPressed: _consultationLoading ? null : _startConsultation,
+                child: _consultationLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_t('consult_start')),
               ),
             ],
           ),
+          if (_consultationAnswer != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: .05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    _consultationAnswer!,
+                    style: const TextStyle(height: 1.45),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -750,6 +847,3 @@ class DashboardHomeScreen extends StatelessWidget {
         ),
       );
 }
-
-
-

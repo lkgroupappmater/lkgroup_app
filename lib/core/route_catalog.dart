@@ -1,4 +1,5 @@
 ﻿// lib/core/route_catalog.dart
+import 'app_language.dart';
 /// 앱 전체 공통 운송 경로.
 /// 기존 내장 경로는 안전한 fallback으로 유지하고,
 /// Supabase route_definitions가 준비되면 런타임 목록/Prefix/BASE 상속 정보를 사용합니다.
@@ -141,6 +142,50 @@ class RouteCatalog {
       ];
 
   static List<String> get routes => all.skip(1).toList(growable: false);
+
+  static String localizedLabel(String displayName, AppLanguage language) {
+    if (language == AppLanguage.korean || displayName == '전체') {
+      return displayName == '전체'
+          ? AppStrings.get(language, 'all')
+          : displayName;
+    }
+    RouteDefinition? route;
+    for (final item in definitions) {
+      if (item.displayName == displayName) {
+        route = item;
+        break;
+      }
+    }
+    if (route == null) return displayName;
+    const english = <String, String>{
+      'kr_la_sea': 'Korea → Laos Sea',
+      'kr_la_air': 'Korea → Laos Air',
+      'la_kr_air_exp': 'Laos → Korea Air Express',
+      'la_th_land': 'Laos → Thailand Land',
+      'th_la_land': 'Thailand → Laos Land',
+      'la_vn_land': 'Laos → Vietnam Land',
+      'vn_la_land': 'Vietnam → Laos Land',
+      'la_ch_land': 'Laos → China Land',
+      'ch_la_land': 'China → Laos Land',
+      'la_kh_land': 'Laos → Cambodia Land',
+      'kh_la_land': 'Cambodia → Laos Land',
+    };
+    const lao = <String, String>{
+      'kr_la_sea': 'ເກົາຫຼີ → ລາວ ທາງເຮືອ',
+      'kr_la_air': 'ເກົາຫຼີ → ລາວ ທາງອາກາດ',
+      'la_kr_air_exp': 'ລາວ → ເກົາຫຼີ ດ່ວນທາງອາກາດ',
+      'la_th_land': 'ລາວ → ໄທ ທາງບົກ',
+      'th_la_land': 'ໄທ → ລາວ ທາງບົກ',
+      'la_vn_land': 'ລາວ → ຫວຽດນາມ ທາງບົກ',
+      'vn_la_land': 'ຫວຽດນາມ → ລາວ ທາງບົກ',
+      'la_ch_land': 'ລາວ → ຈີນ ທາງບົກ',
+      'ch_la_land': 'ຈີນ → ລາວ ທາງບົກ',
+      'la_kh_land': 'ລາວ → ກຳປູເຈຍ ທາງບົກ',
+      'kh_la_land': 'ກຳປູເຈຍ → ລາວ ທາງບົກ',
+    };
+    return (language == AppLanguage.lao ? lao : english)[route.routeKey] ??
+        displayName;
+  }
 
   static void applyDatabaseDefinitions(List<Map<String, dynamic>> rows) {
     final next = <String, RouteDefinition>{};
@@ -287,5 +332,3 @@ class RouteCatalog {
       }[label] ??
       label;
 }
-
-

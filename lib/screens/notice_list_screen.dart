@@ -1,37 +1,66 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
 import '../services/content_service.dart';
 
 class NoticeListScreen extends StatefulWidget {
-  const NoticeListScreen({super.key});
+  const NoticeListScreen({
+    super.key,
+    this.language = AppLanguage.korean,
+  });
+
+  final AppLanguage language;
+
   @override
   State<NoticeListScreen> createState() => _NoticeListScreenState();
 }
 
 class _NoticeListScreenState extends State<NoticeListScreen> {
   late Future<List<Map<String, dynamic>>> _future;
+
+  String _t(String key) => AppStrings.get(widget.language, key);
+
   @override
   void initState() {
     super.initState();
-    _future = ContentService.fetchNotices();
+    _future = _load();
   }
 
-  String _v(Map<String, dynamic> row, String key) => (row[key] ?? '').toString();
+  Future<List<Map<String, dynamic>>> _load() async {
+    return ContentService.fetchNotices(language: widget.language);
+  }
+
+  String _v(Map<String, dynamic> row, String key) =>
+      (row[key] ?? '').toString();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('공지사항'), backgroundColor: AppColors.primary, foregroundColor: AppColors.white),
+      appBar: AppBar(
+        title: Text(_t('notice_title')),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+      ),
       backgroundColor: AppColors.background,
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError) return Center(child: Text('공지사항 조회 실패\n${snapshot.error}'));
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('${_t('notice_load_failed')}\n${snapshot.error}'),
+            );
+          }
           final rows = snapshot.data ?? <Map<String, dynamic>>[];
-          if (rows.isEmpty) return const Center(child: Text('등록된 공지사항이 없습니다.'));
+          if (rows.isEmpty) return Center(child: Text(_t('no_notice')));
           return RefreshIndicator(
-            onRefresh: () async { setState(() => _future = ContentService.fetchNotices()); await _future; },
+            onRefresh: () async {
+              setState(() => _future = _load());
+              await _future;
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(14),
               itemCount: rows.length,
@@ -39,16 +68,42 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
                 final notice = rows[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.divider)),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
                   child: ExpansionTile(
-                    title: Text(_v(notice, 'title'), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    title: Text(
+                      _v(notice, 'title'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     subtitle: notice['show_published_date'] == false
                         ? null
-                        : Text(_v(notice, 'published_at').split('T').first, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
-                    childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                        : Text(
+                            _v(notice, 'published_at').split('T').first,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                    childrenPadding:
+                        const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     children: <Widget>[
                       const Divider(),
-                      Align(alignment: Alignment.centerLeft, child: Text(_v(notice, 'content'), style: const TextStyle(height: 1.6, color: AppColors.textSecondary))),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _v(notice, 'content'),
+                          style: const TextStyle(
+                            height: 1.6,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -60,4 +115,3 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
     );
   }
 }
-

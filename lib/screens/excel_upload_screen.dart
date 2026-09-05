@@ -24,7 +24,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
   String _recalculateMessage = '';
 
   String _message =
-      '파일명에서 운송 경로·년도·항차를 먼저 확인해 즉시 접수합니다. '
+      '파일명에 포함된 운송 경로·년도·항차를 확인해 즉시 접수합니다. '
       '접수 후에는 이 화면에서 나가 다른 업무를 해도 앱이 켜져 있는 동안 순차 처리됩니다.';
 
   @override
@@ -244,8 +244,10 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                '기초 접수 검사: XLSX 파일명 · 운송 경로 · 년도 · 항차\n'
-                '예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n\n'
+                '기초 접수 검사: XLSX/XLSM · 운송 경로 · 년도 · 항차\n'
+                '예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n'
+                '또는: 2026년 LKS 08항차 최종본.xlsm\n'
+                '경로·년도·항차만 포함하면 앞뒤 파일명은 자유롭게 사용할 수 있습니다.\n\n'
                 '접수 후 Excel 분석, 중복 정리, 화물 DB 반영은 순차 처리됩니다.',
               ),
               const SizedBox(height: 20),
@@ -395,4 +397,3 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
         ),
       );
 }
-

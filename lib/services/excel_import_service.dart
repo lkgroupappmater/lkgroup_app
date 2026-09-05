@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../core/route_catalog.dart';
+import 'excel_file_metadata.dart';
 import 'shipment_service.dart';
 import 'supabase_service.dart';
 import '../config/supabase_config.dart';
@@ -64,7 +65,7 @@ class ExcelImportService {
   Future<ExcelImportResult> pickAndImport() async {
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
-      allowedExtensions: ['xlsx'],
+      allowedExtensions: ExcelFileMetadataParser.supportedExtensions,
     );
     if (picked == null) {
       return const ExcelImportResult(
@@ -86,17 +87,18 @@ class ExcelImportService {
     onProgress?.call(0.12, 'Excel 구조 확인 중');
     final workbook = _readRawWorkbook(bytes);
     onProgress?.call(0.25, '화물 행 분석 중');
-    final meta = _parseFileMeta(fileName);
+    final meta = ExcelFileMetadataParser.tryParse(fileName);
     if (meta == null) {
       throw StateError(
-        '파일명 형식을 확인해 주세요. 예: KR_LA_SEA_2026_V01_SHIPMENTS.xlsx',
+        '파일명에 운송 경로(LKS/KR_LA_SEA), 연도(2026), '
+        '항차(V01/01항차)를 넣어 주세요. 앞뒤 설명 문구는 자유롭게 사용할 수 있습니다.',
       );
     }
 
-    final routeKey = meta.$1;
+    final routeKey = meta.routeKey;
     final routeLabel = RouteCatalog.labelForKey(routeKey);
-    final year = meta.$2;
-    final voyage = meta.$3;
+    final year = meta.year;
+    final voyage = meta.voyage;
     final isBaseUpdate = voyage == '00';
 
     // V00 is NEVER a real shipment voyage.
@@ -473,14 +475,16 @@ class ExcelImportService {
   }) async {
     final path = '$routeKey/$year/V$voyage/$fileName';
     final storage = SupabaseService.client.storage.from('shipment-excel-templates');
+    final isMacroEnabled = fileName.toLowerCase().endsWith('.xlsm');
 
     await storage.uploadBinary(
       path,
       bytes,
-      fileOptions: const FileOptions(
+      fileOptions: FileOptions(
         upsert: true,
-        contentType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        contentType: isMacroEnabled
+            ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ),
     );
 
@@ -877,10 +881,12 @@ class ExcelImportService {
           'paid_by': paidBy,
           'notes': chosen.notes,
           'preferred': preferred,
-          'active': normalizedPhone.isNotEmpty &&
-              (customerName.isNotEmpty ||
+          'active': (normalizedPhone.isNotEmpty ||
+                  customerName.isNotEmpty ||
                   alternateName.isNotEmpty ||
-                  companyName.isNotEmpty),
+                  companyName.isNotEmpty) &&
+              (chosen.localCompany.isNotEmpty ||
+                  chosen.destination.isNotEmpty),
         };
       }
     }
@@ -1659,18 +1665,6 @@ class ExcelImportService {
   static String _digits(String value) =>
       value.replaceAll(RegExp(r'[^0-9]'), '');
 
-  static (String, int, String)? _parseFileMeta(String fileName) {
-    final match = RegExp(
-      r'^([A-Z]{2}_[A-Z]{2}_(?:SEA|AIR|AIR_EXP|LAND))_(\d{4})_V(\d{2})_SHIPMENTS\.XLSX$',
-      caseSensitive: false,
-    ).firstMatch(fileName.trim());
-    if (match == null) return null;
-    final prefix = match.group(1)!.toUpperCase();
-    final key = RouteCatalog.keyFromFileName('${prefix}_');
-    if (key == null) return null;
-    return (key, int.parse(match.group(2)!), match.group(3)!);
-  }
-
   static int _findHeaderRow(List<List<String>> rows) {
     for (var r = 0; r < rows.length && r < 20; r++) {
       final values = rows[r].map(_normalise).toList();
@@ -1728,8 +1722,5 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
-
-
 
 

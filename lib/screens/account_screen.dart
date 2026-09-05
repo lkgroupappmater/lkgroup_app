@@ -2,19 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../utils/form_validators.dart';
 
 class AccountScreen extends StatelessWidget {
-  const AccountScreen({super.key, this.currentUser});
+  const AccountScreen({
+    super.key,
+    this.currentUser,
+    this.language = AppLanguage.korean,
+  });
 
   final AppUser? currentUser;
+  final AppLanguage language;
 
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(child: AccountBody(currentUser: currentUser)),
+        body: SafeArea(
+          child: AccountBody(currentUser: currentUser, language: language),
+        ),
       );
 }
 
@@ -25,12 +33,14 @@ class AccountBody extends StatefulWidget {
     this.onLoggedIn,
     this.onLoggedOut,
     this.onUserUpdated,
+    this.language = AppLanguage.korean,
   });
 
   final AppUser? currentUser;
   final ValueChanged<AppUser>? onLoggedIn;
   final VoidCallback? onLoggedOut;
   final ValueChanged<AppUser>? onUserUpdated;
+  final AppLanguage language;
 
   @override
   State<AccountBody> createState() => _AccountBodyState();
@@ -43,6 +53,8 @@ class _AccountBodyState extends State<AccountBody> {
   bool _rememberAccount = false;
   bool _rememberPassword = false;
   AppUser? _displayUser;
+
+  String _t(String key) => AppStrings.get(widget.language, key);
 
   @override
   void initState() {
@@ -194,20 +206,20 @@ class _AccountBodyState extends State<AccountBody> {
             const SizedBox(height: 18),
             OutlinedButton(
               onPressed: widget.onLoggedOut,
-              child: const Text('로그아웃'),
+              child: Text(_t('sign_out')),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: _openAccountDeletion,
-              child: const Text('회원 탈퇴'),
+              child: Text(_t('delete_account')),
             ),
           ] else ...[
             TextField(
               controller: _account,
-              decoration: const InputDecoration(
-                labelText: '계정',
+              decoration: InputDecoration(
+                labelText: _t('email_account'),
                 hintText: '예: member@example.com',
-                prefixIcon: Icon(Icons.person_outline),
+                prefixIcon: const Icon(Icons.person_outline),
                 filled: true,
                 fillColor: AppColors.inputFill,
               ),
@@ -217,7 +229,7 @@ class _AccountBodyState extends State<AccountBody> {
               controller: _password,
               obscureText: _obscure,
               decoration: InputDecoration(
-                labelText: '암호',
+                labelText: _t('password'),
                 hintText: '대문자 + 소문자 + 숫자 포함 8자 이상',
                 prefixIcon: const Icon(Icons.lock_outline),
                 filled: true,
@@ -236,7 +248,7 @@ class _AccountBodyState extends State<AccountBody> {
               value: _rememberAccount,
               onChanged: (v) =>
                   setState(() => _rememberAccount = v ?? false),
-              title: const Text('회원아이디 기억하기'),
+              title: Text(_t('remember_account')),
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
@@ -244,19 +256,19 @@ class _AccountBodyState extends State<AccountBody> {
               value: _rememberPassword,
               onChanged: (v) =>
                   setState(() => _rememberPassword = v ?? false),
-              title: const Text('암호 기억하기'),
+              title: Text(_t('remember_password')),
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: _login,
-              child: const Text('접속'),
+              child: Text(_t('sign_in')),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: _openSignup,
-              child: const Text('회원가입'),
+              child: Text(_t('sign_up')),
             ),
           ],
         ],
@@ -286,14 +298,14 @@ class _AccountBodyState extends State<AccountBody> {
             PopupMenuButton<ImageSource>(
               icon: const Icon(Icons.camera_alt, color: AppColors.primary),
               onSelected: _pickAvatar,
-              itemBuilder: (_) => const [
+              itemBuilder: (_) => [
                 PopupMenuItem(
                   value: ImageSource.camera,
-                  child: Text('카메라'),
+                  child: Text(_t('camera')),
                 ),
                 PopupMenuItem(
                   value: ImageSource.gallery,
-                  child: Text('사진 선택'),
+                  child: Text(_t('select_photo')),
                 ),
               ],
             ),
@@ -314,10 +326,10 @@ class _AccountBodyState extends State<AccountBody> {
         Card(
           child: Column(
             children: [
-              _info('전화번호', user.phone),
-              _info('권한', user.role.label),
-              _info('회사명', user.company),
-              _info('주소', user.address),
+              _info(_t('phone'), user.phone),
+              _info(_t('role'), user.role.label),
+              _info(_t('company'), user.company),
+              _info(_t('address'), user.address),
             ],
           ),
         ),
@@ -328,7 +340,7 @@ class _AccountBodyState extends State<AccountBody> {
               child: FilledButton.icon(
                 onPressed: _openProfileEdit,
                 icon: const Icon(Icons.edit_outlined),
-                label: const Text('회원 정보 변경'),
+                label: Text(_t('edit_profile')),
               ),
             ),
             const SizedBox(width: 8),
@@ -336,7 +348,7 @@ class _AccountBodyState extends State<AccountBody> {
               child: OutlinedButton.icon(
                 onPressed: _openPasswordChange,
                 icon: const Icon(Icons.lock_outline),
-                label: const Text('암호 변경'),
+                label: Text(_t('change_password')),
               ),
             ),
           ],
@@ -350,7 +362,7 @@ class _AccountBodyState extends State<AccountBody> {
           label,
           style: const TextStyle(color: AppColors.textSecondary),
         ),
-        subtitle: Text(value.isEmpty ? '등록되지 않음' : value),
+        subtitle: Text(value.isEmpty ? _t('not_registered') : value),
       );
 }
 

@@ -91,7 +91,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('알림'),
+        title: Text(AppStrings.get(_language, 'notifications')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -108,7 +108,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('확인'),
+            child: Text(AppStrings.get(_language, 'confirm')),
           ),
         ],
       ),
@@ -137,11 +137,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('알림'),
+          title: Text(AppStrings.get(_language, 'notifications')),
           content: SizedBox(
             width: double.maxFinite,
             child: rows.isEmpty
-                ? const Text('새 알림이 없습니다.')
+                ? Text(AppStrings.get(_language, 'no_notifications'))
                 : ListView.separated(
                     shrinkWrap: true,
                     itemCount: rows.length,
@@ -155,7 +155,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('닫기'),
+              child: Text(AppStrings.get(_language, 'close')),
             ),
           ],
         ),
@@ -187,13 +187,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       case 1:
         return AppStrings.get(_language, 'tracking_title');
       case 2:
-        return '운임 확인 및 견적 요청';
+        return AppStrings.get(_language, 'quote_title');
       case 3:
-        return '화물 관리';
+        return AppStrings.get(_language, 'cargo_management_title');
       case 4:
-        return '관리 메뉴';
+        return AppStrings.get(_language, 'management_menu_title');
       default:
-        return '사용자 로그인';
+        return AppStrings.get(_language, 'login_title');
     }
   }
 
@@ -265,17 +265,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           key: ValueKey(
               '${_currentUser!.id}|${_currentUser!.role}|${_cargoSelection.join('|')}'),
           user: _currentUser!,
+          language: _language,
           initialSelectedIds: _cargoSelection,
         ),
       if (!_isLoggedIn) const SizedBox.shrink(),
       if (_hasManagementMenu)
         ManagementMenuScreen(
           user: _currentUser!,
+          language: _language,
           onOpenCargoManagement: () => _selectTab(3),
         ),
       if (!_hasManagementMenu) const SizedBox.shrink(),
       AccountBody(
         currentUser: _currentUser,
+        language: _language,
         onLoggedIn: _onLoggedIn,
         onLoggedOut: _onLoggedOut,
         onUserUpdated: _onUserUpdated,
@@ -283,10 +286,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ];
 
     final navItems = <BottomNavigationBarItem>[
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.home_outlined),
-        activeIcon: Icon(Icons.home),
-        label: '홈',
+      BottomNavigationBarItem(
+        icon: const Icon(Icons.home_outlined),
+        activeIcon: const Icon(Icons.home),
+        label: AppStrings.get(_language, 'home'),
       ),
       BottomNavigationBarItem(
         icon: const Icon(Icons.local_shipping_outlined),
@@ -298,10 +301,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     if (_isLoggedIn) {
       navItems.add(
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2_outlined),
-          activeIcon: Icon(Icons.inventory_2),
-          label: '화물 관리',
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.inventory_2_outlined),
+          activeIcon: const Icon(Icons.inventory_2),
+          label: AppStrings.get(_language, 'cargo_management'),
         ),
       );
       navIndexes.add(3);
@@ -318,10 +321,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     if (_hasManagementMenu) {
       navItems.add(
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.admin_panel_settings_outlined),
-          activeIcon: Icon(Icons.admin_panel_settings),
-          label: '관리 메뉴',
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+          activeIcon: const Icon(Icons.admin_panel_settings),
+          label: AppStrings.get(_language, 'management_menu'),
         ),
       );
       navIndexes.add(4);
@@ -337,7 +340,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     navIndexes.add(5);
 
     final selected = navIndexes.indexOf(_currentIndex);
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: CargoFlowAppBar(
         title: _title,
         selectedLanguage: _language,
@@ -357,6 +360,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         unselectedItemColor: Colors.white70,
         items: navItems,
       ),
+    );
+    final laoFont = _language.fontFamily;
+    if (laoFont == null) return scaffold;
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: laoFont),
+        primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: laoFont),
+      ),
+      child: scaffold,
     );
   }
 }

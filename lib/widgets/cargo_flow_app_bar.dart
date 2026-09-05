@@ -73,7 +73,10 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
                     clipBehavior: Clip.none,
                     children: [
                       IconButton(
-                        tooltip: '알림',
+                        tooltip: AppStrings.get(
+                          selectedLanguage,
+                          'notifications',
+                        ),
                         onPressed:
                             onNotificationTap ?? () => _showNotifications(context),
                         icon: const Icon(Icons.notifications_outlined,
@@ -145,7 +148,7 @@ class _LanguageFlagButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<AppLanguage>(
-      tooltip: 'Language / 언어',
+      tooltip: 'Language / 언어 / ພາສາ',
       offset: const Offset(0, 52),
       color: AppColors.primary,
       onSelected: onChanged,
@@ -162,6 +165,7 @@ class _LanguageFlagButton extends StatelessWidget {
                 style: TextStyle(
                   color: selected ? AppColors.tealAccent : AppColors.white,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                  fontFamily: language.fontFamily,
                 ),
               ),
               if (selected) ...[

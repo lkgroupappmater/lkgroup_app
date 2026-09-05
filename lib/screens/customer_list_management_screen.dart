@@ -172,7 +172,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       case '지방배송': return const Color(0xFFFFC000);
       case '지방배송(선결제)': return const Color(0xFF5B9BD5);
       case '시내배송': return const Color(0xFF92D050);
-      case '시내배송(선결제)': return const Color(0xFFFFFF00);
+      case '시내배송(선결제)': return const Color(0xFFD6B18A);
       default: return null;
     }
   }
@@ -323,9 +323,14 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
     final pic=rec.endRecording();
     final img=await pic.toImage(w.toInt(),h.toInt());
-    final bd=await img.toByteData(format:ui.ImageByteFormat.png);
-    if(bd==null)throw StateError('PNG 생성 실패');
-    return bd.buffer.asUint8List();
+    pic.dispose();
+    try {
+      final bd=await img.toByteData(format:ui.ImageByteFormat.png);
+      if(bd==null)throw StateError('PNG 생성 실패');
+      return bd.buffer.asUint8List();
+    } finally {
+      img.dispose();
+    }
   }
 
   Future<void> _saveImage() async {

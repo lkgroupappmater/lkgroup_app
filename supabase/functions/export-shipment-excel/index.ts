@@ -464,7 +464,7 @@ function applyDeliveryColorConditionalFormatting(
   // Medium-light fills: black text remains readable, but the delivery area
   // is visually clear enough on screen/print.
   // Order: province / province-prepaid / city / city-prepaid.
-  const fills = ['FFFFC000', 'FF9DC3E6', 'FFA9D18E', 'FFFFD966'];
+  const fills = ['FFFFC000', 'FF9DC3E6', 'FFA9D18E', 'FFD6B18A'];
 
   // Excel templates can have either <dxfs count="0"/> or <dxfs ...>...</dxfs>.
   // Handle both forms and append valid differential fills.  A broken dxfId is what
@@ -534,7 +534,11 @@ function applyDeliveryColorConditionalFormatting(
       /<!--LK_STATEMENT_DELIVERY_COLOR_V3--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,
       '',
     );
-    if (xml.includes('LK_STATEMENT_DELIVERY_COLOR_V4')) {
+    xml = xml.replace(
+      /<!--LK_STATEMENT_DELIVERY_COLOR_V4--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,
+      '',
+    );
+    if (xml.includes('LK_STATEMENT_DELIVERY_COLOR_V5')) {
       files[sheetPath] = strToU8(xml);
       continue;
     }
@@ -547,26 +551,55 @@ function applyDeliveryColorConditionalFormatting(
 
     // Remark A:E = NEVER colored.
     // Delivery F:K = colored from the delivery keyword already present in Remark.
-    const block = `<!--LK_STATEMENT_DELIVERY_COLOR_V4--><conditionalFormatting sqref="F18:K24">${rules}</conditionalFormatting>`;
-    xml = insertWorksheetExtensionBlock(xml, block, 'LK_STATEMENT_DELIVERY_COLOR_V4');
+    const block = `<!--LK_STATEMENT_DELIVERY_COLOR_V5--><conditionalFormatting sqref="F18:K24">${rules}</conditionalFormatting>`;
+    xml = insertWorksheetExtensionBlock(xml, block, 'LK_STATEMENT_DELIVERY_COLOR_V5');
     files[sheetPath] = strToU8(xml);
   }
 
   const customerPath = workbookSheetPath(files, '고객 리스트');
   if (customerPath && files[customerPath]) {
     let xml = strFromU8(files[customerPath]);
-    if (!xml.includes('LK_CUSTOMER_LIST_DELIVERY_COLOR_V2')) {
+    xml = xml.replace(
+      /<!--LK_CUSTOMER_LIST_DELIVERY_COLOR_V2--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,
+      '',
+    );
+    if (!xml.includes('LK_CUSTOMER_LIST_DELIVERY_COLOR_V3')) {
       const maxPriority = Math.max(0, ...[...xml.matchAll(/<cfRule\b[^>]*priority="(\d+)"/g)].map((m) => Number(m[1] ?? 0)));
       const rules = makeRules((label) => `$E4="${label}"`, maxPriority);
-      const block = `<!--LK_CUSTOMER_LIST_DELIVERY_COLOR_V2--><conditionalFormatting sqref="E4:E150">${rules}</conditionalFormatting>`;
-      xml = insertWorksheetExtensionBlock(xml, block, 'LK_CUSTOMER_LIST_DELIVERY_COLOR_V2');
+      const block = `<!--LK_CUSTOMER_LIST_DELIVERY_COLOR_V3--><conditionalFormatting sqref="E4:E150">${rules}</conditionalFormatting>`;
+      xml = insertWorksheetExtensionBlock(xml, block, 'LK_CUSTOMER_LIST_DELIVERY_COLOR_V3');
       files[customerPath] = strToU8(xml);
     }
   }
 }
 
 function normalizePhone(value: unknown): string {
-  return String(value ?? '').replace(/\s+/g, '').replace(/-/g, '');
+  return String(value ?? '').replace(/[^0-9]/g, '');
+}
+
+function normalizeReceiptName(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function firstReceiptNameToken(value: unknown): string {
+  return normalizeReceiptName(String(value ?? '').split('/')[0]);
+}
+
+function receiptNameTokenIsUncertain(value: unknown): boolean {
+  const first = firstReceiptNameToken(value);
+  return first === '' || /[*?#＊？]/u.test(first) ||
+    /^(수취인\s*불명|수신인\s*불명|불확실한\s*물품|불확실|미확인|기호포함\s*이름|unknown|unidentified|n\/a|na|none)/iu.test(first);
+}
+
+function receiptPhoneIsUncertain(value: unknown): boolean {
+  const raw = String(value ?? '');
+  return raw.trim() === '' || /[*?＊？]/u.test(raw) || normalizePhone(raw).length < 7;
+}
+
+function receiptIsTrulyUnknown(name: unknown, phone: unknown): boolean {
+  return String(name ?? '').trim() !== ''
+    ? receiptNameTokenIsUncertain(name)
+    : receiptPhoneIsUncertain(phone);
 }
 
 function assignReceiptNumbers(
@@ -581,62 +614,132 @@ function assignReceiptNumbers(
     routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
       ? `${prefix} XX`
       : `${prefix}XX`;
-  const normalizedShipments = shipments.map((shipment) =>
-    shipment.recipient_unknown === true
+  const normalizedShipments = shipments.map((shipment) => {
+    const unknown = receiptIsTrulyUnknown(
+      shipment.consignee_name,
+      shipment.consignee_phone,
+    );
+    return unknown
       ? {
           ...shipment,
+          recipient_unknown: true,
           receipt_number: unknownReceipt,
           unloading_zone: 'F',
         }
-      : shipment
-  );
+      : { ...shipment, recipient_unknown: false };
+  });
 
-  // 이름 + 전화번호가 같으면 같은 영수번호를 사용합니다.
+  // 정상 정보는 전체 이름 + 전화번호로 묶습니다. 마스킹 전화번호는
+  // 첫 번째 정상 이름이 기존 영수증 하나로만 확인될 때 그 번호를 따릅니다.
   const groupToReceipt = new Map<string, string>();
+  const knownReceiptsByFirstName = new Map<string, Set<string>>();
+  const knownGroupKeysByFirstName = new Map<string, Set<string>>();
   let next = 1;
+
+  const isPark = (name: unknown) => {
+    const first = firstReceiptNameToken(name).replace(/\s+/g, '');
+    return first === '박성호' || first === '박성호대표';
+  };
+
+  const groupKey = (shipment: Record<string, unknown>): string => {
+    const fullName = normalizeReceiptName(shipment.consignee_name);
+    const firstName = firstReceiptNameToken(shipment.consignee_name);
+    const phone = normalizePhone(shipment.consignee_phone);
+    if (!receiptPhoneIsUncertain(shipment.consignee_phone)) {
+      return fullName
+        ? `NAMEPHONE|${fullName}|${phone.slice(-8)}`
+        : `PHONE|${phone.slice(-8)}`;
+    }
+    return firstName ? `NAME|${firstName}` : '';
+  };
+
+  // Collect trustworthy name+phone groups before numbering. This makes a
+  // masked-phone row such as "이우용 / 이*용" follow the unique normal
+  // "이우용" group even when the masked row appears first in the sheet.
+  for (const shipment of normalizedShipments) {
+    if (shipment.recipient_unknown === true ||
+        receiptPhoneIsUncertain(shipment.consignee_phone)) continue;
+    const first = firstReceiptNameToken(shipment.consignee_name);
+    const key = groupKey(shipment);
+    if (!first || !key) continue;
+    const values = knownGroupKeysByFirstName.get(first) ?? new Set<string>();
+    values.add(key);
+    knownGroupKeysByFirstName.set(first, values);
+  }
 
   // 기존 영수번호가 있으면 우선 그대로 유지하고 다음 번호 계산.
   for (const shipment of normalizedShipments) {
     const existing = String(shipment.receipt_number ?? '').trim();
-    const hasIdentity =
-      String(shipment.consignee_name ?? '').trim() !== '' &&
-      normalizePhone(shipment.consignee_phone) !== '';
+    if (shipment.recipient_unknown === true) continue;
+    if (isPark(shipment.consignee_name)) {
+      const parkReceipt = routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
+        ? `${prefix} 100`
+        : `${prefix}100`;
+      groupToReceipt.set(groupKey(shipment), parkReceipt);
+      continue;
+    }
     const recoverableXx =
-      shipment.recipient_unknown !== true &&
-      hasIdentity &&
       /\bXX\s*$/i.test(existing);
     if (existing && !recoverableXx) {
       const m = existing.match(/(\d+)\s*$/);
       if (m) next = Math.max(next, Number(m[1]) + 1);
-      const key = `${String(shipment.consignee_name ?? '').trim().toLowerCase()}|${normalizePhone(shipment.consignee_phone)}`;
-      if (key !== '|') groupToReceipt.set(key, existing);
+      const key = groupKey(shipment);
+      if (key) groupToReceipt.set(key, existing);
+      if (!receiptPhoneIsUncertain(shipment.consignee_phone)) {
+        const first = firstReceiptNameToken(shipment.consignee_name);
+        if (first) {
+          const values = knownReceiptsByFirstName.get(first) ?? new Set<string>();
+          values.add(existing);
+          knownReceiptsByFirstName.set(first, values);
+        }
+      }
     }
   }
 
+  const allocateReceipt = (key: string): string => {
+    const prior = groupToReceipt.get(key);
+    if (prior) return prior;
+    if (next === 100) next = 101;
+    const receipt = routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
+      ? `${prefix} ${String(next).padStart(2, '0')}`
+      : `${prefix}${String(next).padStart(2, '0')}`;
+    groupToReceipt.set(key, receipt);
+    next += 1;
+    return receipt;
+  };
+
   return normalizedShipments.map((shipment) => {
     const existing = String(shipment.receipt_number ?? '').trim();
-    const name = String(shipment.consignee_name ?? '').trim();
-    const phone = normalizePhone(shipment.consignee_phone);
+    if (shipment.recipient_unknown === true) return shipment;
+    if (isPark(shipment.consignee_name)) {
+      return {
+        ...shipment,
+        receipt_number: routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
+          ? `${prefix} 100`
+          : `${prefix}100`,
+        unloading_zone: '102',
+      };
+    }
     const recoverableXx =
-      shipment.recipient_unknown !== true &&
-      name !== '' &&
-      phone !== '' &&
       /\bXX\s*$/i.test(existing);
     if (existing && !recoverableXx) return shipment;
 
-    const key = `${name.toLowerCase()}|${phone}`;
-    if (key === '|') return shipment;
+    const key = groupKey(shipment);
+    if (!key) return shipment;
 
     let receipt = groupToReceipt.get(key);
-    if (!receipt) {
-      if (routeKey === 'kr_la_sea' || routeKey === 'kr_la_air') {
-        receipt = `${prefix} ${String(next).padStart(2, '0')}`;
-      } else {
-        receipt = `${prefix}${String(next).padStart(2, '0')}`;
+    if (!receipt && receiptPhoneIsUncertain(shipment.consignee_phone)) {
+      const first = firstReceiptNameToken(shipment.consignee_name);
+      const known = knownReceiptsByFirstName.get(first);
+      if (known?.size === 1) receipt = [...known][0];
+      if (!receipt) {
+        const normalGroups = knownGroupKeysByFirstName.get(first);
+        if (normalGroups?.size === 1) {
+          receipt = allocateReceipt([...normalGroups][0]);
+        }
       }
-      groupToReceipt.set(key, receipt);
-      next += 1;
     }
+    if (!receipt) receipt = allocateReceipt(key);
 
     return { ...shipment, receipt_number: receipt };
   });
@@ -821,7 +924,7 @@ function seedCustomerListFromShipments(
           nextRow,
           rowNumber,
           'C',
-          `IF(B${rowNumber}="","",IF(F${rowNumber}<=10,"A",IF(F${rowNumber}<=20,"B",IF(F${rowNumber}<=30,"C","F"))))`,
+          `IF(B${rowNumber}="","",IF(F${rowNumber}<=4,"A",IF(F${rowNumber}<=9,"B",IF(F${rowNumber}<=19,"C","F"))))`,
         );
       }
       return nextRow;
@@ -856,7 +959,7 @@ function seedCustomerListFromShipments(
         nextRow,
         rowNumber,
         'C',
-        `IF(B${rowNumber}="","",IF(F${rowNumber}<=10,"A",IF(F${rowNumber}<=20,"B",IF(F${rowNumber}<=30,"C","F"))))`,
+        `IF(B${rowNumber}="","",IF(F${rowNumber}<=4,"A",IF(F${rowNumber}<=9,"B",IF(F${rowNumber}<=19,"C","F"))))`,
       );
     }
 
@@ -1386,7 +1489,12 @@ function appendDocumentAutomationBlock(
   const normalizeName = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
   const phoneMatch = (a: unknown, b: unknown) => {
     const aa = normalizePhone(a); const bb = normalizePhone(b);
-    return !!aa && !!bb && (aa === bb || (aa.length >= 8 && bb.length >= 8 && aa.slice(-8) === bb.slice(-8)));
+    return !!aa && !!bb && (
+      aa === bb ||
+      (aa.length >= 8 && bb.length >= 8 && aa.slice(-8) === bb.slice(-8)) ||
+      (aa.length >= 8 && bb.includes(aa)) ||
+      (bb.length >= 8 && aa.includes(bb))
+    );
   };
   const groups = new Map<string, Record<string, unknown>[]>();
   for (const s of shipments) {
@@ -1434,20 +1542,34 @@ function appendDocumentAutomationBlock(
     const first = rows[0];
     const name = String(first.consignee_name ?? '').trim();
     const phone = String(first.consignee_phone ?? '').trim();
-    const compactName = (v: unknown) =>
-      normalizeName(v).replace(/[\s/,_()\-*?]+/g, '');
-    const nameTokens = (v: unknown) =>
-      String(v ?? '')
-        .toLowerCase()
-        .split(/[\s/,_()\-*?]+/)
-        .map(x => x.trim())
-        .filter(Boolean);
+    const nameTokens = (v: unknown) => {
+      const full = normalizeName(v);
+      const parts = String(v ?? '')
+        .split(/[/,;|()\\]+/)
+        .map(x => normalizeName(x))
+        .filter(x => x !== '' && !/[*?]/.test(x));
+      return [...new Set([full, ...parts].filter(
+        x => x !== '' && !/[*?]/.test(x),
+      ))];
+    };
 
-    const shipmentCompact = compactName(name);
     const shipmentTokens = new Set(nameTokens(name));
 
+    const exactFullName = (a: unknown, b: unknown) => {
+      const aa = String(a ?? '').trim().toLowerCase().replace(/\s+/g, '');
+      const bb = String(b ?? '').trim().toLowerCase().replace(/\s+/g, '');
+      return aa !== '' && aa === bb;
+    };
+    const isPrepaid = (value: unknown) => {
+      const key = String(value ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+      return key.includes('선결제') ||
+        key.includes('선결재') ||
+        key.includes('선불') ||
+        key.includes('prepaid') ||
+        key.includes('payinadvance');
+    };
+
     const rankedDeliveries = deliveries
-      .filter(x => phoneMatch(phone, x.phone))
       .map((x, index) => {
         const candidateNames = [
           x.customer_name,
@@ -1455,22 +1577,47 @@ function appendDocumentAutomationBlock(
           x.company_name,
         ].filter(v => String(v ?? '').trim() !== '');
 
-        let nameRank = 0;
+        let exactName = false;
+        let partialNameRank = 9999;
         for (const candidateName of candidateNames) {
-          const candidateCompact = compactName(candidateName);
-          if (shipmentCompact && candidateCompact === shipmentCompact) {
-            nameRank = Math.max(nameRank, 300);
-            continue;
+          if (exactFullName(name, candidateName)) {
+            exactName = true;
           }
 
-          const candidateTokens = nameTokens(candidateName);
-          const overlap = candidateTokens.filter(token =>
+          const candidateTokens = new Set(nameTokens(candidateName));
+          const overlap = [...candidateTokens].filter(token =>
             shipmentTokens.has(token),
           ).length;
-          if (overlap > 0) {
-            nameRank = Math.max(nameRank, 100 + overlap);
-          }
+          if (overlap === 0) continue;
+          const everyShipmentTokenExists = [...shipmentTokens]
+            .every(token => candidateTokens.has(token));
+          const everyCandidateTokenExists = [...candidateTokens]
+            .every(token => shipmentTokens.has(token));
+          partialNameRank = Math.min(
+            partialNameRank,
+            everyShipmentTokenExists && everyCandidateTokenExists
+              ? 0
+              : (everyShipmentTokenExists || everyCandidateTokenExists
+                ? 10 + Math.abs(shipmentTokens.size - candidateTokens.size)
+                : 50 - overlap),
+          );
         }
+
+        const prepaid = isPrepaid(x.paid_by);
+        const samePhone = phoneMatch(phone, x.phone);
+        const matchRank = prepaid
+          ? (exactName ? 0 : 9999)
+          : (exactName && samePhone
+            ? 10
+            : exactName
+              ? 20
+              : partialNameRank < 9999 && samePhone
+                ? 30 + partialNameRank
+                : samePhone
+                  ? 100
+                  : partialNameRank < 9999
+                    ? 200 + partialNameRank
+                    : 9999);
 
         const hasDestination =
           String(x.destination_address ?? '').trim() !== '';
@@ -1480,17 +1627,17 @@ function appendDocumentAutomationBlock(
         return {
           row: x,
           index,
-          nameRank,
+          matchRank,
           hasDestination,
           preferred,
           sourceNo: Number.isFinite(sourceNo) ? sourceNo : 999999,
         };
       })
-      .filter(x => x.nameRank > 0)
+      .filter(x => x.matchRank < 9999)
       .sort((a, b) =>
-        b.nameRank - a.nameRank ||
-        Number(b.hasDestination) - Number(a.hasDestination) ||
+        a.matchRank - b.matchRank ||
         Number(b.preferred) - Number(a.preferred) ||
+        Number(b.hasDestination) - Number(a.hasDestination) ||
         a.sourceNo - b.sourceNo ||
         a.index - b.index
       );
@@ -1500,16 +1647,21 @@ function appendDocumentAutomationBlock(
     // customer/source block when BASE Excel is imported.
     // Do NOT jump to another same-phone profile merely because it has an address.
     const d = rankedDeliveries[0]?.row;
-    const paidBy = String(d?.paid_by ?? '').toLowerCase();
-    const koreaMarker =
-      paidBy.includes('\uD55C\uAD6D') || paidBy.includes('korea');
-    const prepaidMarker =
-      paidBy.includes('\uC120\uACB0\uC81C') ||
-      paidBy.includes('\uC120\uBD88') ||
-      paidBy.includes('prepaid');
-    const isKoreaPrepaid = koreaMarker && prepaidMarker;
-    const type = d ? (String(d.delivery_type ?? '') === 'city' ? 'city' : (isKoreaPrepaid ? 'province_prepaid_kr' : 'province')) : '';
-    const delivery = d ? [d.source_no ? `(${d.source_no})` : '', d.alternate_name || d.customer_name || name, d.phone_display || d.phone || phone, d.local_company, d.destination_address].filter(Boolean).join(', ') : '';
+    const prepaid = d ? isPrepaid(d.paid_by) : false;
+    const type = d
+      ? (String(d.delivery_type ?? '') === 'city'
+        ? (prepaid ? 'city_prepaid' : 'city')
+        : (prepaid ? 'province_prepaid' : 'province'))
+      : '';
+    const rawSourceNo = Number(d?.source_no ?? 0);
+    const displaySourceNo = rawSourceNo >= 10000 ? rawSourceNo - 10000 : rawSourceNo;
+    const delivery = d ? [
+      displaySourceNo > 0 ? `No. ${displaySourceNo}` : '',
+      d.alternate_name || d.customer_name || name,
+      d.phone_display || d.phone || phone,
+      d.local_company,
+      d.destination_address,
+    ].filter(Boolean).join('\n') : '';
     const auto = [...new Set(rows.map(x => String(x.special_note_auto ?? '').trim()).filter(Boolean))].join(' / ');
     const extra = extraMap.get(receipt) ?? 0;
     const discountRate = receiptDiscountRates.get(receipt) ?? 0;
@@ -2044,8 +2196,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const voyageToken = voyage.toUpperCase().startsWith('V')
       ? voyage.toUpperCase()
       : `V${voyage}`;
+    const templateFileName = String(template.file_name ?? '').toLowerCase();
+    const outputExtension = templateFileName.endsWith('.xlsm')
+      ? 'xlsm'
+      : 'xlsx';
     const outputFileName =
-      `${prefix}_${shipmentYear}_${voyageToken}_SHIPMENTS.xlsx`;
+      `${prefix}_${shipmentYear}_${voyageToken}_SHIPMENTS.${outputExtension}`;
 
     const original = new Uint8Array(await templateBlob.arrayBuffer());
     console.log('[EXCEL200C] unzip start', original.byteLength);
@@ -2126,7 +2282,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       shipmentRouteLabel,
       shipmentYear,
       voyage,
-    );    appendDocumentAutomationBlock(
+    );
+    appendDocumentAutomationBlock(
       files,
       enrichedShipments,
       (localDeliveryProfiles ?? []) as Record<string, unknown>[],
@@ -2191,8 +2348,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       .from('shipment-excel-exports')
       .upload(exportPath, encoded, {
         upsert: false,
-        contentType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        contentType: outputExtension === 'xlsm'
+          ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
     if (uploadError) throw uploadError;
 
@@ -2225,12 +2383,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
-
-
-
-
-
 
 
 

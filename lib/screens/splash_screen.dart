@@ -136,8 +136,10 @@ class CompanySplashLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 190,
-      height: 130,
+      // Keep the LK Group signature inside Android's circular splash safe area.
+      // The native splash uses the same slightly reduced visual scale.
+      width: 174,
+      height: 119,
       child: Image.asset(
         'assets/images/company_logo_transparent.png',
         fit: BoxFit.contain,
