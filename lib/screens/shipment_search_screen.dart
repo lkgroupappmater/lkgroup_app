@@ -467,7 +467,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$route / ${_localizedYearValue(year)} / '
+                              '${_routeText(route)} / ${_localizedYearValue(year)} / '
                               '${_localizedVoyageValue(voyage)}',
                               style: const TextStyle(
                                 fontSize: 15,
@@ -574,6 +574,132 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     }
   }
 
+  bool _isInvoiceSuffixResult(Map<String, dynamic> row) =>
+      row['invoice_suffix_match'] == true;
+
+  Future<void> _requestInvoiceCorrection(Map<String, dynamic> row) async {
+    final user = widget.currentUser;
+    if (user == null || user.role != UserRole.member) return;
+    final note = TextEditingController();
+    final pending = row['correction_pending'] == true;
+    if (pending) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_l('이미 관리자 확인 대기 중인 요청이 있습니다.'))),
+      );
+      note.dispose();
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(
+              widget.language == AppLanguage.english
+                  ? 'Request cargo information correction'
+                  : widget.language == AppLanguage.lao
+                      ? 'ຂໍແກ້ໄຂຂໍ້ມູນສິນຄ້າ'
+                      : '본인 화물 확인 및 정보 정정 요청',
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_routeText(row['route'])} / '
+                    '${_localizedYearValue(row['shipment_year'])} / '
+                    '${_localizedVoyageValue(row['voyage'])}\n'
+                    '${_l('화물번호')}: ${row['box_number'] ?? '-'}\n'
+                    '${_l('송장번호')}: ${row['invoice_number'] ?? '-'}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.language == AppLanguage.english
+                        ? 'For privacy, the current recipient name and phone are hidden. Your verified profile name and phone will be sent to an administrator.'
+                        : widget.language == AppLanguage.lao
+                            ? 'ເພື່ອຄວາມລັບ ຊື່ ແລະ ເບີໂທຜູ້ຮັບປັດຈຸບັນຈະບໍ່ສະແດງ. ຂໍ້ມູນບັນຊີຂອງທ່ານຈະຖືກສົ່ງໃຫ້ຜູ້ບໍລິຫານ.'
+                            : '개인정보 보호를 위해 현재 등록된 수취인 이름과 연락처는 표시하지 않습니다. 회원정보의 이름과 연락처로 관리자에게 확인을 요청합니다.',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  Text('${_l('이름')}: ${user.name}'),
+                  Text('${_l('연락처')}: ${user.phone}'),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: note,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: widget.language == AppLanguage.english
+                          ? 'Reference details (optional)'
+                          : widget.language == AppLanguage.lao
+                              ? 'ຂໍ້ມູນອ້າງອີງ (ບໍ່ບັງຄັບ)'
+                              : '확인 참고 내용 (선택)',
+                      hintText: widget.language == AppLanguage.english
+                          ? 'Sender, item description, or other details'
+                          : widget.language == AppLanguage.lao
+                              ? 'ຜູ້ສົ່ງ, ລາຍການສິນຄ້າ ຫຼື ຂໍ້ມູນອື່ນ'
+                              : '발송인, 물품 내용 등 확인에 도움이 되는 정보',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(_l('취소')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(
+                  widget.language == AppLanguage.english
+                      ? 'Send request'
+                      : widget.language == AppLanguage.lao
+                          ? 'ສົ່ງຄຳຂໍ'
+                          : '확인 요청 보내기',
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirmed) {
+      try {
+        await ShipmentService.instance.requestInvoiceCorrection(
+          shipmentId: '${row['id']}',
+          invoiceSuffix: _invoiceCtrl.text,
+          claimantName: user.name,
+          claimantPhone: user.phone,
+          note: note.text,
+        );
+        if (!mounted) return;
+        setState(() => row['correction_pending'] = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.language == AppLanguage.english
+                  ? 'The cargo correction request was sent to an administrator.'
+                  : widget.language == AppLanguage.lao
+                      ? 'ສົ່ງຄຳຂໍແກ້ໄຂສິນຄ້າໃຫ້ຜູ້ບໍລິຫານແລ້ວ.'
+                      : '관리자에게 본인 화물 확인 및 정보 정정 요청을 보냈습니다.',
+            ),
+          ),
+        );
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${_l('본인 화물 확인 요청 실패')}: $error')),
+          );
+        }
+      }
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    note.dispose();
+  }
+
   void _toggle(String id) {
     setState(() {
       if (!_selectedIds.remove(id)) _selectedIds.add(id);
@@ -582,7 +708,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   void _toggleAll() {
     setState(() {
-      final ids = _results.map((r) => '${r['id']}').toSet();
+      final ids = _results
+          .where((row) => !_isInvoiceSuffixResult(row))
+          .map((r) => '${r['id']}')
+          .toSet();
       if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
         _selectedIds.removeAll(ids);
       } else {
@@ -639,8 +768,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   Widget _searchFixedBottomBar() {
-    final allSelected = _results.isNotEmpty &&
-        _selectedIds.containsAll(_results.map((r) => '${r['id']}'));
+    final selectableIds = _results
+        .where((row) => !_isInvoiceSuffixResult(row))
+        .map((r) => '${r['id']}')
+        .toSet();
+    final allSelected = selectableIds.isNotEmpty &&
+        _selectedIds.containsAll(selectableIds);
 
     Widget divider() => Container(
           width: 1,
@@ -703,7 +836,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                     ? Icons.check_circle
                     : Icons.check_circle_outline,
                 label: _l('전체'),
-                enabled: _results.isNotEmpty,
+                enabled: selectableIds.isNotEmpty,
                 onTap: _toggleAll,
               ),
               divider(),
@@ -881,7 +1014,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   void _toggleGroup(List<Map<String, dynamic>> rows) {
-    final ids = rows.map((r) => '${r['id']}').toSet();
+    final ids = rows
+        .where((row) => !_isInvoiceSuffixResult(row))
+        .map((r) => '${r['id']}')
+        .toSet();
     setState(() {
       if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
         _selectedIds.removeAll(ids);
@@ -959,7 +1095,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   ) {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final row in rows) {
-      final receipt = '${row['receipt_number'] ?? ''}'.trim();
+      final receipt = _isInvoiceSuffixResult(row)
+          ? '__invoice_suffix_${row['id']}'
+          : '${row['receipt_number'] ?? ''}'.trim();
       map.putIfAbsent(receipt, () => <Map<String, dynamic>>[]).add(row);
     }
     final entries = map.entries.toList();
@@ -977,7 +1115,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   }
 
   void _toggleReceiptGroup(List<Map<String, dynamic>> rows) {
-    final ids = rows.map((r) => '${r['id']}').toSet();
+    final ids = rows
+        .where((row) => !_isInvoiceSuffixResult(row))
+        .map((r) => '${r['id']}')
+        .toSet();
     setState(() {
       if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
         _selectedIds.removeAll(ids);
@@ -991,7 +1132,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     return _resultGroups().map((entry) {
       final rows = entry.value;
       final first = rows.first;
-      final ids = rows.map((r) => '${r['id']}').toSet();
+      final normalRows = rows
+          .where((row) => !_isInvoiceSuffixResult(row))
+          .toList(growable: false);
+      final ids = normalRows.map((r) => '${r['id']}').toSet();
       final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
       return Card(
         margin: const EdgeInsets.only(bottom: 14),
@@ -1003,11 +1147,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
               color: AppColors.inputFill,
               child: Row(
                 children: [
-                  Checkbox(
-                    value: all,
-                    onChanged: (_) => _toggleGroup(rows),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  if (normalRows.isNotEmpty)
+                    Checkbox(
+                      value: all,
+                      onChanged: (_) => _toggleGroup(normalRows),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   Expanded(
                     child: Text(
                       '${_routeText(first['route'])} · ${_localizedYearValue(first['shipment_year'])} · ${_localizedVoyageValue(first['voyage'])}',
@@ -1017,11 +1162,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                       ),
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () => _showGroupFreight(rows),
-                    icon: const Icon(Icons.price_check_outlined, size: 17),
-                    label: Text(_t('quote')),
-                  ),
+                  if (normalRows.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => _showGroupFreight(normalRows),
+                      icon: const Icon(Icons.price_check_outlined, size: 17),
+                      label: Text(_t('quote')),
+                    ),
                 ],
               ),
             ),
@@ -1034,7 +1180,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   Widget _receiptResultCard(List<Map<String, dynamic>> rows) {
     final first = rows.first;
-    final ids = rows.map((r) => '${r['id']}').toSet();
+    final normalRows = rows
+        .where((row) => !_isInvoiceSuffixResult(row))
+        .toList(growable: false);
+    final ids = normalRows.map((r) => '${r['id']}').toSet();
     final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
     final receipt = '${first['receipt_number'] ?? ''}'.trim();
     final zone = '${first['unloading_zone'] ?? ''}'.trim();
@@ -1064,11 +1213,12 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(
-                  value: all,
-                  onChanged: (_) => _toggleReceiptGroup(rows),
-                  visualDensity: VisualDensity.compact,
-                ),
+                if (normalRows.isNotEmpty)
+                  Checkbox(
+                    value: all,
+                    onChanged: (_) => _toggleReceiptGroup(normalRows),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 Expanded(
                   child: Wrap(
                     spacing: 10,
@@ -1153,6 +1303,67 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
 
   Widget _shipmentCard(Map<String, dynamic> r) {
     final id = '${r['id']}';
+    final suffixResult = _isInvoiceSuffixResult(r);
+    if (suffixResult) {
+      final pending = r['correction_pending'] == true;
+      return Card(
+        margin: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+        color: const Color(0xFFFFFBF2),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.verified_user_outlined,
+                      size: 18, color: Colors.orange),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.language == AppLanguage.english
+                          ? 'Invoice suffix match · recipient verification required'
+                          : widget.language == AppLanguage.lao
+                              ? 'ເລກໃບຂົນສົ່ງກົງກັນ · ຕ້ອງກວດຜູ້ຮັບ'
+                              : '송장 뒷자리 일치 · 수취인 정보 확인 필요',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _row(_l('화물번호'), '${r['box_number'] ?? '-'}'),
+              _row(_l('송장번호'), '${r['invoice_number'] ?? '-'}'),
+              _row(_l('입고날짜'), _dateOnly(r['received_at'])),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: pending ? null : () => _requestInvoiceCorrection(r),
+                  icon: Icon(pending ? Icons.hourglass_top : Icons.fact_check_outlined),
+                  label: Text(
+                    pending
+                        ? (widget.language == AppLanguage.english
+                            ? 'Administrator review pending'
+                            : widget.language == AppLanguage.lao
+                                ? 'ລໍຖ້າຜູ້ບໍລິຫານກວດ'
+                                : '관리자 확인 대기 중')
+                        : (widget.language == AppLanguage.english
+                            ? 'Request my cargo verification'
+                            : widget.language == AppLanguage.lao
+                                ? 'ຂໍກວດສິນຄ້າຂອງຂ້ອຍ'
+                                : '본인 화물 확인·정정 요청'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final quantity = int.tryParse('${r['quantity'] ?? ''}') ?? 1;
     final receivedDate = _dateOnly(r['received_at']);
     final length = _naturalNumber(r['length_cm']);

@@ -54,6 +54,29 @@ class ShipmentService {
 
     final result = List<Map<String, dynamic>>.from(rows as List);
 
+    // A member may need to recover cargo whose recipient name/phone was entered
+    // incorrectly at the logistics center.  The dedicated RPC accepts an exact
+    // invoice suffix of at least four characters and only returns masked
+    // recipient data.  It is deliberately separate from the normal RLS-scoped
+    // result so an invoice suffix never opens another customer's full record.
+    if (currentUser.role == UserRole.member && invoice.trim().isNotEmpty) {
+      final suffix = invoice
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (suffix.length < 4) {
+        throw StateError('송장번호 뒤 4자리 이상을 입력해 주세요.');
+      }
+      final maskedRaw = await SupabaseService.client.rpc(
+        'search_shipments_by_invoice_suffix',
+        params: {'p_invoice_suffix': suffix},
+      );
+      final existingIds = result.map((row) => '${row['id']}').toSet();
+      for (final raw in List<Map<String, dynamic>>.from(maskedRaw as List)) {
+        if (existingIds.add('${raw['id']}')) result.add(raw);
+      }
+    }
+
     // 관리자·직원·협력/파트너 검색에서는 수취인 불명 화물도 일반 화물 검색 결과
     // 아래에 보여야 합니다. 과거 RPC 버전에 recipient_unknown 제외 조건이 남아 있어도
     // 앱에서 해당 항차의 불명 화물을 보강해 누락되지 않게 합니다.
@@ -302,6 +325,28 @@ class ShipmentService {
     );
   }
 
+  Future<void> requestInvoiceCorrection({
+    required String shipmentId,
+    required String invoiceSuffix,
+    required String claimantName,
+    required String claimantPhone,
+    String note = '',
+  }) async {
+    if (!SupabaseConfig.isConfigured) return;
+    final id = int.tryParse(shipmentId.trim());
+    if (id == null) throw StateError('화물 ID가 올바르지 않습니다.');
+    await SupabaseService.client.rpc(
+      'create_invoice_correction_request',
+      params: {
+        'p_shipment_id': id,
+        'p_invoice_suffix': invoiceSuffix.trim(),
+        'p_claimant_name': claimantName.trim(),
+        'p_claimant_phone': claimantPhone.trim(),
+        'p_note': note.trim(),
+      },
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getPendingChangeRequests() async {
     if (!SupabaseConfig.isConfigured) return const [];
     final raw = await SupabaseService.client.rpc(
@@ -481,7 +526,6 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-
 
 
 

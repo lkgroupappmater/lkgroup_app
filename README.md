@@ -30,10 +30,22 @@ build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
 관리자의 `알 수 없는 앱 설치`를 일시적으로 허용해야 합니다. 테스트가 끝나면
 다시 꺼도 됩니다.
 
+## 스토어 등록 기본 정보
+
+- Android application ID: `com.lkgrouptrading.app`
+- iOS bundle ID: `com.lkgrouptrading.app`
+- 앱 표시 이름: `LK Group Trading`
+- 개인정보처리방침: `https://lkgrouptrading.com/#privacy`
+- 회원 탈퇴: 앱/uc6f9의 `내 정보` 안에서 본인 인증 후 처리
+
+스토어 등록, 서명키, 테스트 배포 순서는
+`docs/STORE_RELEASE_CHECKLIST.md`에 정리했습니다.
+
 ## 유지하는 보조 도구
 
-- `scripts/rebuild_excel_printarea_assets.ps1`: 견적서 Excel 인쇄영역 자산 재생성
+- `scripts/rebuild_excel_printarea_assets.ps1`: `QUOTATION_EXCEL_TEMPLATES`에서 견적서 Excel 인쇄영역 자산 재생성
 - `package.json`: Supabase CLI 버전 관리
 
 `node_modules`, Flutter 빌드 캐시, 과거 패치·백업 파일은 저장소에 포함하지
-않습니다. 필요할 때 `flutter pub get` 또는 `npm install`로 다시 생성합니다.
+않습니다. 런타임에 불필요한 중복 Excel 원본 폴더와 로고 중간 작업물도
+제거했습니다. 필요할 때 `flutter pub get` 또는 `npm install`로 의존성을 다시 생성합니다.

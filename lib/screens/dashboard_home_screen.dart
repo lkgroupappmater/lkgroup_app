@@ -28,9 +28,9 @@ class ContactLink {
 const _contactLinks = <ContactLink>[
   ContactLink(label: 'LK그룹 카카오톡 단톡방', icon: 'kakao_group', placeholder: 'https://open.kakao.com/o/gvMbtWJc'),
   ContactLink(label: '오픈상담톡(한국어, Eng, ລາວ)', icon: 'kakao_open', placeholder: 'https://open.kakao.com/o/sYly2bxf'),
-  ContactLink(label: '카카오톡(대표번호, Eng, ລາວ)', icon: 'kakao', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
+  ContactLink(label: '카카오톡 대표번호 (Eng, ລາວ)', icon: 'kakao', placeholder: 'http://qr.kakao.com/talk/98dpGrAOWUcmXlhyLxFqtwOS_qQ-'),
   ContactLink(label: 'WhatsApp(한국어, Eng, ລາວ)', icon: 'whatsapp', placeholder: 'https://wa.me/8562052883018'),
-  ContactLink(label: 'WhatsApp(대표번호, Eng, ລາວ)', icon: 'whatsapp', placeholder: 'https://wa.me/8562091126780'),
+  ContactLink(label: 'WhatsApp 대표번호 (Eng, ລາວ)', icon: 'whatsapp', placeholder: 'https://wa.me/8562091126780'),
   ContactLink(label: 'LK Trading Facebook', icon: 'facebook', placeholder: 'https://www.facebook.com/LKTradingofLao'),
   ContactLink(label: 'LK Group 블로그', icon: 'naver', placeholder: 'https://blog.naver.com/lkgrouplaos'),
   ContactLink(label: 'LK Group 사무실 위치', icon: 'google_maps', placeholder: 'https://maps.app.goo.gl/jMEFmjCw1wmJiAqx7'),
@@ -119,28 +119,9 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       UiLocalizations.format(widget.language, korean, values);
 
   String _contactLabel(ContactLink link) {
-    if (widget.language == AppLanguage.korean) return link.label;
-    final isLao = widget.language == AppLanguage.lao;
-    switch (link.icon) {
-      case 'kakao_group':
-        return isLao ? 'ກຸ່ມ KakaoTalk LK Group' : 'LK Group KakaoTalk Group';
-      case 'kakao_open':
-        return isLao
-            ? 'ປຶກສາຜ່ານ Open KakaoTalk'
-            : 'Open KakaoTalk Consultation';
-      case 'kakao':
-        return isLao ? 'KakaoTalk ເບີຫຼັກ' : 'Main KakaoTalk';
-      case 'whatsapp':
-        final main = link.label.contains('대표번호');
-        if (isLao) return main ? 'WhatsApp ເບີຫຼັກ' : 'WhatsApp';
-        return main ? 'Main WhatsApp' : 'WhatsApp';
-      case 'naver':
-        return isLao ? 'ບລັອກ LK Group' : 'LK Group Blog';
-      case 'google_maps':
-        return isLao ? 'ສະຖານທີ່ສຳນັກງານ LK Group' : 'LK Group Office';
-      default:
-        return link.label;
-    }
+    // These service names are the company's official labels and intentionally
+    // stay identical in Korean, English, and Lao UI modes.
+    return link.label;
   }
 
   String _dateOnly(dynamic value) {

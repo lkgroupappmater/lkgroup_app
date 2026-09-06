@@ -14,6 +14,7 @@ class ChangeApprovalScreen extends StatefulWidget {
 class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   List<Map<String, dynamic>> _requests = const [];
   List<Map<String, dynamic>> _unknownClaims = const [];
+  List<Map<String, dynamic>> _invoiceCorrections = const [];
   List<Map<String, dynamic>> _autoUnmatched = const [];
   List<Map<String, dynamic>> _incomplete = const [];
   final Set<int> _checked = <int>{};
@@ -66,6 +67,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
       final unknownClaims =
           await UnknownRecipientService.instance.listPendingClaimsForAdmin();
+      final invoiceCorrections = await UnknownRecipientService.instance
+          .listPendingInvoiceCorrectionsForAdmin();
       final autoUnmatched =
           await UnknownRecipientService.instance.listAutoUnmatchedForAdmin();
       final incomplete = <Map<String, dynamic>>[
@@ -97,6 +100,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       setState(() {
         _requests = rows;
         _unknownClaims = unknownClaims;
+        _invoiceCorrections = invoiceCorrections;
         _autoUnmatched = autoUnmatched;
         _incomplete = incomplete;
         _checked.clear();
@@ -649,6 +653,52 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }
   }
 
+  Future<void> _reviewInvoiceCorrection(
+    Map<String, dynamic> request,
+    String action,
+  ) async {
+    final approve = action == 'approve';
+    if (approve) {
+      final ok = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('송장 뒷자리 화물 정보 정정 승인'),
+              content: Text(
+                '요청 회원의 정보로 화물 수취인을 변경합니다.\n\n'
+                '이름: ${request['claimant_name'] ?? ''}\n'
+                '연락처: ${request['claimant_phone'] ?? ''}\n'
+                '송장번호: ${request['invoice_number'] ?? ''}\n\n'
+                '실물 송장 및 회원 정보를 확인한 후 승인해 주세요.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('확인 후 승인'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!ok) return;
+    }
+
+    try {
+      await UnknownRecipientService.instance.reviewInvoiceCorrection(
+        requestId: (request['request_id'] as num).toInt(),
+        action: action,
+      );
+      if (!mounted) return;
+      _message(approve ? '화물 수취인 정보를 정정했습니다.' : '정정 요청을 거절했습니다.');
+      await _load();
+    } catch (error) {
+      _message('송장 뒷자리 정정 요청 처리 실패: $error');
+    }
+  }
+
   Future<void> _bulk(String action) async {
     final ids = _checked.toList();
     for (final id in ids) {
@@ -746,7 +796,27 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       const Divider(),
                       const SizedBox(height: 8),
                     ],
-                    if (_requests.isEmpty && _unknownClaims.isEmpty && _autoUnmatched.isEmpty && _incomplete.isEmpty)
+                    if (_invoiceCorrections.isNotEmpty) ...[
+                      const Text(
+                        '송장 뒷자리 일치 · 회원 화물 정정 요청',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '수취인 오류로 일반 조회가 안 된 화물입니다. 송장 뒷자리와 회원 본인 정보를 확인한 후 처리하세요.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._invoiceCorrections.map(_invoiceCorrectionCard),
+                      const SizedBox(height: 14),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_requests.isEmpty && _unknownClaims.isEmpty && _invoiceCorrections.isEmpty && _autoUnmatched.isEmpty && _incomplete.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
                         child: Center(
@@ -876,6 +946,74 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                 FilledButton(
                   onPressed: () => _reviewUnknownClaim(claim, 'approve'),
                   child: const Text('본인 화물 확인 승인'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _invoiceCorrectionCard(Map<String, dynamic> request) {
+    return Card(
+      color: const Color(0xFFF2F7FF),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.verified_user_outlined, color: AppColors.primary),
+                SizedBox(width: 6),
+                Text(
+                  '수취인 정보 오류 정정 요청',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${request['box_number'] ?? ''} · ${request['invoice_number'] ?? ''}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            Text(
+              '${request['route'] ?? ''} · ${request['shipment_year'] ?? ''}년 · '
+              '${request['voyage'] ?? ''}항차',
+            ),
+            const SizedBox(height: 6),
+            Text('현재 수취인: ${request['current_name'] ?? ''}'),
+            Text('현재 연락처: ${request['current_phone'] ?? ''}'),
+            const Divider(height: 20),
+            Text(
+              '요청 회원: ${request['claimant_name'] ?? ''} '
+              '(${request['requester_email'] ?? ''})',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text('요청 연락처: ${request['claimant_phone'] ?? ''}'),
+            if ('${request['note'] ?? ''}'.trim().isNotEmpty)
+              Text('확인 메모: ${request['note']}'),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      _reviewInvoiceCorrection(request, 'reject'),
+                  child: const Text('거절'),
+                ),
+                const SizedBox(width: 6),
+                FilledButton(
+                  onPressed: () =>
+                      _reviewInvoiceCorrection(request, 'approve'),
+                  child: const Text('확인 후 정정 승인'),
                 ),
               ],
             ),
@@ -1108,7 +1246,6 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }).join('\n');
   }
 }
-
 
 
 

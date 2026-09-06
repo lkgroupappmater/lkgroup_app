@@ -170,6 +170,29 @@ class UnknownRecipientService {
       },
     );
   }
-}
 
+  Future<List<Map<String, dynamic>>>
+      listPendingInvoiceCorrectionsForAdmin() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final raw = await SupabaseService.client
+        .rpc('admin_list_invoice_correction_requests') as List;
+    return raw
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+  }
+
+  Future<void> reviewInvoiceCorrection({
+    required int requestId,
+    required String action,
+  }) async {
+    if (!SupabaseConfig.isConfigured) return;
+    await SupabaseService.client.rpc(
+      'admin_review_invoice_correction_request',
+      params: {
+        'p_request_id': requestId,
+        'p_action': action,
+      },
+    );
+  }
+}
 
