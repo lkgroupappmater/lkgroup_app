@@ -119,9 +119,37 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       UiLocalizations.format(widget.language, korean, values);
 
   String _contactLabel(ContactLink link) {
-    // These service names are the company's official labels and intentionally
-    // stay identical in Korean, English, and Lao UI modes.
-    return link.label;
+    // Translate the service name, but keep the language availability markers
+    // exactly as written so users can recognise every supported language.
+    if (widget.language == AppLanguage.korean) return link.label;
+    const english = <String, String>{
+      'LK그룹 카카오톡 단톡방': 'LK Group KakaoTalk Group Chat',
+      '오픈상담톡(한국어, Eng, ລາວ)':
+          'Open Consultation Chat(한국어, Eng, ລາວ)',
+      '카카오톡 대표번호 (Eng, ລາວ)':
+          'KakaoTalk Main Number (Eng, ລາວ)',
+      'WhatsApp(한국어, Eng, ລາວ)': 'WhatsApp(한국어, Eng, ລາວ)',
+      'WhatsApp 대표번호 (Eng, ລາວ)':
+          'WhatsApp Main Number (Eng, ລາວ)',
+      'LK Trading Facebook': 'LK Trading Facebook',
+      'LK Group 블로그': 'LK Group Blog',
+      'LK Group 사무실 위치': 'LK Group Office Location',
+    };
+    const lao = <String, String>{
+      'LK그룹 카카오톡 단톡방': 'ກຸ່ມສົນທະນາ KakaoTalk ຂອງ LK Group',
+      '오픈상담톡(한국어, Eng, ລາວ)':
+          'ຫ້ອງສົນທະນາປຶກສາ(한국어, Eng, ລາວ)',
+      '카카오톡 대표번호 (Eng, ລາວ)':
+          'ເບີຫຼັກ KakaoTalk (Eng, ລາວ)',
+      'WhatsApp(한국어, Eng, ລາວ)': 'WhatsApp(한국어, Eng, ລາວ)',
+      'WhatsApp 대표번호 (Eng, ລາວ)':
+          'ເບີຫຼັກ WhatsApp (Eng, ລາວ)',
+      'LK Trading Facebook': 'Facebook ຂອງ LK Trading',
+      'LK Group 블로그': 'ບລັອກ LK Group',
+      'LK Group 사무실 위치': 'ທີ່ຕັ້ງສຳນັກງານ LK Group',
+    };
+    return (widget.language == AppLanguage.lao ? lao : english)[link.label] ??
+        link.label;
   }
 
   String _dateOnly(dynamic value) {
