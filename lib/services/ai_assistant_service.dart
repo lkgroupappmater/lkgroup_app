@@ -73,24 +73,39 @@ class AiAssistantService {
     return output;
   }
 
-  static Future<String> consult({
-    required String question,
-    required AppLanguage language,
+  static Future<List<Map<String, dynamic>>> history() async {
+    final user = SupabaseService.client.auth.currentUser;
+    if (user == null) return [];
+    final rows = await SupabaseService.client.from('ai_consultations')
+        .select('id,question,answer,language,sources,created_at')
+        .eq('user_id', user.id).eq('status','completed')
+        .order('created_at', ascending:false).limit(30);
+    return List<Map<String,dynamic>>.from(rows).reversed.toList();
+  }
+
+  static Future<bool> requestFailed(String? id) async {
+    final user = SupabaseService.client.auth.currentUser;
+    if (id == null || user == null) return false;
+    final row = await SupabaseService.client.from('ai_consultations').select('status').eq('id', id).eq('user_id', user.id).maybeSingle();
+    return row?['status'] == 'failed';
+  }
+
+  static Future<Map<String,dynamic>> consultDetailed({
+    required String question, required AppLanguage language, String? requestId,
   }) async {
     final response = await SupabaseService.client.functions.invoke(
       'ai-assistant',
-      body: <String, dynamic>{
-        'mode': 'consult',
-        'target_language': language.code,
-        'question': question.trim(),
-      },
+      body: <String,dynamic>{'mode':'consult','target_language':language.code,
+        'question':question.trim(), if(requestId!=null) 'request_id':requestId},
     );
-    if (response.status < 200 || response.status >= 300) {
-      throw StateError('AI consultation failed (${response.status})');
-    }
-    final body = response.data;
-    final answer = body is Map ? '${body['answer'] ?? ''}'.trim() : '';
-    if (answer.isEmpty) throw StateError('AI consultation returned no answer.');
-    return answer;
+    if(response.status<200||response.status>=300) throw StateError('AI consultation failed (${response.status})');
+    final data=response.data;
+    if(data is! Map || '${data['answer']??''}'.trim().isEmpty) throw StateError('AI consultation returned no answer.');
+    return Map<String,dynamic>.from(data);
+  }
+
+  static Future<String> consult({required String question,required AppLanguage language}) async {
+    final result=await consultDetailed(question:question,language:language);
+    return '${result['answer']}';
   }
 }

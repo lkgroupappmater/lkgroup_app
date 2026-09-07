@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -6,7 +6,9 @@ import '../core/route_catalog.dart';
 import '../core/shipment_period_labels.dart';
 import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
-import '../services/ai_assistant_service.dart';
+import '../widgets/ai_consultation.dart';
+import '../widgets/content_media.dart';
+import 'company_content_screen.dart';
 import '../services/content_service.dart';
 import 'notice_list_screen.dart';
 import 'shipment_schedule_screen.dart';
@@ -44,6 +46,7 @@ class _ScheduleItem {
   final String arrival;
   final String status;
   final String detail;
+  final List<Map<String,dynamic>> attachments;
 
   const _ScheduleItem({
     required this.route,
@@ -53,6 +56,7 @@ class _ScheduleItem {
     required this.arrival,
     required this.status,
     required this.detail,
+    this.attachments=const [],
   });
 }
 
@@ -62,6 +66,7 @@ class _NoticeItem {
   final bool showDate;
   final String content;
   final bool isNew;
+  final List<Map<String,dynamic>> attachments;
 
   const _NoticeItem({
     required this.title,
@@ -69,6 +74,7 @@ class _NoticeItem {
     required this.showDate,
     required this.content,
     this.isNew = false,
+    this.attachments=const [],
   });
 }
 
@@ -87,12 +93,8 @@ class DashboardHomeBody extends StatefulWidget {
 }
 
 class _DashboardHomeBodyState extends State<DashboardHomeBody> {
-  bool _consultationOpen = false;
   List<_ScheduleItem> _visibleSchedules = <_ScheduleItem>[];
   List<_NoticeItem> _visibleNotices = <_NoticeItem>[];
-  final _questionController = TextEditingController();
-  bool _consultationLoading = false;
-  String? _consultationAnswer;
 
   bool get _isManager =>
       widget.currentUser?.role == UserRole.staff ||
@@ -108,7 +110,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   void didUpdateWidget(covariant DashboardHomeBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.language != widget.language) {
-      _consultationAnswer = null;
       _loadContent();
     }
   }
@@ -194,6 +195,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               ),
               status: '${r['status'] ?? '예정'}',
               detail: '${r['detail'] ?? ''}',
+              attachments: contentAttachments(r['attachments']),
             ),
           )
           .toList();
@@ -205,6 +207,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
               showDate: r['show_published_date'] != false,
               content: '${r['content'] ?? ''}',
               isNew: r['is_new'] == true,
+              attachments: contentAttachments(r['attachments']),
             ),
           )
           .toList();
@@ -222,7 +225,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
 
   @override
   void dispose() {
-    _questionController.dispose();
     super.dispose();
   }
 
@@ -265,12 +267,12 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       builder: (dialogContext) => AlertDialog(
         title: Text(_t('schedule')),
         content: SingleChildScrollView(
-          child: Text(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(
             '${_t('booking_close')}: ${item.departure}\n'
             '${_t('arrival_expected')}: ${item.arrival}\n'
             '${_uf('상태: {status}', {'status': _u(item.status)})}'
             '${item.detail.trim().isEmpty ? '' : '\n\n${item.detail}'}',
-          ),
+          ), ContentMediaGallery(items: item.attachments, language: widget.language)]),
         ),
         actions: [
           TextButton(
@@ -288,10 +290,10 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
       builder: (dialogContext) => AlertDialog(
         title: Text(item.title),
         content: SingleChildScrollView(
-          child: Text(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(
             '${item.showDate ? item.date : ''}'
             '${item.content.trim().isEmpty ? '' : '${item.showDate ? '\n\n' : ''}${item.content}'}',
-          ),
+          ), ContentMediaGallery(items: item.attachments, language: widget.language)]),
         ),
         actions: [
           TextButton(
@@ -354,42 +356,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
   void _message(String text) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(text)));
 
-  Future<void> _startConsultation() async {
-    if (widget.currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_t('login_required'))),
-      );
-      return;
-    }
-    if (_questionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_t('question_required'))),
-      );
-      return;
-    }
-    setState(() {
-      _consultationLoading = true;
-      _consultationAnswer = null;
-    });
-    try {
-      final answer = await AiAssistantService.consult(
-        question: _questionController.text,
-        language: widget.language,
-      );
-      if (!mounted) return;
-      setState(() => _consultationAnswer = answer);
-      _questionController.clear();
-    } catch (_) {
-      if (!mounted) return;
-      setState(
-        () => _consultationAnswer =
-            '${_t('consult_failed')}\n${_t('staff_confirmation')}',
-      );
-    } finally {
-      if (mounted) setState(() => _consultationLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -413,14 +379,19 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
             const SizedBox(height: 8),
             ..._visibleNotices.map(_noticeCard),
             const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => _open(context, CompanyContentScreen(language: widget.language)),
+              icon: const Icon(Icons.business_outlined),
+              label: Text(sharedText(widget.language,'회사 소개·활동·자료실','Company / activities / resources','ບໍລິສັດ / ກິດຈະກຳ / ຂໍ້ມູນ')),
+            ),
+            const SizedBox(height: 14),
             _contactSection(),
           ],
         ),
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _consultationArea(),
+          right: 16,
+          bottom: 16,
+          child: AiConsultationBubble(language: widget.language),
         ),
       ],
     );
@@ -759,119 +730,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
         ),
       );
 
-  Widget _consultationArea() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_consultationOpen) _consultationPanel(),
-        InkWell(
-          onTap: () =>
-              setState(() => _consultationOpen = !_consultationOpen),
-          child: Container(
-            width: double.infinity,
-            color: AppColors.primary,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _consultationOpen
-                      ? Icons.keyboard_arrow_down
-                      : Icons.chat_bubble_outline,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _consultationOpen
-                      ? _t('consult_close')
-                      : _t('consult_open'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _consultationPanel() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _t('ai_consult'),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _t('ai_description'),
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _questionController,
-                  decoration: InputDecoration(
-                    hintText: _t('question_hint'),
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _consultationLoading ? null : _startConsultation,
-                child: _consultationLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_t('consult_start')),
-              ),
-            ],
-          ),
-          if (_consultationAnswer != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: .05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 180),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    _consultationAnswer!,
-                    style: const TextStyle(height: 1.45),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 class DashboardHomeScreen extends StatelessWidget {

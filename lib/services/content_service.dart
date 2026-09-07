@@ -12,6 +12,15 @@ class ContentService {
   static SupabaseClient? get _client =>
       SupabaseConfig.isConfigured ? Supabase.instance.client : null;
 
+  static Future<List<Map<String,dynamic>>> fetchCompanyArticles({AppLanguage language=AppLanguage.korean}) async {
+    final client=_client; if(client==null)return [];
+    final rows=await client.from('website_articles').select()
+        .eq('status','published').eq('verified',true)
+        .lte('published_at',DateTime.now().toUtc().toIso8601String())
+        .order('published_at',ascending:false).limit(500);
+    return _localizedRows(List<Map<String,dynamic>>.from(rows),language,const ['title','summary','body']);
+  }
+
   static Future<void> purgeExpiredContent() async {
     final client = _client;
     if (client == null) return;
@@ -48,7 +57,7 @@ class ContentService {
         final deletionStatus =
             '${row['deletion_status'] ?? 'active'}'.trim().toLowerCase();
         final deletedAt = row['deleted_at'];
-        return deletionStatus == 'active' &&
+        return row['is_visible'] != false && deletionStatus == 'active' &&
             (deletedAt == null || '$deletedAt'.trim().isEmpty);
       }).toList();
     }
@@ -135,19 +144,17 @@ class ContentService {
 
   static Future<Map<String, dynamic>> updateSchedule(
     String id,
-    Map<String, dynamic> data,
+    Map<String, dynamic> data, {String? expectedUpdatedAt}
   ) async {
     final client = _requireClient();
     final translated = await _withTranslations(
       data,
       const <String>['route', 'origin', 'destination', 'status', 'detail'],
     );
-    final row = await client
-        .from('shipping_schedules')
-        .update(translated)
-        .eq('id', id)
-        .select()
-        .single();
+    var query = client.from('shipping_schedules').update({...translated, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', id);
+    if (expectedUpdatedAt != null && expectedUpdatedAt.isNotEmpty) query = query.eq('updated_at', expectedUpdatedAt);
+    final row = await query.select().maybeSingle();
+    if (row == null) throw StateError('다른 곳에서 변경된 자료입니다. 입력 내용을 보관하고 다시 열어 주세요. / This item changed elsewhere. Keep your input and reopen it.');
     return Map<String, dynamic>.from(row);
   }
 
@@ -197,19 +204,17 @@ class ContentService {
 
   static Future<Map<String, dynamic>> updateNotice(
     String id,
-    Map<String, dynamic> data,
+    Map<String, dynamic> data, {String? expectedUpdatedAt}
   ) async {
     final client = _requireClient();
     final translated = await _withTranslations(
       data,
       const <String>['title', 'content'],
     );
-    final row = await client
-        .from('notices')
-        .update(translated)
-        .eq('id', id)
-        .select()
-        .single();
+    var query = client.from('notices').update({...translated, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', id);
+    if (expectedUpdatedAt != null && expectedUpdatedAt.isNotEmpty) query = query.eq('updated_at', expectedUpdatedAt);
+    final row = await query.select().maybeSingle();
+    if (row == null) throw StateError('다른 곳에서 변경된 자료입니다. 입력 내용을 보관하고 다시 열어 주세요. / This item changed elsewhere. Keep your input and reopen it.');
     return Map<String, dynamic>.from(row);
   }
 

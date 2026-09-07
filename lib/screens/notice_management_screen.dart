@@ -4,6 +4,7 @@ import '../core/app_language.dart';
 import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../services/content_service.dart';
+import '../widgets/content_media.dart';
 
 class NoticeManagementScreen extends StatefulWidget {
   const NoticeManagementScreen({
@@ -126,10 +127,15 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     bool pinned = existing?['is_pinned'] == true;
     bool showPublishedDate = existing == null || existing['show_published_date'] != false;
 
+    final attachments = contentAttachments(existing?['attachments']);
+    bool mediaBusy = false;
+    bool saving = false;
+
     await showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PopScope(canPop: !mediaBusy && !saving, child: AlertDialog(
           title: Text(_u(existing == null ? '공지 및 안내 추가' : '공지 및 안내 편집')),
           content: SingleChildScrollView(
             child: Column(
@@ -150,6 +156,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                     hintText: _u('공지 내용을 입력해 주세요.'),
                   ),
                 ),
+                IgnorePointer(ignoring: saving, child: ContentMediaEditor(items: attachments, kind: 'notice', language: widget.language, onBusy: (value) { if (dialogContext.mounted) setDialogState(() => mediaBusy=value); })),
                 CheckboxListTile(
                   value: showPublishedDate,
                   onChanged: (v) => setDialogState(() => showPublishedDate = v ?? true),
@@ -165,38 +172,42 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: mediaBusy || saving ? null : () => Navigator.pop(dialogContext),
               child: Text(_u('취소')),
             ),
             FilledButton(
-              onPressed: () async {
+              onPressed: mediaBusy || saving ? null : () async {
                 if (title.text.trim().isEmpty || content.text.trim().isEmpty) {
                   _message(_u('제목과 내용을 입력해 주세요.'));
                   return;
                 }
                 final data = <String, dynamic>{
+                  'attachments': attachments,
                   'title': title.text.trim(),
                   'content': content.text.trim(),
                   'is_pinned': pinned,
                   'show_published_date': showPublishedDate,
-                  'published_at': DateTime.now().toUtc().toIso8601String(),
+                  if (existing == null) 'published_at': DateTime.now().toUtc().toIso8601String(),
                 };
+                setDialogState(() => saving=true);
                 try {
                   if (existing == null) {
                     await ContentService.createNotice(data);
                   } else {
-                    await ContentService.updateNotice(_text(existing, 'id'), data);
+                    await ContentService.updateNotice(_text(existing, 'id'), data, expectedUpdatedAt: existing['updated_at']?.toString());
                   }
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (dialogContext.mounted) { setDialogState(() => saving=false); Navigator.pop(dialogContext); }
                   await _load();
                 } catch (e) {
                   _message(_ue(existing == null ? '작성 실패' : '저장 실패', e));
+                } finally {
+                  if (dialogContext.mounted) setDialogState(() => saving=false);
                 }
               },
               child: Text(_u(existing == null ? '작성' : '저장')),
             ),
           ],
-        ),
+        )),
       ),
     );
 

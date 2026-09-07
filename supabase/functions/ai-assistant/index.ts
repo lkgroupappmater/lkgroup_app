@@ -1,3 +1,4 @@
+import { consult, authenticatedUser } from './consult.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -49,6 +50,7 @@ async function callOpenAi(body: Record<string, unknown>) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
+    signal: AbortSignal.timeout(90000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -71,6 +73,9 @@ Deno.serve(async (req) => {
     return json(401, { error: 'Authorization required' });
   }
 
+  let userId: string;
+  try { userId = await authenticatedUser(req); }
+  catch { return json(401, { error: 'Sign in with an active, approved account.' }); }
   try {
     const body = await req.json() as Record<string, unknown>;
     const mode = String(body.mode ?? '');
@@ -117,19 +122,7 @@ Deno.serve(async (req) => {
     }
 
     if (mode === 'consult') {
-      const question = String(body.question ?? '').trim().slice(0, 4000);
-      if (!question) return json(400, { error: 'Question is required.' });
-      const response = await callOpenAi({
-        instructions:
-          `Reply in ${targetLabel}. You are LK Group Trading's Korean-English-`
-          + 'Lao shipping assistant. Answer only general guidance from the '
-          + 'customer question. Never invent or infer an LK Group price, '
-          + 'schedule, customs rule, customer record or delivery promise. For '
-          + 'any company-specific fact, clearly say that staff confirmation is '
-          + 'required. Do not expose or request personal data.',
-        input: `CUSTOMER_QUESTION:\n${question}`,
-      });
-      return json(200, { answer: outputText(response) });
+      return json(200, await consult(req, body, callOpenAi, outputText, userId));
     }
     return json(400, { error: 'Unsupported mode.' });
   } catch (error) {

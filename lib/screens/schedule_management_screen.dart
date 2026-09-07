@@ -6,6 +6,7 @@ import '../core/shipment_period_labels.dart';
 import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../services/content_service.dart';
+import '../widgets/content_media.dart';
 import '../utils/form_validators.dart';
 
 class ScheduleManagementScreen extends StatefulWidget {
@@ -135,11 +136,15 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
         ? '2026년'
         : _text(existing!, 'year');
 
+    final attachments = contentAttachments(existing?['attachments']);
+    bool mediaBusy = false;
+    bool saving = false;
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PopScope(canPop: !mediaBusy && !saving, child: AlertDialog(
           title: Text(_u(existing == null ? '선적 일정 추가' : '선적 일정 편집')),
           content: Form(
             key: formKey,
@@ -227,6 +232,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                       FormValidators.date(v, required: true),
                     ),
                   ),
+                  IgnorePointer(ignoring: saving, child: ContentMediaEditor(items: attachments, kind: 'schedule', language: widget.language, onBusy: (value) { if (dialogContext.mounted) setDialogState(() => mediaBusy=value); })),
                   TextFormField(
                     controller: detail,
                     maxLines: 3,
@@ -241,13 +247,14 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: mediaBusy || saving ? null : () => Navigator.pop(dialogContext),
               child: Text(_u('취소')),
             ),
             FilledButton(
-              onPressed: () async {
+              onPressed: mediaBusy || saving ? null : () async {
                 if (!formKey.currentState!.validate()) return;
                 final item = <String, dynamic>{
+                  'attachments': attachments,
                   'route': route,
                   'year': year,
                   'voyage': voyage.text.trim(),
@@ -260,22 +267,25 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                 if (existing != null && existing['status'] != null) {
                   item['status'] = existing['status'];
                 }
+                setDialogState(() => saving=true);
                 try {
                   if (existing == null) {
                     await ContentService.createSchedule(item);
                   } else {
-                    await ContentService.updateSchedule(_text(existing, 'id'), item);
+                    await ContentService.updateSchedule(_text(existing, 'id'), item, expectedUpdatedAt: existing['updated_at']?.toString());
                   }
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (dialogContext.mounted) { setDialogState(() => saving=false); Navigator.pop(dialogContext); }
                   await _load();
                 } catch (e) {
                   _message(_ue(existing == null ? '작성 실패' : '저장 실패', e));
+                } finally {
+                  if (dialogContext.mounted) setDialogState(() => saving=false);
                 }
               },
               child: Text(_u(existing == null ? '작성' : '저장')),
             ),
           ],
-        ),
+        )),
       ),
     );
 

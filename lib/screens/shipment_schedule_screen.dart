@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../services/content_service.dart';
+import '../widgets/content_media.dart';
 
 class ShipmentScheduleScreen extends StatefulWidget {
   const ShipmentScheduleScreen({
@@ -91,6 +92,7 @@ class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> {
                           childrenPadding:
                               const EdgeInsets.fromLTRB(16, 0, 16, 14),
                           children: [
+                            ContentMediaGallery(items: contentAttachments(row['attachments']), language: widget.language),
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Text(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../services/content_service.dart';
+import '../widgets/content_media.dart';
 
 class NoticeListScreen extends StatefulWidget {
   const NoticeListScreen({
@@ -93,6 +94,7 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
                     childrenPadding:
                         const EdgeInsets.fromLTRB(14, 0, 14, 14),
                     children: <Widget>[
+                      ContentMediaGallery(items: contentAttachments(notice['attachments']), language: widget.language),
                       const Divider(),
                       Align(
                         alignment: Alignment.centerLeft,
