@@ -1,0 +1,43 @@
+﻿LKGroup 앱 수정본 적용 방법 — 압축 폴더 구조 정정
+
+이 파일은 전체 앱이 아니라 기존 프로젝트에 합치는 수정 파일입니다.
+이번 정정은 압축 구조와 적용 안내만 변경했습니다. Dart 소스 10개는 앞서 전달한 수정본과 동일합니다.
+
+1. 기존 프로젝트 안에 풀어 둔 app_changes 폴더를 프로젝트 밖(예: 바탕 화면의 백업 폴더)으로 옮깁니다.
+   프로젝트 안에서 이름만 바꾸거나 lib 안으로 옮기지 마세요. 남아 있으면 같은 분석 오류가 계속 나옵니다.
+   기존 프로젝트의 원래 lib 폴더는 그대로 둡니다.
+
+2. 이 ZIP을 프로젝트 밖의 별도 폴더에 압축 해제합니다.
+   이제 압축을 풀면 바로 lib, supabase 폴더가 보입니다. app_changes 폴더는 없습니다.
+
+3. 압축을 푼 곳의 lib 폴더를 기존 프로젝트의 pubspec.yaml이 있는 폴더로 복사합니다.
+   기존 lib와 합치고, 같은 이름의 수정 파일만 덮어씁니다.
+   기존 lib를 삭제하거나 통째로 교체하면 안 됩니다. 기존 core, models, config 등의 파일이 필요합니다.
+   앞선 수정본 이후 같은 파일을 별도로 수정했다면 해당 변경은 병합해서 유지하세요.
+
+   올바른 위치 예:
+   C:\Users\ssapd\StudioProjects\lkgroup_app\pubspec.yaml
+   C:\Users\ssapd\StudioProjects\lkgroup_app\lib\core\app_colors.dart  (기존 파일 유지)
+   C:\Users\ssapd\StudioProjects\lkgroup_app\lib\screens\company_content_screen.dart  (수정본)
+
+   잘못된 위치:
+   ...\lkgroup_app\app_changes\lib\screens\company_content_screen.dart
+   ...\lkgroup_app\lib\lib\screens\company_content_screen.dart
+
+4. 기존 프로젝트 폴더의 터미널에서 실행합니다.
+   flutter pub get
+   flutter analyze
+   flutter run
+
+서버 SQL과 AI 함수는 앞선 작업에서 이미 적용했습니다. 이번 경로 오류 해결을 위해 SQL을 다시 실행하거나 서버에 재배포할 필요는 없습니다.
+supabase 폴더는 서버 소스 보관용이며, 필요하면 기존 저장소의 동일 경로에 합쳐 보관합니다.
+
+검증:
+- 첨부 로그의 오류 173개는 모두 app_changes\lib 경로에서 발생했습니다.
+- 수정 Dart 파일 10개의 상대 import 55개가 기존 앱의 올바른 위치에서 모두 존재함을 확인했습니다.
+- ZIP 무결성과 Dart 소스가 이전 전달본과 동일한지 확인했습니다.
+- 첨부 로그의 info 1개는 중괄호 스타일 안내이며 위 파일 경로 오류와는 별개입니다.
+- 이 환경에서 Flutter analyze / APK / AAB 빌드를 실행한 것은 아닙니다.
+
+기준 소스: lkgroupappmater/lkgroup_app, master 커밋 2c962fdea72e171da4aaad4b7b86769b75f5be18
+추가 기능과 사용 위치는 README_UPDATE.md를 참고하세요.

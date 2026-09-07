@@ -1,0 +1,27 @@
+{
+  "repository": "lkgroupappmater/lkgroup_app",
+  "branch": "master",
+  "base_commit": "2c962fdea72e171da4aaad4b7b86769b75f5be18",
+  "build_status": "Source patch only; Flutter build not run",
+  "files": {
+    "00_APPLY_KO.txt": "a28c4cc4cbeecbcf4442facb97b7d9667e694c26e357a34debaee42004915169",
+    "APP_WEB_UPDATE_20260907.md": "98cd923d13ac10fa7f988ed2ab8e38edcda74644b9bcb7a1f6b23c25c9ee36f7",
+    "README_UPDATE.md": "98cd923d13ac10fa7f988ed2ab8e38edcda74644b9bcb7a1f6b23c25c9ee36f7",
+    "lib/screens/company_content_screen.dart": "2ccef8038281ce530a30320b51ed1f073038eafe9e239b82a0c166685bfca51d",
+    "lib/screens/dashboard_home_screen.dart": "79fe2213a1207f5d631d28be301aef7d702e3752dcc799d8b3e917df05c4920f",
+    "lib/screens/notice_list_screen.dart": "bb8ce4eca1fdd10e3eba44c135499e5ba59e50181c40d0c8d0b22f5551d24273",
+    "lib/screens/notice_management_screen.dart": "0d146f60ba08a76af565c765fa6971400ec26b8c2d2c526eaf765b069191e254",
+    "lib/screens/schedule_management_screen.dart": "e92cb0c22585e715b06d69118d1a8d1680a526bc73d852254049d0d95ad33a50",
+    "lib/screens/shipment_schedule_screen.dart": "c3b58d0e5d31616e91df1134c665bcd85b0f62167380a9e48a917fb94fe4b98c",
+    "lib/services/ai_assistant_service.dart": "9b7f215e63522537af31c0dd5f1ea78c429d834382bdb73a049a794520ff688d",
+    "lib/services/content_service.dart": "243c037cd8062620d3700068c47de1a5e2c98d81a04cf16e53bdd0934262eed1",
+    "lib/widgets/ai_consultation.dart": "ca2850725c44549e3befec4c4cd22a6f859be2268638d70cc17037e54beabb38",
+    "lib/widgets/content_media.dart": "d92be5e9433a38152e8b569426d57098cba9a90e9ff9ffa7f5416b86f9c2efcd",
+    "supabase/functions/ai-assistant/consult.ts": "d0dbdceee86a7394c9068147a0e891516d8c310cf189cb79012a5be464ad9c17",
+    "supabase/functions/ai-assistant/index.ts": "6d412669eff2bdf1de98aafad1183a4473bdadc132d6c2883fc7be04c32d36d4",
+    "supabase/quote_privacy_20260907.sql": "5f6e3c676a01b246934d668a47dcbb2b042fbcb9c5d6778defa6b66e2b8fc227",
+    "supabase/shared_content_ai_setup_20260907.sql": "002760b2b0361abc1c9ce4d284fd42eeab7ff0cf0cdb0f889e8ca1a4f37e5f70"
+  },
+  "packaging": "Root-relative overlay: merge lib into existing project lib; remove old app_changes directory from analyzer scope by moving it outside project.",
+  "revision_note": "Packaging and instructions only; Dart source unchanged from previous delivery."
+}
