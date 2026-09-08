@@ -1928,9 +1928,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
                 const SizedBox(height: 6),
                 Text('${_l('박스')} ${rows.length}${_l('건')}'),
                 Text('USD  \$${freight.totalUsd.toStringAsFixed(2)}'),
-                Text('KIP  ${freight.totalKip.toStringAsFixed(0)}'),
-                Text('THB  ${freight.totalThb.toStringAsFixed(1)}'),
-                Text('KRW  ${freight.totalKrw.toStringAsFixed(0)}'),
+                Text('KIP  ${MoneyFormat.kipNumber(freight.totalKip)}'),
+                Text('THB  ${MoneyFormat.thbNumber(freight.totalThb)}'),
+                Text('KRW  ${MoneyFormat.krwNumber(freight.totalKrw)}'),
                 const Divider(),
                 if (receipts.isEmpty)
                   Text(_l('명세서를 열 수 있는 영수번호가 없습니다.'))
