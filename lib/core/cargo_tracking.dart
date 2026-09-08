@@ -2,6 +2,8 @@ enum CargoTrackingMode { sea, air }
 
 enum CargoTrackingVehicle { truck, ship, plane }
 
+enum CargoTrackingPhase { moving, arrived, dispatching }
+
 class CargoTrackingLeg {
   const CargoTrackingLeg({
     required this.from,
@@ -127,16 +129,40 @@ class CargoTracking {
           schedule['eta'] ??
           schedule['estimated_arrival_date']);
 
+  static CargoTrackingPhase phase(
+    Map<String, dynamic> schedule, {
+    DateTime? now,
+  }) {
+    final status = _text(schedule['status']).toLowerCase().trim();
+    if (RegExp(r'출고|dispatch|out.?for.?delivery').hasMatch(status)) {
+      return CargoTrackingPhase.dispatching;
+    }
+    if (RegExp(r'도착완료|arrived|^도착$').hasMatch(status)) {
+      return CargoTrackingPhase.arrived;
+    }
+    final end = endDate(schedule);
+    if (end == null) return CargoTrackingPhase.moving;
+    final current = (now ?? DateTime.now()).toLocal();
+    final localEnd = end.toLocal();
+    final today = DateTime(current.year, current.month, current.day);
+    final endDay = DateTime(localEnd.year, localEnd.month, localEnd.day);
+    final elapsedDays = today.difference(endDay).inDays;
+    if (elapsedDays >= 2) return CargoTrackingPhase.dispatching;
+    if (elapsedDays >= 0) return CargoTrackingPhase.arrived;
+    return CargoTrackingPhase.moving;
+  }
+
   static double progress(
     Map<String, dynamic> schedule, {
     DateTime? now,
   }) {
+    final current = now ?? DateTime.now();
+    if (phase(schedule, now: current) != CargoTrackingPhase.moving) return 1;
     final status = _text(schedule['status']).toLowerCase();
     if (RegExp(r'arriv|deliver|complete|도착|완료').hasMatch(status)) return 1;
     final start = startDate(schedule);
     final end = endDate(schedule);
     if (start == null || end == null || !end.isAfter(start)) return 0;
-    final current = now ?? DateTime.now();
     if (!current.isAfter(start)) return 0;
     if (!current.isBefore(end)) return 1;
     return current.difference(start).inMilliseconds /
