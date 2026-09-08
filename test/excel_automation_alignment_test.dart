@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lkgroup_app/services/customer_benefit_service.dart';
 import 'package:lkgroup_app/services/excel_file_metadata.dart';
+import 'package:lkgroup_app/services/shipment_service.dart';
 
 void main() {
   group('ExcelFileMetadataParser', () {
@@ -85,6 +86,26 @@ void main() {
 
     test('recognizes prepaid spelling variants', () {
       expect(rule.isPrepaid, isTrue);
+    });
+  });
+
+  group('ShipmentImportSummary', () {
+    test('parses and combines new, identical, and review counts', () {
+      final first = ShipmentImportSummary.fromRpc({
+        'new_rows': 2,
+        'unchanged': 3,
+        'change_requests': 4,
+        'already_pending': 1,
+        'protected_rows': 1,
+      });
+      const second = ShipmentImportSummary(newRows: 1, unchanged: 2);
+      final combined = first + second;
+
+      expect(combined.newRows, 3);
+      expect(combined.unchanged, 5);
+      expect(combined.changeRequests, 4);
+      expect(combined.existingRows, 11);
+      expect(combined.actions, 7);
     });
   });
 }

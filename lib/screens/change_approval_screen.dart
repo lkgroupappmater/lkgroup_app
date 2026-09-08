@@ -53,14 +53,26 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       if (shipmentIds.isNotEmpty) {
         final shipmentRows =
             await ShipmentService.instance.getRowsByIds(shipmentIds);
-        final lockedById = <String, bool>{
+        final shipmentById = <String, Map<String, dynamic>>{
           for (final shipment in shipmentRows)
-            '${shipment['id']}': shipment['data_locked'] == true,
+            '${shipment['id']}': shipment,
         };
         for (final row in rows) {
           final shipmentId = '${row['shipment_id'] ?? ''}'.trim();
-          if (shipmentId.isNotEmpty && lockedById.containsKey(shipmentId)) {
-            row['data_locked'] = lockedById[shipmentId];
+          final shipment = shipmentById[shipmentId];
+          if (shipment != null) {
+            for (final key in const [
+              'sender_name',
+              'contents',
+              'package_type',
+              'quantity',
+              'receipt_number',
+              'unloading_zone',
+              'received_at',
+              'data_locked',
+            ]) {
+              row[key] = shipment[key];
+            }
           }
         }
       }
@@ -122,15 +134,24 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       return {
         'invoice_number':
             TextEditingController(text: value('invoice_number')),
+        'sender_name': TextEditingController(text: value('sender_name')),
         'consignee_name':
             TextEditingController(text: value('consignee_name')),
         'consignee_phone':
             TextEditingController(text: value('consignee_phone')),
+        'contents': TextEditingController(text: value('contents')),
+        'package_type': TextEditingController(text: value('package_type')),
+        'quantity': TextEditingController(text: value('quantity')),
         'notes': TextEditingController(text: value('notes')),
         'weight_kg': TextEditingController(text: value('weight_kg')),
         'length_cm': TextEditingController(text: value('length_cm')),
         'width_cm': TextEditingController(text: value('width_cm')),
         'height_cm': TextEditingController(text: value('height_cm')),
+        'receipt_number':
+            TextEditingController(text: value('receipt_number')),
+        'unloading_zone':
+            TextEditingController(text: value('unloading_zone')),
+        'received_at': TextEditingController(text: value('received_at')),
       };
     });
   }
@@ -148,18 +169,45 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       final text = c[key]!.text.trim();
       final old = '${r[key] ?? ''}'.trim();
       if (text != old) {
-        changes[key] = text.isEmpty ? null : num.tryParse(text);
+        if (text.isEmpty) {
+          changes[key] = null;
+          return;
+        }
+        final value = num.tryParse(text);
+        if (value == null) throw FormatException('$key 숫자를 확인해 주세요.');
+        changes[key] = value;
+      }
+    }
+
+    void addInt(String key) {
+      final text = c[key]!.text.trim();
+      final old = '${r[key] ?? ''}'.trim();
+      if (text != old) {
+        if (text.isEmpty) {
+          changes[key] = null;
+          return;
+        }
+        final value = int.tryParse(text);
+        if (value == null) throw const FormatException('수량은 정수로 입력해 주세요.');
+        changes[key] = value;
       }
     }
 
     addText('invoice_number');
+    addText('sender_name');
     addText('consignee_name');
     addText('consignee_phone');
+    addText('contents');
+    addText('package_type');
+    addInt('quantity');
     addText('notes');
     addNum('weight_kg');
     addNum('length_cm');
     addNum('width_cm');
     addNum('height_cm');
+    addText('receipt_number');
+    addText('unloading_zone');
+    addText('received_at');
     return changes;
   }
 
@@ -1177,8 +1225,17 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
     return [
       field('invoice_number', '송장번호'),
+      field('sender_name', '발신인'),
       field('consignee_name', '이름/라오스 수령인'),
       field('consignee_phone', '연락처'),
+      field('contents', '내용물'),
+      Row(
+        children: [
+          Expanded(child: field('package_type', '포장형태')),
+          const SizedBox(width: 8),
+          Expanded(child: field('quantity', '수량', number: true)),
+        ],
+      ),
       field('notes', '기타 내용', maxLines: 2),
       Row(
         children: [
@@ -1202,6 +1259,14 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           ),
         ],
       ),
+      Row(
+        children: [
+          Expanded(child: field('receipt_number', '영수번호')),
+          const SizedBox(width: 8),
+          Expanded(child: field('unloading_zone', '구획')),
+        ],
+      ),
+      field('received_at', '접수일 (YYYY-MM-DD)'),
     ];
   }
 
@@ -1213,13 +1278,19 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     const labels = {
       'consignee_name': '이름/수령인',
       'consignee_phone': '연락처',
+      'sender_name': '발신인',
+      'contents': '내용물',
+      'package_type': '포장형태',
+      'quantity': '수량',
       'notes': '기타 내용',
       'invoice_number': '송장번호',
       'weight_kg': '무게',
       'length_cm': '가로',
       'width_cm': '세로',
       'height_cm': '높이',
-      'received_at': '요청 일시',
+      'receipt_number': '영수번호',
+      'unloading_zone': '구획',
+      'received_at': '접수일',
     };
 
     String clean(dynamic value) {
@@ -1246,7 +1317,5 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }).join('\n');
   }
 }
-
-
 
 

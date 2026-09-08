@@ -4,6 +4,49 @@ import '../models/shipment.dart';
 import '../data/mock_data.dart';
 import 'supabase_service.dart';
 
+class ShipmentImportSummary {
+  const ShipmentImportSummary({
+    this.newRows = 0,
+    this.unchanged = 0,
+    this.changeRequests = 0,
+    this.alreadyPending = 0,
+    this.protectedRows = 0,
+  });
+
+  final int newRows;
+  final int unchanged;
+  final int changeRequests;
+  final int alreadyPending;
+  final int protectedRows;
+
+  int get existingRows =>
+      unchanged + changeRequests + alreadyPending + protectedRows;
+  int get actions => newRows + changeRequests;
+
+  ShipmentImportSummary operator +(ShipmentImportSummary other) =>
+      ShipmentImportSummary(
+        newRows: newRows + other.newRows,
+        unchanged: unchanged + other.unchanged,
+        changeRequests: changeRequests + other.changeRequests,
+        alreadyPending: alreadyPending + other.alreadyPending,
+        protectedRows: protectedRows + other.protectedRows,
+      );
+
+  factory ShipmentImportSummary.fromRpc(dynamic value) {
+    final map = value is Map
+        ? Map<String, dynamic>.from(value)
+        : const <String, dynamic>{};
+    int count(String key) => (map[key] as num?)?.toInt() ?? 0;
+    return ShipmentImportSummary(
+      newRows: count('new_rows'),
+      unchanged: count('unchanged'),
+      changeRequests: count('change_requests'),
+      alreadyPending: count('already_pending'),
+      protectedRows: count('protected_rows'),
+    );
+  }
+}
+
 class ShipmentService {
   ShipmentService._();
   static final ShipmentService instance = ShipmentService._();
@@ -149,40 +192,49 @@ class ShipmentService {
   }
 
   Future<int> upsertFromRows(List<Map<String, dynamic>> rows) async {
-    if (!SupabaseConfig.isConfigured || rows.isEmpty) return 0;
+    final summary = await importDifferencesFromRows(rows);
+    return summary.actions;
+  }
+
+  Future<ShipmentImportSummary> importDifferencesFromRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (!SupabaseConfig.isConfigured || rows.isEmpty) {
+      return const ShipmentImportSummary();
+    }
 
     // 대용량 Excel을 한 번의 RPC로 보내면 PostgreSQL statement_timeout(57014)에
     // 걸릴 수 있으므로 작은 묶음으로 나눠 순차 반영합니다.
-    // 각 행의 import_key가 동일하므로 기존 upsert 동작/중복 방지는 그대로 유지됩니다.
-    // Patch168: bulk-import RPC suppresses the expensive per-row normalize trigger.
+    // 신규 화물만 추가하고 기존 화물의 차이는 승인 요청으로 보내며,
+    // 동일값은 다시 저장하지 않습니다.
     // 100 rows keeps request count low while avoiding one huge JSON payload.
     const chunkSize = 100;
-    var inserted = 0;
+    var summary = const ShipmentImportSummary();
 
     for (var start = 0; start < rows.length; start += chunkSize) {
       final end = (start + chunkSize < rows.length)
           ? start + chunkSize
           : rows.length;
       final chunk = rows.sublist(start, end);
-      inserted += await _upsertShipmentChunk(chunk);
+      summary += await _importShipmentDifferenceChunk(chunk);
     }
 
-    return inserted;
+    return summary;
   }
 
-  Future<int> _upsertShipmentChunk(
+  Future<ShipmentImportSummary> _importShipmentDifferenceChunk(
     List<Map<String, dynamic>> rows,
   ) async {
-    if (rows.isEmpty) return 0;
+    if (rows.isEmpty) return const ShipmentImportSummary();
 
     final payload = rows.map(_shipmentPayload).toList();
 
     try {
       final result = await SupabaseService.client.rpc(
-        'manager_upsert_unlocked_shipments_bulk',
+        'manager_import_shipment_differences_bulk',
         params: {'p_rows': payload},
       );
-      return (result as num?)?.toInt() ?? 0;
+      return ShipmentImportSummary.fromRpc(result);
     } catch (error) {
       final message = error.toString();
 
@@ -202,9 +254,9 @@ class ShipmentService {
         final left = rows.sublist(0, middle);
         final right = rows.sublist(middle);
 
-        final leftCount = await _upsertShipmentChunk(left);
-        final rightCount = await _upsertShipmentChunk(right);
-        return leftCount + rightCount;
+        final leftSummary = await _importShipmentDifferenceChunk(left);
+        final rightSummary = await _importShipmentDifferenceChunk(right);
+        return leftSummary + rightSummary;
       }
 
       rethrow;
@@ -526,6 +578,5 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-
 
 

@@ -15,6 +15,10 @@ class ExcelImportResult {
     required this.inserted,
     required this.skipped,
     required this.customerRules,
+    this.changeRequests = 0,
+    this.unchanged = 0,
+    this.alreadyPending = 0,
+    this.protectedRows = 0,
     this.customerRulesWaitingForPhone = 0,
     this.message = '',
   });
@@ -24,6 +28,11 @@ class ExcelImportResult {
   final int skipped;
   // 이름+전화번호가 모두 있어 실제 적용 가능한 고객 할인규칙.
   final int customerRules;
+  // 기존 화물은 즉시 덮어쓰지 않고 변경 승인 요청으로 분리합니다.
+  final int changeRequests;
+  final int unchanged;
+  final int alreadyPending;
+  final int protectedRows;
   // 이름/할인율은 있으나 전화번호가 없어 안전상 적용 대기 중인 규칙.
   final int customerRulesWaitingForPhone;
   final String message;
@@ -168,7 +177,7 @@ class ExcelImportService {
 
           // Excel 날짜 셀은 OOXML에서 2026-07-14 같은 문자열이 아니라
           // 46217 같은 serial number로 저장될 수 있습니다.
-          // DB received_at은 timestamptz이므로 업로드 전에 ISO 날짜로 정규화합니다.
+          // DB received_at은 date이므로 업로드 전에 ISO 날짜로 정규화합니다.
           final receivedAtRaw = '${map['received_at'] ?? ''}'.trim();
           if (receivedAtRaw.isNotEmpty) {
             map['received_at'] = _normaliseExcelDateValue(receivedAtRaw);
@@ -208,7 +217,8 @@ class ExcelImportService {
     await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
 
     onProgress?.call(0.45, '배송표 반영 완료 · 화물 DB 반영 중');
-    final inserted = await ShipmentService.instance.upsertFromRows(uniqueRows);
+    final importSummary =
+        await ShipmentService.instance.importDifferencesFromRows(uniqueRows);
     onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
@@ -216,8 +226,10 @@ class ExcelImportService {
 
     // One batch-scoped finalizer after all rows/rules are ready.
     // Do not silently finish an upload with missing delivery/receipt/zone data.
-    if (SupabaseConfig.isConfigured) {
-      onProgress?.call(0.82, '배송·구획·영수번호 최종 정리 중');
+    if (SupabaseConfig.isConfigured &&
+        uniqueRows.isNotEmpty &&
+        importSummary.existingRows == 0) {
+      onProgress?.call(0.82, '신규 항차 배송·구획·영수번호 최종 정리 중');
       await SupabaseService.client.rpc(
         'admin_finalize_excel_batch_rules_fast',
         params: {
@@ -227,6 +239,8 @@ class ExcelImportService {
           'p_resequence': true,
         },
       );
+    } else if (SupabaseConfig.isConfigured && importSummary.existingRows > 0) {
+      onProgress?.call(0.82, '기존 항차 비교 반영 · 자동 재번호 생략');
     }
 
     onProgress?.call(0.86, '최종 규칙 반영 완료 · 원본 Excel 보관 중');
@@ -248,13 +262,17 @@ class ExcelImportService {
         rows.isEmpty && !workbook.keys.any((name) => name.trim() == '물품 입고 내역');
 
     return ExcelImportResult(
-      inserted: inserted,
+      inserted: importSummary.newRows,
       skipped: skipped,
       customerRules: customerRuleResult.applied,
+      changeRequests: importSummary.changeRequests,
+      unchanged: importSummary.unchanged,
+      alreadyPending: importSummary.alreadyPending,
+      protectedRows: importSummary.protectedRows,
       customerRulesWaitingForPhone: customerRuleResult.waitingForPhone,
       message: noCargoSheet
           ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
-          : '화물 데이터를 반영하고, 같은 항차의 원본 Excel 템플릿도 안전하게 저장했습니다.',
+          : '신규 화물만 추가하고 기존 화물의 차이는 변경 승인 요청으로 분리했습니다. 동일값은 저장하지 않았으며 원본 Excel 템플릿을 안전하게 저장했습니다.',
     );
   }
 
@@ -1723,5 +1741,3 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
-

@@ -128,11 +128,18 @@ class ExcelImportQueueService extends ChangeNotifier {
             },
           );
           next.progress = 1;
-          next.status = result.customerRulesWaitingForPhone > 0
+          next.status = result.customerRulesWaitingForPhone > 0 ||
+                  result.changeRequests > 0 ||
+                  result.alreadyPending > 0 ||
+                  result.protectedRows > 0
               ? ExcelImportJobStatus.warning
               : ExcelImportJobStatus.completed;
           next.message =
-              '작업 완료 · 화물 ${result.inserted}건 · 비화물 ${result.skipped}건'
+              '작업 완료 · 신규 ${result.inserted}건 · 변경 승인 요청 ${result.changeRequests}건'
+              ' · 동일 ${result.unchanged}건 저장 생략'
+              '${result.alreadyPending > 0 ? ' · 기존 요청 ${result.alreadyPending}건 유지' : ''}'
+              '${result.protectedRows > 0 ? ' · 삭제 보호 ${result.protectedRows}건' : ''}'
+              ' · 비화물 ${result.skipped}건'
               '${result.customerRulesWaitingForPhone > 0 ? ' · 할인 전화번호 대기 ${result.customerRulesWaitingForPhone}건' : ''}';
           GlobalNoticeService.instance.show(
             '업로드 완료 · ${next.routeLabel} · ${next.year}년 · ${next.voyage}항차'
