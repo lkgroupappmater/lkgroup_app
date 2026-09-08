@@ -499,13 +499,13 @@ class _DigitalStatementPainter extends CustomPainter {
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, actualColor, null, null, null, null, volumeColor,
+      null, null, null, null, null, null, null, null, null, null, null,
       actualColor, volumeColor, appliedColor
     ];
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 17, bold: true, center: true);
+      _text(c, headers[i], r.deflate(3), 18, bold: true, center: true);
     }
 
     final lines = freight.lines;
@@ -528,14 +528,14 @@ class _DigitalStatementPainter extends CustomPainter {
       }
       _text(c, '${i + 1}',
           Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
-          15, bold: true, center: true);
+          17, bold: true, center: true);
       if (hasExtra) {
         final extra = extraCosts[extraIndex];
         _text(
           c,
           extra.discountApplies ? '${extra.name} (할인)' : extra.name,
           Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
-          17,
+          19,
           bold: true,
           center: true,
         );
@@ -543,7 +543,7 @@ class _DigitalStatementPainter extends CustomPainter {
           c,
           MoneyFormat.usd(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
-          20,
+          21,
           bold: true,
           right: true,
         );
@@ -573,7 +573,7 @@ class _DigitalStatementPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 20 : 18,
+            col >= 10 && col <= 12 ? 21 : 19,
             bold: col == 4 || col == 9 || col == 12,
             center: col < 10,
             right: col >= 10);
@@ -621,7 +621,7 @@ class _DigitalStatementPainter extends CustomPainter {
     for (final e in summaryValues.entries) {
       _text(c, e.value,
           Rect.fromLTRB(cols[e.key] + 4, summaryY + 2, cols[e.key + 1] - 4, summaryY + rowH - 2),
-          16, bold: true, center: true);
+          18, bold: true, center: true);
     }
 
     final sumTop = summaryY + rowH + 10;
@@ -630,7 +630,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 160), const Color(0xFFFBFCFD));
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
-        17, bold: true);
+        19, bold: true);
     final autoNotes = rows
         .map((row) => _s(row['special_note_auto']))
         .where((value) => value.isNotEmpty)
@@ -713,7 +713,7 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
-        18, bold: true);
+        19, bold: true);
 
     final deliveryNote = rows
         .map((e) => '${e['special_note_auto'] ?? e['special_note'] ?? ''}')
@@ -812,7 +812,7 @@ class _DigitalStatementPainter extends CustomPainter {
         discountableExtraTotal * additionalDiscountPercent;
 
     // Three clear columns: label | percent (~2/3) | amount (far right).
-    const adjustmentFont = 14.0;
+    const adjustmentFont = 16.0;
     final adjustmentColumnLabelW = totalW * .46;
     final percentX = totalX + totalW * .54;
     final percentW = totalW * .18;
@@ -921,27 +921,27 @@ class _DigitalStatementPainter extends CustomPainter {
     final labelW = totalW * .38;
     _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
     _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
-        19, bold: true, center: true);
+        20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFCE48A));
     _text(c, 'USD     ${MoneyFormat.usd(finalUsd)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFFC21A));
     _text(c, 'KIP     ${MoneyFormat.kip(finalUsd * freight.rates.appliedKip)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF91D18B));
     _text(c, 'THB     ${MoneyFormat.thb(finalUsd * freight.rates.appliedThb)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF23B6D8));
     _text(c, 'KRW     ${MoneyFormat.krw(finalUsd * freight.rates.appliedKrw)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     final payTop = sumTop + 204;
     const payGap = 4.0;
     final payW = (w - payGap * 3) / 4;
@@ -1009,7 +1009,7 @@ class _DigitalStatementPainter extends CustomPainter {
       lineHeight: 1.05,
     );
     _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 12, signTop + 8, signW - 24, 24),
-        16, bold: true);
+        17, bold: true);
 
     c.drawRect(Offset.zero & size, border);
   }
@@ -1027,7 +1027,7 @@ class _DigitalStatementPainter extends CustomPainter {
       c,
       k,
       Rect.fromLTWH(r.left, r.top, labelW, r.height),
-      16,
+      18,
       bold: true,
       center: true,
     );
@@ -1035,7 +1035,7 @@ class _DigitalStatementPainter extends CustomPainter {
       c,
       v.isEmpty ? '-' : v,
       Rect.fromLTWH(r.left + labelW, r.top, r.width - labelW, r.height),
-      emphasize ? 21 : 19,
+      emphasize ? 22 : 20,
       bold: emphasize,
       center: true,
     );
@@ -1045,7 +1045,7 @@ class _DigitalStatementPainter extends CustomPainter {
       {double valueSize = 30}) {
     _box(c, r, paleBlue);
     _text(c, label, Rect.fromLTWH(r.left, r.top + 4, r.width, 22),
-        14, bold: true, center: true);
+        16, bold: true, center: true);
     _text(c, value.isEmpty ? '-' : value,
         Rect.fromLTWH(r.left, r.top + 26, r.width, r.height - 30),
         valueSize, bold: true, center: true);

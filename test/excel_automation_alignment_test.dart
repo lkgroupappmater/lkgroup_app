@@ -40,6 +40,15 @@ void main() {
       expect(meta?.voyage, '00');
     });
 
+    test('accepts arbitrary descriptive text after the canonical V00 prefix', () {
+      final meta = ExcelFileMetadataParser.tryParse(
+        'KR_LA_SEA_2026_V00_기준명세서_수정본.xlsm',
+      );
+      expect(meta?.routeKey, 'kr_la_sea');
+      expect(meta?.year, 2026);
+      expect(meta?.voyage, '00');
+    });
+
     test('rejects a name without a voyage token', () {
       expect(
         ExcelFileMetadataParser.tryParse('LKS_2026_최종본.xlsx'),

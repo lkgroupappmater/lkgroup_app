@@ -429,14 +429,14 @@ class _DigitalQuotationPainter extends CustomPainter {
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, actualColor, null, null, null, null, volumeColor,
+      null, null, null, null, null, null, null, null, null, null, null,
       actualColor, volumeColor, appliedColor
     ];
 
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 17, bold: true, center: true);
+      _text(c, headers[i], r.deflate(3), 18, bold: true, center: true);
     }
 
     for (var i = 0; i < rowCount; i++) {
@@ -459,14 +459,14 @@ class _DigitalQuotationPainter extends CustomPainter {
       }
       _text(c, '${i + 1}',
           Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
-          15, bold: true, center: true);
+          17, bold: true, center: true);
       if (hasExtra) {
         final extra = extraCosts[extraIndex];
         _text(
           c,
           '${extra.name}${extra.discountApplies && safeDiscountPercent > 0 ? ' (할인)' : ''}',
           Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
-          17,
+          19,
           bold: true,
           center: true,
         );
@@ -474,7 +474,7 @@ class _DigitalQuotationPainter extends CustomPainter {
           c,
           MoneyFormat.usd(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
-          20,
+          21,
           bold: true,
           right: true,
         );
@@ -505,7 +505,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 20 : 18,
+            col >= 10 && col <= 12 ? 21 : 19,
             bold: col == 4 || col == 9 || col == 12,
             center: col < 10,
             right: col >= 10);
@@ -539,7 +539,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     for (final e in summaryValues.entries) {
       _text(c, e.value,
           Rect.fromLTRB(cols[e.key] + 4, summaryY + 2, cols[e.key + 1] - 4, summaryY + rowH - 2),
-          16, bold: true, center: true);
+          18, bold: true, center: true);
     }
 
     final sumTop = summaryY + rowH + 10;
@@ -548,7 +548,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 160), const Color(0xFFFBFCFD));
     _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
-        17, bold: true);
+        19, bold: true);
     _text(
       c,
       docText.remark,
@@ -560,7 +560,7 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     _text(c, 'Inland delivery/시내·지방 배송',
         Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 24),
-        18, bold: true);
+        19, bold: true);
     
 
     final totalX = leftW + 6;
@@ -576,20 +576,20 @@ class _DigitalQuotationPainter extends CustomPainter {
 
     _text(c, '운임 총합',
         Rect.fromLTWH(totalX + 12, sumTop + 3, totalW * .48, adjH),
-        14, bold: true);
+        16, bold: true);
     _text(c, MoneyFormat.usd(grossUsd),
         Rect.fromLTWH(totalX + totalW * .78, sumTop + 3, totalW * .18, adjH),
-        14, bold: true, right: true);
+        16, bold: true, right: true);
 
     _text(c, '할인',
         Rect.fromLTWH(totalX + 12, sumTop + 25, totalW * .48, adjH),
-        14, bold: true);
+        16, bold: true);
     _text(c, discountLabel,
         Rect.fromLTWH(totalX + totalW * .58, sumTop + 25, totalW * .18, adjH),
-        14, bold: true, center: true);
+        16, bold: true, center: true);
     _text(c, discountValue,
         Rect.fromLTWH(totalX + totalW * .78, sumTop + 25, totalW * .18, adjH),
-        14, bold: true, right: true);
+        16, bold: true, right: true);
 
     for (final row in <(String, double)>[
       ('특별할인', sumTop + 47),
@@ -597,40 +597,40 @@ class _DigitalQuotationPainter extends CustomPainter {
     ]) {
       _text(c, row.$1,
           Rect.fromLTWH(totalX + 12, row.$2, totalW * .48, adjH),
-          14, bold: true);
+          16, bold: true);
       _text(c, '-',
           Rect.fromLTWH(totalX + totalW * .58, row.$2, totalW * .18, adjH),
-          14, bold: true, center: true);
+          16, bold: true, center: true);
       _text(c, '-',
           Rect.fromLTWH(totalX + totalW * .78, row.$2, totalW * .18, adjH),
-          14, bold: true, right: true);
+          16, bold: true, right: true);
     }
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;
     _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
     _text(c, '최종 가견적 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
-        19, bold: true, center: true);
+        20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFCE48A));
     _text(c, 'USD     ${MoneyFormat.usd(usd)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
         const Color(0xFFFFC21A));
     _text(c, 'KIP     ${MoneyFormat.kip(usd * rates.appliedKip)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF91D18B));
     _text(c, 'THB     ${MoneyFormat.thb(usd * rates.appliedThb)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
         const Color(0xFF23B6D8));
     _text(c, 'KRW     ${MoneyFormat.krw(usd * rates.appliedKrw)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
-        20, bold: true, right: true);
+        21, bold: true, right: true);
     final payTop = sumTop + 204;
     const payGap = 4.0;
     final payW = (w - payGap * 3) / 4;
@@ -686,7 +686,7 @@ class _DigitalQuotationPainter extends CustomPainter {
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(12, signTop + 8, signW - 24, 24),
-        16, bold: true);
+        17, bold: true);
     _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, signH - 8));
     _text(
       c,
@@ -714,7 +714,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       c,
       k,
       Rect.fromLTWH(r.left, r.top, labelW, r.height),
-      16,
+      18,
       bold: true,
       center: true,
     );
@@ -722,7 +722,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       c,
       v,
       Rect.fromLTWH(r.left + labelW, r.top, r.width - labelW, r.height),
-      19,
+      20,
       bold: v != '-',
       center: true,
     );
@@ -731,7 +731,7 @@ class _DigitalQuotationPainter extends CustomPainter {
   void _labelValue(Canvas c, String label, String value, Rect r) {
     _box(c, r, paleBlue);
     _text(c, label, Rect.fromLTWH(r.left, r.top + 4, r.width, 22),
-        14, bold: true, center: true);
+        16, bold: true, center: true);
     _text(c, value, Rect.fromLTWH(r.left, r.top + 26, r.width, r.height - 30),
         30, bold: true, center: true);
   }
@@ -828,7 +828,6 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
-
 
 
 
