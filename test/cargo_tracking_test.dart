@@ -22,6 +22,28 @@ void main() {
     );
   });
 
+  test('arrival phase changes on ETA and two calendar days later', () {
+    final schedule = <String, dynamic>{
+      'route': '한국->라오스 해상',
+      'booking_close_date': '2026-09-01',
+      'estimated_arrival_date': '2026-09-08',
+    };
+
+    expect(
+      CargoTracking.phase(schedule, now: DateTime(2026, 9, 8)),
+      CargoTrackingPhase.arrived,
+    );
+    expect(
+      CargoTracking.phase(schedule, now: DateTime(2026, 9, 10)),
+      CargoTrackingPhase.dispatching,
+    );
+    schedule['estimated_arrival_date'] = '2026-09-12';
+    expect(
+      CargoTracking.phase(schedule, now: DateTime(2026, 9, 10)),
+      CargoTrackingPhase.moving,
+    );
+  });
+
   test('sea cargo uses the vessel leg at the midpoint of its schedule', () {
     final schedule = <String, dynamic>{
       'route': '한국->라오스 해상',
