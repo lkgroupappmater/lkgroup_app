@@ -1,4 +1,5 @@
 import '../config/supabase_config.dart';
+import '../core/cargo_tracking.dart';
 import 'supabase_service.dart';
 
 class ScheduleService {
@@ -9,6 +10,14 @@ class ScheduleService {
     if (!SupabaseConfig.isConfigured) return const [];
     final rows = await SupabaseService.client.from('shipping_schedules').select().order('estimated_arrival_date');
     return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<Map<String, dynamic>?> findForCargo(
+    Map<String, dynamic> cargo, {
+    List<Map<String, dynamic>>? schedules,
+  }) async {
+    final rows = schedules ?? await list();
+    return CargoTracking.findSchedule(cargo, rows);
   }
 
   Future<void> save(Map<String, dynamic> data, {int? id}) async {
