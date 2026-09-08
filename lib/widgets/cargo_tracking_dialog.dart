@@ -1055,8 +1055,8 @@ class _CargoRoutePainter extends CustomPainter {
     _label(canvas, 'THAILAND', const Offset(135, 372), size: 13);
     _label(canvas, 'LAOS', const Offset(186, 325), size: 13);
     _label(canvas, 'VIETNAM', const Offset(263, 365), size: 13);
-    final land = _landPath(), sea = _seaPath(), air = _airPath();
-    _drawRoute(canvas, land, const Color(0xFF2F80ED), true);
+    final landRoute = _landPath(), sea = _seaPath(), air = _airPath();
+    _drawRoute(canvas, landRoute, const Color(0xFF2F80ED), true);
     _drawRoute(canvas, sea, const Color(0xFFEF3F48), mode == CargoTrackingMode.sea);
     _drawRoute(canvas, air, const Color(0xFFFFAD32), mode == CargoTrackingMode.air);
 
