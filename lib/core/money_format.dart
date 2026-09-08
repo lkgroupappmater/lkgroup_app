@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 ///
 /// - thousands separator: ,
 /// - decimal separator: .
-/// - USD/THB keep up to 2 decimals when needed
-/// - KIP/KRW default to whole units
+/// - USD keeps 2 decimals
+/// - KIP rounds upward to 1,000, THB to 1, KRW to 100
 class MoneyFormat {
   MoneyFormat._();
 
@@ -17,8 +17,21 @@ class MoneyFormat {
     return _two.format(value);
   }
 
+  static num _roundUpTo(num value, num unit) {
+    if (!value.isFinite || unit <= 0) return value;
+    return ((value / unit) - 0.000000001).ceil() * unit;
+  }
+
+  static num roundKip(num value) => _roundUpTo(value, 1000);
+  static num roundThb(num value) => _roundUpTo(value, 1);
+  static num roundKrw(num value) => _roundUpTo(value, 100);
+
+  static String kipNumber(num value) => number(roundKip(value));
+  static String thbNumber(num value) => number(roundThb(value));
+  static String krwNumber(num value) => number(roundKrw(value));
+
   static String usd(num value) => '\$${number(value, decimals: 2)}';
-  static String kip(num value) => '₭${number(value)}';
-  static String thb(num value) => '฿${number(value, decimals: 2)}';
-  static String krw(num value) => '₩${number(value)}';
+  static String kip(num value) => '₭${kipNumber(value)}';
+  static String thb(num value) => '฿${thbNumber(value)}';
+  static String krw(num value) => '₩${krwNumber(value)}';
 }
