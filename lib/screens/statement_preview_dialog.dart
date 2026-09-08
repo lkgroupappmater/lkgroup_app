@@ -69,7 +69,6 @@ class StatementPreviewDialog extends StatefulWidget {
 class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   List<Map<String, dynamic>> _rows = const [];
   FreightCalculation? _freight;
-  String? _arrivalDate;
   String _inlandDeliveryText = '';
   List<ExtraCostItem> _extraCosts = const <ExtraCostItem>[];
   ui.Image? _logo;
@@ -132,11 +131,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         throw StateError('명세서에 표시할 화물 데이터가 없습니다.');
       }
       final freight = await FreightService.instance.calculate(rows);
-      final arrival = await StatementService.instance.arrivalDate(
-        route: widget.routeLabel,
-        year: widget.year,
-        voyage: widget.voyage,
-      );
       final inland = await CustomerBenefitService.instance
           .inlandTextForRows(widget.routeLabel, rows);
       final extraCosts = await ReceiptExtraCostService.instance.list(
@@ -156,7 +150,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _bankStrip = assets[5];
         _rows = rows;
         _freight = freight;
-        _arrivalDate = arrival;
         _inlandDeliveryText = inland;
         _extraCosts = extraCosts;
         _loading = false;
@@ -175,7 +168,6 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         freight: _freight!,
         receiptNumber: widget.receiptNumber,
         voyage: widget.voyage,
-        arrivalDate: _arrivalDate,
         inlandDeliveryText: _inlandDeliveryText,
         extraCosts: _extraCosts,
         logo: _logo!,
@@ -417,7 +409,6 @@ class _DigitalStatementPainter extends CustomPainter {
     required this.freight,
     required this.receiptNumber,
     required this.voyage,
-    required this.arrivalDate,
     required this.inlandDeliveryText,
     required this.extraCosts,
     required this.logo,
@@ -433,7 +424,6 @@ class _DigitalStatementPainter extends CustomPainter {
   final FreightCalculation freight;
   final String receiptNumber;
   final String voyage;
-  final String? arrivalDate;
   final String inlandDeliveryText;
   final List<ExtraCostItem> extraCosts;
   final ui.Image logo;
@@ -567,7 +557,7 @@ class _DigitalStatementPainter extends CustomPainter {
       final volumeFreight = f == null ? 0.0 : f.volumeWeight * f.rate;
       final values = <String>[
         _s(row['box_number']),
-        f == null ? '-' : '\$${f.rate.toStringAsFixed(2)}',
+        f == null ? '-' : '\$ ${f.rate.toStringAsFixed(2)}',
         _s(row['quantity']).isEmpty ? '1' : _s(row['quantity']),
         f == null ? '-' : _fmtWeight(unitActual),
         f == null ? '-' : _fmtWeight(f.actualWeight),
@@ -619,14 +609,14 @@ class _DigitalStatementPainter extends CustomPainter {
         discountableExtraTotal * baseDiscountPercent;
     final totalDiscountUsd =
         freight.discountTotalUsd + extraDiscountUsd;
-    final finalUsd =
-        freight.grossTotalUsd + extraTotal - totalDiscountUsd;
+    final grossUsd = freight.grossTotalUsd + extraTotal;
+    final finalUsd = grossUsd - totalDiscountUsd;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(finalUsd),
+      13: MoneyFormat.usd(grossUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -758,7 +748,7 @@ class _DigitalStatementPainter extends CustomPainter {
     final totalX = leftW + 6;
     final totalW = w - totalX;
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
-    final adjH = 25.0;
+    final adjH = 21.0;
     final lineDiscountPercent = freight.lines
         .map((line) => line.discountPercent)
         .fold<double>(0, (best, value) => value > best ? value : best);
@@ -822,7 +812,7 @@ class _DigitalStatementPainter extends CustomPainter {
         discountableExtraTotal * additionalDiscountPercent;
 
     // Three clear columns: label | percent (~2/3) | amount (far right).
-    const adjustmentFont = 15.0;
+    const adjustmentFont = 14.0;
     final adjustmentColumnLabelW = totalW * .46;
     final percentX = totalX + totalW * .54;
     final percentW = totalW * .18;
@@ -831,8 +821,24 @@ class _DigitalStatementPainter extends CustomPainter {
 
     _text(
       c,
+      '운임 총합',
+      Rect.fromLTWH(totalX + 12, sumTop + 3, adjustmentColumnLabelW, adjH),
+      adjustmentFont,
+      bold: true,
+    );
+    _text(
+      c,
+      MoneyFormat.usd(grossUsd),
+      Rect.fromLTWH(amountX, sumTop + 3, amountW, adjH),
+      adjustmentFont,
+      bold: true,
+      right: true,
+    );
+
+    _text(
+      c,
       '할인',
-      Rect.fromLTWH(totalX + 12, sumTop + 7, adjustmentColumnLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 25, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
@@ -841,7 +847,7 @@ class _DigitalStatementPainter extends CustomPainter {
       autoDiscountPctText.isNotEmpty
           ? autoDiscountPctText
           : '-',
-      Rect.fromLTWH(percentX, sumTop + 7, percentW, adjH),
+      Rect.fromLTWH(percentX, sumTop + 25, percentW, adjH),
       adjustmentFont,
       bold: true,
       center: true,
@@ -851,7 +857,7 @@ class _DigitalStatementPainter extends CustomPainter {
       autoDiscountPctText.isNotEmpty
           ? '-${MoneyFormat.usd(regularDiscountUsd)}'
           : '-',
-      Rect.fromLTWH(amountX, sumTop + 7, amountW, adjH),
+      Rect.fromLTWH(amountX, sumTop + 25, amountW, adjH),
       adjustmentFont,
       bold: true,
       right: true,
@@ -862,7 +868,7 @@ class _DigitalStatementPainter extends CustomPainter {
       additionalDiscountPctText.isNotEmpty
           ? (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName)
           : '',
-      Rect.fromLTWH(totalX + 12, sumTop + 34, adjustmentColumnLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 47, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
@@ -871,7 +877,7 @@ class _DigitalStatementPainter extends CustomPainter {
       additionalDiscountPctText.isNotEmpty
           ? additionalDiscountPctText
           : '-',
-      Rect.fromLTWH(percentX, sumTop + 34, percentW, adjH),
+      Rect.fromLTWH(percentX, sumTop + 47, percentW, adjH),
       adjustmentFont,
       bold: true,
       center: true,
@@ -881,7 +887,7 @@ class _DigitalStatementPainter extends CustomPainter {
       additionalDiscountPctText.isNotEmpty
           ? '-${MoneyFormat.usd(specialDiscountUsd)}'
           : '-',
-      Rect.fromLTWH(amountX, sumTop + 34, amountW, adjH),
+      Rect.fromLTWH(amountX, sumTop + 47, amountW, adjH),
       adjustmentFont,
       bold: true,
       right: true,
@@ -890,14 +896,14 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(
       c,
       '세금 계산서(VAT)',
-      Rect.fromLTWH(totalX + 12, sumTop + 61, adjustmentColumnLabelW, adjH),
+      Rect.fromLTWH(totalX + 12, sumTop + 69, adjustmentColumnLabelW, adjH),
       adjustmentFont,
       bold: true,
     );
     _text(
       c,
       '-',
-      Rect.fromLTWH(percentX, sumTop + 61, percentW, adjH),
+      Rect.fromLTWH(percentX, sumTop + 69, percentW, adjH),
       adjustmentFont,
       bold: true,
       center: true,
@@ -905,7 +911,7 @@ class _DigitalStatementPainter extends CustomPainter {
     _text(
       c,
       '-',
-      Rect.fromLTWH(amountX, sumTop + 61, amountW, adjH),
+      Rect.fromLTWH(amountX, sumTop + 69, amountW, adjH),
       adjustmentFont,
       bold: true,
       right: true,
@@ -990,9 +996,9 @@ class _DigitalStatementPainter extends CustomPainter {
     final signH = 105.0;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
-    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
-        20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(8, signTop + 4, signW - 16, signH - 8));
+    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(12, signTop + 8, signW - 24, 24),
+        16, bold: true);
+    _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, signH - 8));
     _text(
       c,
       docText.footerText,
@@ -1002,8 +1008,8 @@ class _DigitalStatementPainter extends CustomPainter {
       maxLines: 6,
       lineHeight: 1.05,
     );
-    _text(c, '고객사 서명', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
-        18, bold: true);
+    _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 12, signTop + 8, signW - 24, 24),
+        16, bold: true);
 
     c.drawRect(Offset.zero & size, border);
   }
@@ -1186,11 +1192,6 @@ class StatementDocumentRenderer {
       throw StateError('${request.receiptNumber}: 명세서 데이터가 없습니다.');
     }
     final freight = await FreightService.instance.calculate(rows);
-    final arrival = await StatementService.instance.arrivalDate(
-      route: request.routeLabel,
-      year: request.year,
-      voyage: request.voyage,
-    );
     final inland = await CustomerBenefitService.instance
         .inlandTextForRows(request.routeLabel, rows);
     final extraCosts = await ReceiptExtraCostService.instance.list(
@@ -1214,7 +1215,6 @@ class StatementDocumentRenderer {
       freight: freight,
       receiptNumber: request.receiptNumber,
       voyage: request.voyage,
-      arrivalDate: arrival,
       inlandDeliveryText: inland,
       extraCosts: extraCosts,
       logo: assets[0],

@@ -489,7 +489,7 @@ class _DigitalQuotationPainter extends CustomPainter {
       final volumeFreight = b.result.volumeWeightKg * b.result.ratePerKg;
       final values = <String>[
         'Q${i + 1}',
-        '\$${b.result.ratePerKg.toStringAsFixed(2)}',
+        '\$ ${b.result.ratePerKg.toStringAsFixed(2)}',
         '$qty',
         _fmtWeight(unitActual),
         _fmtWeight(b.result.actualWeightKg),
@@ -567,36 +567,43 @@ class _DigitalQuotationPainter extends CustomPainter {
     final totalW = w - totalX;
 
     _box(c, Rect.fromLTWH(totalX, sumTop, totalW, 190), totalColor);
-    final adjH = 25.0;
+    final adjH = 21.0;
     final discountLabel = safeDiscountPercent > 0
         ? '${safeDiscountPercent.toStringAsFixed(safeDiscountPercent == safeDiscountPercent.roundToDouble() ? 0 : 1)}%'
         : '-';
     final discountValue =
         safeDiscountPercent > 0 ? '-${MoneyFormat.usd(discountAmount)}' : '-';
 
+    _text(c, '운임 총합',
+        Rect.fromLTWH(totalX + 12, sumTop + 3, totalW * .48, adjH),
+        14, bold: true);
+    _text(c, MoneyFormat.usd(grossUsd),
+        Rect.fromLTWH(totalX + totalW * .78, sumTop + 3, totalW * .18, adjH),
+        14, bold: true, right: true);
+
     _text(c, '할인',
-        Rect.fromLTWH(totalX + 12, sumTop + 7, totalW * .48, adjH),
-        16, bold: true);
+        Rect.fromLTWH(totalX + 12, sumTop + 25, totalW * .48, adjH),
+        14, bold: true);
     _text(c, discountLabel,
-        Rect.fromLTWH(totalX + totalW * .58, sumTop + 7, totalW * .18, adjH),
-        16, bold: true, center: true);
+        Rect.fromLTWH(totalX + totalW * .58, sumTop + 25, totalW * .18, adjH),
+        14, bold: true, center: true);
     _text(c, discountValue,
-        Rect.fromLTWH(totalX + totalW * .78, sumTop + 7, totalW * .18, adjH),
-        16, bold: true, right: true);
+        Rect.fromLTWH(totalX + totalW * .78, sumTop + 25, totalW * .18, adjH),
+        14, bold: true, right: true);
 
     for (final row in <(String, double)>[
-      ('특별할인', sumTop + 34),
-      ('세금 계산서(VAT)', sumTop + 61),
+      ('특별할인', sumTop + 47),
+      ('세금 계산서(VAT)', sumTop + 69),
     ]) {
       _text(c, row.$1,
           Rect.fromLTWH(totalX + 12, row.$2, totalW * .48, adjH),
-          16, bold: true);
+          14, bold: true);
       _text(c, '-',
           Rect.fromLTWH(totalX + totalW * .58, row.$2, totalW * .18, adjH),
-          16, bold: true, center: true);
+          14, bold: true, center: true);
       _text(c, '-',
           Rect.fromLTWH(totalX + totalW * .78, row.$2, totalW * .18, adjH),
-          16, bold: true, right: true);
+          14, bold: true, right: true);
     }
 
     final finalTop = sumTop + 92;
@@ -678,9 +685,9 @@ class _DigitalQuotationPainter extends CustomPainter {
     final signH = 105.0;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
-    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(18, signTop + 14, signW - 36, 30),
-        20, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(8, signTop + 4, signW - 16, signH - 8));
+    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(12, signTop + 8, signW - 24, 24),
+        16, bold: true);
+    _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, signH - 8));
     _text(
       c,
       docText.footerText,
@@ -690,8 +697,8 @@ class _DigitalQuotationPainter extends CustomPainter {
       maxLines: 6,
       lineHeight: 1.05,
     );
-    _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 18, signTop + 14, signW - 36, 30),
-        18, bold: true);
+    _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 12, signTop + 8, signW - 24, 24),
+        16, bold: true);
   }
 
   void _payment(Canvas c, ui.Image image, String title, String detail, Rect r) {
@@ -821,8 +828,6 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
-
-
 
 
 

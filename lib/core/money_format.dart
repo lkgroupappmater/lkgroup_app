@@ -30,8 +30,8 @@ class MoneyFormat {
   static String thbNumber(num value) => number(roundThb(value));
   static String krwNumber(num value) => number(roundKrw(value));
 
-  static String usd(num value) => '\$${number(value, decimals: 2)}';
-  static String kip(num value) => '₭${kipNumber(value)}';
-  static String thb(num value) => '฿${thbNumber(value)}';
-  static String krw(num value) => '₩${krwNumber(value)}';
+  static String usd(num value) => '\$ ${number(value, decimals: 2)}';
+  static String kip(num value) => '₭ ${kipNumber(value)}';
+  static String thb(num value) => '฿ ${thbNumber(value)}';
+  static String krw(num value) => '₩ ${krwNumber(value)}';
 }

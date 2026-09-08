@@ -3,6 +3,22 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+pw.Widget _centerCutLine() => pw.Container(
+      height: 24,
+      alignment: pw.Alignment.center,
+      child: pw.Row(
+        children: List<pw.Widget>.generate(
+          48,
+          (index) => pw.Expanded(
+            child: pw.Container(
+              height: .7,
+              color: index.isEven ? PdfColors.grey600 : PdfColors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+
 class DocumentPdfExport {
   DocumentPdfExport._();
 
@@ -56,11 +72,7 @@ class DocumentPdfExport {
                   child: pw.Image(image, fit: pw.BoxFit.contain),
                 ),
               ),
-              pw.Container(
-                height: 24,
-                alignment: pw.Alignment.center,
-                child: pw.Container(height: .6, color: PdfColors.grey600),
-              ),
+              _centerCutLine(),
               pw.Expanded(
                 child: pw.Align(
                   alignment: pw.Alignment.topCenter,
@@ -129,11 +141,7 @@ class StatementPdfBatchBuilder {
                   child: pw.Image(image, fit: pw.BoxFit.contain),
                 ),
               ),
-              pw.Container(
-                height: 24,
-                alignment: pw.Alignment.center,
-                child: pw.Container(height: .6, color: PdfColors.grey600),
-              ),
+              _centerCutLine(),
               pw.Expanded(
                 child: pw.Padding(
                   padding: const pw.EdgeInsets.only(top: 10),
