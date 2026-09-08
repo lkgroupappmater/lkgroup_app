@@ -14,6 +14,7 @@ create or replace function public.lk_delivery_match_name(p_name text)
 returns text
 language sql
 immutable
+set search_path=public
 as $$
   select case
     when strpos(coalesce(p_name,''),'/')>0
@@ -37,6 +38,7 @@ create or replace function public.lk_delivery_name_matches(
 returns boolean
 language sql
 immutable
+set search_path=public
 as $$
   select public.lk_exact_full_name_matches(
     p_profile_name,
@@ -53,6 +55,7 @@ create or replace function public.lk_delivery_profile_name_matches(
 returns boolean
 language sql
 immutable
+set search_path=public
 as $$
   select
     public.lk_delivery_name_matches(p_customer_name,p_shipment_name)
@@ -115,6 +118,7 @@ create or replace function public.lk_delivery_candidate_rank(
 returns integer
 language sql
 immutable
+set search_path=public
 as $$
   select case
     when public.lk_delivery_profile_name_matches(
