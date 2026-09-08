@@ -18,6 +18,8 @@ class CargoTrackingLabels {
     'preparing': ['출발 준비', 'Preparing', 'ກຳລັງກຽມອອກ'],
     'moving': ['운송 진행 예상', 'Estimated in transit', 'ຄາດວ່າກຳລັງຂົນສົ່ງ'],
     'arriving': ['도착 예정 구간', 'Arrival stage', 'ຂັ້ນຕອນຮອດ'],
+    'arrived': ['도착', 'Arrived', 'ຮອດແລ້ວ'],
+    'dispatching': ['출고중', 'Dispatching', 'ກຳລັງຈັດສົ່ງ'],
     'loading': ['선적 일정을 연결하는 중입니다.', 'Linking the shipping schedule.', 'ກຳລັງເຊື່ອມຕໍ່ຕາຕະລາງ.'],
     'missing': ['연결된 선적 일정이 없어 현재 예상 위치를 계산할 수 없습니다.', 'No linked shipping schedule is available to estimate the current location.', 'ບໍ່ມີຕາຕະລາງທີ່ເຊື່ອມຕໍ່ ເພື່ອຄາດຄະເນຕຳແໜ່ງ.'],
     'notLinkedShort': ['일정 연결 확인', 'Check schedule link', 'ກວດກາຕາຕະລາງ'],
@@ -71,6 +73,13 @@ class CargoTrackingLabels {
     Map<String, dynamic>? schedule,
   ) {
     if (schedule == null) return text(language, 'missing');
+    final phase = CargoTracking.phase(schedule);
+    if (phase == CargoTrackingPhase.arrived) {
+      return '${text(language, 'arrived')} · ${location(language, 'lkCenter')}';
+    }
+    if (phase == CargoTrackingPhase.dispatching) {
+      return '${text(language, 'dispatching')} · ${location(language, 'lkCenter')}';
+    }
     final mode = CargoTracking.modeOf(schedule) ?? CargoTrackingMode.sea;
     final progress = CargoTracking.progress(schedule);
     final leg = CargoTracking.currentLeg(mode, progress);
@@ -604,17 +613,49 @@ class _CargoRoutePainter extends CustomPainter {
   Path _seaPath() => Path()
     ..moveTo(650, 60)
     ..lineTo(643, 72)
-    ..cubicTo(620, 108, 587, 140, 538, 170)
-    ..cubicTo(470, 212, 408, 251, 333, 286)
-    ..cubicTo(262, 320, 202, 365, 118, 475)
-    ..lineTo(181, 389)
+    ..moveTo(643, 72)
+    ..cubicTo(675, 105, 690, 150, 676, 208)
+    ..cubicTo(660, 276, 622, 334, 563, 382)
+    ..cubicTo(490, 440, 406, 470, 315, 482)
+    ..cubicTo(236, 493, 174, 488, 118, 475)
+    ..moveTo(118, 475)
+    ..cubicTo(132, 448, 153, 414, 181, 389)
     ..lineTo(191, 383);
 
   Path _airPath() => Path()
     ..moveTo(650, 60)
     ..lineTo(637, 55)
+    ..moveTo(637, 55)
     ..cubicTo(520, 118, 346, 236, 186, 382)
+    ..moveTo(186, 382)
     ..lineTo(191, 383);
+
+  Path _legPath(CargoTrackingMode trackingMode, int index) {
+    if (trackingMode == CargoTrackingMode.air) {
+      if (index == 0) return Path()..moveTo(650, 60)..lineTo(637, 55);
+      if (index == 1) {
+        return Path()
+          ..moveTo(637, 55)
+          ..cubicTo(520, 118, 346, 236, 186, 382);
+      }
+      return Path()..moveTo(186, 382)..lineTo(191, 383);
+    }
+    if (index == 0) return Path()..moveTo(650, 60)..lineTo(643, 72);
+    if (index == 1) {
+      return Path()
+        ..moveTo(643, 72)
+        ..cubicTo(675, 105, 690, 150, 676, 208)
+        ..cubicTo(660, 276, 622, 334, 563, 382)
+        ..cubicTo(490, 440, 406, 470, 315, 482)
+        ..cubicTo(236, 493, 174, 488, 118, 475);
+    }
+    if (index == 2) {
+      return Path()
+        ..moveTo(118, 475)
+        ..cubicTo(132, 448, 153, 414, 181, 389);
+    }
+    return Path()..moveTo(181, 389)..lineTo(191, 383);
+  }
 
   void _label(Canvas canvas, String text, Offset point,
       {double size = 15, TextAlign align = TextAlign.left}) {
@@ -741,27 +782,42 @@ class _CargoRoutePainter extends CustomPainter {
     );
   }
 
-  void _drawVehicle(Canvas canvas, Path path) {
+  void _drawVehicle(Canvas canvas) {
     if (progress == null) return;
+    final trackingMode = mode;
+    final legs = CargoTracking.legs(trackingMode);
+    final leg = CargoTracking.currentLeg(trackingMode, progress!);
+    final legIndex = legs.indexWhere((item) =>
+        item.from == leg.from &&
+        item.to == leg.to &&
+        item.vehicle == leg.vehicle);
+    final path = _legPath(trackingMode, legIndex < 0 ? 0 : legIndex);
     final metric = path.computeMetrics().first;
-    final base = metric.length * progress!.clamp(0.0, 1.0).toDouble();
+    final span = math.max(.0001, leg.toProgress - leg.fromProgress);
+    final localProgress =
+        ((progress! - leg.fromProgress) / span).clamp(0.0, 1.0).toDouble();
+    final base = metric.length * localProgress;
     final wave = math.sin(_motion.value * math.pi * 2) * 2.5;
     final tangent = metric.getTangentForOffset(
       (base + wave).clamp(0.0, metric.length).toDouble(),
     );
     if (tangent == null) return;
-    final trackingMode = mode;
-    final leg = CargoTracking.currentLeg(trackingMode, progress!);
     canvas.save();
     canvas.translate(tangent.position.dx, tangent.position.dy);
+    final haloRadius = leg.vehicle == CargoTrackingVehicle.ship
+        ? 29.0
+        : leg.vehicle == CargoTrackingVehicle.truck
+            ? 20.0
+            : 25.0;
     canvas.drawCircle(
       Offset.zero,
-      leg.vehicle == CargoTrackingVehicle.ship ? 29 : 25,
+      haloRadius,
       Paint()..color = const Color(0xBB082E57),
     );
     canvas.rotate(tangent.angle);
     switch (leg.vehicle) {
       case CargoTrackingVehicle.truck:
+        canvas.scale(.82);
         _drawTruck(canvas);
         break;
       case CargoTrackingVehicle.ship:
@@ -835,7 +891,7 @@ class _CargoRoutePainter extends CustomPainter {
     _drawWarehouse(canvas, const Offset(210, 367));
     _label(canvas, CargoTrackingLabels.location(language, 'incheonCenter'), const Offset(704, 31), size: 16, align: TextAlign.right);
     _label(canvas, CargoTrackingLabels.location(language, 'lkCenter'), const Offset(239, 352), size: 16);
-    _drawVehicle(canvas, mode == CargoTrackingMode.sea ? sea : air);
+    _drawVehicle(canvas);
     canvas.restore();
   }
 
