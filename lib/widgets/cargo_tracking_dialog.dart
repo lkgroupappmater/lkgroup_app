@@ -594,8 +594,8 @@ class _CargoRoutePainter extends CustomPainter {
     required this.progress,
     required this.language,
     required Animation<double> motion,
-  }) : super(repaint: motion),
-       _motion = motion;
+  }) : _motion = motion,
+       super(repaint: motion);
 
   final CargoTrackingMode mode;
   final double? progress;
