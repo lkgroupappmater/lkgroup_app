@@ -209,13 +209,32 @@ class CustomerBenefitService {
   static String normalizePhone(String value) =>
       value.replaceAll(RegExp(r'[^0-9]'), '');
 
-  static String _normalizeName(String value) => value
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'\s+'), ' ');
-
   static String _normalizeFullName(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+
+  /// Removes an explicit unknown-recipient prefix for delivery lookup only.
+  /// The shipment's displayed name and receipt number are never changed.
+  static String deliveryMatchName(String value) {
+    final original = value.trim();
+    final slash = original.indexOf('/');
+    if (slash < 0) return original;
+    final prefix = original
+        .substring(0, slash)
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s._-]+'), '');
+    const unknownPrefixes = <String>{
+      '수취인불명',
+      '수신인불명',
+      '미확인',
+      '불확실',
+      'unknown',
+      'unidentified',
+    };
+    if (!unknownPrefixes.contains(prefix)) return original;
+    final trailingName = original.substring(slash + 1).trim();
+    return trailingName.isEmpty ? original : trailingName;
+  }
 
   static bool _phoneMatches(String a, String b) {
     final aa = normalizePhone(a);
@@ -232,43 +251,41 @@ class CustomerBenefitService {
     return false;
   }
 
-  static Iterable<String> _nameTokens(String value) sync* {
-    final normalized = _normalizeName(value);
-    if (normalized.isEmpty) return;
-    if (!RegExp(r'[*?]').hasMatch(normalized)) yield normalized;
-
-    // 실무 BASE 표기: 이경화/이경희, 이름,이름, 이름(보조명) 등.
-    for (final part in normalized.split(RegExp(r'[/,;|()\\]+'))) {
-      final token = _normalizeName(part);
-      if (token.isNotEmpty && !RegExp(r'[*?]').hasMatch(token)) {
-        yield token;
-      }
-    }
+  static bool _exactRuleName(LocalDeliveryRule rule, String shipmentName) {
+    final key = _normalizeFullName(deliveryMatchName(shipmentName));
+    if (key.isEmpty) return false;
+    return <String>[
+      rule.customerName,
+      rule.alternateName,
+      rule.companyName,
+    ].where((value) => value.trim().isNotEmpty).any(
+          (value) => _normalizeFullName(value) == key,
+        );
   }
 
-  static int _nameMatchRank(String shipmentName, String candidateName) {
-    final a = _nameTokens(shipmentName).toSet();
-    final b = _nameTokens(candidateName).toSet();
-    if (a.isEmpty || b.isEmpty) return 9999;
-    final overlap = a.intersection(b);
-    if (overlap.isEmpty) return 9999;
-    if (a.length == b.length && a.containsAll(b) && b.containsAll(a)) return 0;
-    if (a.containsAll(b)) return 10 + (a.length - b.length);
-    if (b.containsAll(a)) return 30 - b.length.clamp(0, 20).toInt();
-    return 50 - overlap.length.clamp(0, 20).toInt();
-  }
+  /// Applies the same deterministic delivery identity order as Excel/web:
+  /// unique exact name+phone, then unique exact full name, then unique phone.
+  /// A partial token such as `김민규` never matches `김민규/Shuana lor`.
+  static LocalDeliveryRule? selectLocalDeliveryRule({
+    required Iterable<LocalDeliveryRule> rules,
+    required String name,
+    required String phone,
+  }) {
+    final active = rules.where((rule) => rule.active).toList(growable: false);
+    final exact = active
+        .where((rule) => _exactRuleName(rule, name))
+        .toList(growable: false);
+    final exactWithPhone = exact
+        .where((rule) => _phoneMatches(phone, rule.phone))
+        .toList(growable: false);
+    if (exactWithPhone.length == 1) return exactWithPhone.single;
+    if (exact.length == 1) return exact.single;
 
-  static int _bestNameRank(
-    String shipmentName,
-    Iterable<String> candidates,
-  ) {
-    var best = 9999;
-    for (final value in candidates) {
-      if (value.trim().isEmpty) continue;
-      final rank = _nameMatchRank(shipmentName, value);
-      if (rank < best) best = rank;
-    }
-    return best;
+    final byPhone = active
+        .where((rule) => _phoneMatches(phone, rule.phone))
+        .toList(growable: false);
+    if (byPhone.length == 1) return byPhone.single;
+    return null;
   }
 
   Future<List<DiscountRule>> listDiscountRules() async {
@@ -410,73 +427,15 @@ class CustomerBenefitService {
         .order('preferred', ascending: false)
         .order('source_no')
         .limit(500);
-    LocalDeliveryRule? bestRule;
-    var bestCategory = 9999;
-    var bestNameRank = 9999;
-    var bestPreferred = false;
-    var bestHasAddress = false;
-    var bestSource = 1 << 30;
-    for (final raw in rows) {
-      final rule =
-          LocalDeliveryRule.fromMap(Map<String, dynamic>.from(raw));
-      final phoneMatches = _phoneMatches(phone, rule.phone);
-      final nameRank = _bestNameRank(
-        name,
-        [rule.customerName, rule.alternateName, rule.companyName],
-      );
-      final exactFullName = <String>[
-        rule.customerName,
-        rule.alternateName,
-        rule.companyName,
-      ].where((value) => value.trim().isNotEmpty).any(
-            (value) =>
-                _normalizeFullName(value) == _normalizeFullName(name),
-          );
-
-      // Prepaid delivery can change who pays, so it is selected only by an
-      // exact full-name match. Normal delivery may be recovered by a name
-      // token or by the phone number alone (for example Vang Vieng).
-      if (rule.isPrepaid && !exactFullName) continue;
-      if (!rule.isPrepaid && nameRank >= 9999 && !phoneMatches) continue;
-
-      final category = rule.isPrepaid
-          ? 0
-          : (exactFullName && phoneMatches
-              ? 10
-              : (exactFullName
-                  ? 20
-                  : (nameRank < 9999 && phoneMatches
-                      ? 30
-                      : (phoneMatches
-                          ? 100
-                          : (nameRank < 9999 ? 200 : 9999)))));
-      final hasAddress = rule.destinationAddress.trim().isNotEmpty;
-      final source = rule.sourceNo ?? (1 << 30);
-      if (category < bestCategory ||
-          (category == bestCategory && nameRank < bestNameRank) ||
-          (category == bestCategory &&
-              nameRank == bestNameRank &&
-              rule.preferred &&
-              !bestPreferred) ||
-          (category == bestCategory &&
-              nameRank == bestNameRank &&
-              rule.preferred == bestPreferred &&
-              hasAddress &&
-              !bestHasAddress) ||
-          (category == bestCategory &&
-              nameRank == bestNameRank &&
-              rule.preferred == bestPreferred &&
-              hasAddress == bestHasAddress &&
-              source < bestSource)) {
-        bestRule = rule;
-        bestCategory = category;
-        bestNameRank = nameRank;
-        bestPreferred = rule.preferred;
-        bestHasAddress = hasAddress;
-        bestSource = source;
-      }
-    }
-    return bestRule;
+    return selectLocalDeliveryRule(
+      rules: rows.map(
+        (raw) => LocalDeliveryRule.fromMap(
+          Map<String, dynamic>.from(raw),
+        ),
+      ),
+      name: name,
+      phone: phone,
+    );
   }
 
   Future<String> inlandTextForRows(

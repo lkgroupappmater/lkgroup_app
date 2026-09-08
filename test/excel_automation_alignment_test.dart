@@ -87,6 +87,98 @@ void main() {
     test('recognizes prepaid spelling variants', () {
       expect(rule.isPrepaid, isTrue);
     });
+
+    LocalDeliveryRule delivery({
+      required int no,
+      required String name,
+      required String phone,
+      String paidBy = '',
+    }) => LocalDeliveryRule(
+          id: no,
+          routeKey: 'kr_la_sea',
+          sourceNo: no,
+          customerName: name,
+          alternateName: '',
+          companyName: '',
+          phone: phone,
+          phoneDisplay: phone,
+          deliveryType: 'province',
+          localCompany: 'HAL',
+          destinationAddress: 'Laos',
+          paidBy: paidBy,
+          notes: '',
+          active: true,
+          preferred: true,
+        );
+
+    test('does not partially match a multi-name delivery profile', () {
+      final selected = CustomerBenefitService.selectLocalDeliveryRule(
+        rules: [
+          delivery(
+            no: 68,
+            name: '김민규/Shuana lor',
+            phone: '02078291765',
+          ),
+        ],
+        name: '김민규',
+        phone: '02055599055',
+      );
+      expect(selected, isNull);
+    });
+
+    test('uses a unique phone when the written name is different', () {
+      final selected = CustomerBenefitService.selectLocalDeliveryRule(
+        rules: [
+          delivery(
+            no: 48,
+            name: '방비엥 고향식당',
+            phone: '02091120020',
+          ),
+        ],
+        name: '다른 표기 이름',
+        phone: '020 9112 0020',
+      );
+      expect(selected?.sourceNo, 48);
+    });
+
+    test('unknown prefix is ignored only while matching delivery', () {
+      final selected = CustomerBenefitService.selectLocalDeliveryRule(
+        rules: [
+          delivery(no: 22, name: '이우용', phone: '02058477710'),
+          delivery(
+            no: 23,
+            name: '김병찬/이우용',
+            phone: '02058477710',
+            paidBy: '선결제',
+          ),
+        ],
+        name: '수취인 불명 / 이우용',
+        phone: '020 5847 7710 / ???',
+      );
+      expect(selected?.sourceNo, 22);
+      expect(
+        CustomerBenefitService.deliveryMatchName('수취인 불명 / 이우용'),
+        '이우용',
+      );
+    });
+
+    test('exact multi-name wins when profiles share a phone', () {
+      final selected = CustomerBenefitService.selectLocalDeliveryRule(
+        rules: [
+          delivery(no: 34, name: '백종훈', phone: '02055854057'),
+          delivery(
+            no: 87,
+            name: '조미숙/백종훈',
+            phone: '02055854057',
+            paidBy: '선결제',
+          ),
+        ],
+        name: '조미숙 / 백종훈',
+        phone: '020-5585-4057 / ????',
+      );
+      expect(selected?.sourceNo, 87);
+      expect(selected?.isPrepaid, isTrue);
+    });
   });
 
   group('ShipmentImportSummary', () {
