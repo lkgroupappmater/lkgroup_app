@@ -429,8 +429,8 @@ class _DigitalQuotationPainter extends CustomPainter {
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
-      null, null, null, null, null, null, null, null, null, null, null,
-      actualColor, volumeColor, appliedColor
+      null, null, null, null, null, actualColor, null, null, null, null,
+      volumeColor, actualColor, volumeColor, appliedColor
     ];
 
     for (var i = 0; i < headers.length; i++) {
@@ -828,7 +828,6 @@ class _DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DigitalQuotationPainter oldDelegate) => true;
 }
-
 
 
 
