@@ -46,7 +46,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
       .showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _edit([LocalDeliveryRule? rule]) async {
-    final sourceNo = TextEditingController(text: rule?.sourceNo?.toString() ?? '');
+    final sourceNo = TextEditingController(text: (rule?.originalSourceNo ?? rule?.sourceNo)?.toString() ?? '');
     final name = TextEditingController(text: rule?.customerName ?? '');
     final alt = TextEditingController(text: rule?.alternateName ?? '');
     final company = TextEditingController(text: rule?.companyName ?? '');
@@ -118,7 +118,8 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
         LocalDeliveryRule(
           id: rule?.id,
           routeKey: routeKey,
-          sourceNo: int.tryParse(sourceNo.text.trim()),
+          sourceNo: rule?.originalSourceNo != null ? rule?.sourceNo : int.tryParse(sourceNo.text.trim()),
+          originalSourceNo: rule?.originalSourceNo != null ? int.tryParse(sourceNo.text.trim()) : null,
           customerName: name.text.trim(),
           alternateName: alt.text.trim(),
           companyName: company.text.trim(),
@@ -130,6 +131,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
           paidBy: paidBy.text.trim(),
           notes: notes.text.trim(),
           active: active,
+          preferred: rule?.preferred ?? false,
         ),
       );
       _msg('배송 정보를 저장했습니다.');
@@ -208,7 +210,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
                                     backgroundColor: r.isCity ? Colors.green.shade100 : Colors.grey.shade200,
                                     child: Icon(r.isCity ? Icons.location_city : Icons.local_shipping_outlined, color: r.isCity ? Colors.green.shade800 : Colors.grey.shade800),
                                   ),
-                                  title: Text('${r.sourceNo == null ? '' : '(${r.sourceNo}) '}${r.customerName}${r.alternateName.isEmpty ? '' : ' / ${r.alternateName}'}'),
+                                  title: Text('${r.sourceNo == null ? '' : '(${r.originalSourceNo ?? r.sourceNo}) '}${r.customerName}${r.alternateName.isEmpty ? '' : ' / ${r.alternateName}'}'),
                                   subtitle: Text('${r.typeLabel} · ${r.phoneDisplay.isEmpty ? r.phone : r.phoneDisplay}\n${r.localCompany}${r.destinationAddress.isEmpty ? '' : ' · ${r.destinationAddress}'}'),
                                   isThreeLine: true,
                                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
