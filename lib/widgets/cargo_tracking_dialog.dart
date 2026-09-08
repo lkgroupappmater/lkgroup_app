@@ -27,6 +27,9 @@ class CargoTrackingLabels {
     'booking': ['접수 마감', 'Booking close', 'ປິດຮັບ'],
     'eta': ['도착 예정', 'Estimated arrival', 'ຄາດວ່າຮອດ'],
     'legs': ['구간별 예상 일정', 'Estimated route legs', 'ຕາຕະລາງຄາດຄະເນແຕ່ລະຊ່ວງ'],
+    'sea': ['해상', 'Ocean', 'ທາງເຮືອ'],
+    'land': ['육로', 'Road', 'ທາງບົກ'],
+    'air': ['항공', 'Air', 'ທາງອາກາດ'],
     'truck': ['컨테이너 차량', 'Container truck', 'ລົດບັນທຸກຕູ້'],
     'ship': ['컨테이너 선박', 'Container vessel', 'ເຮືອຕູ້ຄອນເທນເນີ'],
     'plane': ['항공기', 'Aircraft', 'ເຮືອບິນ'],
@@ -279,6 +282,12 @@ class _TrackingContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final mode = CargoTracking.modeOf(schedule ?? cargo) ?? CargoTrackingMode.sea;
     final progress = schedule == null ? 0.0 : CargoTracking.progress(schedule!);
+    final phase = schedule == null ? null : CargoTracking.phase(schedule!);
+    final arrivalDateLabel = phase == CargoTrackingPhase.dispatching
+        ? _t('dispatching')
+        : phase == CargoTrackingPhase.arrived
+            ? _t('arrived')
+            : _t('eta');
     final current = CargoTracking.currentLeg(mode, progress);
     final legs = CargoTracking.legs(mode);
     return SingleChildScrollView(
@@ -379,7 +388,7 @@ class _TrackingContent extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${_t('eta')} ${_date(CargoTracking.endDate(schedule!))}',
+                        '$arrivalDateLabel ${_date(CargoTracking.endDate(schedule!))}',
                         style: const TextStyle(fontSize: 11),
                       ),
                     ],
@@ -610,51 +619,58 @@ class _CargoRoutePainter extends CustomPainter {
     return path..close();
   }
 
+  Path _landPath() => Path()
+    ..moveTo(575, 96)
+    ..lineTo(563, 106)
+    ..moveTo(575, 96)
+    ..lineTo(557, 93)
+    ..moveTo(169, 409)
+    ..cubicTo(171, 392, 180, 374, 188, 362)
+    ..cubicTo(193, 355, 195, 350, 195, 346)
+    ..moveTo(195, 346)
+    ..lineTo(207, 337);
+
   Path _seaPath() => Path()
-    ..moveTo(650, 60)
-    ..lineTo(643, 72)
-    ..moveTo(643, 72)
-    ..cubicTo(675, 105, 690, 150, 676, 208)
-    ..cubicTo(660, 276, 622, 334, 563, 382)
-    ..cubicTo(490, 440, 406, 470, 315, 482)
-    ..cubicTo(236, 493, 174, 488, 118, 475)
-    ..moveTo(118, 475)
-    ..cubicTo(132, 448, 153, 414, 181, 389)
-    ..lineTo(191, 383);
+    ..moveTo(563, 106)
+    ..cubicTo(564, 150, 545, 185, 515, 220)
+    ..cubicTo(495, 242, 478, 260, 467, 285)
+    ..cubicTo(445, 330, 402, 368, 346, 404)
+    ..cubicTo(315, 424, 292, 445, 268, 463)
+    ..cubicTo(240, 482, 197, 472, 180, 450)
+    ..cubicTo(167, 434, 163, 420, 169, 409);
 
   Path _airPath() => Path()
-    ..moveTo(650, 60)
-    ..lineTo(637, 55)
-    ..moveTo(637, 55)
-    ..cubicTo(520, 118, 346, 236, 186, 382)
-    ..moveTo(186, 382)
-    ..lineTo(191, 383);
+    ..moveTo(557, 93)
+    ..cubicTo(470, 160, 350, 246, 195, 346);
 
   Path _legPath(CargoTrackingMode trackingMode, int index) {
     if (trackingMode == CargoTrackingMode.air) {
-      if (index == 0) return Path()..moveTo(650, 60)..lineTo(637, 55);
+      if (index == 0) return Path()..moveTo(575, 96)..lineTo(557, 93);
       if (index == 1) {
         return Path()
-          ..moveTo(637, 55)
-          ..cubicTo(520, 118, 346, 236, 186, 382);
+          ..moveTo(557, 93)
+          ..cubicTo(470, 160, 350, 246, 195, 346);
       }
-      return Path()..moveTo(186, 382)..lineTo(191, 383);
+      return Path()..moveTo(195, 346)..lineTo(207, 337);
     }
-    if (index == 0) return Path()..moveTo(650, 60)..lineTo(643, 72);
+    if (index == 0) return Path()..moveTo(575, 96)..lineTo(563, 106);
     if (index == 1) {
       return Path()
-        ..moveTo(643, 72)
-        ..cubicTo(675, 105, 690, 150, 676, 208)
-        ..cubicTo(660, 276, 622, 334, 563, 382)
-        ..cubicTo(490, 440, 406, 470, 315, 482)
-        ..cubicTo(236, 493, 174, 488, 118, 475);
+        ..moveTo(563, 106)
+        ..cubicTo(564, 150, 545, 185, 515, 220)
+        ..cubicTo(495, 242, 478, 260, 467, 285)
+        ..cubicTo(445, 330, 402, 368, 346, 404)
+        ..cubicTo(315, 424, 292, 445, 268, 463)
+        ..cubicTo(240, 482, 197, 472, 180, 450)
+        ..cubicTo(167, 434, 163, 420, 169, 409);
     }
     if (index == 2) {
       return Path()
-        ..moveTo(118, 475)
-        ..cubicTo(132, 448, 153, 414, 181, 389);
+        ..moveTo(169, 409)
+        ..cubicTo(171, 392, 180, 374, 188, 362)
+        ..cubicTo(193, 355, 195, 350, 195, 346);
     }
-    return Path()..moveTo(181, 389)..lineTo(191, 383);
+    return Path()..moveTo(195, 346)..lineTo(207, 337);
   }
 
   void _label(Canvas canvas, String text, Offset point,
@@ -856,41 +872,223 @@ class _CargoRoutePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     final countries = <Path>[
-      _polygon(const [Offset(0,0),Offset(625,0),Offset(627,28),Offset(614,54),Offset(611,84),Offset(586,115),Offset(556,135),Offset(538,166),Offset(504,189),Offset(482,214),Offset(442,231),Offset(411,256),Offset(369,274),Offset(341,302),Offset(302,317),Offset(273,346),Offset(234,366),Offset(209,395),Offset(173,413),Offset(142,405),Offset(132,377),Offset(106,363),Offset(79,330),Offset(36,321),Offset(0,289)]),
-      _polygon(const [Offset(631,24),Offset(653,29),Offset(667,48),Offset(665,73),Offset(653,94),Offset(640,107),Offset(628,97),Offset(631,77),Offset(623,59),Offset(630,43)]),
-      _polygon(const [Offset(701,37),Offset(712,45),Offset(706,69),Offset(693,86),Offset(688,112),Offset(676,123),Offset(670,116),Offset(677,93),Offset(687,76),Offset(692,49)]),
-      _polygon(const [Offset(523,216),Offset(533,225),Offset(529,254),Offset(517,270),Offset(509,263),Offset(513,237)]),
-      _polygon(const [Offset(242,309),Offset(257,325),Offset(252,349),Offset(264,374),Offset(256,402),Offset(265,431),Offset(253,464),Offset(238,456),Offset(244,428),Offset(230,406),Offset(235,377),Offset(222,357),Offset(229,329)]),
-      _polygon(const [Offset(183,339),Offset(212,326),Offset(232,342),Offset(227,369),Offset(242,392),Offset(226,421),Offset(198,416),Offset(178,385)]),
-      _polygon(const [Offset(103,371),Offset(145,359),Offset(179,379),Offset(196,416),Offset(182,442),Offset(196,478),Offset(183,500),Offset(132,500),Offset(124,469),Offset(93,446),Offset(81,408)]),
-      _polygon(const [Offset(185,421),Offset(225,418),Offset(252,440),Offset(244,471),Offset(202,479),Offset(182,450)]),
+      _polygon(const <Offset>[
+        Offset(315.5, 337.5), Offset(302.1, 343.6), Offset(289.3, 339.6), Offset(288.9, 328.6), Offset(296.5, 322.8),
+        Offset(313.5, 319.2), Offset(322.4, 319.5), Offset(325.9, 324.4), Offset(319.1, 330.1),
+      ]),
+      _polygon(const <Offset>[
+        Offset(637.5, 0.0), Offset(636.3, 0.4), Offset(640.4, 11.4), Offset(638.2, 26.5), Offset(630.2, 26.9),
+        Offset(630.3, 33.4), Offset(620.3, 25.8), Offset(614.2, 33.0), Offset(590.2, 38.5), Offset(592.6, 45.3),
+        Offset(579.2, 44.8), Offset(571.8, 40.8), Offset(561.2, 49.9), Offset(544.1, 56.8), Offset(531.5, 65.0),
+        Offset(509.8, 68.7), Offset(498.4, 74.7), Offset(481.7, 78.2), Offset(489.9, 72.3), Offset(486.7, 67.3),
+        Offset(498.9, 58.7), Offset(490.7, 52.0), Offset(477.2, 56.5), Offset(459.7, 65.4), Offset(450.2, 73.7),
+        Offset(434.9, 74.3), Offset(427.0, 80.3), Offset(435.2, 89.0), Offset(447.9, 91.1), Offset(448.4, 96.8),
+        Offset(460.7, 100.6), Offset(478.1, 91.4), Offset(491.8, 96.4), Offset(501.9, 96.7), Offset(504.4, 103.5),
+        Offset(482.4, 107.0), Offset(475.2, 114.0), Offset(460.1, 120.4), Offset(452.1, 129.4), Offset(468.8, 136.4),
+        Offset(474.9, 149.0), Offset(484.4, 160.8), Offset(494.9, 170.6), Offset(494.7, 180.1), Offset(484.9, 183.6),
+        Offset(488.6, 190.5), Offset(497.8, 194.5), Offset(495.4, 204.9), Offset(491.4, 215.1), Offset(482.8, 216.2),
+        Offset(471.4, 230.1), Offset(458.9, 246.9), Offset(444.5, 262.2), Offset(423.1, 274.0), Offset(401.6, 284.8),
+        Offset(384.1, 286.3), Offset(374.6, 292.0), Offset(369.2, 287.8), Offset(360.5, 294.2), Offset(338.8, 300.6),
+        Offset(322.4, 302.6), Offset(317.1, 316.1), Offset(308.5, 316.9), Offset(304.4, 307.6), Offset(308.1, 302.6),
+        Offset(287.3, 298.5), Offset(280.0, 300.6), Offset(264.3, 297.3), Offset(257.0, 292.1), Offset(259.4, 284.7),
+        Offset(245.2, 282.3), Offset(237.8, 277.5), Offset(224.5, 284.4), Offset(209.5, 285.8), Offset(197.1, 285.8),
+        Offset(188.8, 288.9), Offset(180.7, 290.8), Offset(183.1, 305.5), Offset(174.8, 305.1), Offset(173.4, 302.1),
+        Offset(172.9, 296.8), Offset(161.6, 300.5), Offset(154.8, 298.2), Offset(143.3, 293.4), Offset(147.8, 282.7),
+        Offset(138.0, 280.2), Offset(134.3, 268.4), Offset(118.0, 270.5), Offset(119.8, 255.3), Offset(134.5, 244.6),
+        Offset(135.1, 234.1), Offset(134.7, 224.2), Offset(127.9, 221.2), Offset(122.7, 213.6), Offset(113.6, 214.6),
+        Offset(96.9, 212.7), Offset(102.2, 207.3), Offset(94.9, 199.3), Offset(83.8, 204.7), Offset(70.8, 201.6),
+        Offset(52.9, 209.7), Offset(38.8, 219.3), Offset(26.3, 220.9), Offset(19.5, 217.4), Offset(11.3, 217.1),
+        Offset(0.2, 214.1), Offset(0.0, 214.2), Offset(0.0, 0.0), Offset(50.3, 0.0), Offset(54.0, 0.3),
+        Offset(72.7, 8.3), Offset(82.3, 9.7), Offset(89.4, 21.5), Offset(98.5, 29.2), Offset(115.6, 28.9),
+        Offset(147.6, 31.7), Offset(168.2, 30.0), Offset(183.5, 31.9), Offset(206.5, 39.6), Offset(225.2, 39.6),
+        Offset(232.1, 43.6), Offset(250.2, 36.7), Offset(275.2, 32.3), Offset(298.5, 31.8), Offset(316.6, 27.3),
+        Offset(327.7, 20.4), Offset(338.6, 16.1), Offset(336.1, 11.9), Offset(331.1, 7.0), Offset(338.0, 0.0),
+        Offset(348.9, 0.0), Offset(363.9, 2.5), Offset(369.5, 0.0),
+      ]),
+      _polygon(const <Offset>[
+        Offset(630.3, 33.4), Offset(632.5, 35.6), Offset(626.6, 34.9), Offset(619.9, 39.2), Offset(615.2, 43.6),
+        Offset(615.8, 52.8), Offset(607.8, 55.6), Offset(605.1, 57.9), Offset(599.2, 61.7), Offset(588.9, 63.8),
+        Offset(582.2, 67.2), Offset(581.7, 72.8), Offset(579.9, 74.2), Offset(586.0, 76.3), Offset(594.8, 81.9),
+        Offset(592.6, 85.0), Offset(586.0, 85.8), Offset(575.0, 86.5), Offset(569.0, 92.2), Offset(562.0, 91.8),
+        Offset(561.1, 93.0), Offset(553.5, 90.5), Offset(551.7, 92.9), Offset(547.1, 94.0), Offset(546.6, 91.6),
+        Offset(542.6, 90.4), Offset(538.4, 88.4), Offset(542.6, 82.7), Offset(546.3, 81.2), Offset(544.9, 78.9),
+        Offset(548.9, 71.9), Offset(547.8, 69.9), Offset(538.8, 68.5), Offset(531.5, 65.0), Offset(544.1, 56.8),
+        Offset(561.2, 49.9), Offset(571.8, 40.8), Offset(579.2, 44.8), Offset(592.6, 45.3), Offset(590.2, 38.5),
+        Offset(614.2, 33.0), Offset(620.3, 25.8),
+      ]),
+      _polygon(const <Offset>[
+        Offset(594.8, 81.9), Offset(608.2, 97.0), Offset(612.0, 105.3), Offset(612.2, 120.1), Offset(606.3, 127.1),
+        Offset(592.3, 129.6), Offset(579.9, 134.9), Offset(565.9, 136.0), Offset(564.2, 129.0), Offset(567.0, 119.4),
+        Offset(560.2, 106.1), Offset(571.7, 103.9), Offset(561.1, 93.0), Offset(562.0, 91.8), Offset(569.0, 92.2),
+        Offset(575.0, 86.5), Offset(586.0, 85.8), Offset(592.6, 85.0),
+      ]),
+      _polygon(const <Offset>[
+        Offset(692.4, 139.1), Offset(694.3, 143.5), Offset(685.6, 151.3), Offset(679.2, 147.2), Offset(671.3, 150.1),
+        Offset(667.2, 157.6), Offset(657.1, 154.0), Offset(657.2, 147.9), Offset(665.8, 140.3), Offset(674.6, 141.7),
+        Offset(681.0, 136.3),
+      ]),
+      _polygon(const <Offset>[
+        Offset(760.0, 132.4), Offset(759.6, 132.5), Offset(732.4, 133.3), Offset(710.3, 147.9), Offset(699.8, 143.0),
+        Offset(699.2, 133.4), Offset(672.2, 136.2), Offset(653.9, 142.2), Offset(635.7, 142.5), Offset(651.4, 151.9),
+        Offset(641.1, 173.7), Offset(631.1, 179.1), Offset(623.5, 174.1), Offset(627.4, 162.6), Offset(617.5, 158.8),
+        Offset(611.2, 150.1), Offset(625.9, 146.1), Offset(634.0, 138.0), Offset(649.6, 131.4), Offset(661.0, 122.6),
+        Offset(691.9, 118.8), Offset(708.5, 121.4), Offset(724.7, 98.7), Offset(735.0, 104.8), Offset(757.8, 92.0),
+        Offset(760.0, 90.7),
+      ]),
+      _polygon(const <Offset>[
+        Offset(492.9, 264.2), Offset(483.5, 284.7), Offset(476.9, 295.2), Offset(468.7, 284.4), Offset(467.0, 274.9),
+        Offset(476.1, 262.3), Offset(488.5, 252.6), Offset(495.6, 256.4),
+      ]),
+      _polygon(const <Offset>[
+        Offset(280.0, 300.6), Offset(259.3, 311.6), Offset(246.3, 323.7), Offset(242.9, 332.6), Offset(254.8, 346.1),
+        Offset(269.3, 362.9), Offset(283.4, 370.8), Offset(292.8, 381.1), Offset(299.9, 404.8), Offset(297.8, 427.3),
+        Offset(284.9, 435.8), Offset(267.1, 444.0), Offset(254.4, 454.7), Offset(235.1, 466.7), Offset(229.5, 458.4),
+        Offset(233.8, 449.8), Offset(222.3, 442.5), Offset(235.8, 437.3), Offset(252.0, 436.4), Offset(245.2, 428.6),
+        Offset(271.3, 418.8), Offset(273.2, 403.4), Offset(269.6, 394.8), Offset(272.4, 382.0), Offset(268.5, 373.0),
+        Offset(256.8, 364.0), Offset(247.0, 352.8), Offset(234.1, 337.6), Offset(215.5, 329.9), Offset(220.0, 325.3),
+        Offset(229.9, 322.0), Offset(223.9, 310.8), Offset(204.8, 310.7), Offset(197.8, 299.0), Offset(188.8, 288.9),
+        Offset(197.1, 285.8), Offset(209.5, 285.8), Offset(224.5, 284.4), Offset(237.8, 277.5), Offset(245.2, 282.3),
+        Offset(259.4, 284.7), Offset(257.0, 292.1), Offset(264.3, 297.3),
+      ]),
+      _polygon(const <Offset>[
+        Offset(236.0, 393.9), Offset(241.1, 388.2), Offset(241.8, 377.3), Offset(229.2, 366.1), Offset(228.3, 353.5),
+        Offset(216.5, 343.1), Offset(204.7, 342.2), Offset(201.6, 346.6), Offset(192.5, 347.0), Offset(187.9, 344.8),
+        Offset(171.5, 352.4), Offset(171.2, 340.9), Offset(175.0, 327.4), Offset(164.5, 326.8), Offset(163.6, 319.1),
+        Offset(156.9, 315.2), Offset(160.2, 310.4), Offset(173.4, 302.1), Offset(174.8, 305.1), Offset(183.1, 305.5),
+        Offset(180.7, 290.8), Offset(188.8, 288.9), Offset(197.8, 299.0), Offset(204.8, 310.7), Offset(223.9, 310.8),
+        Offset(229.9, 322.0), Offset(220.0, 325.3), Offset(215.5, 329.9), Offset(234.1, 337.6), Offset(247.0, 352.8),
+        Offset(256.8, 364.0), Offset(268.5, 373.0), Offset(272.4, 382.0), Offset(269.6, 394.8), Offset(255.9, 390.1),
+        Offset(248.8, 399.0),
+      ]),
+      _polygon(const <Offset>[
+        Offset(195.2, 420.7), Offset(181.3, 414.8), Offset(168.0, 415.0), Offset(170.3, 405.0), Offset(156.6, 405.0),
+        Offset(155.4, 419.1), Offset(147.0, 437.9), Offset(142.0, 449.2), Offset(143.0, 458.5), Offset(153.1, 458.9),
+        Offset(159.4, 470.6), Offset(162.2, 481.7), Offset(170.9, 489.0), Offset(180.3, 490.5), Offset(188.3, 497.2),
+        Offset(185.6, 500.0), Offset(172.3, 500.0), Offset(171.8, 497.4), Offset(159.1, 491.8), Offset(156.4, 494.0),
+        Offset(150.3, 489.1), Offset(147.7, 482.8), Offset(139.4, 475.5), Offset(131.9, 469.5), Offset(129.3, 477.0),
+        Offset(126.4, 469.9), Offset(128.1, 461.9), Offset(132.7, 449.6), Offset(140.2, 436.4), Offset(148.7, 424.5),
+        Offset(142.6, 412.8), Offset(142.9, 406.8), Offset(141.1, 399.6), Offset(130.8, 389.5), Offset(127.1, 383.0),
+        Offset(132.4, 380.7), Offset(138.1, 369.5), Offset(131.7, 361.1), Offset(121.9, 351.7), Offset(114.4, 340.4),
+        Offset(120.9, 338.1), Offset(128.0, 324.3), Offset(139.0, 323.7), Offset(148.0, 318.1), Offset(156.9, 315.2),
+        Offset(163.6, 319.1), Offset(164.5, 326.8), Offset(175.0, 327.4), Offset(171.2, 340.9), Offset(171.5, 352.4),
+        Offset(187.9, 344.8), Offset(192.5, 347.0), Offset(201.6, 346.6), Offset(204.7, 342.2), Offset(216.5, 343.1),
+        Offset(228.3, 353.5), Offset(229.2, 366.1), Offset(241.8, 377.3), Offset(241.1, 388.2), Offset(236.0, 393.9),
+        Offset(221.5, 392.1), Offset(201.5, 394.5), Offset(191.5, 405.2),
+      ]),
+      _polygon(const <Offset>[
+        Offset(209.3, 440.6), Offset(203.0, 433.9), Offset(195.2, 420.7), Offset(191.5, 405.2), Offset(201.5, 394.5),
+        Offset(221.5, 392.1), Offset(236.0, 393.9), Offset(248.8, 399.0), Offset(255.9, 390.1), Offset(269.6, 394.8),
+        Offset(273.2, 403.4), Offset(271.3, 418.8), Offset(245.2, 428.6), Offset(252.0, 436.4), Offset(235.8, 437.3),
+        Offset(222.3, 442.5),
+      ]),
+      _polygon(const <Offset>[
+        Offset(148.0, 318.1), Offset(139.0, 323.7), Offset(128.0, 324.3), Offset(120.9, 338.1), Offset(114.4, 340.4),
+        Offset(121.9, 351.7), Offset(131.7, 361.1), Offset(138.1, 369.5), Offset(132.4, 380.7), Offset(127.1, 383.0),
+        Offset(130.8, 389.5), Offset(141.1, 399.6), Offset(142.9, 406.8), Offset(142.6, 412.8), Offset(148.7, 424.5),
+        Offset(140.2, 436.4), Offset(132.7, 449.6), Offset(131.2, 440.1), Offset(135.9, 430.2), Offset(130.7, 422.7),
+        Offset(132.0, 408.7), Offset(125.7, 402.0), Offset(120.6, 386.7), Offset(117.8, 370.5), Offset(111.1, 359.9),
+        Offset(100.9, 366.3), Offset(83.3, 375.5), Offset(74.6, 374.3), Offset(65.0, 371.3), Offset(70.3, 355.4),
+        Offset(67.1, 343.4), Offset(54.9, 328.6), Offset(56.8, 324.0), Offset(47.7, 322.4), Offset(36.7, 311.9),
+        Offset(35.7, 301.6), Offset(41.1, 303.5), Offset(41.5, 294.3), Offset(49.1, 291.3), Offset(47.5, 285.9),
+        Offset(51.0, 281.5), Offset(51.6, 268.2), Offset(63.7, 271.1), Offset(70.6, 260.6), Offset(71.4, 254.3),
+        Offset(80.0, 243.6), Offset(79.5, 236.2), Offset(99.6, 227.4), Offset(110.6, 229.7), Offset(109.4, 221.8),
+        Offset(114.8, 219.5), Offset(113.6, 214.6), Offset(122.7, 213.6), Offset(127.9, 221.2), Offset(134.7, 224.2),
+        Offset(135.1, 234.1), Offset(134.5, 244.6), Offset(119.8, 255.3), Offset(118.0, 270.5), Offset(134.3, 268.4),
+        Offset(138.0, 280.2), Offset(147.8, 282.7), Offset(143.3, 293.4), Offset(154.8, 298.2), Offset(161.6, 300.5),
+        Offset(172.9, 296.8), Offset(173.4, 302.1), Offset(160.2, 310.4), Offset(156.9, 315.2),
+      ]),
+      _polygon(const <Offset>[
+        Offset(564.2, 469.0), Offset(565.8, 477.6), Offset(566.7, 484.8), Offset(561.4, 496.5), Offset(555.8, 483.4),
+        Offset(548.5, 489.9), Offset(553.5, 499.4), Offset(553.0, 500.0), Offset(535.8, 500.0), Offset(530.8, 497.9),
+        Offset(526.4, 488.7), Offset(531.1, 482.6), Offset(521.3, 476.5), Offset(516.4, 481.8), Offset(509.1, 481.3),
+        Offset(497.7, 488.5), Offset(495.1, 484.7), Offset(501.2, 473.9), Offset(510.9, 470.3), Offset(519.4, 465.5),
+        Offset(524.9, 471.3), Offset(536.7, 467.8), Offset(539.2, 462.0), Offset(550.2, 461.7), Offset(549.2, 451.8),
+        Offset(561.8, 457.9), Offset(563.1, 464.3),
+      ]),
+      _polygon(const <Offset>[
+        Offset(527.1, 445.1), Offset(521.5, 449.4), Offset(516.6, 457.5), Offset(511.8, 461.3), Offset(502.2, 452.4),
+        Offset(505.4, 449.0), Offset(509.3, 445.4), Offset(511.0, 437.4), Offset(519.6, 436.7), Offset(517.1, 445.3),
+        Offset(528.6, 432.9),
+      ]),
+      _polygon(const <Offset>[
+        Offset(442.1, 457.5), Offset(421.5, 469.6), Offset(429.1, 460.7), Offset(440.3, 452.8), Offset(449.6, 443.9),
+        Offset(457.7, 431.2), Offset(460.5, 441.6), Offset(450.3, 448.7),
+      ]),
+      _polygon(const <Offset>[
+        Offset(494.5, 424.5), Offset(503.8, 428.4), Offset(513.7, 428.4), Offset(513.4, 433.8), Offset(506.2, 439.2),
+        Offset(496.4, 443.1), Offset(495.8, 437.1), Offset(496.9, 430.6),
+      ]),
+      _polygon(const <Offset>[
+        Offset(550.7, 421.0), Offset(555.0, 435.3), Offset(543.0, 431.9), Offset(543.4, 436.2), Offset(547.2, 444.1),
+        Offset(539.8, 447.0), Offset(539.1, 438.0), Offset(534.5, 437.3), Offset(532.0, 429.5), Offset(541.2, 430.6),
+        Offset(541.0, 425.7), Offset(531.5, 415.9), Offset(546.4, 416.2),
+      ]),
+      _polygon(const <Offset>[
+        Offset(489.0, 409.4), Offset(484.9, 420.4), Offset(478.2, 414.0), Offset(470.3, 404.3), Offset(483.6, 404.7),
+      ]),
+      _polygon(const <Offset>[
+        Offset(485.8, 339.7), Offset(495.4, 343.4), Offset(500.1, 340.0), Offset(501.6, 343.3), Offset(499.0, 348.6),
+        Offset(504.3, 357.8), Offset(500.2, 368.4), Offset(491.1, 372.7), Offset(488.7, 383.0), Offset(492.1, 393.2),
+        Offset(500.3, 394.6), Offset(507.2, 393.1), Offset(526.6, 400.2), Offset(525.1, 407.2), Offset(530.2, 410.3),
+        Offset(528.5, 416.2), Offset(516.5, 409.9), Offset(510.7, 403.2), Offset(506.7, 407.9), Offset(496.9, 400.2),
+        Offset(482.8, 402.1), Offset(475.1, 399.3), Offset(475.8, 394.0), Offset(480.7, 390.7), Offset(476.1, 387.7),
+        Offset(474.1, 392.4), Offset(466.4, 385.0), Offset(464.1, 379.4), Offset(463.5, 367.1), Offset(469.7, 371.4),
+        Offset(471.4, 351.3), Offset(476.4, 339.7),
+      ]),
+      _polygon(const <Offset>[
+        Offset(171.8, 497.4), Offset(172.3, 500.0), Offset(185.6, 500.0), Offset(188.3, 497.2), Offset(191.9, 498.4),
+        Offset(193.8, 500.0), Offset(159.8, 500.0), Offset(159.9, 499.5), Offset(156.4, 494.0), Offset(159.1, 491.8),
+      ]),
+      _polygon(const <Offset>[
+        Offset(404.2, 500.0), Offset(406.7, 498.2), Offset(414.5, 488.1), Offset(420.8, 488.1), Offset(428.8, 494.6),
+        Offset(429.4, 500.0),
+      ]),
     ];
     for (final country in countries) {
       canvas.drawPath(country, land);
       canvas.drawPath(country, edge);
     }
 
-    _label(canvas, 'CHINA', const Offset(468, 104), size: 17);
-    _label(canvas, 'KOREA', const Offset(650, 12), size: 16);
-    _label(canvas, 'THAILAND', const Offset(101, 425), size: 15);
-    _label(canvas, 'LAOS', const Offset(181, 374), size: 15);
-    final sea = _seaPath(), air = _airPath();
-    _drawRoute(canvas, sea, const Color(0xFF5BD3ED), mode == CargoTrackingMode.sea);
-    _drawRoute(canvas, air, const Color(0xFFFFBE65), mode == CargoTrackingMode.air);
+    _label(canvas, 'CHINA', const Offset(390, 160), size: 16);
+    _label(canvas, 'KOREA', const Offset(568, 72), size: 14);
+    _label(canvas, 'JAPAN', const Offset(675, 130), size: 13);
+    _label(canvas, 'THAILAND', const Offset(135, 372), size: 13);
+    _label(canvas, 'LAOS', const Offset(186, 325), size: 13);
+    _label(canvas, 'VIETNAM', const Offset(263, 365), size: 13);
+    final land = _landPath(), sea = _seaPath(), air = _airPath();
+    _drawRoute(canvas, land, const Color(0xFF2F80ED), true);
+    _drawRoute(canvas, sea, const Color(0xFFEF3F48), mode == CargoTrackingMode.sea);
+    _drawRoute(canvas, air, const Color(0xFFFFAD32), mode == CargoTrackingMode.air);
 
     final node = Paint()..color = Colors.white;
     final nodeEdge = Paint()
-      ..color = const Color(0xFF4CC6E3)
+      ..color = const Color(0xFF2F80ED)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
-    for (final point in const [Offset(643,72),Offset(637,55),Offset(118,475),Offset(181,389),Offset(186,382)]) {
+    for (final point in const [
+      Offset(563, 106),
+      Offset(557, 93),
+      Offset(169, 409),
+      Offset(195, 346),
+    ]) {
       canvas.drawCircle(point, 5, node);
       canvas.drawCircle(point, 5, nodeEdge);
     }
-    _drawWarehouse(canvas, const Offset(671, 48));
-    _drawWarehouse(canvas, const Offset(210, 367));
-    _label(canvas, CargoTrackingLabels.location(language, 'incheonCenter'), const Offset(704, 31), size: 16, align: TextAlign.right);
-    _label(canvas, CargoTrackingLabels.location(language, 'lkCenter'), const Offset(239, 352), size: 16);
+    _drawWarehouse(canvas, const Offset(575, 96));
+    _drawWarehouse(canvas, const Offset(207, 337));
+    _label(
+      canvas,
+      CargoTrackingLabels.location(language, 'incheonCenter'),
+      const Offset(622, 82),
+      size: 15,
+      align: TextAlign.right,
+    );
+    _label(
+      canvas,
+      CargoTrackingLabels.location(language, 'lkCenter'),
+      const Offset(232, 337),
+      size: 15,
+    );
     _drawVehicle(canvas);
     canvas.restore();
   }
