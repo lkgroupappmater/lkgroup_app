@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/cargo_ui_strings.dart';
+import '../core/cargo_tracking.dart';
 import '../core/route_catalog.dart';
 import '../core/shipment_period_labels.dart';
 import '../core/money_format.dart';
 import '../models/app_user.dart';
 import '../services/freight_service.dart';
+import '../services/schedule_service.dart';
 import '../services/shipment_service.dart';
 import '../services/shipment_filter_options_service.dart';
 import '../services/unknown_recipient_service.dart';
+import '../widgets/cargo_tracking_dialog.dart';
 
 class ShipmentSearchBody extends StatefulWidget {
   const ShipmentSearchBody({
@@ -44,6 +47,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   List<Map<String, dynamic>> _results = [];
   List<Map<String, dynamic>> _unknownRecipientRows = const [];
   List<ShipmentBatchOption> _filterBatches = const [];
+  List<Map<String, dynamic>> _trackingSchedules = const [];
   bool _loadingUnknownRecipients = false;
   bool _searched = false;
   final Set<String> _selectedIds = <String>{};
@@ -95,12 +99,24 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     }
   }
 
+  Future<void> _loadTrackingSchedules() async {
+    if (!widget.isLoggedIn || widget.currentUser == null) return;
+    try {
+      final rows = await ScheduleService.instance.list();
+      if (!mounted) return;
+      setState(() => _trackingSchedules = rows);
+    } catch (_) {
+      // 일정 연결 실패가 기존 화물 조회를 막지 않도록 합니다.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _prefillMemberFields();
     _loadUnknownRecipientCargo();
     _loadFilterBatches();
+    _loadTrackingSchedules();
   }
 
   @override
@@ -108,8 +124,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentUser?.id != widget.currentUser?.id) {
       _prefillMemberFields();
-    _loadUnknownRecipientCargo();
+      _loadUnknownRecipientCargo();
       _loadFilterBatches();
+      _loadTrackingSchedules();
     }
   }
 
@@ -1041,6 +1058,18 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         p1.substring(p1.length - 8) == p2.substring(p2.length - 8);
   }
 
+  Map<String, dynamic>? _trackingScheduleFor(Map<String, dynamic> cargo) =>
+      CargoTracking.findSchedule(cargo, _trackingSchedules);
+
+  Future<void> _showCargoTracking(Map<String, dynamic> cargo) async {
+    await CargoTrackingDialog.show(
+      context,
+      cargo: cargo,
+      language: widget.language,
+      schedule: _trackingScheduleFor(cargo),
+    );
+  }
+
   Future<void> _showGroupFreight(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return;
     try {
@@ -1370,6 +1399,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     final height = _naturalNumber(r['height_cm']);
     final width = _naturalNumber(r['width_cm']);
     final size = '$length × $height × $width cm';
+    final trackingSchedule = _trackingScheduleFor(r);
+    final trackingSummary = trackingSchedule == null
+        ? CargoTrackingLabels.text(widget.language, 'notLinkedShort')
+        : CargoTrackingLabels.summary(widget.language, trackingSchedule);
 
     return InkWell(
       onTap: () => _toggle(id),
@@ -1395,6 +1428,26 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
                     '${_weightOneDecimal(r['weight_kg'])} kg / $size',
                   ),
                   _row(_l('입고날짜'), receivedDate),
+                  _row(
+                    CargoTrackingLabels.text(widget.language, 'current'),
+                    trackingSummary,
+                  ),
+                  const SizedBox(height: 4),
+                  OutlinedButton.icon(
+                    onPressed: () => _showCargoTracking(r),
+                    icon: const Icon(Icons.route_outlined, size: 17),
+                    label: Text(
+                      CargoTrackingLabels.text(widget.language, 'title'),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.navyPrimary,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
