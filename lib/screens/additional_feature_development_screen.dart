@@ -111,7 +111,7 @@ class _AdditionalFeatureDevelopmentScreenState
     }
   }
 
-  Future<void> _deleteDraftFromList(Map<String, dynamic> route) async {
+  Future<void> _deleteRouteFromList(Map<String, dynamic> route) async {
     final key = '${route['route_key'] ?? ''}';
     final name = '${route['display_name'] ?? ''}';
     if (key.isEmpty) return;
@@ -122,7 +122,7 @@ class _AdditionalFeatureDevelopmentScreenState
             title: const Text('운송 경로 삭제'),
             content: Text(
               '${name.isEmpty ? key : name}\n\n'
-              '삭제하면 즉시 적용 대기 목록과 기존 메뉴/기능에서 사라집니다.\n'
+              '삭제하면 즉시 운송 경로 선택 목록과 기존 메뉴/기능에서 사라집니다.\n'
               '30일 동안 삭제 대기 상태로 보관된 뒤 자동으로 완전히 삭제됩니다.\n\n'
               '즉시 완전 삭제 기능은 없습니다.',
             ),
@@ -247,6 +247,25 @@ class _AdditionalFeatureDevelopmentScreenState
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                    onPressed: _selectedRouteKey == null
+                        ? null
+                        : () => _deleteRouteFromList(
+                              _activeRoutes.firstWhere(
+                                (row) =>
+                                    '${row['route_key']}' == _selectedRouteKey,
+                              ),
+                            ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('선택한 운송 경로 삭제'),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 const Card(
                   child: Padding(
@@ -324,7 +343,7 @@ class _AdditionalFeatureDevelopmentScreenState
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  onPressed: () => _deleteDraftFromList(route),
+                                  onPressed: () => _deleteRouteFromList(route),
                                   child: const Text(
                                     '삭제',
                                     style: TextStyle(fontSize: 12),
@@ -1262,7 +1281,6 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
-
 
 
 
