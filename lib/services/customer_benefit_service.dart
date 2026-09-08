@@ -104,11 +104,13 @@ class LocalDeliveryRule {
     required this.notes,
     required this.active,
     this.preferred = false,
+    this.originalSourceNo,
   });
 
   final int? id;
   final String routeKey;
   final int? sourceNo;
+  final int? originalSourceNo;
   final String customerName;
   final String alternateName;
   final String companyName;
@@ -138,6 +140,7 @@ class LocalDeliveryRule {
         id: (map['id'] as num?)?.toInt(),
         routeKey: '${map['route_key'] ?? ''}'.trim(),
         sourceNo: (map['source_no'] as num?)?.toInt(),
+        originalSourceNo: (map['original_source_no'] as num?)?.toInt(),
         customerName: '${map['customer_name'] ?? ''}'.trim(),
         alternateName: '${map['alternate_name'] ?? ''}'.trim(),
         companyName: '${map['company_name'] ?? ''}'.trim(),
@@ -155,6 +158,7 @@ class LocalDeliveryRule {
   Map<String, dynamic> toMap() => {
         'route_key': routeKey,
         'source_no': sourceNo,
+        'original_source_no': originalSourceNo,
         'customer_name': customerName.trim(),
         'alternate_name': alternateName.trim(),
         'company_name': companyName.trim(),
@@ -178,9 +182,9 @@ class LocalDeliveryRule {
   String toStatementText() {
     final name = alternateName.isNotEmpty ? alternateName : customerName;
     final tel = phoneDisplay.isNotEmpty ? phoneDisplay : phone;
-    final displayNo = sourceNo == null
+    final displayNo = originalSourceNo ?? (sourceNo == null
         ? null
-        : (sourceNo! >= 10000 ? sourceNo! - 10000 : sourceNo!);
+        : (sourceNo! >= 10000 ? sourceNo! - 10000 : sourceNo!));
     final no = displayNo == null ? '' : 'No. $displayNo';
     return <String>[
       no,
