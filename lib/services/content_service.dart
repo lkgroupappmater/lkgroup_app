@@ -21,16 +21,6 @@ class ContentService {
     return _localizedRows(List<Map<String,dynamic>>.from(rows),language,const ['title','summary','body']);
   }
 
-  static Future<void> purgeExpiredContent() async {
-    final client = _client;
-    if (client == null) return;
-    try {
-      await client.rpc('purge_expired_content');
-    } catch (_) {
-      // 마이그레이션 적용 전에도 조회 자체는 계속 동작하도록 합니다.
-    }
-  }
-
   static Future<List<Map<String, dynamic>>> fetchSchedules({
     bool includePendingDeletion = false,
     AppLanguage language = AppLanguage.korean,
@@ -38,13 +28,12 @@ class ContentService {
     final client = _client;
     if (client == null) return <Map<String, dynamic>>[];
 
-    await purgeExpiredContent();
-
     var query = client.from('shipping_schedules').select();
     if (!includePendingDeletion) {
       query = query
           .isFilter('deleted_at', null)
-          .eq('deletion_status', 'active');
+          .eq('deletion_status', 'active')
+          .eq('is_visible', true);
     }
 
     final rows = await query;
@@ -90,13 +79,12 @@ class ContentService {
     final client = _client;
     if (client == null) return <Map<String, dynamic>>[];
 
-    await purgeExpiredContent();
-
     var query = client.from('notices').select();
     if (!includePendingDeletion) {
       query = query
           .isFilter('deleted_at', null)
-          .eq('deletion_status', 'active');
+          .eq('deletion_status', 'active')
+          .lte('published_at', DateTime.now().toUtc().toIso8601String());
     }
 
     final rows = await query

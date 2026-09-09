@@ -356,7 +356,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         title: _title,
         selectedLanguage: _language,
         onLanguageChanged: _onLanguageChanged,
-        showHomeActions: _currentIndex == 0,
+        // 알림은 계정별 비공개 데이터입니다. 비회원 홈에서는 회사 소개,
+        // 공개 일정·공지만 표시하고 알림 조회 요청 자체를 보내지 않습니다.
+        showHomeActions: _currentIndex == 0 && _isLoggedIn,
         onNotificationTap: _openNotifications,
         notificationCount: _unreadNotifications.length,
         titleFontSize: _currentIndex == 2 ? 17 : 21,
