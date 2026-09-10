@@ -80,13 +80,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver, AutoRe
   }
 
   Future<void> _refreshNotifications({required bool showPopup}) async {
-    if (_currentUser == null) {
+    final userId = _currentUser?.id;
+    if (userId == null) {
       if (mounted) setState(() => _unreadNotifications = const []);
       return;
     }
     try {
       final rows = await NotificationService.instance.fetchUnread();
-      if (!mounted) return;
+      if (!mounted || _currentUser?.id != userId) return;
       setState(() {
         _unreadNotifications = rows;
         if (rows.isEmpty) _popupShownForCurrentBatch = false;

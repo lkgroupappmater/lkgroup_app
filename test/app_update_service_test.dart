@@ -11,7 +11,6 @@ void main() {
   const channel = MethodChannel('com.lkgrouptrading.app/updates');
   final calls = <String>[];
   setUp(() {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     calls.clear();
     AppUpdateService.instance.value = AppUpdateStatus.unavailable;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -27,6 +26,7 @@ void main() {
   });
 
   test('availability check never starts installation and is rate limited', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await AppUpdateService.instance.check(force: true);
     await AppUpdateService.instance.check();
     expect(calls, ['check']);
@@ -37,6 +37,7 @@ void main() {
   });
 
   test('offline and unsupported platforms leave the app usable', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (_) async {
       throw PlatformException(code: 'play_update_unavailable');
