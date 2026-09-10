@@ -245,7 +245,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(_u('로그인 필요')),
-        content: Text(_u('운임 확인 및 견적 요청은 회원 로그인 후 이용하실 수 있습니다.')),
+        content: Text(_u(
+          '대량 혹은 특수 견적 요청은 실명 및 회신을 위해 로그인 후 이용해 주세요.',
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -268,10 +270,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   Future<void> _calculateFreight() async {
-    if (!_isLoggedIn) {
-      _requireLoginMessage();
-      return;
-    }
     final selected = <QuoteBoxInput>[];
     for (var i = 0; i < _boxes.length; i++) {
       final box = _boxes[i];
@@ -319,32 +317,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   Future<void> _showQuotationPreview() async {
-    if (!_isLoggedIn) {
-      _requireLoginMessage();
-      return;
-    }
-
-    // 협력/파트너사 권한 제외. DB의 현재 로그인 프로필 역할을 기준으로 재확인합니다.
-    if (SupabaseConfig.isConfigured) {
-      try {
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user != null) {
-          final profile = await Supabase.instance.client
-              .from('profiles')
-              .select('role')
-              .eq('id', user.id)
-              .maybeSingle();
-          if ('${profile?['role'] ?? ''}' == 'partner') {
-            _message(_u('협력/파트너사는 견적서 보기 권한이 없습니다.'));
-            return;
-          }
-        }
-      } catch (error) {
-        _message(_ue('견적서 권한 확인 실패', error));
-        return;
-      }
-    }
-
     if (_calculation == null || _calculationRates == null) {
       await _calculateFreight();
     }

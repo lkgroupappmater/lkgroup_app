@@ -49,16 +49,14 @@ class FreightPolicyService {
       throw StateError('Supabase 운임 정책을 불러올 수 없습니다.');
     }
 
-    final raw = await SupabaseService.client
-        .from('freight_rate_tiers')
-        .select(
-          'min_weight_kg,rate_per_kg,minimum_charge,volumetric_factor,source_note',
-        )
-        .eq('route_key', routeKey)
-        .eq('active', true)
-        .order('min_weight_kg');
+    final raw = await SupabaseService.client.rpc(
+      'list_public_freight_rate_tiers',
+      params: {'p_route_key': routeKey},
+    );
 
-    final rows = raw.map(Map<String, dynamic>.from).toList(growable: false);
+    final rows = (raw as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList(growable: false);
     if (rows.isEmpty) {
       throw StateError('해당 운송 경로의 DB 기준 운임 정책이 없습니다.');
     }

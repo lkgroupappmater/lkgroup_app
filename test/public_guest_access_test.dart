@@ -15,4 +15,19 @@ void main() {
     expect(find.text('화물 관리'), findsNothing);
     expect(find.text('관리 메뉴'), findsNothing);
   });
+
+  testWidgets(
+    'guest can open freight check and estimate controls',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: AppShell()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('운임 확인').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('박스 정보 입력'), findsOneWidget);
+      expect(find.text('견적서 보기'), findsOneWidget);
+      expect(find.text('대량 혹은 특수 견적 요청'), findsOneWidget);
+    },
+  );
 }

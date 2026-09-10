@@ -44,11 +44,12 @@ class ExchangeRateService {
     if (!SupabaseConfig.isConfigured) {
       return const ExchangeRateSettings(baseKip: 0, baseThb: 0, baseKrw: 0);
     }
-    final rows = await SupabaseService.client
-        .from('exchange_rate_settings')
-        .select()
-        .eq('id', 1)
-        .limit(1);
+    final raw = await SupabaseService.client.rpc(
+      'get_public_exchange_rate_settings',
+    );
+    final rows = (raw as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList(growable: false);
     if (rows.isEmpty) {
       return const ExchangeRateSettings(baseKip: 0, baseThb: 0, baseKrw: 0);
     }

@@ -161,6 +161,8 @@ class UiLocalizations {
     '로그인 필요': 'Sign-in Required',
     '운임 확인 및 견적 요청은 회원 로그인 후 이용하실 수 있습니다.':
         'Sign in to check freight rates and request a quote.',
+    '대량 혹은 특수 견적 요청은 실명 및 회신을 위해 로그인 후 이용해 주세요.':
+        'Sign in to submit a bulk or special quote request so we can verify your name and reply.',
     '회원 로그인': 'Member Sign-in',
     '선택한 박스의 무게와 가로·세로·높이를 모두 입력해 주세요.':
         'Enter the weight, length, width and height for every selected box.',
@@ -395,6 +397,8 @@ class UiLocalizations {
     '로그인 필요': 'ຕ້ອງເຂົ້າລະບົບ',
     '운임 확인 및 견적 요청은 회원 로그인 후 이용하실 수 있습니다.':
         'ກະລຸນາເຂົ້າລະບົບເພື່ອກວດຄ່າຂົນສົ່ງ ແລະ ຂໍໃບສະເໜີລາຄາ.',
+    '대량 혹은 특수 견적 요청은 실명 및 회신을 위해 로그인 후 이용해 주세요.':
+        'ກະລຸນາເຂົ້າລະບົບເພື່ອສົ່ງຄຳຂໍລາຄາຈຳນວນຫຼາຍ ຫຼື ພິເສດ ເພື່ອຢືນຢັນຊື່ ແລະ ຮັບຄຳຕອບ.',
     '회원 로그인': 'ເຂົ້າລະບົບສະມາຊິກ',
     '선택한 박스의 무게와 가로·세로·높이를 모두 입력해 주세요.':
         'ກະລຸນາປ້ອນນ້ຳໜັກ, ຄວາມຍາວ, ຄວາມກວ້າງ ແລະ ຄວາມສູງຂອງທຸກກ່ອງ.',
