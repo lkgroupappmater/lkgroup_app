@@ -1,3 +1,4 @@
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -36,7 +37,27 @@ class ShipmentSearchBody extends StatefulWidget {
   State<ShipmentSearchBody> createState() => _ShipmentSearchBodyState();
 }
 
-class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
+class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefreshState<ShipmentSearchBody> {
+  int _searchRequest = 0;
+  @override
+  Set<String> get autoRefreshTopics => const {'shipments', 'content'};
+  @override
+  bool get autoRefreshAllowed => widget.isLoggedIn && widget.currentUser != null &&
+      _selectedIds.isEmpty && !_loadingUnknownRecipients;
+
+  String get _queryKey => [widget.currentUser?.id, _selectedRouteLabel, _year, _voyage,
+      _invoiceCtrl.text, _recipientCtrl.text, _phoneCtrl.text].join('\u0000');
+  String? _lastSearchKey;
+
+  @override
+  Future<void> refreshAutomatically() async {
+    // Only repeat a submitted search. Unsubmitted filter edits stay untouched.
+    if (_searched && _lastSearchKey == _queryKey) await _search(background: true);
+    if (!canApplyAutoRefresh) return;
+    await _loadUnknownRecipientCargo(background: true);
+    if (canApplyAutoRefresh) await _loadTrackingSchedules();
+  }
+
   int _selectedRoute = -1;
   String _year = '전체';
   String _voyage = '전체';
@@ -123,6 +144,11 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
   void didUpdateWidget(covariant ShipmentSearchBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentUser?.id != widget.currentUser?.id) {
+      _searchRequest++;
+      _results = [];
+      _searched = false;
+      _lastSearchKey = null;
+      _selectedIds.clear();
       _prefillMemberFields();
       _loadUnknownRecipientCargo();
       _loadFilterBatches();
@@ -145,7 +171,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
     super.dispose();
   }
 
-  Future<void> _loadUnknownRecipientCargo() async {
+  Future<void> _loadUnknownRecipientCargo({bool background = false}) async {
     final user = widget.currentUser;
     if (!widget.isLoggedIn || user == null) {
       if (mounted) {
@@ -154,14 +180,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
       return;
     }
 
-    if (mounted) setState(() => _loadingUnknownRecipients = true);
+    if (mounted && !background) setState(() => _loadingUnknownRecipients = true);
     try {
       final rows =
           await UnknownRecipientService.instance.listVisibleUnknownCargo();
       if (!mounted) return;
+      if (user.id != widget.currentUser?.id || (background && !canApplyAutoRefresh)) return;
       setState(() => _unknownRecipientRows = rows);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || background) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -171,7 +198,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _loadingUnknownRecipients = false);
+      if (mounted && !background) setState(() => _loadingUnknownRecipients = false);
     }
   }
 
@@ -562,7 +589,9 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
       ],
     );
   }
-  Future<void> _search() async {
+  Future<void> _search({bool background = false}) async {
+    final key = _queryKey;
+    final request = ++_searchRequest;
     try {
       final dbRows = await ShipmentService.instance.searchRows(
         route: _selectedRouteLabel,
@@ -573,14 +602,16 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> {
         voyage: _voyage,
         currentUser: widget.currentUser,
       );
-      if (!mounted) return;
+      if (!mounted || request != _searchRequest || key != _queryKey ||
+          (background && !canApplyAutoRefresh)) return;
       setState(() {
         _results = dbRows;
         _searched = true;
-        _selectedIds.clear();
+        _lastSearchKey = key;
+        if (!background) _selectedIds.clear();
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || background || request != _searchRequest) return;
       setState(() {
         _results = const [];
         _searched = true;

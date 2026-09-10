@@ -1,3 +1,4 @@
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
@@ -92,7 +93,13 @@ class DashboardHomeBody extends StatefulWidget {
   State<DashboardHomeBody> createState() => _DashboardHomeBodyState();
 }
 
-class _DashboardHomeBodyState extends State<DashboardHomeBody> {
+class _DashboardHomeBodyState extends State<DashboardHomeBody> with AutoRefreshState<DashboardHomeBody> {
+  int _contentRequest = 0;
+  @override
+  Set<String> get autoRefreshTopics => const {'content'};
+  @override
+  Future<void> refreshAutomatically() => _loadContent(background: true);
+
   List<_ScheduleItem> _visibleSchedules = <_ScheduleItem>[];
   List<_NoticeItem> _visibleNotices = <_NoticeItem>[];
 
@@ -159,9 +166,11 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
     return text.contains('T') ? text.split('T').first : text.split(' ').first;
   }
 
-  Future<void> _loadContent() async {
+  Future<void> _loadContent({bool background = false}) async {
+    final request = ++_contentRequest;
+    final language = widget.language;
     try {
-      if (_isManager) {
+      if (_isManager && !background) {
         await ContentService.backfillMissingTranslations();
       }
       final results = await Future.wait<dynamic>(<Future<dynamic>>[
@@ -212,7 +221,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> {
           )
           .toList();
 
-      if (!mounted) return;
+      if (!mounted || request != _contentRequest || widget.language != language ||
+          (background && !canApplyAutoRefresh)) return;
 
       setState(() {
         _visibleSchedules = scheduleItems;

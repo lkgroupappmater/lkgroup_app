@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'screens/splash_screen.dart';
 import 'services/global_notice_service.dart';
+import 'widgets/auto_refresh_state.dart';
 
 // ── Public entry widgets ────────────────────────────────────────────────────
 // main.dart typically calls: runApp(CargoFlowApp()) or runApp(App())
@@ -33,6 +34,7 @@ class _RootApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: GlobalNoticeService.instance.messengerKey,
+      navigatorObservers: [autoRefreshRouteObserver],
       title: 'CargoFlow',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

@@ -1,3 +1,4 @@
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -17,8 +18,18 @@ class NoticeListScreen extends StatefulWidget {
   State<NoticeListScreen> createState() => _NoticeListScreenState();
 }
 
-class _NoticeListScreenState extends State<NoticeListScreen> {
+class _NoticeListScreenState extends State<NoticeListScreen> with AutoRefreshState<NoticeListScreen> {
   late Future<List<Map<String, dynamic>>> _future;
+  @override
+  Set<String> get autoRefreshTopics => const {'content'};
+  @override
+  Future<void> refreshAutomatically() async {
+    final before = _future;
+    final rows = await _load();
+    if (!canApplyAutoRefresh || before != _future) return;
+    setState(() => _future = Future.value(rows));
+  }
+
 
   String _t(String key) => AppStrings.get(widget.language, key);
 
@@ -47,7 +58,7 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
@@ -68,6 +79,7 @@ class _NoticeListScreenState extends State<NoticeListScreen> {
               itemBuilder: (context, index) {
                 final notice = rows[index];
                 return Container(
+                  key: ValueKey(notice['id']),
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
                     color: AppColors.surface,

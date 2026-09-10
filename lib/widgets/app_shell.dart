@@ -1,3 +1,6 @@
+import '../services/app_update_service.dart';
+import 'app_update_banner.dart';
+import 'auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -19,7 +22,16 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver, AutoRefreshState<AppShell> {
+  @override
+  Set<String> get autoRefreshTopics => const {'notifications'};
+
+  @override
+  Future<void> refreshAutomatically() async {
+    await _refreshNotifications(showPopup: false);
+    await AppUpdateService.instance.check();
+  }
+
   int _currentIndex = 0;
   AppLanguage _language = AppLanguage.korean;
   AppUser? _currentUser;
@@ -31,6 +43,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppUpdateService.instance.check();
     AuthService.instance.restoreSession().then((_) async {
       if (!mounted) return;
       setState(() => _currentUser = AuthService.instance.currentUser);
@@ -47,6 +60,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      AppUpdateService.instance.check(
+        force: AppUpdateService.instance.value == AppUpdateStatus.downloading,
+      );
       _refreshUserRole();
       _refreshNotifications(showPopup: false);
     }
@@ -363,7 +379,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         notificationCount: _unreadNotifications.length,
         titleFontSize: _currentIndex == 2 ? 17 : 21,
       ),
-      body: IndexedStack(index: _currentIndex, children: tabs),
+      body: Column(
+        children: [
+          if (_currentIndex == 0) AppUpdateBanner(language: _language),
+          Expanded(child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              for (var i = 0; i < tabs.length; i++)
+                AutoRefreshScope(active: _currentIndex == i, child: tabs[i]),
+            ],
+          )),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selected < 0 ? 0 : selected,
         onTap: (index) => _selectTab(navIndexes[index]),

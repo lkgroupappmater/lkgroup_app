@@ -1,0 +1,31 @@
+name: App update checks
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: app-update-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: python3 -m unittest discover -s tool -p test_ota.py
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/live_data_service.dart lib/services/app_update_service.dart lib/widgets/auto_refresh_state.dart lib/widgets/app_update_banner.dart lib/widgets/app_shell.dart lib/screens/dashboard_home_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart lib/screens/notice_list_screen.dart lib/screens/shipment_schedule_screen.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart
+      - run: flutter test test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart
+      # Compile the native Play bridge; no credentials, signing or publishing.
+      - run: flutter build apk --debug

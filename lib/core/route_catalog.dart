@@ -131,9 +131,17 @@ class RouteCatalog {
 
   static List<RouteDefinition> get definitions {
     if (!_databaseLoaded) return List.unmodifiable(_builtIns);
-    return _runtime.values
+    final active = _runtime.values
         .where((item) => item.status == 'active')
-        .toList(growable: false);
+        .toList();
+    // Keep the same business order in every language and with older servers.
+    // Newly added routes follow the eleven standard routes in server order.
+    final order = <String, int>{
+      for (var i = 0; i < active.length; i++) active[i].routeKey: 100 + i,
+      for (var i = 0; i < _builtIns.length; i++) _builtIns[i].routeKey: i,
+    };
+    active.sort((a, b) => order[a.routeKey]!.compareTo(order[b.routeKey]!));
+    return List.unmodifiable(active);
   }
 
   static List<String> get all => <String>[

@@ -1,3 +1,4 @@
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
@@ -41,7 +42,33 @@ class CargoManagementScreen extends StatefulWidget {
   State<CargoManagementScreen> createState() => _CargoManagementScreenState();
 }
 
-class _CargoManagementScreenState extends State<CargoManagementScreen> {
+class _CargoManagementScreenState extends State<CargoManagementScreen> with AutoRefreshState<CargoManagementScreen> {
+  @override
+  Set<String> get autoRefreshTopics => const {'shipments'};
+  @override
+  bool get autoRefreshAllowed => !_busy && _selectedIds.isEmpty;
+  String get _queryKey => [_route, _year, _voyage, _boxNumberController.text,
+      _invoiceController.text, _nameController.text, _phoneController.text,
+      _showBoxSearch, _showInvoiceSearch, _showNameSearch, _showPhoneSearch].join('\u0000');
+  String? _lastSearchKey;
+
+  @override
+  Future<void> refreshAutomatically() async {
+    // Never overwrite editors, select rows or open the "add cargo" dialog.
+    if (!_searched || _lastSearchKey != _queryKey) return;
+    final key = _queryKey;
+    final rows = await ShipmentService.instance.searchRows(
+      route: _route,
+      boxNumber: _showBoxSearch ? _boxNumberForRequest() : '',
+      invoice: _showInvoiceSearch ? _invoiceController.text.trim() : '',
+      recipient: _showNameSearch ? _nameController.text.trim() : '',
+      phone: _showPhoneSearch ? _phoneController.text.trim() : '',
+      year: _year, voyage: _voyage, currentUser: widget.user,
+    );
+    if (!canApplyAutoRefresh || key != _queryKey) return;
+    setState(() => _results = rows);
+  }
+
   final _boxNumberController = TextEditingController();
   final _invoiceController = TextEditingController();
   final _nameController = TextEditingController();
@@ -161,6 +188,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
   }
 
   Future<void> _search() async {
+    final key = _queryKey;
     setState(() => _busy = true);
     try {
       final rows = await ShipmentService.instance.searchRows(
@@ -173,10 +201,11 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> {
         voyage: _voyage,
         currentUser: widget.user,
       );
-      if (!mounted) return;
+      if (!mounted || key != _queryKey) return;
       setState(() {
         _results = rows;
         _searched = true;
+        _lastSearchKey = key;
         _selectedIds.clear();
       });
       _syncEditControllers();

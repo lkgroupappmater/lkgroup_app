@@ -207,8 +207,9 @@ class ShipmentService {
     // 걸릴 수 있으므로 작은 묶음으로 나눠 순차 반영합니다.
     // 신규 화물만 추가하고 기존 화물의 차이는 승인 요청으로 보내며,
     // 동일값은 다시 저장하지 않습니다.
-    // 100 rows keeps request count low while avoiding one huge JSON payload.
-    const chunkSize = 100;
+    // Keep each request below the shared DB budget even for complex rules.
+    // Web uses the same 20-row starting size and timeout subdivision.
+    const chunkSize = 20;
     var summary = const ShipmentImportSummary();
 
     for (var start = 0; start < rows.length; start += chunkSize) {
@@ -239,7 +240,7 @@ class ShipmentService {
       final message = error.toString();
 
       // DB statement_timeout이면 현재 묶음을 한 번 더 쪼개서 재시도합니다.
-      // 최소 5행까지 자동 분할하여 현장 대용량 업로드 성공률을 높입니다.
+      // 최소 1행까지 자동 분할하고, 한 행도 실패하면 오류를 그대로 알립니다.
       final lower = message.toLowerCase();
       final isRetryable =
           message.contains('57014') ||
@@ -249,7 +250,7 @@ class ShipmentService {
           lower.contains('connection closed') ||
           lower.contains('clientexception');
 
-      if (isRetryable && rows.length > 10) {
+      if (isRetryable && rows.length > 1) {
         final middle = (rows.length / 2).ceil();
         final left = rows.sublist(0, middle);
         final right = rows.sublist(middle);
@@ -578,5 +579,4 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-
 

@@ -1,3 +1,4 @@
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -18,8 +19,18 @@ class ShipmentScheduleScreen extends StatefulWidget {
       _ShipmentScheduleScreenState();
 }
 
-class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> {
+class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> with AutoRefreshState<ShipmentScheduleScreen> {
   late Future<List<Map<String, dynamic>>> _future;
+  @override
+  Set<String> get autoRefreshTopics => const {'content'};
+  @override
+  Future<void> refreshAutomatically() async {
+    final before = _future;
+    final rows = await _load();
+    if (!canApplyAutoRefresh || before != _future) return;
+    setState(() => _future = Future.value(rows));
+  }
+
 
   String _t(String key) => AppStrings.get(widget.language, key);
 
@@ -55,7 +66,7 @@ class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> {
         body: FutureBuilder<List<Map<String, dynamic>>>(
           future: _future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
@@ -77,6 +88,7 @@ class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> {
                 children: rows
                     .map(
                       (row) => Card(
+                        key: ValueKey(row['id']),
                         margin: const EdgeInsets.only(bottom: 10),
                         child: ExpansionTile(
                           title: Text(
