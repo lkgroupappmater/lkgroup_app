@@ -279,6 +279,9 @@ class UiLocalizations {
     '관리자 권한이 필요합니다.': 'Administrator access is required.',
     '공지 및 안내 목록 관리': 'Manage Notices',
     '등록된 공지 및 안내가 없습니다.': 'No notices are registered.',
+    '직접 입력 (선택)': 'Manual entry (optional)',
+    '비어 있는 영어·라오스어는 자동 번역됩니다. 직접 입력한 번역은 우선 저장됩니다.':
+        'Empty English and Lao fields are translated automatically. Manually entered translations take priority.',
   };
 
   static const Map<String, String> _lao = {
@@ -511,5 +514,8 @@ class UiLocalizations {
     '관리자 권한이 필요합니다.': 'ຕ້ອງມີສິດຜູ້ບໍລິຫານ.',
     '공지 및 안내 목록 관리': 'ຈັດການລາຍການແຈ້ງການ',
     '등록된 공지 및 안내가 없습니다.': 'ບໍ່ມີແຈ້ງການ.',
+    '직접 입력 (선택)': 'ປ້ອນເອງ (ບໍ່ບັງຄັບ)',
+    '비어 있는 영어·라오스어는 자동 번역됩니다. 직접 입력한 번역은 우선 저장됩니다.':
+        'ຊ່ອງອັງກິດ ແລະ ລາວທີ່ວ່າງຈະຖືກແປອັດຕະໂນມັດ. ຂໍ້ຄວາມທີ່ປ້ອນເອງຈະຖືກເກັບເປັນຫຼັກ.',
   };
 }

@@ -129,6 +129,26 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     final close = TextEditingController(text: _text(existing ?? {}, 'booking_close_date'));
     final eta = TextEditingController(text: _text(existing ?? {}, 'estimated_arrival_date'));
     final detail = TextEditingController(text: _text(existing ?? {}, 'detail'));
+    final routeEn =
+        TextEditingController(text: _text(existing ?? {}, 'route_en'));
+    final originEn =
+        TextEditingController(text: _text(existing ?? {}, 'origin_en'));
+    final destinationEn =
+        TextEditingController(text: _text(existing ?? {}, 'destination_en'));
+    final statusEn =
+        TextEditingController(text: _text(existing ?? {}, 'status_en'));
+    final detailEn =
+        TextEditingController(text: _text(existing ?? {}, 'detail_en'));
+    final routeLo =
+        TextEditingController(text: _text(existing ?? {}, 'route_lo'));
+    final originLo =
+        TextEditingController(text: _text(existing ?? {}, 'origin_lo'));
+    final destinationLo =
+        TextEditingController(text: _text(existing ?? {}, 'destination_lo'));
+    final statusLo =
+        TextEditingController(text: _text(existing ?? {}, 'status_lo'));
+    final detailLo =
+        TextEditingController(text: _text(existing ?? {}, 'detail_lo'));
     var route = _text(existing ?? {}, 'route').isEmpty
         ? RouteCatalog.routes.first
         : _text(existing!, 'route');
@@ -241,6 +261,38 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                       hintText: _u('예: 출항/도착 일정은 현지 사정에 따라 변경될 수 있습니다.'),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      _u('비어 있는 영어·라오스어는 자동 번역됩니다. 직접 입력한 번역은 우선 저장됩니다.'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text('English · ${_u('직접 입력 (선택)')}'),
+                    children: [
+                      TextFormField(controller: routeEn, decoration: const InputDecoration(labelText: 'Route')),
+                      TextFormField(controller: originEn, decoration: const InputDecoration(labelText: 'Origin')),
+                      TextFormField(controller: destinationEn, decoration: const InputDecoration(labelText: 'Destination')),
+                      TextFormField(controller: statusEn, decoration: const InputDecoration(labelText: 'Status')),
+                      TextFormField(controller: detailEn, maxLines: 3, decoration: const InputDecoration(labelText: 'Detail')),
+                    ],
+                  ),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text('ລາວ · ${_u('직접 입력 (선택)')}'),
+                    children: [
+                      TextFormField(controller: routeLo, decoration: const InputDecoration(labelText: 'ເສັ້ນທາງ')),
+                      TextFormField(controller: originLo, decoration: const InputDecoration(labelText: 'ຕົ້ນທາງ')),
+                      TextFormField(controller: destinationLo, decoration: const InputDecoration(labelText: 'ປາຍທາງ')),
+                      TextFormField(controller: statusLo, decoration: const InputDecoration(labelText: 'ສະຖານະ')),
+                      TextFormField(controller: detailLo, maxLines: 3, decoration: const InputDecoration(labelText: 'ລາຍລະອຽດ')),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -263,10 +315,18 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
                   'booking_close_date': FormValidators.normalizeDate(close.text),
                   'estimated_arrival_date': FormValidators.normalizeDate(eta.text),
                   'detail': detail.text.trim(),
+                  'route_en': routeEn.text.trim(),
+                  'origin_en': originEn.text.trim(),
+                  'destination_en': destinationEn.text.trim(),
+                  'status_en': statusEn.text.trim(),
+                  'detail_en': detailEn.text.trim(),
+                  'route_lo': routeLo.text.trim(),
+                  'origin_lo': originLo.text.trim(),
+                  'destination_lo': destinationLo.text.trim(),
+                  'status_lo': statusLo.text.trim(),
+                  'detail_lo': detailLo.text.trim(),
                 };
-                if (existing != null && existing['status'] != null) {
-                  item['status'] = existing['status'];
-                }
+                item['status'] = existing?['status'] ?? 'scheduled';
                 setDialogState(() => saving=true);
                 try {
                   if (existing == null) {
@@ -296,6 +356,16 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> {
     close.dispose();
     eta.dispose();
     detail.dispose();
+    routeEn.dispose();
+    originEn.dispose();
+    destinationEn.dispose();
+    statusEn.dispose();
+    detailEn.dispose();
+    routeLo.dispose();
+    originLo.dispose();
+    destinationLo.dispose();
+    statusLo.dispose();
+    detailLo.dispose();
   }
 
   @override

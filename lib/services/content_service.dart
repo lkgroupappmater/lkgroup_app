@@ -274,6 +274,7 @@ class ContentService {
       }
     } catch (_) {
       // Backfill is optional and must not interrupt the public home screen.
+      _backfillAttempted = false;
     }
   }
 
@@ -332,20 +333,29 @@ class ContentService {
     List<String> fields,
   ) async {
     final result = Map<String, dynamic>.from(data);
-    final source = [for (final field in fields) '${data[field] ?? ''}'];
-    try {
-      final english = await AiAssistantService.translate(
-        source,
-        AppLanguage.english,
-      );
-      final lao = await AiAssistantService.translate(source, AppLanguage.lao);
-      for (var index = 0; index < fields.length; index++) {
-        result['${fields[index]}_en'] = english[index];
-        result['${fields[index]}_lo'] = lao[index];
+    for (final language in const <AppLanguage>[
+      AppLanguage.english,
+      AppLanguage.lao,
+    ]) {
+      final suffix = language == AppLanguage.lao ? 'lo' : 'en';
+      final pendingFields = <String>[];
+      final pendingSources = <String>[];
+      for (final field in fields) {
+        final source = '${data[field] ?? ''}'.trim();
+        final manual = '${data['${field}_$suffix'] ?? ''}'.trim();
+        if (source.isNotEmpty && manual.isEmpty) {
+          pendingFields.add(field);
+          pendingSources.add(source);
+        }
       }
-    } catch (_) {
-      // Content saving remains available when the AI provider is unavailable.
-      // Existing stored translations remain untouched on partial updates.
+      if (pendingFields.isEmpty) continue;
+      final translated = await AiAssistantService.translate(
+        pendingSources,
+        language,
+      );
+      for (var index = 0; index < pendingFields.length; index++) {
+        result['${pendingFields[index]}_$suffix'] = translated[index];
+      }
     }
     return result;
   }
@@ -354,11 +364,11 @@ class ContentService {
     Map<String, dynamic> row,
     List<String> fields,
   ) =>
-      fields.any(
-        (field) =>
-            '${row['${field}_en'] ?? ''}'.trim().isEmpty ||
-            '${row['${field}_lo'] ?? ''}'.trim().isEmpty,
-      );
+      fields.any((field) {
+        if ('${row[field] ?? ''}'.trim().isEmpty) return false;
+        return '${row['${field}_en'] ?? ''}'.trim().isEmpty ||
+            '${row['${field}_lo'] ?? ''}'.trim().isEmpty;
+      });
 
   static Map<String, dynamic> _translationValues(
     Map<String, dynamic> row,

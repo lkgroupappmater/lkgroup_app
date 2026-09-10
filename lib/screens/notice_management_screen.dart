@@ -124,6 +124,14 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
   Future<void> _showEditor({Map<String, dynamic>? existing}) async {
     final title = TextEditingController(text: _text(existing ?? {}, 'title'));
     final content = TextEditingController(text: _text(existing ?? {}, 'content'));
+    final titleEn =
+        TextEditingController(text: _text(existing ?? {}, 'title_en'));
+    final contentEn =
+        TextEditingController(text: _text(existing ?? {}, 'content_en'));
+    final titleLo =
+        TextEditingController(text: _text(existing ?? {}, 'title_lo'));
+    final contentLo =
+        TextEditingController(text: _text(existing ?? {}, 'content_lo'));
     bool pinned = existing?['is_pinned'] == true;
     bool showPublishedDate = existing == null || existing['show_published_date'] != false;
 
@@ -156,6 +164,46 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                     hintText: _u('공지 내용을 입력해 주세요.'),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _u('비어 있는 영어·라오스어는 자동 번역됩니다. 직접 입력한 번역은 우선 저장됩니다.'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text('English · ${_u('직접 입력 (선택)')}'),
+                  children: [
+                    TextField(
+                      controller: titleEn,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    TextField(
+                      controller: contentEn,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'Content'),
+                    ),
+                  ],
+                ),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text('ລາວ · ${_u('직접 입력 (선택)')}'),
+                  children: [
+                    TextField(
+                      controller: titleLo,
+                      decoration: const InputDecoration(labelText: 'ຫົວຂໍ້'),
+                    ),
+                    TextField(
+                      controller: contentLo,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'ເນື້ອໃນ'),
+                    ),
+                  ],
+                ),
                 IgnorePointer(ignoring: saving, child: ContentMediaEditor(items: attachments, kind: 'notice', language: widget.language, onBusy: (value) { if (dialogContext.mounted) setDialogState(() => mediaBusy=value); })),
                 CheckboxListTile(
                   value: showPublishedDate,
@@ -185,6 +233,10 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
                   'attachments': attachments,
                   'title': title.text.trim(),
                   'content': content.text.trim(),
+                  'title_en': titleEn.text.trim(),
+                  'content_en': contentEn.text.trim(),
+                  'title_lo': titleLo.text.trim(),
+                  'content_lo': contentLo.text.trim(),
                   'is_pinned': pinned,
                   'show_published_date': showPublishedDate,
                   if (existing == null) 'published_at': DateTime.now().toUtc().toIso8601String(),
@@ -214,6 +266,10 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     title.dispose();
     content.dispose();
+    titleEn.dispose();
+    contentEn.dispose();
+    titleLo.dispose();
+    contentLo.dispose();
   }
 
   @override
