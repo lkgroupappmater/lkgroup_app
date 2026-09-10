@@ -254,7 +254,9 @@ class FreightService {
         final row = Map<String, dynamic>.from(raw);
         if (row['id'] != null) return row;
       }
-    } catch (_) {}
+    } catch (error) {
+      throw StateError('명세서 추가 할인 정보를 확인하지 못했습니다: $error');
+    }
     return null;
   }
 
@@ -266,76 +268,19 @@ class FreightService {
     required String name,
     required String phone,
   }) async {
-    if (!SupabaseConfig.isConfigured || name.trim().isEmpty) {
+    if (!SupabaseConfig.isConfigured || (name.trim().isEmpty && phone.trim().isEmpty)) {
       return null;
     }
 
-    // Patch123+: Customer Group의 개인명+회사명 물량을 같은 항차에서 합산해
-    // bulk tier를 결정합니다.
-    try {
-      final raw = await SupabaseService.client.rpc(
-        'resolve_customer_discount_context',
-        params: {
-          'p_route_key': routeKey,
-          'p_year': year,
-          'p_voyage': voyage,
-          'p_name': name.trim(),
-          'p_phone': phone.trim(),
-        },
-      );
-      if (raw is Map) {
-        final mapped = Map<String, dynamic>.from(raw);
-        if (mapped['id'] != null ||
-            mapped['customer_group_id'] != null) {
-          return mapped;
-        }
-      }
-    } catch (_) {
-      // 068 SQL 적용 전에는 기존 할인 매칭으로 안전하게 fallback.
-    }
+    final raw = await SupabaseService.client.rpc(
+      'resolve_customer_discount_context',
+      params: {
+        'p_route_key': routeKey, 'p_year': year, 'p_voyage': voyage,
+        'p_name': name.trim(), 'p_phone': phone.trim(),
+      },
+    );
+    return raw is Map ? Map<String, dynamic>.from(raw) : null;
 
-    final rows = await SupabaseService.client
-        .from('customer_rate_overrides')
-        .select()
-        .eq('active', true)
-        .limit(500);
-
-    Map<String, dynamic>? bestRouteMatch;
-    Map<String, dynamic>? bestAllMatch;
-    var bestRouteRank = 9999;
-    var bestAllRank = 9999;
-
-    for (final raw in rows) {
-      final row = Map<String, dynamic>.from(raw);
-      final ruleRoute = '${row['route_key'] ?? ''}'.trim();
-      if (ruleRoute != 'all' && ruleRoute != routeKey) continue;
-      if (!_phoneMatches(phone, '${row['phone'] ?? ''}')) {
-        continue;
-      }
-
-      final candidates = [
-        '${row['customer_name'] ?? ''}',
-        '${row['company_name'] ?? ''}',
-      ];
-      var rank = 9999;
-      for (final candidate in candidates) {
-        if (candidate.trim().isEmpty) continue;
-        final candidateRank = _nameMatchRank(name, candidate);
-        if (candidateRank < rank) rank = candidateRank;
-      }
-      if (rank >= 9999) continue;
-
-      if (ruleRoute == routeKey) {
-        if (rank < bestRouteRank) {
-          bestRouteRank = rank;
-          bestRouteMatch = row;
-        }
-      } else if (rank < bestAllRank) {
-        bestAllRank = rank;
-        bestAllMatch = row;
-      }
-    }
-    return bestRouteMatch ?? bestAllMatch;
   }
 
   static List<String> _nameTokens(String value) => value
@@ -407,3 +352,4 @@ class FreightService {
   static double? _nullableD(dynamic value) =>
       value == null ? null : double.tryParse('$value');
 }
+

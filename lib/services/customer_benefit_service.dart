@@ -419,22 +419,24 @@ class CustomerBenefitService {
     }
     final routeKey = RouteCatalog.formRouteKeyFor(routeLabel);
     if (!localDeliveryRouteKeys.contains(routeKey)) return null;
-    final rows = await SupabaseService.client
+    final rawId = await SupabaseService.client.rpc(
+      'lk_resolve_delivery_profile_id',
+      params: {
+        'p_route_key': routeKey,
+        'p_shipment_name': name,
+        'p_shipment_phone': phone,
+      },
+    );
+    if (rawId == null) return null;
+    final row = await SupabaseService.client
         .from('local_delivery_profiles')
         .select()
+        .eq('id', rawId)
         .eq('route_key', routeKey)
         .eq('active', true)
-        .order('preferred', ascending: false)
-        .order('source_no')
-        .limit(500);
-    return selectLocalDeliveryRule(
-      rules: rows.map(
-        (raw) => LocalDeliveryRule.fromMap(
-          Map<String, dynamic>.from(raw),
-        ),
-      ),
-      name: name,
-      phone: phone,
+        .maybeSingle();
+    return row == null ? null : LocalDeliveryRule.fromMap(
+      Map<String, dynamic>.from(row),
     );
   }
 
@@ -461,3 +463,4 @@ class CustomerBenefitService {
     }
   }
 }
+

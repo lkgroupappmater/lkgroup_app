@@ -12,8 +12,12 @@ class AiAssistantService {
 
   static Future<List<String>> translate(
     List<String> texts,
-    AppLanguage language,
-  ) async {
+    AppLanguage language, {
+    List<String>? fields,
+  }) async {
+    if (fields != null && fields.length != texts.length) {
+      throw ArgumentError('Translation fields must match texts.');
+    }
     if (language == AppLanguage.korean || texts.isEmpty) {
       return List<String>.from(texts);
     }
@@ -25,7 +29,7 @@ class AiAssistantService {
     for (var i = 0; i < texts.length; i++) {
       final source = texts[i].trim();
       if (source.isEmpty) continue;
-      final cacheKey = '${language.code}\u0000$source';
+      final cacheKey = '${language.code}\u0000${fields?[i] ?? ''}\u0000$source';
       final cached = _translationCache[cacheKey];
       if (cached != null) {
         output[i] = cached;
@@ -47,6 +51,9 @@ class AiAssistantService {
           'mode': 'translate',
           'target_language': language.code,
           'texts': chunk,
+          if (fields != null) 'text_fields': [
+            for (var i = start; i < end; i++) fields[missingIndexes[i]],
+          ],
         },
       );
       if (response.status < 200 || response.status >= 300) {
@@ -63,11 +70,14 @@ class AiAssistantService {
         );
       }
       for (var offset = 0; offset < chunk.length; offset++) {
-        final value = '${translated[offset]}'.trim();
-        final safeValue = value.isEmpty ? chunk[offset] : value;
+        final value = translated[offset];
+        if (value is! String || value.trim().isEmpty) {
+          throw StateError('AI translation returned empty or invalid text.');
+        }
+        final safeValue = value.trim();
         final originalIndex = missingIndexes[start + offset];
         output[originalIndex] = safeValue;
-        _translationCache['${language.code}\u0000${chunk[offset]}'] = safeValue;
+        _translationCache['${language.code}\u0000${fields?[originalIndex] ?? ''}\u0000${chunk[offset]}'] = safeValue;
       }
     }
     return output;
@@ -109,3 +119,4 @@ class AiAssistantService {
     return '${result['answer']}';
   }
 }
+

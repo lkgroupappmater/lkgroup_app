@@ -224,23 +224,11 @@ class ExcelImportService {
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
     await _importStatementShareRules(workbook, routeKey: routeKey);
 
-    // One batch-scoped finalizer after all rows/rules are ready.
-    // Do not silently finish an upload with missing delivery/receipt/zone data.
-    if (SupabaseConfig.isConfigured &&
-        uniqueRows.isNotEmpty &&
-        importSummary.existingRows == 0) {
-      onProgress?.call(0.82, '신규 항차 배송·구획·영수번호 최종 정리 중');
-      await SupabaseService.client.rpc(
-        'admin_finalize_excel_batch_rules_fast',
-        params: {
-          'p_route': routeLabel,
-          'p_year': year,
-          'p_voyage': voyage,
-          'p_resequence': true,
-        },
-      );
-    } else if (SupabaseConfig.isConfigured && importSummary.existingRows > 0) {
-      onProgress?.call(0.82, '기존 항차 비교 반영 · 자동 재번호 생략');
+    if (SupabaseConfig.isConfigured && uniqueRows.isNotEmpty) {
+      onProgress?.call(0.82, '공통 규칙으로 배송·구획·이름순 명세서 번호 적용 중');
+      await SupabaseService.client.rpc('admin_finalize_excel_batch_rules_fast', params: {
+        'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_resequence': true,
+      });
     }
 
     onProgress?.call(0.86, '최종 규칙 반영 완료 · 원본 Excel 보관 중');
@@ -430,6 +418,9 @@ class ExcelImportService {
 
         values[columnIndex] = value;
       }
+      final physicalRow = int.tryParse(RegExp(r'^<row\b[^>]*\br="(\d+)"')
+          .firstMatch(rowMatch.group(0) ?? '')?.group(1) ?? '') ?? rows.length + 1;
+      while (rows.length < physicalRow - 1) { rows.add(<String>[]); }
       rows.add(values);
     }
 
@@ -1185,6 +1176,8 @@ class ExcelImportService {
 
       var rowOrdinal = 0;
       for (final rowMatch in rowPattern.allMatches(sheetXml)) {
+        rowOrdinal = (int.tryParse(RegExp(r'^<row\b[^>]*\br="(\d+)"')
+            .firstMatch(rowMatch.group(0) ?? '')?.group(1) ?? '') ?? rowOrdinal + 1) - 1;
         final green = <int>{};
         final yellow = <int>{};
         final orange = <int>{};
@@ -1276,6 +1269,12 @@ class ExcelImportService {
     if (!SupabaseConfig.isConfigured) {
       return (applied: 0, waitingForPhone: 0);
     }
+    final fixedZones = AutomationWorkbookRules.zones(workbook);
+    if (fixedZones != null) {
+      await SupabaseService.client.rpc('web_import_excel_zone_rules', params: {
+        'p_route_key': routeKey, 'p_zones': fixedZones,
+      });
+    }
     final sheet = workbook['Row data'];
     if (sheet == null || sheet.isEmpty) {
       return (applied: 0, waitingForPhone: 0);
@@ -1336,6 +1335,7 @@ class ExcelImportService {
             'phone': normalizedPhone,
             'route_key': routeKey,
             'discount_percent': discount,
+            'excel_source_row': rr + 1,
             if (groupName.isNotEmpty) 'group_name': groupName,
             if (groupName.isNotEmpty) 'source_detail': 'BASE Excel · $groupName',
             // 동명이인/오적용 방지: 전화번호가 없는 규칙은 저장하되 적용하지 않습니다.
@@ -1741,3 +1741,4 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
+

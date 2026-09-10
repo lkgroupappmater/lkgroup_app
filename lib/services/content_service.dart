@@ -352,6 +352,7 @@ class ContentService {
       final translated = await AiAssistantService.translate(
         pendingSources,
         language,
+        fields: pendingFields,
       );
       for (var index = 0; index < pendingFields.length; index++) {
         result['${pendingFields[index]}_$suffix'] = translated[index];
@@ -381,3 +382,4 @@ class ContentService {
           if (row.containsKey('${field}_lo')) '${field}_lo': row['${field}_lo'],
       };
 }
+

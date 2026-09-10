@@ -76,4 +76,18 @@ class AutomationWorkbookRules {
     }
     return result;
   }
+  static List<Map<String, dynamic>>? zones(Map<String, List<List<String>>> workbook) {
+    final rows = workbook['고객 리스트'];
+    if (rows == null) return null;
+    final header = rows.indexWhere((r) => key(cell(r, 1)) == '고정분류고객' && key(cell(r, 2)) == '구획');
+    if (header < 0) return null;
+    final result = <Map<String, dynamic>>[];
+    for (var i = header + 1; i < rows.length && i < 200; i++) {
+      final name = cell(rows[i], 1), zone = cell(rows[i], 2);
+      if (name.isNotEmpty && zone.isNotEmpty) result.add({'customer_name': name, 'zone': zone});
+    }
+    return result;
+  }
+
 }
+

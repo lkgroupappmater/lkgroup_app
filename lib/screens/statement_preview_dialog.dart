@@ -9,6 +9,7 @@ import 'package:image/image.dart' as image_lib;
 import '../core/money_format.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
+import '../core/document_form_style.dart';
 import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
@@ -80,11 +81,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   bool _loading = true;
   bool _saving = false;
 
-  static const double _docWidth = 1800;
-  int get _visibleRows => _rows.length + _extraCosts.length + 1 < 10
-      ? 10
-      : _rows.length + _extraCosts.length + 1;
-  double get _docHeight => 1120 + (_visibleRows - 10) * 32;
+  static const double _docWidth = DocumentFormStyle.width;
+  double get _docHeight => _painter.documentHeight;
 
   @override
   void initState() {
@@ -320,7 +318,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
             const Divider(height: 1),
             Expanded(
               child: Container(
-                color: const Color(0xFF202124),
+                color: const Color(0xFFEDF2F7),
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : !ready
@@ -433,18 +431,101 @@ class _DigitalStatementPainter extends CustomPainter {
   final ui.Image stamp;
   final ui.Image bankStrip;
 
-  static const ink = Color(0xFF182433);
-  static const line = Color(0xFF687A8C);
-  static const paleBlue = Color(0xFFD9EAF7);
-  static const actualColor = Color(0xFFFFE49A);
-  static const volumeColor = Color(0xFFCFE8BD);
-  static const appliedColor = Color(0xFFBFDDF1);
-  static const totalColor = Color(0xFFFFE86A);
+  static const ink = DocumentFormStyle.ink;
+  static const line = DocumentFormStyle.line;
+  static const paleBlue = DocumentFormStyle.paleBlue;
+  static const actualColor = DocumentFormStyle.actual;
+  static const volumeColor = DocumentFormStyle.volume;
+  static const appliedColor = DocumentFormStyle.applied;
+  static const totalColor = DocumentFormStyle.total;
+
+  DocumentTextContent get _docText => DocumentTextCatalog.statement(routeLabel, DateTime.now());
+  String get _remarkText => _displayAutoNotes.isEmpty
+      ? _docText.remark : '${_docText.remark}\n\n$_displayAutoNotes';
+
+  DocumentFormLayout get _layout => DocumentFormLayout(
+    itemCount: rows.length + extraCosts.length,
+    remark: _remarkText, remarkFontSize: _docText.remarkFontSize,
+    footer: _docText.footerText, footerFontSize: _docText.footerFontSize,
+    delivery: inlandDeliveryText,
+  );
+  double get documentHeight => _layout.height;
+
+  String get _displayAutoNotes {
+    final autoNotes = rows
+        .map((row) => _s(row['special_note_auto']))
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .join(' / ');
+    bool validDiscountGroup(String value) {
+      final key = value
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\s_./()-]+'), '');
+      return key.isNotEmpty &&
+          key != '할인' &&
+          key != '할인율' &&
+          key != '할인금액' &&
+          key != '할인액' &&
+          key != 'discount' &&
+          key != 'discountrate' &&
+          key != 'discountamount' &&
+          key != '기타할인';
+    }
+
+    final freightGroups = freight.lines
+        .map((line) => line.discountGroup.trim())
+        .where(validDiscountGroup)
+        .where((value) => value.isNotEmpty && value != '기타 할인')
+        .toSet()
+        .toList(growable: false);
+    final freightDiscountPercent = freight.lines
+        .map((line) => line.discountPercent)
+        .fold<double>(0, (best, value) => value > best ? value : best);
+
+    var displayAutoNotes = autoNotes;
+    if (freightDiscountPercent > 0) {
+      final group = freightGroups.isEmpty ? '' : freightGroups.first;
+      final phrase = group.isEmpty
+          ? '할인 ${pctText(freightDiscountPercent)}% 적용'
+          : (group.contains('할인')
+              ? '$group ${pctText(freightDiscountPercent)}% 적용'
+              : '$group 할인 ${pctText(freightDiscountPercent)}% 적용');
+      final parts = displayAutoNotes.isEmpty
+          ? <String>[]
+          : displayAutoNotes.split(' / ').map((e) => e.trim()).toList();
+      final oldDiscount = parts.indexWhere(
+        (e) => e.contains('할인') && e.contains('% 적용'),
+      );
+      if (oldDiscount >= 0) {
+        parts[oldDiscount] = phrase;
+      } else {
+        final delivery = parts.indexWhere(
+          (e) => e.contains('지방배송') || e.contains('시내배송'),
+        );
+        if (delivery >= 0) {
+          parts.insert(delivery, phrase);
+        } else {
+          parts.add(phrase);
+        }
+      }
+      displayAutoNotes = parts.where((e) => e.isNotEmpty).join(' / ');
+    }
+    return displayAutoNotes;
+  }
+
+  String pctText(double value) {
+    final p = value * 100;
+    return (p - p.roundToDouble()).abs() < .001
+        ? p.toStringAsFixed(0)
+        : p.toStringAsFixed(2);
+  }
+
 
   @override
   void paint(Canvas c, Size size) {
+    final layout = _layout;
     final w = size.width;
-    final h = size.height;
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
     final border = Paint()
       ..color = line
@@ -460,15 +541,15 @@ class _DigitalStatementPainter extends CustomPainter {
         : '${RouteCatalog.documentTitleFor(routeLabel)} $voyageText 거래 명세서';
 
     _text(c, statementTitle,
-        Rect.fromLTWH(0, 12, w, 62),
+        Rect.fromLTWH(180, 12, w - 510, 62),
         39,
         bold: true,
         center: true);
     _labelValue(c, '구획(Zone)', _s(rows.first['unloading_zone']),
         Rect.fromLTWH(w - 300, 8, 282, 72), valueSize: 34);
 
-    final infoTop = 90.0;
-    const infoH = 106.0;
+    const infoTop = 104.0;
+    const infoH = 108.0;
     final half = w * .5;
     for (var r = 0; r < 3; r++) {
       final y = infoTop + r * (infoH / 3);
@@ -485,11 +566,10 @@ class _DigitalStatementPainter extends CustomPainter {
         Rect.fromLTWH(half + 8, infoTop + 39, half - 16, 28), emphasize: true);
     _kv(c, '영수번호', receiptNumber, Rect.fromLTWH(half + 8, infoTop + 74, half - 16, 28), emphasize: true);
 
-    const tableTop = 205.0;
-    const headerH = 42.0;
-    const rowH = 32.0;
-    final usedRows = rows.length + extraCosts.length;
-    final rowCount = usedRows + 1 < 10 ? 10 : usedRows + 1;
+    const tableTop = DocumentFormStyle.tableTop;
+    const headerH = DocumentFormStyle.headerHeight;
+    const rowH = DocumentFormStyle.rowHeight;
+    final rowCount = layout.rowCount;
     final cols = <double>[
       0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
     ];
@@ -531,13 +611,14 @@ class _DigitalStatementPainter extends CustomPainter {
           17, bold: true, center: true);
       if (hasExtra) {
         final extra = extraCosts[extraIndex];
+        _box(c, Rect.fromLTRB(cols[1], y, cols[13], y + rowH), const Color(0xFFF8FAFD));
         _text(
           c,
           extra.discountApplies ? '${extra.name} (할인)' : extra.name,
-          Rect.fromLTRB(cols[1] + 3, y + 2, cols[2] - 3, y + rowH - 2),
+          Rect.fromLTRB(cols[1] + 12, y + 2, cols[13] - 12, y + rowH - 2),
           19,
           bold: true,
-          center: true,
+          center: false,
         );
         _text(
           c,
@@ -624,91 +705,23 @@ class _DigitalStatementPainter extends CustomPainter {
           18, bold: true, center: true);
     }
 
-    final sumTop = summaryY + rowH + 10;
-    final docText = DocumentTextCatalog.statement(routeLabel, DateTime.now());
+    final sumTop = layout.summaryTop;
+    final docText = _docText;
     final leftW = w * .70;
-    _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, 160), const Color(0xFFFBFCFD));
-    _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, 160), const Color(0xFFF3F8FC));
+    _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, layout.summaryHeight), const Color(0xFFFBFCFD));
+    _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, layout.summaryHeight), const Color(0xFFF3F8FC));
     _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 24),
         19, bold: true);
-    final autoNotes = rows
-        .map((row) => _s(row['special_note_auto']))
-        .where((value) => value.isNotEmpty)
-        .toSet()
-        .join(' / ');
-    bool validDiscountGroup(String value) {
-      final key = value
-          .trim()
-          .toLowerCase()
-          .replaceAll(RegExp(r'[\s_./()-]+'), '');
-      return key.isNotEmpty &&
-          key != '할인' &&
-          key != '할인율' &&
-          key != '할인금액' &&
-          key != '할인액' &&
-          key != 'discount' &&
-          key != 'discountrate' &&
-          key != 'discountamount' &&
-          key != '기타할인';
-    }
-
-    final freightGroups = freight.lines
-        .map((line) => line.discountGroup.trim())
-        .where(validDiscountGroup)
-        .where((value) => value.isNotEmpty && value != '기타 할인')
-        .toSet()
-        .toList(growable: false);
-    final freightDiscountPercent = freight.lines
-        .map((line) => line.discountPercent)
-        .fold<double>(0, (best, value) => value > best ? value : best);
-
-    String pctText(double value) {
-      final p = value * 100;
-      return (p - p.roundToDouble()).abs() < .001
-          ? p.toStringAsFixed(0)
-          : p.toStringAsFixed(2);
-    }
-
-    var displayAutoNotes = autoNotes;
-    if (freightDiscountPercent > 0) {
-      final group = freightGroups.isEmpty ? '' : freightGroups.first;
-      final phrase = group.isEmpty
-          ? '할인 ${pctText(freightDiscountPercent)}% 적용'
-          : (group.contains('할인')
-              ? '$group ${pctText(freightDiscountPercent)}% 적용'
-              : '$group 할인 ${pctText(freightDiscountPercent)}% 적용');
-      final parts = displayAutoNotes.isEmpty
-          ? <String>[]
-          : displayAutoNotes.split(' / ').map((e) => e.trim()).toList();
-      final oldDiscount = parts.indexWhere(
-        (e) => e.contains('할인') && e.contains('% 적용'),
-      );
-      if (oldDiscount >= 0) {
-        parts[oldDiscount] = phrase;
-      } else {
-        final delivery = parts.indexWhere(
-          (e) => e.contains('지방배송') || e.contains('시내배송'),
-        );
-        if (delivery >= 0) {
-          parts.insert(delivery, phrase);
-        } else {
-          parts.add(phrase);
-        }
-      }
-      displayAutoNotes = parts.where((e) => e.isNotEmpty).join(' / ');
-    }
+    final displayAutoNotes = _displayAutoNotes;
     final remarkText = displayAutoNotes.isEmpty
         ? docText.remark
         : '${docText.remark}\n\n$displayAutoNotes';
     _text(
       c,
       remarkText,
-      Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, 112),
+      Rect.fromLTWH(10, sumTop + 38, leftW * .58 - 20, layout.summaryHeight - 54),
       docText.remarkFontSize,
-      bold: true,
-      center: true,
-      maxLines: 6,
-      lineHeight: 1.05,
+      lineHeight: 1.2,
     );
 
     _text(c, 'Inland delivery/시내·지방 배송',
@@ -730,18 +743,17 @@ class _DigitalStatementPainter extends CustomPainter {
     }
     if (deliveryColor != null && inlandDeliveryText.trim().isNotEmpty) {
       c.drawRect(
-        Rect.fromLTWH(leftW * .58 + 8, sumTop + 34, leftW * .42 - 16, 118),
+        Rect.fromLTWH(leftW * .58 + 8, sumTop + 34, leftW * .42 - 16, layout.summaryHeight - 42),
         Paint()..color = deliveryColor.withOpacity(.32),
       );
     }
     _text(
       c,
       inlandDeliveryText,
-      Rect.fromLTWH(leftW * .58 + 14, sumTop + 40, leftW * .42 - 24, 108),
+      Rect.fromLTWH(leftW * .58 + 14, sumTop + 40, leftW * .42 - 24, layout.summaryHeight - 56),
       18.5,
       bold: true,
       center: true,
-      maxLines: 5,
       lineHeight: 1.16,
     );
 
@@ -919,30 +931,30 @@ class _DigitalStatementPainter extends CustomPainter {
 
     final finalTop = sumTop + 92;
     final labelW = totalW * .38;
-    _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), const Color(0xFFFFF200));
+    _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 94), DocumentFormStyle.totalLabel);
     _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 82),
         20, bold: true, center: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 23.5, totalW - labelW, 23.5),
-        const Color(0xFFFCE48A));
+        const Color(0xFFF3F7FC));
     _text(c, 'USD     ${MoneyFormat.usd(finalUsd)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 23.5, totalW - labelW - 16, 23.5),
         21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 23.5, totalW - labelW, 23.5),
-        const Color(0xFFFFC21A));
+        const Color(0xFFEAF1F8));
     _text(c, 'KIP     ${MoneyFormat.kip(finalUsd * freight.rates.appliedKip)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 23.5, totalW - labelW - 16, 23.5),
         21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 23.5, totalW - labelW, 23.5),
-        const Color(0xFF91D18B));
+        const Color(0xFFF3F7FC));
     _text(c, 'THB     ${MoneyFormat.thb(finalUsd * freight.rates.appliedThb)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 23.5, totalW - labelW - 16, 23.5),
         21, bold: true, right: true);
     _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 23.5, totalW - labelW, 23.5),
-        const Color(0xFF23B6D8));
+        const Color(0xFFEAF1F8));
     _text(c, 'KRW     ${MoneyFormat.krw(finalUsd * freight.rates.appliedKrw)}',
         Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 23.5, totalW - labelW - 16, 23.5),
         21, bold: true, right: true);
-    final payTop = sumTop + 204;
+    final payTop = layout.paymentTop;
     const payGap = 4.0;
     final payW = (w - payGap * 3) / 4;
     final payRects = <Rect>[
@@ -984,29 +996,24 @@ class _DigitalStatementPainter extends CustomPainter {
       22,
       bold: true,
       center: true,
-      maxLines: 4,
       lineHeight: 1.35,
     );
 
-    final noteTop = payTop + 150;
-    _text(c, '', Rect.fromLTWH(15, noteTop, w - 30, 42), 1);
-
-    final signTop = noteTop + 46;
+    final signTop = layout.signTop;
     final signW = w * .26;
-    final signH = 105.0;
+    final signH = layout.signHeight;
     _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
     _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
     _text(c, '엘케이 (LK)무역', Rect.fromLTWH(12, signTop + 8, signW - 24, 24),
         16, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, signH - 8));
+    _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, 97));
     _text(
       c,
       docText.footerText,
       Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
       docText.footerFontSize,
       center: true,
-      maxLines: 6,
-      lineHeight: 1.05,
+      lineHeight: 1.2,
     );
     _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 12, signTop + 8, signW - 24, 24),
         17, bold: true);
@@ -1118,26 +1125,9 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   void _text(Canvas c, String text, Rect r, double size,
-      {bool bold = false, bool center = false, bool right = false, int maxLines = 3, double lineHeight = 1.15}) {
-    final p = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: ink,
-          fontFamily: 'NotoSansKR',
-          fontSize: size,
-          fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-          height: lineHeight,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: center ? TextAlign.center : (right ? TextAlign.right : TextAlign.left),
-      maxLines: maxLines,
-      ellipsis: '…',
-    )..layout(maxWidth: r.width);
-    final y = r.top + (r.height - p.height).clamp(0, r.height) / 2;
-    final x = center ? r.left + (r.width - p.width) / 2 : (right ? r.right - p.width : r.left);
-    p.paint(c, Offset(x, y));
+      {bool bold = false, bool center = false, bool right = false, double lineHeight = 1.15}) {
+    DocumentFormStyle.drawText(c, text, r, size,
+        bold: bold, center: center, right: right, lineHeight: lineHeight);
   }
 
   @override
@@ -1200,11 +1190,7 @@ class StatementDocumentRenderer {
       voyage: request.voyage,
       receiptNumber: request.receiptNumber,
     );
-    final visibleRows = rows.length + extraCosts.length + 1 < 10
-        ? 10
-        : rows.length + extraCosts.length + 1;
-    final docHeight = 1120.0 + (visibleRows - 10) * 32;
-    const docWidth = 1800.0;
+    const docWidth = DocumentFormStyle.width;
     // 1440px wide JPEG is clear for an A4 half-page while using a fraction of
     // the heap required by the previous 2430px PNG.
     const scale = .8;
@@ -1224,6 +1210,7 @@ class StatementDocumentRenderer {
       stamp: assets[4],
       bankStrip: assets[5],
     );
+    final docHeight = painter.documentHeight;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)..scale(scale);
     painter.paint(canvas, Size(docWidth, docHeight));
@@ -1271,3 +1258,4 @@ class StatementDocumentRenderer {
     }
   }
 }
+

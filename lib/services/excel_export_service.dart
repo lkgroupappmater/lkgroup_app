@@ -127,6 +127,10 @@ class ExcelExportService {
       );
     }
 
+    await SupabaseService.client.rpc('admin_finalize_excel_batch_rules_fast', params: {
+      'p_route': batch.routeLabel, 'p_year': batch.year,
+      'p_voyage': batch.voyage, 'p_resequence': true,
+    });
     // Excel 생성 직전 DB의 현재 화물을 중앙 FreightService로 영수번호별 정산하고
     // 동일 결과를 snapshot으로 저장합니다. Edge Function은 다음 단계부터 이 snapshot을
     // Row data에 그대로 사용하므로 Excel용 별도 운임 계산식을 만들지 않습니다.
@@ -239,5 +243,6 @@ class ExcelExportService {
     );
   }
 }
+
 
 
