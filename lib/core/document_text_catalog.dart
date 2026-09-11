@@ -1,4 +1,4 @@
-﻿import 'route_catalog.dart';
+import 'route_catalog.dart';
 
 class DocumentTextContent {
   const DocumentTextContent({required this.remark, required this.footerLines});
@@ -8,19 +8,10 @@ class DocumentTextContent {
 
   String get footerText => <String>[...footerLines, '* 이용해 주셔서 감사합니다.'].join('\n');
 
-  double get footerFontSize {
-    final lines = footerLines.length + 1;
-    if (lines >= 5) return 15.5;
-    if (lines == 4) return 16.5;
-    if (lines == 3) return 17.5;
-    return 19.0;
-  }
+  // Long route notes grow vertically instead of becoming harder to read.
+  double get footerFontSize => 20.0;
+  double get remarkFontSize => 24.0;
 
-  double get remarkFontSize {
-    if (remark.length > 430) return 17.0;
-    if (remark.length > 300) return 18.0;
-    return 19.0;
-  }
 }
 
 class DocumentTextCatalog {
@@ -155,3 +146,4 @@ class DocumentTextCatalog {
     );
   }
 }
+

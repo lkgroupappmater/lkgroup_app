@@ -20,6 +20,8 @@ void main() {
     for (final route in RouteCatalog.routes) {
       for (final content in [DocumentTextCatalog.quotation(route, date),
           DocumentTextCatalog.statement(route, date)]) {
+        expect(content.remarkFontSize, greaterThanOrEqualTo(24));
+        expect(content.footerFontSize, greaterThanOrEqualTo(20));
         final layout = DocumentFormLayout(itemCount: 1,
           remark: content.remark, remarkFontSize: content.remarkFontSize,
           footer: content.footerText, footerFontSize: content.footerFontSize);
@@ -27,7 +29,7 @@ void main() {
           content.remarkFontSize, DocumentFormStyle.remarkWidth, lineHeight: 1.2);
         final footerHeight = DocumentFormStyle.textHeight(content.footerText,
           content.footerFontSize, DocumentFormStyle.footerWidth, lineHeight: 1.2);
-        expect(remarkHeight, lessThanOrEqualTo(layout.summaryHeight - 54), reason: route);
+        expect(remarkHeight, lessThanOrEqualTo(layout.summaryHeight - 60), reason: route);
         expect(footerHeight, lessThanOrEqualTo(layout.signHeight - 24), reason: route);
         expect(layout.paymentTop, greaterThan(layout.summaryTop + layout.summaryHeight));
         expect(layout.height, greaterThan(layout.signTop + layout.signHeight));
@@ -44,8 +46,9 @@ void main() {
     expect(layout.rowCount, 36);
     expect(layout.summaryHeight, greaterThan(190));
     expect(layout.signHeight, greaterThan(112));
-    expect(DocumentFormStyle.textHeight(delivery, 18.5,
+    expect(DocumentFormStyle.textHeight(delivery, DocumentFormStyle.deliveryFontSize,
         DocumentFormStyle.deliveryWidth, bold: true, lineHeight: 1.16),
-      lessThanOrEqualTo(layout.summaryHeight - 56));
+      lessThanOrEqualTo(layout.summaryHeight - 62));
   });
 }
+
