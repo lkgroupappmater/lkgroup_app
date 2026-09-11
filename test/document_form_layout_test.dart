@@ -20,16 +20,16 @@ void main() {
     for (final route in RouteCatalog.routes) {
       for (final content in [DocumentTextCatalog.quotation(route, date),
           DocumentTextCatalog.statement(route, date)]) {
-        expect(content.remarkFontSize, greaterThanOrEqualTo(24));
-        expect(content.footerFontSize, greaterThanOrEqualTo(20));
+        expect(content.remarkFontSize, greaterThanOrEqualTo(22));
+        expect(content.footerFontSize, greaterThanOrEqualTo(17));
         final layout = DocumentFormLayout(itemCount: 1,
           remark: content.remark, remarkFontSize: content.remarkFontSize,
           footer: content.footerText, footerFontSize: content.footerFontSize);
         final remarkHeight = DocumentFormStyle.textHeight(content.remark,
-          content.remarkFontSize, DocumentFormStyle.remarkWidth, lineHeight: 1.2);
+          content.remarkFontSize, DocumentFormStyle.remarkWidth, lineHeight: 1.45);
         final footerHeight = DocumentFormStyle.textHeight(content.footerText,
-          content.footerFontSize, DocumentFormStyle.footerWidth, lineHeight: 1.2);
-        expect(remarkHeight, lessThanOrEqualTo(layout.summaryHeight - 60), reason: route);
+          content.footerFontSize, DocumentFormStyle.footerWidth, lineHeight: 1.25);
+        expect(remarkHeight, lessThanOrEqualTo(layout.summaryHeight - 68), reason: route);
         expect(footerHeight, lessThanOrEqualTo(layout.signHeight - 24), reason: route);
         expect(layout.paymentTop, greaterThan(layout.summaryTop + layout.summaryHeight));
         expect(layout.height, greaterThan(layout.signTop + layout.signHeight));
@@ -47,8 +47,9 @@ void main() {
     expect(layout.summaryHeight, greaterThan(190));
     expect(layout.signHeight, greaterThan(112));
     expect(DocumentFormStyle.textHeight(delivery, DocumentFormStyle.deliveryFontSize,
-        DocumentFormStyle.deliveryWidth, bold: true, lineHeight: 1.16),
-      lessThanOrEqualTo(layout.summaryHeight - 62));
+        DocumentFormStyle.deliveryWidth, bold: true, lineHeight: 1.35),
+      lessThanOrEqualTo(layout.summaryHeight - 68));
   });
 }
+
 

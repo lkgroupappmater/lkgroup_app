@@ -10,6 +10,7 @@ import '../core/money_format.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
 import '../core/document_form_style.dart';
+import '../core/document_form_painter.dart';
 import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
@@ -160,7 +161,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
     }
   }
 
-  _DigitalStatementPainter get _painter => _DigitalStatementPainter(
+  DigitalStatementPainter get _painter => DigitalStatementPainter(
         routeLabel: widget.routeLabel,
         rows: _rows,
         freight: _freight!,
@@ -400,8 +401,8 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   }
 }
 
-class _DigitalStatementPainter extends CustomPainter {
-  const _DigitalStatementPainter({
+class DigitalStatementPainter extends CustomPainter {
+  const DigitalStatementPainter({
     required this.routeLabel,
     required this.rows,
     required this.freight,
@@ -525,14 +526,9 @@ class _DigitalStatementPainter extends CustomPainter {
   @override
   void paint(Canvas c, Size size) {
     final layout = _layout;
-    final w = size.width;
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
-    final border = Paint()
-      ..color = line
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    _imageContain(c, logo, Rect.fromLTWH(18, 8, 135, 72));
+    c.save();
+    c.translate(DocumentFormStyle.pagePadding, DocumentFormStyle.pagePadding);
     final voyageText = voyage.trim().isEmpty
         ? ''
         : (voyage.trim().endsWith('항차') ? voyage.trim() : '${voyage.trim()}항차');
@@ -540,42 +536,19 @@ class _DigitalStatementPainter extends CustomPainter {
         ? '${RouteCatalog.documentTitleFor(routeLabel)} 거래 명세서'
         : '${RouteCatalog.documentTitleFor(routeLabel)} $voyageText 거래 명세서';
 
-    _text(c, statementTitle,
-        Rect.fromLTWH(180, 12, w - 510, 62),
-        39,
-        bold: true,
-        center: true);
-    _labelValue(c, '구획(Zone)', _s(rows.first['unloading_zone']),
-        Rect.fromLTWH(w - 300, 8, 282, 72), valueSize: 34);
-
-    const infoTop = 104.0;
-    const infoH = 108.0;
-    final half = w * .5;
-    for (var r = 0; r < 3; r++) {
-      final y = infoTop + r * (infoH / 3);
-      _box(c, Rect.fromLTWH(0, y, half, infoH / 3), paleBlue.withOpacity(.38));
-      _box(c, Rect.fromLTWH(half, y, half, infoH / 3), paleBlue.withOpacity(.38));
-    }
-    _kv(c, '회사명', '엘케이(LK)무역', Rect.fromLTWH(8, infoTop + 7, half - 16, 28));
-    _kv(c, '회사주소', '비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading', Rect.fromLTWH(8, infoTop + 39, half - 16, 28));
-    _kv(c, '전화번호', '+856 20 9112 6780', Rect.fromLTWH(8, infoTop + 71, half - 16, 28));
-    
-    _kv(c, '고객명/회사명', _s(rows.first['consignee_name']),
-        Rect.fromLTWH(half + 8, infoTop + 4, half - 16, 28), emphasize: true);
-    _kv(c, '연락처', _s(rows.first['consignee_phone']),
-        Rect.fromLTWH(half + 8, infoTop + 39, half - 16, 28), emphasize: true);
-    _kv(c, '영수번호', receiptNumber, Rect.fromLTWH(half + 8, infoTop + 74, half - 16, 28), emphasize: true);
+    final first = rows.isEmpty ? const <String, dynamic>{} : rows.first;
+    DocumentFormPainter.header(c, logo: logo, title: statementTitle,
+      zone: _s(first['unloading_zone']), customer: _s(first['consignee_name']),
+      phone: _s(first['consignee_phone']), lastLabel: '영수번호', lastValue: receiptNumber);
 
     const tableTop = DocumentFormStyle.tableTop;
     const headerH = DocumentFormStyle.headerHeight;
-    const rowH = DocumentFormStyle.rowHeight;
+    const rowH = DocumentFormStyle.totalsRowHeight;
     final rowCount = layout.rowCount;
-    final cols = <double>[
-      0, 55, 170, 285, 365, 490, 620, 710, 800, 890, 1030, 1170, 1360, 1570, 1800
-    ];
+    final cols = DocumentFormStyle.columns;
     final headers = <String>[
-      'No.', '박스번호', '단가', '수량', '실제중량(kg)', '실제중량 합산(kg)',
-      'L', 'W', 'H', '용적중량(kg)', '용적중량 합산(kg)',
+      'No.', '박스번호', '단가', '수량', '실제중량\n(kg)', '실제중량 합산\n(kg)',
+      'L', 'W', 'H', '용적중량\n(kg)', '용적중량 합산\n(kg)',
       '실제중량 운임', '용적중량 운임', '청구중량 운임'
     ];
     final fills = <Color?>[
@@ -590,7 +563,8 @@ class _DigitalStatementPainter extends CustomPainter {
 
     final lines = freight.lines;
     for (var i = 0; i < rowCount; i++) {
-      final y = tableTop + headerH + i * rowH;
+      final y = layout.rowTop(i);
+      final rowH = layout.rowHeightAt(i);
       final has = i < rows.length;
       final extraIndex = i - rows.length;
       final hasExtra = extraIndex >= 0 && extraIndex < extraCosts.length;
@@ -603,12 +577,12 @@ class _DigitalStatementPainter extends CustomPainter {
         Color fill = Colors.white;
         if (has && col == 11 && actualWins) fill = actualColor;
         if (has && col == 12 && volumeWins) fill = volumeColor;
-        if (has && col == 13) fill = appliedColor;
+        if ((has || hasExtra) && col == 13) fill = appliedColor;
         _box(c, Rect.fromLTRB(cols[col], y, cols[col + 1], y + rowH), fill);
       }
-      _text(c, '${i + 1}',
+      if (has || hasExtra) _text(c, '${i + 1}',
           Rect.fromLTRB(cols[0] + 3, y + 2, cols[1] - 3, y + rowH - 2),
-          17, bold: true, center: true);
+          18, center: true);
       if (hasExtra) {
         final extra = extraCosts[extraIndex];
         _box(c, Rect.fromLTRB(cols[1], y, cols[13], y + rowH), const Color(0xFFF8FAFD));
@@ -624,9 +598,9 @@ class _DigitalStatementPainter extends CustomPainter {
           c,
           MoneyFormat.usd(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
-          21,
+          19,
           bold: true,
-          right: true,
+          center: true,
         );
         continue;
       }
@@ -654,14 +628,13 @@ class _DigitalStatementPainter extends CustomPainter {
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
             Rect.fromLTRB(cols[col + 1] + 3, y + 2, cols[col + 2] - 3, y + rowH - 2),
-            col >= 10 && col <= 12 ? 21 : 19,
-            bold: col == 4 || col == 9 || col == 12,
-            center: col < 10,
-            right: col >= 10);
+            19,
+            bold: col == 0 || col == 12 || (col == 10 && actualWins) || (col == 11 && volumeWins),
+            center: true);
       }
     }
 
-    final summaryY = tableTop + headerH + rowCount * rowH;
+    final summaryY = layout.tableTotalTop;
     for (var col = 0; col < headers.length; col++) {
       _box(c, Rect.fromLTRB(cols[col], summaryY, cols[col + 1], summaryY + rowH),
           col >= 11 ? paleBlue : const Color(0xFFF2F5F8));
@@ -705,29 +678,7 @@ class _DigitalStatementPainter extends CustomPainter {
           18, bold: true, center: true);
     }
 
-    final sumTop = layout.summaryTop;
     final docText = _docText;
-    final leftW = w * .70;
-    _box(c, Rect.fromLTWH(0, sumTop, leftW * .58, layout.summaryHeight), const Color(0xFFFBFCFD));
-    _box(c, Rect.fromLTWH(leftW * .58 + 4, sumTop, leftW * .42 - 4, layout.summaryHeight), const Color(0xFFF3F8FC));
-    _text(c, 'Remark/비고', Rect.fromLTWH(10, sumTop + 7, leftW * .58 - 20, 30),
-        19, bold: true);
-    final displayAutoNotes = _displayAutoNotes;
-    final remarkText = displayAutoNotes.isEmpty
-        ? docText.remark
-        : '${docText.remark}\n\n$displayAutoNotes';
-    _text(
-      c,
-      remarkText,
-      Rect.fromLTWH(10, sumTop + 44, leftW * .58 - 20, layout.summaryHeight - 60),
-      docText.remarkFontSize,
-      lineHeight: 1.2,
-    );
-
-    _text(c, 'Inland delivery/시내·지방 배송',
-        Rect.fromLTWH(leftW * .58 + 14, sumTop + 7, leftW * .42 - 24, 30),
-        19, bold: true);
-
     final deliveryNote = rows
         .map((e) => '${e['special_note_auto'] ?? e['special_note'] ?? ''}')
         .join(' ');
@@ -741,63 +692,10 @@ class _DigitalStatementPainter extends CustomPainter {
     } else if (deliveryNote.contains('시내배송')) {
       deliveryColor = const Color(0xFF92D050);
     }
-    if (deliveryColor != null && inlandDeliveryText.trim().isNotEmpty) {
-      c.drawRect(
-        Rect.fromLTWH(leftW * .58 + 8, sumTop + 34, leftW * .42 - 16, layout.summaryHeight - 42),
-        Paint()..color = deliveryColor.withOpacity(.32),
-      );
-    }
-    _text(
-      c,
-      inlandDeliveryText,
-      Rect.fromLTWH(leftW * .58 + 14, sumTop + 46, leftW * .42 - 24, layout.summaryHeight - 62),
-      DocumentFormStyle.deliveryFontSize,
-      bold: true,
-      center: true,
-      lineHeight: 1.16,
-    );
+    DocumentFormPainter.notes(c, layout,
+      remark: _remarkText, remarkFontSize: docText.remarkFontSize,
+      delivery: inlandDeliveryText, deliveryColor: deliveryColor);
 
-    final totalX = leftW + 6;
-    final totalW = w - totalX;
-    _box(c, Rect.fromLTWH(totalX, sumTop, totalW, DocumentFormStyle.minimumSummaryHeight), totalColor);
-    final adjH = 26.0;
-    final lineDiscountPercent = freight.lines
-        .map((line) => line.discountPercent)
-        .fold<double>(0, (best, value) => value > best ? value : best);
-    final discountPercentText = lineDiscountPercent > 0
-        ? '${(lineDiscountPercent * 100).toStringAsFixed(
-            ((lineDiscountPercent * 100) -
-                        (lineDiscountPercent * 100).roundToDouble())
-                    .abs() <
-                .001
-                ? 0
-                : 2,
-          )}%'
-        : '';
-    final discountGroupText = freight.lines
-        .map((line) => line.discountGroup.trim())
-        .firstWhere(
-          (value) => value.isNotEmpty,
-          orElse: () => '',
-        );
-    final actualDiscountPercent = freight.lines
-        .map((line) => line.discountPercent)
-        .fold<double>(0, (best, value) => value > best ? value : best);
-    final noteDiscountMatch = RegExp(r'([0-9]+(?:\.[0-9]+)?)%\s*적용')
-        .firstMatch(displayAutoNotes);
-    final noteDiscountPercent =
-        double.tryParse(noteDiscountMatch?.group(1) ?? '') ?? 0;
-    final actualDiscountPctText = actualDiscountPercent > 0
-        ? '${pctText(actualDiscountPercent)}%'
-        : (noteDiscountPercent > 0
-            ? '${noteDiscountPercent.toStringAsFixed(
-                (noteDiscountPercent - noteDiscountPercent.roundToDouble())
-                            .abs() <
-                        .001
-                    ? 0
-                    : 2,
-              )}%'
-            : '');
     final autoDiscountPercent = freight.lines
         .map((line) => line.autoDiscountPercent)
         .fold<double>(0, (best, value) => value > best ? value : best);
@@ -815,7 +713,6 @@ class _DigitalStatementPainter extends CustomPainter {
     }
     final autoDiscountPctText = patch199Pct(autoDiscountPercent);
     final additionalDiscountPctText = patch199Pct(additionalDiscountPercent);
-    const discountLabel = '할인';
     final regularDiscountUsd = freight.lines.fold<double>(
           0, (sum, line) => sum + line.autoDiscountAmountUsd) +
         discountableExtraTotal * autoDiscountPercent;
@@ -823,306 +720,26 @@ class _DigitalStatementPainter extends CustomPainter {
           0, (sum, line) => sum + line.additionalDiscountAmountUsd) +
         discountableExtraTotal * additionalDiscountPercent;
 
-    // Three clear columns: label | percent (~2/3) | amount (far right).
-    const adjustmentFont = 16.0;
-    final adjustmentColumnLabelW = totalW * .46;
-    final percentX = totalX + totalW * .54;
-    final percentW = totalW * .18;
-    final amountX = totalX + totalW * .74;
-    final amountW = totalW * .22;
-
-    _text(
-      c,
-      '운임 총합',
-      Rect.fromLTWH(totalX + 12, sumTop + 3, adjustmentColumnLabelW, adjH),
-      adjustmentFont,
-      bold: true,
-    );
-    _text(
-      c,
-      MoneyFormat.usd(grossUsd),
-      Rect.fromLTWH(amountX, sumTop + 3, amountW, adjH),
-      adjustmentFont,
-      bold: true,
-      right: true,
-    );
-
-    _text(
-      c,
-      '할인',
-      Rect.fromLTWH(totalX + 12, sumTop + 30, adjustmentColumnLabelW, adjH),
-      adjustmentFont,
-      bold: true,
-    );
-    _text(
-      c,
-      autoDiscountPctText.isNotEmpty
-          ? autoDiscountPctText
-          : '-',
-      Rect.fromLTWH(percentX, sumTop + 30, percentW, adjH),
-      adjustmentFont,
-      bold: true,
-      center: true,
-    );
-    _text(
-      c,
-      autoDiscountPctText.isNotEmpty
-          ? '-${MoneyFormat.usd(regularDiscountUsd)}'
-          : '-',
-      Rect.fromLTWH(amountX, sumTop + 30, amountW, adjH),
-      adjustmentFont,
-      bold: true,
-      right: true,
-    );
-
-    _text(
-      c,
-      additionalDiscountPctText.isNotEmpty
-          ? (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName)
-          : '',
-      Rect.fromLTWH(totalX + 12, sumTop + 57, adjustmentColumnLabelW, adjH),
-      adjustmentFont,
-      bold: true,
-    );
-    _text(
-      c,
-      additionalDiscountPctText.isNotEmpty
-          ? additionalDiscountPctText
-          : '-',
-      Rect.fromLTWH(percentX, sumTop + 57, percentW, adjH),
-      adjustmentFont,
-      bold: true,
-      center: true,
-    );
-    _text(
-      c,
-      additionalDiscountPctText.isNotEmpty
-          ? '-${MoneyFormat.usd(specialDiscountUsd)}'
-          : '-',
-      Rect.fromLTWH(amountX, sumTop + 57, amountW, adjH),
-      adjustmentFont,
-      bold: true,
-      right: true,
-    );
-
-    _text(
-      c,
-      '세금 계산서(VAT)',
-      Rect.fromLTWH(totalX + 12, sumTop + 84, adjustmentColumnLabelW, adjH),
-      adjustmentFont,
-      bold: true,
-    );
-    _text(
-      c,
-      '-',
-      Rect.fromLTWH(percentX, sumTop + 84, percentW, adjH),
-      adjustmentFont,
-      bold: true,
-      center: true,
-    );
-    _text(
-      c,
-      '-',
-      Rect.fromLTWH(amountX, sumTop + 84, amountW, adjH),
-      adjustmentFont,
-      bold: true,
-      right: true,
-    );
-
-    final finalTop = sumTop + 112;
-    final labelW = totalW * .38;
-    _box(c, Rect.fromLTWH(totalX, finalTop, labelW, 112), DocumentFormStyle.totalLabel);
-    _text(c, '최종 명세서 총액', Rect.fromLTWH(totalX + 8, finalTop + 6, labelW - 16, 100),
-        20, bold: true, center: true);
-    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 0 * 28.0, totalW - labelW, 28.0),
-        const Color(0xFFF3F7FC));
-    _text(c, 'USD     ${MoneyFormat.usd(finalUsd)}',
-        Rect.fromLTWH(totalX + labelW + 8, finalTop + 0 * 28.0, totalW - labelW - 16, 28.0),
-        21, bold: true, right: true);
-    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 1 * 28.0, totalW - labelW, 28.0),
-        const Color(0xFFEAF1F8));
-    _text(c, 'KIP     ${MoneyFormat.kip(finalUsd * freight.rates.appliedKip)}',
-        Rect.fromLTWH(totalX + labelW + 8, finalTop + 1 * 28.0, totalW - labelW - 16, 28.0),
-        21, bold: true, right: true);
-    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 2 * 28.0, totalW - labelW, 28.0),
-        const Color(0xFFF3F7FC));
-    _text(c, 'THB     ${MoneyFormat.thb(finalUsd * freight.rates.appliedThb)}',
-        Rect.fromLTWH(totalX + labelW + 8, finalTop + 2 * 28.0, totalW - labelW - 16, 28.0),
-        21, bold: true, right: true);
-    _box(c, Rect.fromLTWH(totalX + labelW, finalTop + 3 * 28.0, totalW - labelW, 28.0),
-        const Color(0xFFEAF1F8));
-    _text(c, 'KRW     ${MoneyFormat.krw(finalUsd * freight.rates.appliedKrw)}',
-        Rect.fromLTWH(totalX + labelW + 8, finalTop + 3 * 28.0, totalW - labelW - 16, 28.0),
-        21, bold: true, right: true);
-    final payTop = layout.paymentTop;
-    const payGap = 4.0;
-    final payW = (w - payGap * 3) / 4;
-    final payRects = <Rect>[
-      Rect.fromLTWH(0, payTop, payW, 150),
-      Rect.fromLTWH(payW + payGap, payTop, payW, 150),
-      Rect.fromLTWH((payW + payGap) * 2, payTop, payW, 150),
-      Rect.fromLTWH((payW + payGap) * 3, payTop, payW, 150),
-    ];
-
-    for (final r in payRects) {
-      _box(c, r, Colors.white);
-    }
-
-    _payment(
-      c,
-      qrUsd,
-      'BCEL (USD):',
-      '(SungHo Park)\n010-12-01-\n017655-60-001',
-      payRects[0],
-    );
-    _payment(
-      c,
-      qrKip,
-      'BCEL (KIP):',
-      '(SungHo Park)\n013-12-00-\n017655-60-001',
-      payRects[1],
-    );
-    _payment(
-      c,
-      qrThb,
-      'BCEL (Baht):',
-      '(SungHo Park)\n010-12-02-\n017655-60-001',
-      payRects[2],
-    );
-    _text(
-      c,
-      '한국 원화 계좌:\n경남은행\n571-22-0330221\n박성호',
-      payRects[3].deflate(8),
-      22,
-      bold: true,
-      center: true,
-      lineHeight: 1.35,
-    );
-
-    final signTop = layout.signTop;
-    final signW = w * .26;
-    final signH = layout.signHeight;
-    _box(c, Rect.fromLTWH(0, signTop, signW, signH), Colors.white);
-    _box(c, Rect.fromLTWH(w - signW, signTop, signW, signH), Colors.white);
-    _text(c, '엘케이 (LK)무역', Rect.fromLTWH(12, signTop + 8, signW - 24, 24),
-        16, bold: true);
-    _imageContain(c, stamp, Rect.fromLTWH(54, signTop + 4, signW - 62, 97));
-    _text(
-      c,
-      docText.footerText,
-      Rect.fromLTWH(signW + 18, signTop + 6, w - signW * 2 - 36, signH - 12),
-      docText.footerFontSize,
-      center: true,
-      lineHeight: 1.2,
-    );
-    _text(c, '고객사 확인', Rect.fromLTWH(w - signW + 12, signTop + 8, signW - 24, 24),
-        17, bold: true);
-
-    c.drawRect(Offset.zero & size, border);
+    DocumentFormPainter.totals(c, layout, adjustments: [
+      ('운임 총합', '', MoneyFormat.usd(grossUsd)),
+      ('할인', autoDiscountPctText.isEmpty ? '-' : autoDiscountPctText,
+        autoDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usd(regularDiscountUsd)}'),
+      (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName,
+        additionalDiscountPctText.isEmpty ? '-' : additionalDiscountPctText,
+        additionalDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usd(specialDiscountUsd)}'),
+      ('세금 계산서(VAT)', '-', '-'),
+    ], label: '최종 명세서 총액', amounts: [
+      MoneyFormat.usd(finalUsd), MoneyFormat.kip(finalUsd * freight.rates.appliedKip),
+      MoneyFormat.thb(finalUsd * freight.rates.appliedThb), MoneyFormat.krw(finalUsd * freight.rates.appliedKrw),
+    ]);
+    DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
+      qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
+      footerFontSize: docText.footerFontSize,
+      kipRate: freight.rates.appliedKip, thbRate: freight.rates.appliedThb, krwRate: freight.rates.appliedKrw);
+    c.restore();
   }
 
-  void _payment(Canvas c, ui.Image image, String title, String detail, Rect r) {
-    _imageContain(c, image, Rect.fromLTWH(r.left + 6, r.top + 6, 132, 132));
-    _text(c, title, Rect.fromLTWH(r.left + 144, r.top + 8, r.width - 150, 32), 22, bold: true, center: true);
-    _text(c, detail, Rect.fromLTWH(r.left + 144, r.top + 42, r.width - 150, 96),
-        22, bold: true, center: true);
-  }
-
-  void _kv(Canvas c, String k, String v, Rect r, {bool emphasize = false}) {
-    const labelW = 165.0;
-    _text(
-      c,
-      k,
-      Rect.fromLTWH(r.left, r.top, labelW, r.height),
-      18,
-      bold: true,
-      center: true,
-    );
-    _text(
-      c,
-      v.isEmpty ? '-' : v,
-      Rect.fromLTWH(r.left + labelW, r.top, r.width - labelW, r.height),
-      emphasize ? 22 : 20,
-      bold: emphasize,
-      center: true,
-    );
-  }
-
-  void _labelValue(Canvas c, String label, String value, Rect r,
-      {double valueSize = 30}) {
-    _box(c, r, paleBlue);
-    _text(c, label, Rect.fromLTWH(r.left, r.top + 4, r.width, 22),
-        16, bold: true, center: true);
-    _text(c, value.isEmpty ? '-' : value,
-        Rect.fromLTWH(r.left, r.top + 26, r.width, r.height - 30),
-        valueSize, bold: true, center: true);
-  }
-
-  void _box(Canvas c, Rect r, Color fill) {
-    c.drawRect(r, Paint()..color = fill);
-    c.drawRect(
-      r,
-      Paint()
-        ..color = line
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-  }
-
-  void _imageContainTrimmed(
-    Canvas c,
-    ui.Image image,
-    Rect box, {
-    double trimRatio = .18,
-  }) {
-    final insetX = image.width * trimRatio;
-    final insetY = image.height * trimRatio;
-    final source = Rect.fromLTRB(
-      insetX,
-      insetY,
-      image.width - insetX,
-      image.height - insetY,
-    );
-    final ratio = source.width / source.height;
-    var dw = box.width;
-    var dh = dw / ratio;
-    if (dh > box.height) {
-      dh = box.height;
-      dw = dh * ratio;
-    }
-    final dst = Rect.fromLTWH(
-      box.left + (box.width - dw) / 2,
-      box.top + (box.height - dh) / 2,
-      dw,
-      dh,
-    );
-    c.drawImageRect(image, source, dst, Paint());
-  }
-  void _imageContain(Canvas c, ui.Image image, Rect box) {
-    final ratio = image.width / image.height;
-    var dw = box.width;
-    var dh = dw / ratio;
-    if (dh > box.height) {
-      dh = box.height;
-      dw = dh * ratio;
-    }
-    final dst = Rect.fromLTWH(
-      box.left + (box.width - dw) / 2,
-      box.top + (box.height - dh) / 2,
-      dw,
-      dh,
-    );
-    _image(c, image, dst);
-  }
-
-  void _image(Canvas c, ui.Image image, Rect dst) {
-    c.drawImageRect(
-      image,
-      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-      dst,
-      Paint()..filterQuality = FilterQuality.high,
-    );
-  }
+  void _box(Canvas c, Rect r, Color fill) => DocumentFormPainter.box(c, r, fill);
 
   void _text(Canvas c, String text, Rect r, double size,
       {bool bold = false, bool center = false, bool right = false, double lineHeight = 1.15}) {
@@ -1131,7 +748,7 @@ class _DigitalStatementPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DigitalStatementPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DigitalStatementPainter oldDelegate) => true;
 }
 
 
@@ -1195,7 +812,7 @@ class StatementDocumentRenderer {
     // the heap required by the previous 2430px PNG.
     const scale = .8;
 
-    final painter = _DigitalStatementPainter(
+    final painter = DigitalStatementPainter(
       routeLabel: request.routeLabel,
       rows: rows,
       freight: freight,
@@ -1258,5 +875,6 @@ class StatementDocumentRenderer {
     }
   }
 }
+
 
 
