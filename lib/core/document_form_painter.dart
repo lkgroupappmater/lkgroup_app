@@ -124,10 +124,36 @@ class DocumentFormPainter {
       box(c, r, fills[i]);
       DocumentFormStyle.drawText(c, currencies[i],
         Rect.fromLTWH(r.left + 10, r.top + 2, 54, r.height - 4), 20, bold: true);
-      DocumentFormStyle.drawText(c, amounts[i],
-        Rect.fromLTRB(r.left + 64, r.top + 2, r.right - 8, r.bottom - 2), 20,
-        bold: true, right: true);
+      money(c, amounts[i],
+        Rect.fromLTRB(r.left + 64, r.top + 2, r.right - 8, r.bottom - 2), 20);
     }
+  }
+
+  // The bundled Korean and Lao fonts both omit U+0E3F (Thai Baht).
+  // Render its standard B-and-stem form with the document font so exported
+  // amounts do not depend on platform fallback fonts or new bundled assets.
+  static void money(Canvas c, String amount, Rect rect, double fontSize) {
+    if (!amount.startsWith('฿ ')) {
+      DocumentFormStyle.drawText(c, amount, rect, fontSize, bold: true, right: true);
+      return;
+    }
+    final painter = DocumentFormStyle.textPainter(
+      amount.replaceFirst('฿', 'B'), fontSize, rect.width,
+      bold: true, align: TextAlign.right);
+    final scale = painter.height > rect.height ? rect.height / painter.height : 1.0;
+    c.save();
+    c.translate(rect.right - painter.width * scale,
+      rect.top + (rect.height - painter.height * scale) / 2);
+    c.scale(scale);
+    painter.paint(c, Offset.zero);
+    final glyph = painter.getBoxesForSelection(
+      const TextSelection(baseOffset: 0, extentOffset: 1)).first;
+    final stemX = glyph.left + (glyph.right - glyph.left) * .42;
+    c.drawLine(Offset(stemX, glyph.top + fontSize * .04),
+      Offset(stemX, glyph.bottom - fontSize * .04),
+      Paint()..color = DocumentFormStyle.ink..strokeWidth = fontSize * .065);
+    c.restore();
+    painter.dispose();
   }
 
   static void footer(Canvas c, DocumentFormLayout layout,
