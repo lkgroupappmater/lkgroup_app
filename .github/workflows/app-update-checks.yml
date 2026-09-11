@@ -34,7 +34,15 @@ jobs:
       - run: flutter pub get
       - run: python3 -m unittest discover -s tool -p 'test_*.py'
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/live_data_service.dart lib/services/app_update_service.dart lib/widgets/auto_refresh_state.dart lib/widgets/app_update_banner.dart lib/widgets/app_shell.dart lib/screens/dashboard_home_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart lib/screens/notice_list_screen.dart lib/screens/shipment_schedule_screen.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart
-      - run: flutter test test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/document_form_style.dart lib/core/document_form_painter.dart lib/core/document_text_catalog.dart lib/screens/quotation_preview_dialog.dart lib/screens/statement_preview_dialog.dart test/document_form_layout_test.dart test/document_form_render_test.dart
+      - run: flutter test test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart test/document_form_render_test.dart
+      - name: Save rendered quotation and statement previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: lkgroup-document-previews
+          path: build/document-previews/*.png
+          if-no-files-found: error
+          retention-days: 14
       # Compile the native Play bridge; no credentials, signing or publishing.
       - run: flutter build apk --debug
   shorebird-status:
@@ -100,3 +108,4 @@ jobs:
             build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 30
+

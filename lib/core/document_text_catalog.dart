@@ -9,8 +9,8 @@ class DocumentTextContent {
   String get footerText => <String>[...footerLines, '* 이용해 주셔서 감사합니다.'].join('\n');
 
   // Long route notes grow vertically instead of becoming harder to read.
-  double get footerFontSize => 20.0;
-  double get remarkFontSize => 24.0;
+  double get footerFontSize => 17.0;
+  double get remarkFontSize => 22.0;
 
 }
 
@@ -146,4 +146,5 @@ class DocumentTextCatalog {
     );
   }
 }
+
 
