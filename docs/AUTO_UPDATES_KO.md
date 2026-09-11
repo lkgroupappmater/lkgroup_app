@@ -33,17 +33,17 @@ Android 앱이 시작되거나 다시 열릴 때 업데이트를 확인하고, �
 제공되지 않을 수 있습니다. Play 내부 테스트에서 동일한 앱 ID/서명과 더 높은 versionCode의
 릴리스를 사용하여 실제 단말에서 확인해야 합니다. iOS 스토어 자동 업데이트는 기기 설정을 따릅니다.
 
-## 코드 패치(Shorebird): 최초 1회 연결 필요
+## 코드 패치(Shorebird): 앱 연결 완료, 최초 설치본 배포 필요
 
-현재 저장소에는 실제 Shorebird 앱 ID/계정 연결이 없습니다. 따라서 아래 초기 설정과
-최초 배포를 마치기 전에는 OTA 코드 패치가 활성화되지 않습니다. 임의 앱 ID나
-자격 증명을 넣어 두지 않았습니다.
+`LK Group Trading`의 실제 앱 ID는 `b64e00d6-2682-4ff0-8519-c8701ce795af`이며
+`shorebird.yaml`과 `pubspec.yaml`에 등록되어 있습니다. 같은 앱을 다시 init하거나
+`--force`로 새 앱 ID를 만들지 않습니다. 최초 Shorebird 설치본을 배포하기 전에는
+기존 일반 Flutter 설치본이 OTA 코드 패치를 받을 수 없습니다.
 
-1. 공식 Shorebird CLI와 Python 3.9 이상을 설치합니다.
-2. 프로젝트 폴더에서 `git pull origin master` 후 `python tool/ota.py init`을 실행합니다.
-   본인 계정으로 로그인하면 공식 CLI가 실제 `shorebird.yaml`을 만들고 `pubspec.yaml`에 등록합니다.
-   이미 설정이 있으면 재등록하거나 앱 ID를 덮어쓰지 않습니다.
-3. 생성된 `shorebird.yaml`과 변경된 `pubspec.yaml`을 GitHub에 커밋합니다.
+1. 로컬 빌드에는 공식 Shorebird CLI와 Python 3.9 이상이 필요합니다.
+2. 프로젝트 폴더에서 `git pull --ff-only origin master` 후 `shorebird login`으로
+   이 앱에 접근할 수 있는 본인 계정을 인증합니다.
+3. 기존 등록 파일을 그대로 사용합니다. `python tool/ota.py init`은 등록 상태를 검사할 수 있습니다.
 4. 현재 앱에서 사용하는 `SUPABASE_URL`과 `SUPABASE_PUBLISHABLE_KEY`(또는 `SUPABASE_ANON_KEY`)
    값을 로컬 JSON 파일에 저장합니다. 아래 `C:/LK/app-config.json`은 **로컬 파일 경로 예시**입니다.
    릴리스와 패치에 반드시 같은 설정을 사용합니다. 서버 비밀 키나 service_role은 넣지 않습니다.
@@ -74,8 +74,76 @@ python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.1
 네이티브/자산 차이 검사 우회 옵션을 제공하지 않습니다. iOS 패치는 스토어 정책 범위 안에서
 운영하며 첫 iOS 릴리스에는 macOS와 기존 Apple 서명 설정이 필요합니다(`--platform ios`).
 
-GitHub 검증 워크플로는 분석·회귀 테스트·Android 디버그 빌드만 수행합니다. 사용자에게
-소스를 올릴 때마다 검증하지 않은 패치나 설치본을 자동 배포하지 않습니다.
+## GitHub에서 Android 자동 배포
+
+`App update checks` 워크플로는 다음 순서로 동작합니다.
+
+1. master push 시 Shorebird API 키와 해당 앱 접근 권한을 읽기 전용으로 확인합니다.
+2. pubspec의 정확한 버전에 active Android 릴리스가 있는지와 빌드 비밀 설정의 존재를 확인합니다.
+3. Python 회귀 테스트, Flutter 분석·테스트, Android 디버그 빌드를 모두 통과한 경우에만
+   같은 커밋의 stable 패치를 배포합니다. PR에서는 비밀 설정을 사용하거나 배포하지 않습니다.
+4. 최초 릴리스나 필요한 비밀 설정이 없으면 패치 작업을 보류하고 실행 Summary에 이유를 표시합니다.
+   인증 자체가 거절되면 해당 작업은 실패로 표시됩니다. 키 값은 출력하지 않습니다.
+5. 네이티브·이미지·폰트 변경은 Shorebird의 기본 검사에서 중단됩니다. 검사 우회 옵션은 사용하지 않습니다.
+
+GitHub 저장소의 Settings → Secrets and variables → Actions → New repository secret에
+다음 이름으로 저장합니다. 키/비밀번호를 채팅·소스 코드·일반 Actions Variables에 넣지 않습니다.
+
+| Secret 이름 | 값 |
+|---|---|
+| `SHOREBIRD_TOKEN` | Shorebird Account → API Keys에서 생성한 키 |
+| `APP_DART_DEFINES` | 현재 앱과 같은 서버 URL 및 publishable/anon 키가 담긴 JSON 전체 |
+| `ANDROID_KEYSTORE_BASE64` | 기존 앱 서명용 JKS/keystore 파일을 Base64로 변환한 값 |
+| `ANDROID_KEYSTORE_PASSWORD` | 기존 `android/key.properties`의 `storePassword` 값 |
+| `ANDROID_KEY_ALIAS` | 기존 `android/key.properties`의 `keyAlias` 값 |
+| `ANDROID_KEY_PASSWORD` | 기존 `android/key.properties`의 `keyPassword` 값 |
+
+`APP_DART_DEFINES`는 아래 구조입니다. 예시 문구를 실제 앱의 기존 공개 연결 설정으로 바꿉니다.
+`SUPABASE_ANON_KEY`를 사용하던 경우 `SUPABASE_PUBLISHABLE_KEY` 대신 그 이름을 사용할 수 있습니다.
+
+```json
+{
+  "SUPABASE_URL": "https://YOUR_PROJECT.supabase.co",
+  "SUPABASE_PUBLISHABLE_KEY": "YOUR_EXISTING_PUBLIC_CLIENT_KEY"
+}
+```
+
+`service_role`, `sb_secret_` 등 서버 전용 키는 사용할 수 없습니다. 릴리스와 패치에 같은 값을
+유지합니다. 다른 서버로 바꾸거나 서명 키를 교체하려면 기존 배포본과의 호환성을 먼저 확인합니다.
+
+기존 keystore 파일을 복사할 때는 PowerShell에서 실제 경로를 넣어 아래 명령을 실행한 뒤
+GitHub의 `ANDROID_KEYSTORE_BASE64` Secret 칸에 붙여넣습니다. 명령은 원본 파일을 변경하지 않습니다.
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\실제경로\upload-keystore.jks")) | Set-Clipboard
+```
+
+새 키를 임의로 생성하지 않습니다. 기존 직접 설치 APK와 서명이 다르면 덮어쓰기 업데이트가
+되지 않습니다. 기존 Play 업로드 키도 그대로 유지해야 합니다. GitHub 빌드에서는 설정이
+없을 때 임시 debug 서명으로 대체하지 않고 배포를 보류합니다.
+
+### 최초 설치본 만들기
+
+1. GitHub → Actions → `App update checks` → Run workflow를 엽니다.
+2. Branch `master`, `ota_action`은 `release`로 선택해 실행합니다.
+3. 모든 검증과 Shorebird 릴리스 생성이 성공하면 Artifacts의
+   `lkgroup-shorebird-android-버전`을 다운로드합니다. APK/AAB가 포함됩니다(보관 30일).
+4. AAB는 Play Console에 업로드하고, 직접 배포하는 기존 직원용 앱은 같은 서명의 APK로 업데이트합니다.
+   이 워크플로가 Play Store 공개 게시를 수행하는 것은 아닙니다.
+5. 이후 같은 pubspec 버전의 Dart 수정은 master push → 검증 통과 → stable 패치로 자동 전달됩니다.
+   폰에서 패치를 다운로드한 뒤 앱을 완전히 종료하고 다시 실행해 반영 여부를 확인합니다.
+
+`ota_action=check`는 설정/인증 확인만 수행합니다. `patch`는 현재 pubspec 버전의 패치를
+수동 재시도할 때 사용합니다. 릴리스가 active이면 같은 버전으로 release를 다시 만들지 않습니다.
+이미 일반 AAB로 Play에 사용한 versionCode라면 최초 Shorebird AAB에는 더 높은 versionCode가
+필요합니다. 현재 소스는 `1.0.1+2`이며 실제 Play 등록 이력을 확인한 뒤 변경합니다.
+
+Shorebird 기본 Flutter로 첫 릴리스를 만들고, 패치에는 Shorebird가 해당 릴리스의 Flutter를
+선택합니다. 워크플로가 실행 중에 master가 더 진행된 경우 오래된 커밋은 배포 시작 전에
+건너뜁니다. 패치 게시 작업을 새 push 때문에 중간 취소하지 않습니다.
+
+iOS는 macOS 실행 환경 및 기존 Apple 인증서/프로비저닝 설정이 별도로 필요합니다.
+이번 자동 배포 워크플로는 Android 대상이며, iOS 로컬 명령은 위 설명을 따릅니다.
 
 공식 자료:
 - https://docs.shorebird.dev/code-push/initialize/
@@ -86,7 +154,7 @@ GitHub 검증 워크플로는 분석·회귀 테스트·Android 디버그 빌드
 ## 확인
 
 ```powershell
-python -m unittest discover -s tool -p test_ota.py
+python -m unittest discover -s tool -p 'test_*.py'
 flutter test test/auto_refresh_state_test.dart test/app_update_service_test.dart test/document_form_layout_test.dart
 flutter build apk --debug
 ```
