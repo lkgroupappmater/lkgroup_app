@@ -37,11 +37,12 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/document_form_style.dart lib/core/document_form_painter.dart lib/core/document_text_catalog.dart lib/screens/quotation_preview_dialog.dart lib/screens/statement_preview_dialog.dart test/document_form_layout_test.dart test/document_form_render_test.dart
       - run: flutter test test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart test/document_form_render_test.dart
       - name: Save rendered quotation and statement previews
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: lkgroup-document-previews
           path: build/document-previews/*.png
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 14
       # Compile the native Play bridge; no credentials, signing or publishing.
       - run: flutter build apk --debug

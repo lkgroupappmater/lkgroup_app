@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -191,7 +190,9 @@ void main() {
     // Compare the actual financial panel with independently specified values:
     // 15 freight + 5 discountable + 7 excluded = 27, discount 20, payable 7.
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder)..translate(18, 18);
+    final canvas = Canvas(recorder);
+    canvas.drawRect(Rect.fromLTWH(0, 0, 1800, q.documentHeight), Paint()..color = Colors.white);
+    canvas.translate(18, 18);
     DocumentFormPainter.totals(canvas, layout, adjustments: [
       ('운임 총합', '', '\$ 27.00'), ('할인', '100%', '-\$ 20.00'),
       ('추가 할인', '-', '-'), ('세금 계산서(VAT)', '-', '-'),
