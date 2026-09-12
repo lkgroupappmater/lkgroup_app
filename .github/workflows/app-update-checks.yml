@@ -56,6 +56,8 @@ jobs:
           retention-days: 14
       # Compile the native Play bridge; no credentials, signing or publishing.
       - run: flutter build apk --debug
+        env:
+          LK_NATIVE_STARTUP_CHECK: '1'
       - uses: actions/upload-artifact@v4
         with:
           name: lkgroup-native-test-apk

@@ -27,6 +27,10 @@ android {
     }
 
     defaultConfig {
+        // Only the CI verification APK exposes the debug launcher fixture.
+        // Normal developer builds and all release builds keep it unavailable.
+        manifestPlaceholders["nativeStartupCheckEnabled"] =
+            (System.getenv("LK_NATIVE_STARTUP_CHECK") == "1").toString()
         // Final Play Store application ID. Never change it after the first
         // production release unless publishing a separate app.
         applicationId = "com.lkgrouptrading.app"

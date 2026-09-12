@@ -60,7 +60,6 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     adb('install', '-r', str(ROOT / 'build/native-apk/app-debug.apk'))
     adb('shell', 'input', 'keyevent', '82')
-    adb('shell', 'pm', 'enable', 'com.lkgrouptrading.app/.StartupPreviewActivity')
     for mode in ('no', 'yes'):
         adb('shell', 'cmd', 'uimode', 'night', mode)
         adb('shell', 'am', 'force-stop', 'com.lkgrouptrading.app')
