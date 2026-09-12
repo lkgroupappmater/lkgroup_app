@@ -6,10 +6,17 @@ import 'services/route_catalog_service.dart';
 import 'services/live_data_service.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Paint the group logo before starting services that can wait on the network.
-  runApp(CargoFlowApp(initialize: _initializeServices));
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  binding.deferFirstFrame();
+  runApp(
+    CargoFlowApp(
+      initialize: _initializeServices,
+      onLogoReady: () async {
+        binding.allowFirstFrame();
+        await binding.waitUntilFirstFrameRasterized;
+      },
+    ),
+  );
 }
 
 Future<void> _initializeServices() async {

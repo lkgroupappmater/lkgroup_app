@@ -93,6 +93,44 @@ void main() {
       },
     );
   }
+  testWidgets('visible logo timer waits for the first rasterized frame', (
+    tester,
+  ) async {
+    final frame = Completer<void>();
+    final initialized = Completer<void>();
+    var startedServices = false;
+    await tester.pumpWidget(
+      CargoFlowApp(
+        onLogoReady: () => frame.future,
+        initialize: () {
+          startedServices = true;
+          return initialized.future;
+        },
+      ),
+    );
+    await tester.runAsync(() async {
+      await precacheImage(
+        const AssetImage('assets/images/lk_group_logo.png'),
+        tester.element(find.byType(GroupLaunchLogo)),
+      );
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.byType(GroupLaunchLogo), findsOneWidget);
+    expect(find.byType(CompanySplashLogo), findsNothing);
+    expect(startedServices, isFalse);
+    frame.complete();
+    await tester.pump();
+    expect(startedServices, isTrue);
+    await tester.pump(const Duration(milliseconds: 1100));
+    expect(find.byType(GroupLaunchLogo), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(CompanySplashLogo), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    initialized.complete();
+    await tester.pump();
+  });
+
   testWidgets(
     'failed initialization shows a connection error instead of entering an uninitialized home',
     (tester) async {
@@ -103,6 +141,13 @@ void main() {
           },
         ),
       );
+      await tester.runAsync(() async {
+        await precacheImage(
+          const AssetImage('assets/images/lk_group_logo.png'),
+          tester.element(find.byType(GroupLaunchLogo)),
+        );
+      });
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
       expect(find.textContaining('서비스에 연결하지 못했습니다'), findsOneWidget);

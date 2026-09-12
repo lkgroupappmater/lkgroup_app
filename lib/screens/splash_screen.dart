@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import '../widgets/app_shell.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key, this.initialize});
+  const SplashScreen({super.key, this.initialize, this.onLogoReady});
   final Future<void> Function()? initialize;
+  final Future<void> Function()? onLogoReady;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -15,10 +16,14 @@ class _SplashScreenState extends State<SplashScreen> {
   bool _showGroupLogo = true;
   bool _initializationFailed = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  bool _started = false;
+
+  void _logoReady() {
+    if (_started || !mounted) return;
+    _started = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await widget.onLogoReady?.call();
       if (mounted) _start();
     });
   }
@@ -60,11 +65,11 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFDDF6FC),
       body: _showGroupLogo
-          ? const SafeArea(
+          ? SafeArea(
               child: Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: GroupLaunchLogo(),
+                  padding: const EdgeInsets.all(32),
+                  child: GroupLaunchLogo(onReady: _logoReady),
                 ),
               ),
             )
@@ -169,7 +174,8 @@ class _SplashScreenState extends State<SplashScreen> {
 /// The supplied LK GROUP original is drawn as normal content, outside the OS
 /// splash icon mask. BoxFit.contain preserves every edge in either orientation.
 class GroupLaunchLogo extends StatelessWidget {
-  const GroupLaunchLogo({super.key});
+  const GroupLaunchLogo({super.key, this.onReady});
+  final VoidCallback? onReady;
 
   @override
   Widget build(BuildContext context) => ConstrainedBox(
@@ -178,6 +184,21 @@ class GroupLaunchLogo extends StatelessWidget {
       'assets/images/lk_group_logo.png',
       fit: BoxFit.contain,
       semanticLabel: 'LK GROUP',
+      frameBuilder: (_, child, frame, synchronous) {
+        if (synchronous || frame != null) onReady?.call();
+        return child;
+      },
+      errorBuilder: (_, __, ___) {
+        onReady?.call();
+        return const Text(
+          'LK GROUP',
+          style: TextStyle(
+            color: Color(0xFF393667),
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+      },
       filterQuality: FilterQuality.high,
     ),
   );

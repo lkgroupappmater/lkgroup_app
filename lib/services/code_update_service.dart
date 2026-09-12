@@ -6,12 +6,15 @@ import 'package:shorebird_code_push/shorebird_code_push.dart';
 enum CodeUpdateStatus {
   checking,
   unsupported,
+  development,
   current,
   available,
   downloading,
   ready,
   error,
 }
+
+enum CodeUpdateRuntime { debug, profile, release, web }
 
 enum CodeUpdateNotice { ready, applied, unsupported }
 
@@ -23,15 +26,26 @@ class CodeUpdateService extends ChangeNotifier {
     Future<SharedPreferences> Function()? preferences,
     Future<String> Function()? versionLoader,
     DateTime Function()? clock,
+    CodeUpdateRuntime? runtime,
   }) : _updater = updater ?? ShorebirdUpdater(),
        _preferences = preferences ?? SharedPreferences.getInstance,
        _versionLoader = versionLoader ?? _installedVersion,
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       runtime =
+           runtime ??
+           (kIsWeb
+               ? CodeUpdateRuntime.web
+               : kDebugMode
+               ? CodeUpdateRuntime.debug
+               : kProfileMode
+               ? CodeUpdateRuntime.profile
+               : CodeUpdateRuntime.release);
 
   static final instance = CodeUpdateService();
   static const _seenKey = 'lk.code_update.seen_notices';
   static const _installedKey = 'lk.code_update.installed';
   final ShorebirdUpdater _updater;
+  final CodeUpdateRuntime runtime;
   final Future<SharedPreferences> Function() _preferences;
   final Future<String> Function() _versionLoader;
   final DateTime Function() _clock;
@@ -119,6 +133,12 @@ class CodeUpdateService extends ChangeNotifier {
     _emit();
     try {
       await _load();
+      if (!_updater.isAvailable && runtime != CodeUpdateRuntime.release) {
+        status = CodeUpdateStatus.development;
+        notice = null;
+        noticeId = null;
+        return;
+      }
       if (!_updater.isAvailable) {
         status = CodeUpdateStatus.unsupported;
         _setNotice(CodeUpdateNotice.unsupported, '$version:unsupported');

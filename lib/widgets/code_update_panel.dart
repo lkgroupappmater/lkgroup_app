@@ -20,8 +20,8 @@ class CodeUpdateText {
     'ບັນທຶກວຽກ, ປິດແອັບໃຫ້ໝົດ ແລ້ວເປີດໃໝ່.',
   );
   String get unsupported => pick(
-    '이 설치본은 자동 코드 업데이트를 지원하지 않습니다. 자동 업데이트가 포함된 새 설치본으로 업데이트해 주세요.',
-    'This installation cannot receive automatic code updates. Install the release that includes automatic updates.',
+    '이 설치본은 자동 코드 업데이트를 지원하지 않습니다. GitHub Actions의 release가 성공한 뒤 생성된 Shorebird APK를 설치해 주세요. 소스를 pull하거나 일반 flutter build로 만든 앱에는 자동 업데이트 엔진이 포함되지 않습니다.',
+    'This installation cannot receive automatic code updates. Install the Shorebird APK from a successful GitHub Actions release. Pulling source or building with flutter build does not include the updater engine.',
     'ແອັບທີ່ຕິດຕັ້ງນີ້ບໍ່ຮອງຮັບອັບເດດອັດຕະໂນມັດ. ກະລຸນາຕິດຕັ້ງເວີຊັນທີ່ຮອງຮັບ.',
   );
   String status(CodeUpdateService s) => switch (s.status) {
@@ -31,6 +31,18 @@ class CodeUpdateText {
       'ກຳລັງກວດຫາອັບເດດ.',
     ),
     CodeUpdateStatus.unsupported => unsupported,
+    CodeUpdateStatus.development =>
+      s.runtime == CodeUpdateRuntime.web
+          ? pick(
+              '웹 실행에서는 앱 코드 자동 업데이트를 확인할 수 없습니다.',
+              'App code updates are unavailable in a web run.',
+              'ກວດອັບເດດໂຄດແອັບໃນເວັບບໍ່ໄດ້.',
+            )
+          : pick(
+              '개발용 실행입니다. IDE 실행 버튼이나 flutter run으로 실행한 앱에서는 자동 업데이트가 동작하지 않습니다. 확인하려면 Actions에서 만든 Shorebird APK를 설치하고 휴대폰의 앱 아이콘으로 실행해 주세요.',
+              'Development run: automatic updates do not run with the IDE Run button or flutter run. Install the Shorebird APK built by Actions, then open it from the phone app icon to check updates.',
+              'ເປັນການທົດລອງພັດທະນາ. ກະລຸນາຕິດຕັ້ງ Shorebird APK ຈາກ Actions ແລ້ວເປີດຈາກໄອຄອນແອັບໃນໂທລະສັບເພື່ອກວດອັບເດດ.',
+            ),
     CodeUpdateStatus.current => pick(
       '현재 설치 버전의 최신 패치입니다.',
       'This release has the latest patch.',
@@ -87,9 +99,13 @@ class CodeUpdatePanel extends StatelessWidget {
           Text(t.title, style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           Text(t.installed(service)),
+          Text(
+            '${t.pick('실행 모드', 'Run mode', 'ໂໝດ')}: ${service.runtime.name}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 8),
           Text(t.status(service)),
-          if (service.version == '1.0.3+4') ...[
+          if (service.version == '1.0.4+5') ...[
             const SizedBox(height: 12),
             Text(
               t.pick(
@@ -101,8 +117,8 @@ class CodeUpdatePanel extends StatelessWidget {
             ),
             Text(
               t.pick(
-                '• LK GROUP 시작 로고 전체 표시\n• 자동 업데이트 상태·알림·팝업 안내\n• 배송 정보 색상과 중복 화폐 기호 정리',
-                '• Complete LK GROUP startup logo\n• Automatic update status, notices and prompts\n• Delivery colors and cleaner currency amounts',
+                '• 운영체제 시작 화면 LK GROUP 로고 복원\n• 자동 업데이트 상태·알림·팝업 안내\n• 배송 정보 색상과 중복 화폐 기호 정리',
+                '• Restored native LK GROUP startup logo\n• Automatic update status, notices and prompts\n• Delivery colors and cleaner currency amounts',
                 '• ສະແດງໂລໂກ້ LK GROUP ຄົບຖ້ວນ\n• ສະຖານະ ແລະ ແຈ້ງເຕືອນອັບເດດ\n• ສີຂໍ້ມູນຈັດສົ່ງ ແລະ ຈຳນວນເງິນ',
               ),
             ),

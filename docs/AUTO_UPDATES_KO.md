@@ -1,14 +1,17 @@
 # 앱 자동 업데이트
 
-현재 master 소스는 **`1.0.3+4`**입니다. 새 LK GROUP 시작 화면, 실제 자동 패치 상태와
+현재 master 소스는 **`1.0.4+5`**입니다. 새 LK GROUP 시작 화면, 실제 자동 패치 상태와
 앱 알림/팝업 안내가 포함됩니다. 네이티브 시작 설정과 이미지, 앱 버전 조회 플러그인이
 변경되므로 이 버전의 Shorebird APK/AAB를 한 번 새로 설치해야 합니다.
 
 - 첫 화면은 사용자가 제공한 `assets/images/lk_group_logo.png` 원본입니다. 이미지를 변형하지
-  않고 Flutter에서 원본 비율 전체를 표시합니다. Android의 원형 시작 아이콘 마스크를 쓰지 않습니다.
-- OS 준비 단계는 동일한 하늘색 배경으로 이어지고, 앱의 첫 화면은 LK GROUP 로고(1.2초),
-  다음 화면은 기존 Trading 환영/로딩 화면, 마지막은 홈입니다. 서버 초기화는 첫 화면을 그린 뒤
-  시작하며, 연결이 끝나기 전에는 홈을 열지 않습니다. 실패하면 연결 실패 안내를 표시합니다.
+  않고 Flutter에서 원본 비율 전체를 표시합니다. Android 12 이상에서는 원본 픽셀을 네이티브
+  벡터 경로로 옮기고 전체 그림을 원형 마스크의 안전 영역 안에 배치합니다. 이전 Android와 iOS는
+  원본 PNG를 비율에 맞춰 표시합니다. 로고 아래에는 LK GROUP만 있으며 Trading 문구는 없습니다.
+- OS 준비 단계에도 LK GROUP 로고가 표시됩니다. Flutter 이미지 해독이 끝날 때까지 OS 화면을
+  유지하고 실제 첫 프레임이 그려진 뒤 1.2초간 그룹 로고를 표시합니다. 다음은 기존 Trading
+  환영/로딩 화면, 마지막은 홈입니다. 서버 초기화는 첫 프레임 뒤 시작하며, 연결이 끝나기
+  전에는 홈을 열지 않습니다. 실패하면 연결 실패 안내를 표시합니다.
 - 홈페이지 알림 종에서 현재 실제 설치 버전, 적용된 패치, 업데이트 상태/최근 확인 시간과
   수동 확인 버튼을 볼 수 있습니다. 비회원도 기기 업데이트를 볼 수 있지만 계정 알림은
   로그인한 경우에만 조회합니다. 기기 업데이트 알림은 DB에 생성하지 않습니다.
@@ -18,7 +21,10 @@
 - 다운로드가 확인되면 알림 배지·홈 안내·팝업으로 저장 후 앱을 완전히 종료하고 재실행하라고
   안내합니다. 같은 버전/패치 팝업을 확인한 기록은 기기에 저장하여 재실행 후에도 반복하지 않습니다.
   기존 알림 팝업, 다른 화면, 입력 중에는 새 팝업을 미룹니다. 앱을 강제 종료하거나 재시작하지 않습니다.
-- 일반 Flutter/디버그 설치본처럼 OTA 엔진이 없는 경우에는 지원되지 않는 설치본임을 안내합니다.
+- 실제 실행 모드(debug/profile/release/web)를 알림 상세에 표시합니다. IDE의 실행 버튼이나
+  `flutter run`으로 만든 개발용 실행은 OTA 확인이 불가능한 이유와 Shorebird APK 설치 방법을
+  안내하며, 개발용 제한만으로 새 업데이트 팝업을 띄우지 않습니다. release 모드여도 OTA 엔진이
+  없으면 지원되지 않는 설치본이라고 안내합니다. `flutter run --release`도 Shorebird 빌드가 아닙니다.
   인터넷/다운로드 오류를 '최신 상태'로 표시하지 않습니다. 새 설치 파일 버전과 현재 버전용 코드 패치는
   서로 다르므로 `현재 설치 버전의 최신 패치`는 새로운 APK가 전혀 없다는 뜻이 아닙니다.
 - 업데이트 상세의 현재 버전 개선 내용은 배포 코드와 함께 관리합니다. 다음 패치 내용이 확인되지
@@ -26,10 +32,22 @@
 
 이전 `1.0.1+2`에는 [Patch 2 배포](https://github.com/lkgroupappmater/lkgroup_app/actions/runs/34675919747)가
 성공했습니다. 이전 커밋으로 생성한 `1.0.2+3` 설치본에는 이번 첫 화면/업데이트 알림 수정이 없습니다.
+`1.0.3+4` 릴리스 작업이 시작된 후 네이티브 로고를 추가 수정하여 새 버전은 `1.0.4+5`입니다.
 `git pull --ff-only origin master` 후 GitHub Actions의 `App update checks`에서
-Branch `master`, `ota_action=release`로 **`1.0.3+4`** 설치본을 생성합니다.
-릴리스 생성 전에는 이 새 버전의 자동 패치가 보류되는 것이 정상입니다. 기존 설치본과 같은 서명을
-유지해야 합니다. 실제 Play 게시 시 versionCode `4` 사용 이력도 확인합니다.
+Branch `master`, `ota_action=release`로 **`1.0.4+5`** 설치본을 생성합니다.
+릴리스 생성 전에는 이 새 버전의 자동 패치가 보류되는 것이 정상입니다.
+
+Actions 화면에서 `Android release status: missing`, `Requested action: release`,
+`Deployment ready: true`가 함께 표시되면 **새 설치본을 만들 준비가 된 정상 상태**입니다.
+`validate`와 `native-startup`이 성공하면 `shorebird-deploy`가 실행됩니다. 전체 성공 후 같은 실행의
+Artifacts에서 `lkgroup-shorebird-android-1.0.4+5`를 열고 APK를 휴대폰에 설치합니다.
+AAB는 Play 업로드용입니다. `lkgroup-native-test-apk`는 CI 검증용 개발 APK이므로 OTA 설치용이 아닙니다.
+설치 후 IDE 실행 버튼을 누르지 말고 **휴대폰 앱 아이콘**으로 실행합니다. 알림 상세의 실행 모드가
+release이고 업데이트 확인이 정상인지 확인합니다. `git pull`과 Actions release만으로 이미 설치된
+휴대폰 앱이 Shorebird 설치본으로 교체되지는 않습니다. 같은 버전의 release를 반복 실행할 필요는 없습니다.
+
+ 기존 설치본과 같은 서명을
+유지해야 합니다. 실제 Play 게시 시 versionCode `5` 사용 이력도 확인합니다.
 
 배송 색상은 지방 노랑 `#FFC000`, 시내 초록 `#92D050`, 지방 선결제 파랑 `#5B9BD5`,
 시내 선결제 연갈색 `#D6B18A`를 유지합니다. 운임/환율/할인 계산은 변경하지 않습니다.
@@ -91,8 +109,8 @@ Shorebird CLI의 Android APK 배포 옵션은 공식 릴리스 문서를 참고�
 이후 Dart 코드 수정은 동일 릴리스 소스에서 검증 후 다음과 같이 배포합니다.
 
 ```powershell
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.3+4 --dry-run
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.3+4 --track stable
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.4+5 --dry-run
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.4+5 --track stable
 ```
 
 `--release-version`에는 실제 배포한 버전을 씁니다. 도구는 `latest`나 pubspec과 다른 버전을
@@ -110,7 +128,8 @@ python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.3
 
 1. master push 시 Shorebird API 키와 해당 앱 접근 권한을 읽기 전용으로 확인합니다.
 2. pubspec의 정확한 버전에 active Android 릴리스가 있는지와 빌드 비밀 설정의 존재를 확인합니다.
-3. Python 회귀 테스트, Flutter 분석·테스트, Android 디버그 빌드를 모두 통과한 경우에만
+3. Python 회귀 테스트, Flutter 분석·테스트, Android 디버그 빌드와 Android 12 실제 시작 화면
+   검사(밝은/어두운 모드에서 원본 로고 형태 비교)를 모두 통과한 경우에만
    같은 커밋의 stable 패치를 배포합니다. PR에서는 비밀 설정을 사용하거나 배포하지 않습니다.
 4. 최초 릴리스나 필요한 비밀 설정이 없으면 패치 작업을 보류하고 실행 Summary에 이유를 표시합니다.
    인증 자체가 거절되면 해당 작업은 실패로 표시됩니다. 키 값은 출력하지 않습니다.
@@ -166,7 +185,7 @@ GitHub의 `ANDROID_KEYSTORE_BASE64` Secret 칸에 붙여넣습니다. 명령은 
 `ota_action=check`는 설정/인증 확인만 수행합니다. `patch`는 현재 pubspec 버전의 패치를
 수동 재시도할 때 사용합니다. 릴리스가 active이면 같은 버전으로 release를 다시 만들지 않습니다.
 이미 일반 AAB로 Play에 사용한 versionCode라면 최초 Shorebird AAB에는 더 높은 versionCode가
-필요합니다. 현재 새 설치본 소스는 `1.0.3+4`이며 Play에 게시하기 전에 실제 Play 등록 이력을 확인합니다.
+필요합니다. 현재 새 설치본 소스는 `1.0.4+5`이며 Play에 게시하기 전에 실제 Play 등록 이력을 확인합니다.
 
 Shorebird 기본 Flutter로 첫 릴리스를 만들고, 패치에는 Shorebird가 해당 릴리스의 Flutter를
 선택합니다. 워크플로가 실행 중에 master가 더 진행된 경우 오래된 커밋은 배포 시작 전에

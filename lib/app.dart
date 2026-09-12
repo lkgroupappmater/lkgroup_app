@@ -13,11 +13,13 @@ import 'widgets/auto_refresh_state.dart';
 // Both names are provided for compatibility.
 
 class CargoFlowApp extends StatelessWidget {
-  const CargoFlowApp({super.key, this.initialize});
+  const CargoFlowApp({super.key, this.initialize, this.onLogoReady});
   final Future<void> Function()? initialize;
+  final Future<void> Function()? onLogoReady;
 
   @override
-  Widget build(BuildContext context) => _RootApp(initialize: initialize);
+  Widget build(BuildContext context) =>
+      _RootApp(initialize: initialize, onLogoReady: onLogoReady);
 }
 
 /// Alias so projects that use App() also compile without changes.
@@ -30,8 +32,9 @@ class App extends StatelessWidget {
 
 // ── Internal root ────────────────────────────────────────────────────────────
 class _RootApp extends StatelessWidget {
-  const _RootApp({super.key, this.initialize});
+  const _RootApp({super.key, this.initialize, this.onLogoReady});
   final Future<void> Function()? initialize;
+  final Future<void> Function()? onLogoReady;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +55,7 @@ class _RootApp extends StatelessWidget {
         useMaterial3: false,
       ),
       // Always start with SplashScreen so the welcome screen shows on every launch.
-      home: SplashScreen(initialize: initialize),
+      home: SplashScreen(initialize: initialize, onLogoReady: onLogoReady),
     );
   }
 }

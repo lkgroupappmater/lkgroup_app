@@ -50,11 +50,40 @@ class FakeUpdater implements ShorebirdUpdater {
 CodeUpdateService serviceFor(
   FakeUpdater updater, {
   String version = '1.0.3+4',
-}) => CodeUpdateService(updater: updater, versionLoader: () async => version);
+}) => CodeUpdateService(
+  updater: updater,
+  versionLoader: () async => version,
+  runtime: CodeUpdateRuntime.release,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final runtime in [
+    CodeUpdateRuntime.debug,
+    CodeUpdateRuntime.profile,
+    CodeUpdateRuntime.web,
+  ]) {
+    test(
+      '$runtime explains expected limitation without an update popup',
+      () async {
+        final api = FakeUpdater()..available = false;
+        final service = CodeUpdateService(
+          updater: api,
+          versionLoader: () async => '1.0.4+5',
+          runtime: runtime,
+        );
+        await service.check();
+        expect(service.status, CodeUpdateStatus.development);
+        expect(service.needsPopup, isFalse);
+        expect(service.hasUnread, isFalse);
+        expect(api.checks, 0);
+        expect(api.downloads, 0);
+        service.dispose();
+      },
+    );
+  }
 
   test(
     'an engine background download is announced without downloading twice',
