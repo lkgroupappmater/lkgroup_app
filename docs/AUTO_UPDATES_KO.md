@@ -1,8 +1,26 @@
 # 앱 자동 업데이트
 
-이번 소스 버전은 `1.0.1+2`입니다. 기존에 설치한 `1.0.0+1` 앱에는 이 코드가
-들어 있지 않으므로 새 설치본을 한 번 배포해야 합니다. GitHub에 소스를 올리거나
-`git pull`하는 것만으로 이미 설치된 앱의 실행 파일이 바뀌지는 않습니다.
+현재 master의 새 설치본 소스 버전은 `1.0.2+3`입니다. 로고 내부 LK·Group의 실제 투명 처리와
+Android 첫 화면의 로고 잘림 수정은 이미지/네이티브 자산 변경이므로 새 설치본이 필요합니다.
+기존 `1.0.1+2` Shorebird 설치본용 문서·배송 색상·통화·로딩 문구 코드 수정은
+[별도 코드 커밋](https://github.com/lkgroupappmater/lkgroup_app/commit/0da30c39785426a8b601e47663e2c3255c98941a)으로 먼저 배포했습니다.
+2026-09-12 [자동 배포 검증](https://github.com/lkgroupappmater/lkgroup_app/actions/runs/34675919747)에서
+`1.0.1+2`의 **Patch 2**가 stable로 게시됐습니다.
+GitHub의 새 설치본 소스를 pull하는 것만으로 휴대폰의 설치 파일이 바뀌지는 않습니다.
+
+- 배송 정보 색상: 지방배송 노랑 `#FFC000`, 시내배송 초록 `#92D050`,
+  지방배송 선결제 파랑 `#5B9BD5`, 시내배송 선결제 연갈색 `#D6B18A`.
+  실제 배송 주소에 사용한 고객 배송 설정을 우선하며, 기존 비고의 띄어쓰기와 `선결재`도 인식합니다.
+  가견적서에는 배송 정보 칸이 있으나 현재 배송 데이터가 없으므로 빈 칸을 임의로 색칠하지 않습니다.
+- 운임 합계의 USD/KIP/THB/WON 표기는 유지하고 숫자 앞 중복 화폐 기호만 제거했습니다.
+  운임 계산, 반올림, 환율, 할인 계산은 변경하지 않았습니다.
+- 로딩 화면의 `By LK Group`을 별도 줄로 내렸습니다. 첫 실행 로고 수정은 새 설치본에 포함됩니다.
+
+`git pull --ff-only origin master` 후 아래 **최초 설치본 만들기** 절차에서
+Branch `master`, `ota_action=release`를 실행하면 기존 서명/연결 설정으로 새 APK/AAB를 만듭니다.
+이 릴리스가 만들어지기 전까지 `1.0.2+3`의 자동 패치가 보류되는 것은 정상입니다.
+이미 설치된 `1.0.1+2`의 기존 stable 패치는 유지됩니다. Play에 게시할 경우 versionCode `3`을
+이미 사용했는지 먼저 확인해야 하며, 현재 작업은 Play 게시나 강제 설치를 수행하지 않습니다.
 
 ## 운영 자료
 
@@ -33,7 +51,7 @@ Android 앱이 시작되거나 다시 열릴 때 업데이트를 확인하고, �
 제공되지 않을 수 있습니다. Play 내부 테스트에서 동일한 앱 ID/서명과 더 높은 versionCode의
 릴리스를 사용하여 실제 단말에서 확인해야 합니다. iOS 스토어 자동 업데이트는 기기 설정을 따릅니다.
 
-## 코드 패치(Shorebird): 앱 연결 완료, 최초 설치본 배포 필요
+## 코드 패치(Shorebird): 연결 완료, 새 자산은 새 설치본 필요
 
 `LK Group Trading`의 실제 앱 ID는 `b64e00d6-2682-4ff0-8519-c8701ce795af`이며
 `shorebird.yaml`과 `pubspec.yaml`에 등록되어 있습니다. 같은 앱을 다시 init하거나
@@ -61,8 +79,8 @@ Shorebird CLI의 Android APK 배포 옵션은 공식 릴리스 문서를 참고�
 이후 Dart 코드 수정은 동일 릴리스 소스에서 검증 후 다음과 같이 배포합니다.
 
 ```powershell
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.1+2 --dry-run
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.1+2 --track stable
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.2+3 --dry-run
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.2+3 --track stable
 ```
 
 `--release-version`에는 실제 배포한 버전을 씁니다. 도구는 `latest`나 pubspec과 다른 버전을
@@ -136,7 +154,7 @@ GitHub의 `ANDROID_KEYSTORE_BASE64` Secret 칸에 붙여넣습니다. 명령은 
 `ota_action=check`는 설정/인증 확인만 수행합니다. `patch`는 현재 pubspec 버전의 패치를
 수동 재시도할 때 사용합니다. 릴리스가 active이면 같은 버전으로 release를 다시 만들지 않습니다.
 이미 일반 AAB로 Play에 사용한 versionCode라면 최초 Shorebird AAB에는 더 높은 versionCode가
-필요합니다. 현재 소스는 `1.0.1+2`이며 실제 Play 등록 이력을 확인한 뒤 변경합니다.
+필요합니다. 현재 새 설치본 소스는 `1.0.2+3`이며 Play에 게시하기 전에 실제 Play 등록 이력을 확인합니다.
 
 Shorebird 기본 Flutter로 첫 릴리스를 만들고, 패치에는 Shorebird가 해당 릴리스의 Flutter를
 선택합니다. 워크플로가 실행 중에 master가 더 진행된 경우 오래된 커밋은 배포 시작 전에
