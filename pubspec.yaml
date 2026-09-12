@@ -4,12 +4,15 @@ description: CargoFlow Trading and Logistics App
 
 publish_to: "none"
 
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
+  package_info_plus: 10.2.1
+  shorebird_code_push: 2.0.7
+  shared_preferences: 2.5.5
   archive: ^3.6.1
   flutter:
     sdk: flutter
@@ -36,6 +39,7 @@ flutter:
   assets:
     - assets/images/company_logo_transparent.png
     - assets/images/company_splash_logo.png
+    - assets/images/lk_group_logo.png
     - assets/quotation_forms/
     - assets/statement_forms/
     - assets/images/company_logo.png

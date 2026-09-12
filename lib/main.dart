@@ -5,9 +5,14 @@ import 'config/supabase_config.dart';
 import 'services/route_catalog_service.dart';
 import 'services/live_data_service.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Paint the group logo before starting services that can wait on the network.
+  runApp(CargoFlowApp(initialize: _initializeServices));
+}
+
+Future<void> _initializeServices() async {
   // SupabaseConfig는 --dart-define으로 전달된 값이 있을 때만 초기화합니다.
   await SupabaseConfig.initialize();
 
@@ -16,6 +21,4 @@ Future<void> main() async {
   await RouteCatalogService.instance.refresh();
 
   LiveDataService.instance.start();
-
-  runApp(const CargoFlowApp());
 }

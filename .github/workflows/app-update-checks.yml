@@ -33,9 +33,9 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: python3 -m unittest discover -s tool -p 'test_*.py'
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/live_data_service.dart lib/services/app_update_service.dart lib/widgets/auto_refresh_state.dart lib/widgets/app_update_banner.dart lib/widgets/app_shell.dart lib/screens/dashboard_home_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart lib/screens/notice_list_screen.dart lib/screens/shipment_schedule_screen.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/live_data_service.dart lib/services/app_update_service.dart lib/services/code_update_service.dart lib/widgets/code_update_panel.dart lib/main.dart lib/app.dart lib/widgets/auto_refresh_state.dart lib/widgets/app_update_banner.dart lib/widgets/app_shell.dart lib/screens/dashboard_home_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart lib/screens/notice_list_screen.dart lib/screens/shipment_schedule_screen.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/document_delivery_style.dart lib/core/money_format.dart lib/screens/splash_screen.dart lib/screens/quote_request_screen.dart lib/services/customer_benefit_service.dart lib/core/document_form_style.dart lib/core/document_form_painter.dart lib/core/document_text_catalog.dart lib/screens/quotation_preview_dialog.dart lib/screens/statement_preview_dialog.dart test/document_form_layout_test.dart test/document_form_render_test.dart
-      - run: flutter test test/document_delivery_style_test.dart test/money_format_test.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart test/document_form_render_test.dart
+      - run: flutter test test/code_update_service_test.dart test/code_update_panel_test.dart test/startup_flow_test.dart test/document_delivery_style_test.dart test/money_format_test.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart test/route_selection_order_test.dart test/document_form_layout_test.dart test/document_form_render_test.dart
       - name: Save rendered quotation and statement previews
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -43,6 +43,16 @@ jobs:
           name: lkgroup-document-previews
           path: build/document-previews/*.png
           if-no-files-found: ignore
+          retention-days: 14
+      - name: Save startup previews and resolved dependency lock
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lkgroup-startup-checks
+          path: |
+            build/startup-previews/*.png
+            pubspec.lock
+          if-no-files-found: error
           retention-days: 14
       # Compile the native Play bridge; no credentials, signing or publishing.
       - run: flutter build apk --debug

@@ -1,26 +1,38 @@
 # 앱 자동 업데이트
 
-현재 master의 새 설치본 소스 버전은 `1.0.2+3`입니다. 로고 내부 LK·Group의 실제 투명 처리와
-Android 첫 화면의 로고 잘림 수정은 이미지/네이티브 자산 변경이므로 새 설치본이 필요합니다.
-기존 `1.0.1+2` Shorebird 설치본용 문서·배송 색상·통화·로딩 문구 코드 수정은
-[별도 코드 커밋](https://github.com/lkgroupappmater/lkgroup_app/commit/0da30c39785426a8b601e47663e2c3255c98941a)으로 먼저 배포했습니다.
-2026-09-12 [자동 배포 검증](https://github.com/lkgroupappmater/lkgroup_app/actions/runs/34675919747)에서
-`1.0.1+2`의 **Patch 2**가 stable로 게시됐습니다.
-GitHub의 새 설치본 소스를 pull하는 것만으로 휴대폰의 설치 파일이 바뀌지는 않습니다.
+현재 master 소스는 **`1.0.3+4`**입니다. 새 LK GROUP 시작 화면, 실제 자동 패치 상태와
+앱 알림/팝업 안내가 포함됩니다. 네이티브 시작 설정과 이미지, 앱 버전 조회 플러그인이
+변경되므로 이 버전의 Shorebird APK/AAB를 한 번 새로 설치해야 합니다.
 
-- 배송 정보 색상: 지방배송 노랑 `#FFC000`, 시내배송 초록 `#92D050`,
-  지방배송 선결제 파랑 `#5B9BD5`, 시내배송 선결제 연갈색 `#D6B18A`.
-  실제 배송 주소에 사용한 고객 배송 설정을 우선하며, 기존 비고의 띄어쓰기와 `선결재`도 인식합니다.
-  가견적서에는 배송 정보 칸이 있으나 현재 배송 데이터가 없으므로 빈 칸을 임의로 색칠하지 않습니다.
-- 운임 합계의 USD/KIP/THB/WON 표기는 유지하고 숫자 앞 중복 화폐 기호만 제거했습니다.
-  운임 계산, 반올림, 환율, 할인 계산은 변경하지 않았습니다.
-- 로딩 화면의 `By LK Group`을 별도 줄로 내렸습니다. 첫 실행 로고 수정은 새 설치본에 포함됩니다.
+- 첫 화면은 사용자가 제공한 `assets/images/lk_group_logo.png` 원본입니다. 이미지를 변형하지
+  않고 Flutter에서 원본 비율 전체를 표시합니다. Android의 원형 시작 아이콘 마스크를 쓰지 않습니다.
+- OS 준비 단계는 동일한 하늘색 배경으로 이어지고, 앱의 첫 화면은 LK GROUP 로고(1.2초),
+  다음 화면은 기존 Trading 환영/로딩 화면, 마지막은 홈입니다. 서버 초기화는 첫 화면을 그린 뒤
+  시작하며, 연결이 끝나기 전에는 홈을 열지 않습니다. 실패하면 연결 실패 안내를 표시합니다.
+- 홈페이지 알림 종에서 현재 실제 설치 버전, 적용된 패치, 업데이트 상태/최근 확인 시간과
+  수동 확인 버튼을 볼 수 있습니다. 비회원도 기기 업데이트를 볼 수 있지만 계정 알림은
+  로그인한 경우에만 조회합니다. 기기 업데이트 알림은 DB에 생성하지 않습니다.
+- Shorebird SDK로 stable 패치를 확인하고 새 패치가 있으면 내려받습니다. 앱 실행/복귀와
+  기존 자동 갱신 흐름에서 확인하며 일반 확인은 30분 간격, 실패 재시도는 1분 간격으로 제한합니다.
+  수동 확인 버튼은 제한을 건너뜁니다. 서버 확인이 시작 화면이나 사용자 작업을 막지 않습니다.
+- 다운로드가 확인되면 알림 배지·홈 안내·팝업으로 저장 후 앱을 완전히 종료하고 재실행하라고
+  안내합니다. 같은 버전/패치 팝업을 확인한 기록은 기기에 저장하여 재실행 후에도 반복하지 않습니다.
+  기존 알림 팝업, 다른 화면, 입력 중에는 새 팝업을 미룹니다. 앱을 강제 종료하거나 재시작하지 않습니다.
+- 일반 Flutter/디버그 설치본처럼 OTA 엔진이 없는 경우에는 지원되지 않는 설치본임을 안내합니다.
+  인터넷/다운로드 오류를 '최신 상태'로 표시하지 않습니다. 새 설치 파일 버전과 현재 버전용 코드 패치는
+  서로 다르므로 `현재 설치 버전의 최신 패치`는 새로운 APK가 전혀 없다는 뜻이 아닙니다.
+- 업데이트 상세의 현재 버전 개선 내용은 배포 코드와 함께 관리합니다. 다음 패치 내용이 확인되지
+  않았을 때는 추측한 변경 목록을 표시하지 않고 준비된 패치 번호와 재실행 안내를 표시합니다.
 
-`git pull --ff-only origin master` 후 아래 **최초 설치본 만들기** 절차에서
-Branch `master`, `ota_action=release`를 실행하면 기존 서명/연결 설정으로 새 APK/AAB를 만듭니다.
-이 릴리스가 만들어지기 전까지 `1.0.2+3`의 자동 패치가 보류되는 것은 정상입니다.
-이미 설치된 `1.0.1+2`의 기존 stable 패치는 유지됩니다. Play에 게시할 경우 versionCode `3`을
-이미 사용했는지 먼저 확인해야 하며, 현재 작업은 Play 게시나 강제 설치를 수행하지 않습니다.
+이전 `1.0.1+2`에는 [Patch 2 배포](https://github.com/lkgroupappmater/lkgroup_app/actions/runs/34675919747)가
+성공했습니다. 이전 커밋으로 생성한 `1.0.2+3` 설치본에는 이번 첫 화면/업데이트 알림 수정이 없습니다.
+`git pull --ff-only origin master` 후 GitHub Actions의 `App update checks`에서
+Branch `master`, `ota_action=release`로 **`1.0.3+4`** 설치본을 생성합니다.
+릴리스 생성 전에는 이 새 버전의 자동 패치가 보류되는 것이 정상입니다. 기존 설치본과 같은 서명을
+유지해야 합니다. 실제 Play 게시 시 versionCode `4` 사용 이력도 확인합니다.
+
+배송 색상은 지방 노랑 `#FFC000`, 시내 초록 `#92D050`, 지방 선결제 파랑 `#5B9BD5`,
+시내 선결제 연갈색 `#D6B18A`를 유지합니다. 운임/환율/할인 계산은 변경하지 않습니다.
 
 ## 운영 자료
 
@@ -79,8 +91,8 @@ Shorebird CLI의 Android APK 배포 옵션은 공식 릴리스 문서를 참고�
 이후 Dart 코드 수정은 동일 릴리스 소스에서 검증 후 다음과 같이 배포합니다.
 
 ```powershell
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.2+3 --dry-run
-python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.2+3 --track stable
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.3+4 --dry-run
+python tool/ota.py patch --defines C:/LK/app-config.json --release-version 1.0.3+4 --track stable
 ```
 
 `--release-version`에는 실제 배포한 버전을 씁니다. 도구는 `latest`나 pubspec과 다른 버전을
@@ -154,7 +166,7 @@ GitHub의 `ANDROID_KEYSTORE_BASE64` Secret 칸에 붙여넣습니다. 명령은 
 `ota_action=check`는 설정/인증 확인만 수행합니다. `patch`는 현재 pubspec 버전의 패치를
 수동 재시도할 때 사용합니다. 릴리스가 active이면 같은 버전으로 release를 다시 만들지 않습니다.
 이미 일반 AAB로 Play에 사용한 versionCode라면 최초 Shorebird AAB에는 더 높은 versionCode가
-필요합니다. 현재 새 설치본 소스는 `1.0.2+3`이며 Play에 게시하기 전에 실제 Play 등록 이력을 확인합니다.
+필요합니다. 현재 새 설치본 소스는 `1.0.3+4`이며 Play에 게시하기 전에 실제 Play 등록 이력을 확인합니다.
 
 Shorebird 기본 Flutter로 첫 릴리스를 만들고, 패치에는 Shorebird가 해당 릴리스의 Flutter를
 선택합니다. 워크플로가 실행 중에 master가 더 진행된 경우 오래된 커밋은 배포 시작 전에

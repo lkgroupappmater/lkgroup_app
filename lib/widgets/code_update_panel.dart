@@ -1,0 +1,193 @@
+import 'package:flutter/material.dart';
+
+import '../core/app_language.dart';
+import '../services/code_update_service.dart';
+
+class CodeUpdateText {
+  const CodeUpdateText(this.language);
+  final AppLanguage language;
+  String pick(String ko, String en, String lo) => switch (language) {
+    AppLanguage.korean => ko,
+    AppLanguage.lao => lo,
+    _ => en,
+  };
+  String get title => pick('앱 업데이트', 'App updates', 'ອັບເດດແອັບ');
+  String get close => pick('확인', 'OK', 'ຕົກລົງ');
+  String get check => pick('업데이트 확인', 'Check for updates', 'ກວດຫາອັບເດດ');
+  String get restart => pick(
+    '작업을 저장한 뒤 앱을 완전히 종료하고 다시 실행해 주세요.',
+    'Save your work, fully close the app, then open it again.',
+    'ບັນທຶກວຽກ, ປິດແອັບໃຫ້ໝົດ ແລ້ວເປີດໃໝ່.',
+  );
+  String get unsupported => pick(
+    '이 설치본은 자동 코드 업데이트를 지원하지 않습니다. 자동 업데이트가 포함된 새 설치본으로 업데이트해 주세요.',
+    'This installation cannot receive automatic code updates. Install the release that includes automatic updates.',
+    'ແອັບທີ່ຕິດຕັ້ງນີ້ບໍ່ຮອງຮັບອັບເດດອັດຕະໂນມັດ. ກະລຸນາຕິດຕັ້ງເວີຊັນທີ່ຮອງຮັບ.',
+  );
+  String status(CodeUpdateService s) => switch (s.status) {
+    CodeUpdateStatus.checking => pick(
+      '업데이트 확인 중입니다.',
+      'Checking for updates.',
+      'ກຳລັງກວດຫາອັບເດດ.',
+    ),
+    CodeUpdateStatus.unsupported => unsupported,
+    CodeUpdateStatus.current => pick(
+      '현재 설치 버전의 최신 패치입니다.',
+      'This release has the latest patch.',
+      'ເວີຊັນນີ້ມີແພັດຫຼ້າສຸດແລ້ວ.',
+    ),
+    CodeUpdateStatus.available => pick(
+      '새 업데이트를 발견했습니다.',
+      'A new update is available.',
+      'ມີອັບເດດໃໝ່.',
+    ),
+    CodeUpdateStatus.downloading => pick(
+      '업데이트 다운로드 중입니다.',
+      'Downloading an update.',
+      'ກຳລັງດາວໂຫຼດອັບເດດ.',
+    ),
+    CodeUpdateStatus.ready =>
+      '${pick('업데이트 다운로드가 완료되었습니다.', 'The update is downloaded.', 'ດາວໂຫຼດອັບເດດແລ້ວ.')}\n$restart',
+    CodeUpdateStatus.error => pick(
+      '업데이트를 확인하거나 내려받지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.',
+      'Could not check or download updates. Check your connection and try again.',
+      'ກວດຫາ ຫຼື ດາວໂຫຼດອັບເດດບໍ່ສຳເລັດ. ກວດອິນເຕີເນັດ ແລ້ວລອງໃໝ່.',
+    ),
+  };
+  String installed(CodeUpdateService s) =>
+      '${pick('현재 앱', 'Installed app', 'ແອັບປັດຈຸບັນ')} ${s.version} · '
+      '${s.currentPatch == null ? pick('기본 설치본', 'Base release', 'ເວີຊັນພື້ນຖານ') : 'Patch ${s.currentPatch}'}';
+  String notice(CodeUpdateService s) => switch (s.notice) {
+    CodeUpdateNotice.unsupported => unsupported,
+    CodeUpdateNotice.applied =>
+      '${pick('업데이트 적용을 확인했습니다.', 'Update applied.', 'ອັບເດດສຳເລັດແລ້ວ.')}\n${installed(s)}',
+    _ =>
+      '${pick('새 업데이트가 준비되었습니다.', 'An update is ready.', 'ອັບເດດໃໝ່ພ້ອມແລ້ວ.')} '
+          '${s.nextPatch == null ? '' : '(Patch ${s.nextPatch})'}\n$restart',
+  };
+}
+
+class CodeUpdatePanel extends StatelessWidget {
+  const CodeUpdatePanel({
+    super.key,
+    required this.language,
+    required this.service,
+  });
+  final AppLanguage language;
+  final CodeUpdateService service;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: service,
+    builder: (_, __) {
+      final t = CodeUpdateText(language);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text(t.installed(service)),
+          const SizedBox(height: 8),
+          Text(t.status(service)),
+          if (service.version == '1.0.3+4') ...[
+            const SizedBox(height: 12),
+            Text(
+              t.pick(
+                '현재 버전에 포함된 개선',
+                'Included in this version',
+                'ສິ່ງປັບປຸງໃນເວີຊັນນີ້',
+              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              t.pick(
+                '• LK GROUP 시작 로고 전체 표시\n• 자동 업데이트 상태·알림·팝업 안내\n• 배송 정보 색상과 중복 화폐 기호 정리',
+                '• Complete LK GROUP startup logo\n• Automatic update status, notices and prompts\n• Delivery colors and cleaner currency amounts',
+                '• ສະແດງໂລໂກ້ LK GROUP ຄົບຖ້ວນ\n• ສະຖານະ ແລະ ແຈ້ງເຕືອນອັບເດດ\n• ສີຂໍ້ມູນຈັດສົ່ງ ແລະ ຈຳນວນເງິນ',
+              ),
+            ),
+          ],
+          if (service.status == CodeUpdateStatus.ready &&
+              service.nextPatch != null)
+            Text(
+              '${t.pick('대기 중인 업데이트', 'Pending update', 'ອັບເດດທີ່ລໍຖ້າ')}: Patch ${service.nextPatch}',
+            ),
+          if (service.lastChecked != null)
+            Text(
+              '${t.pick('최근 확인', 'Last checked', 'ກວດຫຼ້າສຸດ')}: ${service.lastChecked!.toLocal().toString().split('.').first}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          TextButton.icon(
+            onPressed: service.busy ? null : () => service.check(force: true),
+            icon: const Icon(Icons.refresh),
+            label: Text(t.check),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class CodeUpdateBanner extends StatelessWidget {
+  const CodeUpdateBanner({
+    super.key,
+    required this.language,
+    required this.service,
+    required this.onDetails,
+  });
+  final AppLanguage language;
+  final CodeUpdateService service;
+  final VoidCallback onDetails;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: service,
+    builder: (_, __) {
+      if (service.status != CodeUpdateStatus.ready &&
+          service.status != CodeUpdateStatus.downloading &&
+          !service.hasUnread) {
+        return const SizedBox.shrink();
+      }
+      final t = CodeUpdateText(language);
+      return MaterialBanner(
+        leading: const Icon(Icons.system_update_alt),
+        content: Text(
+          service.status == CodeUpdateStatus.downloading
+              ? t.status(service)
+              : t.notice(service),
+        ),
+        actions: [
+          TextButton(
+            onPressed: onDetails,
+            child: Text(t.pick('자세히', 'Details', 'ລາຍລະອຽດ')),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> showCodeUpdateNotice(
+  BuildContext context,
+  CodeUpdateService service,
+  AppLanguage language,
+) async {
+  if (!service.needsPopup) return;
+  final id = service.noticeId;
+  final t = CodeUpdateText(language);
+  final message = t.notice(service);
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(t.title),
+      content: SingleChildScrollView(child: Text(message)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(t.close),
+        ),
+      ],
+    ),
+  );
+  await service.acknowledge(id);
+}

@@ -3,6 +3,7 @@
 // If your main.dart calls CargoFlowApp() or App(), both are exported below.
 
 import 'package:flutter/material.dart';
+
 import 'screens/splash_screen.dart';
 import 'services/global_notice_service.dart';
 import 'widgets/auto_refresh_state.dart';
@@ -12,10 +13,11 @@ import 'widgets/auto_refresh_state.dart';
 // Both names are provided for compatibility.
 
 class CargoFlowApp extends StatelessWidget {
-  const CargoFlowApp({Key? key}) : super(key: key);
+  const CargoFlowApp({super.key, this.initialize});
+  final Future<void> Function()? initialize;
 
   @override
-  Widget build(BuildContext context) => const _RootApp();
+  Widget build(BuildContext context) => _RootApp(initialize: initialize);
 }
 
 /// Alias so projects that use App() also compile without changes.
@@ -28,7 +30,8 @@ class App extends StatelessWidget {
 
 // ── Internal root ────────────────────────────────────────────────────────────
 class _RootApp extends StatelessWidget {
-  const _RootApp({Key? key}) : super(key: key);
+  const _RootApp({super.key, this.initialize});
+  final Future<void> Function()? initialize;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +52,7 @@ class _RootApp extends StatelessWidget {
         useMaterial3: false,
       ),
       // Always start with SplashScreen so the welcome screen shows on every launch.
-      home: const SplashScreen(),
+      home: SplashScreen(initialize: initialize),
     );
   }
 }
