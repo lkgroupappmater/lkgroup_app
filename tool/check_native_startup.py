@@ -1,10 +1,10 @@
-"""Capture the real Android OS launch window and reject blank/cropped logos."""
+"""Verify the OS does not duplicate the single large Flutter startup logo."""
 from pathlib import Path
 import subprocess
 import time
 import re
 import xml.etree.ElementTree as ET
-from PIL import Image, ImageChops
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'build/native-startup'
@@ -16,23 +16,17 @@ def adb(*args):
 
 def verify(path):
     shot = Image.open(path).convert('RGB')
-    # Exclude system bars. Both blue and black brand pixels are below 150 red.
+    # The native preparation window must contain only the shared blue background.
+    # The existing Flutter rendering tests separately verify the large LK GROUP
+    # image and that its 1.2-second display begins after the first visible frame.
     region = shot.crop((shot.width // 5, shot.height // 4,
                         shot.width * 4 // 5, shot.height * 3 // 4))
-    mask = region.getchannel('R').point(lambda x: 255 if x < 150 else 0)
-    bounds = mask.getbbox()
-    assert bounds, f'{path.name}: native startup is blank'
-    actual = mask.crop(bounds)
-    ratio = actual.width / actual.height
-    assert abs(ratio - 598 / 384) < 0.07, f'{path.name}: clipped aspect ratio {ratio:.3f}'
-    original = Image.open(ROOT / 'assets/images/lk_group_logo.png').convert('RGBA')
-    expected = original.getchannel('A').resize(actual.size, Image.Resampling.LANCZOS)
-    expected = expected.point(lambda x: 255 if x > 127 else 0)
-    intersect = ImageChops.darker(actual, expected).histogram()[255]
-    union = ImageChops.lighter(actual, expected).histogram()[255]
-    overlap = intersect / union
-    assert overlap > 0.92, f'{path.name}: logo silhouette mismatch {overlap:.1%}'
-    print(f'{path.name}: full native LK GROUP logo, {actual.size}, silhouette overlap {overlap:.1%}')
+    background = (221, 246, 252)
+    unexpected = sum(count for count, rgb in region.getcolors(region.width * region.height)
+                     if any(abs(a - b) > 3 for a, b in zip(rgb, background)))
+    fraction = unexpected / (region.width * region.height)
+    assert fraction < 0.0001, f'{path.name}: unwanted native logo/content ({fraction:.2%})'
+    print(f'{path.name}: no duplicate native logo; uniform LK background verified')
 
 
 def launch_from_home():

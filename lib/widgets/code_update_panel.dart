@@ -105,7 +105,7 @@ class CodeUpdatePanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(t.status(service)),
-          if (service.version == '1.0.4+5') ...[
+          if (service.version == '1.0.5+6') ...[
             const SizedBox(height: 12),
             Text(
               t.pick(
@@ -117,9 +117,9 @@ class CodeUpdatePanel extends StatelessWidget {
             ),
             Text(
               t.pick(
-                '• 운영체제 시작 화면 LK GROUP 로고 복원\n• 자동 업데이트 상태·알림·팝업 안내\n• 배송 정보 색상과 중복 화폐 기호 정리',
-                '• Restored native LK GROUP startup logo\n• Automatic update status, notices and prompts\n• Delivery colors and cleaner currency amounts',
-                '• ສະແດງໂລໂກ້ LK GROUP ຄົບຖ້ວນ\n• ສະຖານະ ແລະ ແຈ້ງເຕືອນອັບເດດ\n• ສີຂໍ້ມູນຈັດສົ່ງ ແລະ ຈຳນວນເງິນ',
+                '• 작은 시작 로고 제거, 큰 LK GROUP 로고 한 번 표시\n• 자동 업데이트 상태·알림·팝업 안내\n• 배송 정보 색상과 중복 화폐 기호 정리',
+                '• One large LK GROUP logo at startup\n• Automatic update status, notices and prompts\n• Delivery colors and cleaner currency amounts',
+                '• ສະແດງໂລໂກ້ LK GROUP ຂະໜາດໃຫຍ່ພຽງຄັ້ງດຽວ\n• ສະຖານະ ແລະ ແຈ້ງເຕືອນອັບເດດ\n• ສີຂໍ້ມູນຈັດສົ່ງ ແລະ ຈຳນວນເງິນ',
               ),
             ),
           ],
