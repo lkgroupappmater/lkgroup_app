@@ -1956,7 +1956,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 ),
                 const SizedBox(height: 6),
                 Text('${_l('박스')} ${rows.length}${_l('건')}'),
-                Text('USD  \$${freight.totalUsd.toStringAsFixed(2)}'),
+                Text('USD  ${freight.totalUsd.toStringAsFixed(2)}'),
                 Text('KIP  ${MoneyFormat.kipNumber(freight.totalKip)}'),
                 Text('THB  ${MoneyFormat.thbNumber(freight.totalThb)}'),
                 Text('KRW  ${MoneyFormat.krwNumber(freight.totalKrw)}'),
@@ -2281,7 +2281,6 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: _l('금액 (USD)'),
-                        prefixText: '\$ ',
                         border: const OutlineInputBorder(),
                       ),
                     ),

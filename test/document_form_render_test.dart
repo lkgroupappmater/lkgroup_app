@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../lib/core/document_form_painter.dart';
+import '../lib/core/document_delivery_style.dart';
 import '../lib/core/document_form_style.dart';
 import '../lib/core/document_text_catalog.dart';
 import '../lib/core/route_catalog.dart';
@@ -147,6 +148,30 @@ void main() {
       greaterThan(1000), reason: 'the enlarged blue stamp must be drawn');
   }
 
+  test('delivery tint is drawn for every type and absent on empty estimates', () async {
+    final layout = DocumentFormLayout(itemCount: 1, remark: '', remarkFontSize: 22,
+      footer: '', footerFontSize: 17);
+    for (final color in [DocumentDeliveryStyle.province, DocumentDeliveryStyle.city,
+        DocumentDeliveryStyle.provincePrepaid, DocumentDeliveryStyle.cityPrepaid]) {
+      for (final delivery in ['배송 검토 고객', '']) {
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        canvas.translate(18, 18);
+        DocumentFormPainter.notes(canvas, layout, remark: '', remarkFontSize: 22,
+          delivery: delivery, deliveryColor: color);
+        final picture = recorder.endRecording();
+        final img = await picture.toImage(1800, layout.height.ceil());
+        picture.dispose();
+        final bytes = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
+        final expected = delivery.isEmpty ? const Color(0xFFF3F8FC)
+            : Color.alphaBlend(color.withOpacity(.32), const Color(0xFFF3F8FC));
+        expect(pixel(bytes, 18+DocumentFormStyle.deliveryLeft+8, 18+layout.summaryTop+48),
+          expected.value & 0xFFFFFF);
+        img.dispose();
+      }
+    }
+  });
+
   test('all eleven route quotation and statement exports use the web form', () async {
     expect(RouteCatalog.routes.length, 11);
     for (final route in RouteCatalog.routes) {
@@ -194,9 +219,9 @@ void main() {
     canvas.drawRect(Rect.fromLTWH(0, 0, 1800, q.documentHeight), Paint()..color = Colors.white);
     canvas.translate(18, 18);
     DocumentFormPainter.totals(canvas, layout, adjustments: [
-      ('운임 총합', '', '\$ 27.00'), ('할인', '100%', '-\$ 20.00'),
+      ('운임 총합', '', '27.00'), ('할인', '100%', '-20.00'),
       ('추가 할인', '-', '-'), ('세금 계산서(VAT)', '-', '-'),
-    ], label: '최종 가견적 총액', amounts: ['\$ 7.00', '₭ 170,000', '฿ 242', '₩ 9,700']);
+    ], label: '최종 가견적 총액', amounts: ['7.00', '170,000', '242', '9,700']);
     final picture = recorder.endRecording();
     final expected = await picture.toImage(1800, q.documentHeight.ceil());
     picture.dispose();

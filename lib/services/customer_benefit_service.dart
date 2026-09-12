@@ -440,7 +440,7 @@ class CustomerBenefitService {
     );
   }
 
-  Future<String> inlandTextForRows(
+  Future<LocalDeliveryRule?> inlandRuleForRows(
     String routeLabel,
     List<Map<String, dynamic>> rows,
   ) async {
@@ -450,10 +450,15 @@ class CustomerBenefitService {
         name: '${row['consignee_name'] ?? ''}',
         phone: '${row['consignee_phone'] ?? ''}',
       );
-      if (rule != null) return rule.toStatementText();
+      if (rule != null) return rule;
     }
-    return '';
+    return null;
   }
+
+  Future<String> inlandTextForRows(
+    String routeLabel,
+    List<Map<String, dynamic>> rows,
+  ) async => (await inlandRuleForRows(routeLabel, rows))?.toStatementText() ?? '';
 
   Future<void> _refreshSpecialNotes() async {
     try {
@@ -463,4 +468,3 @@ class CustomerBenefitService {
     }
   }
 }
-

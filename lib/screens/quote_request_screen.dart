@@ -173,7 +173,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               ],
               decoration: InputDecoration(
                 labelText: _u('금액 (USD)'),
-                prefixText: '\$ ',
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -939,7 +938,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                           {
                             'index': line.index,
                             'weight': line.chargeableWeightKg.toStringAsFixed(2),
-                            'rate': '\$${line.ratePerKg.toStringAsFixed(2)}',
+                            'rate': line.ratePerKg.toStringAsFixed(2),
                             'moving': line.movingCargoSurchargeUsd > 0
                                 ? _uf(' · 이삿짐 통관 +\${amount}', {
                                     'amount': line.movingCargoSurchargeUsd
@@ -1002,7 +1001,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   if (_manualDiscountPercent > 0) ...[
                     Text(
                       _uf('할인 전  USD {amount}', {
-                        'amount': '\$${grossUsd.toStringAsFixed(2)}',
+                        'amount': grossUsd.toStringAsFixed(2),
                       }),
                       style: const TextStyle(fontSize: 12),
                     ),
@@ -1026,7 +1025,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   ],
                   Text(
                     _uf('총 운임  USD {amount}', {
-                      'amount': '\$${finalUsd.toStringAsFixed(2)}',
+                      'amount': finalUsd.toStringAsFixed(2),
                     }),
                     style: const TextStyle(
                       fontSize: 16,
@@ -1036,18 +1035,18 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
                   if (kip != null && rates!.appliedKip > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'LAK  ${_moneyNumber(kip)} ກີບ',
+                      'LAK  ${_moneyNumber(kip)}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ],
                   if (thb != null && rates!.appliedThb > 0)
                     Text(
-                      'THB  ฿${_moneyNumber(thb, decimals: 2)}',
+                      'THB  ${_moneyNumber(thb, decimals: 2)}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   if (krw != null && rates!.appliedKrw > 0)
                     Text(
-                      'KRW  ₩${_moneyNumber(krw)}',
+                      'KRW  ${_moneyNumber(krw)}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                 ],

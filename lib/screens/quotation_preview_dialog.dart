@@ -465,7 +465,7 @@ class DigitalQuotationPainter extends CustomPainter {
         );
         _text(
           c,
-          MoneyFormat.usd(extra.amountUsd),
+          MoneyFormat.usdNumber(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
           19,
           bold: true,
@@ -482,7 +482,7 @@ class DigitalQuotationPainter extends CustomPainter {
       final volumeFreight = b.result.volumeWeightKg * b.result.ratePerKg;
       final values = <String>[
         'Q${i + 1}',
-        '\$ ${b.result.ratePerKg.toStringAsFixed(2)}',
+        MoneyFormat.usdNumber(b.result.ratePerKg),
         '$qty',
         _fmtWeight(unitActual),
         _fmtWeight(b.result.actualWeightKg),
@@ -491,9 +491,9 @@ class DigitalQuotationPainter extends CustomPainter {
         _fmtWeight(b.heightCm),
         _fmtWeight(unitVolume),
         _fmtWeight(b.result.volumeWeightKg),
-        MoneyFormat.usd(actualFreight),
-        MoneyFormat.usd(volumeFreight),
-        MoneyFormat.usd(b.result.amountUsd),
+        MoneyFormat.usdNumber(actualFreight),
+        MoneyFormat.usdNumber(volumeFreight),
+        MoneyFormat.usdNumber(b.result.amountUsd),
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
@@ -526,7 +526,7 @@ class DigitalQuotationPainter extends CustomPainter {
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(grossUsd),
+      13: MoneyFormat.usdNumber(grossUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -541,16 +541,16 @@ class DigitalQuotationPainter extends CustomPainter {
         ? '${safeDiscountPercent.toStringAsFixed(safeDiscountPercent == safeDiscountPercent.roundToDouble() ? 0 : 1)}%'
         : '-';
     final discountValue =
-        safeDiscountPercent > 0 ? '-${MoneyFormat.usd(discountAmount)}' : '-';
+        safeDiscountPercent > 0 ? '-${MoneyFormat.usdNumber(discountAmount)}' : '-';
 
     DocumentFormPainter.totals(c, layout, adjustments: [
-      ('운임 총합', '', MoneyFormat.usd(grossUsd)),
+      ('운임 총합', '', MoneyFormat.usdNumber(grossUsd)),
       ('할인', discountLabel, discountValue),
       ('추가 할인', '-', '-'),
       ('세금 계산서(VAT)', '-', '-'),
     ], label: '최종 가견적 총액', amounts: [
-      MoneyFormat.usd(usd), MoneyFormat.kip(usd * rates.appliedKip),
-      MoneyFormat.thb(usd * rates.appliedThb), MoneyFormat.krw(usd * rates.appliedKrw),
+      MoneyFormat.usdNumber(usd), MoneyFormat.kipNumber(usd * rates.appliedKip),
+      MoneyFormat.thbNumber(usd * rates.appliedThb), MoneyFormat.krwNumber(usd * rates.appliedKrw),
     ]);
     DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
@@ -570,7 +570,6 @@ class DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DigitalQuotationPainter oldDelegate) => true;
 }
-
 
 
 

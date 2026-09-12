@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as image_lib;
 
 import '../core/money_format.dart';
+import '../core/document_delivery_style.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
 import '../core/document_form_style.dart';
@@ -72,6 +73,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
   List<Map<String, dynamic>> _rows = const [];
   FreightCalculation? _freight;
   String _inlandDeliveryText = '';
+  Color? _inlandDeliveryColor;
   List<ExtraCostItem> _extraCosts = const <ExtraCostItem>[];
   ui.Image? _logo;
   ui.Image? _qrUsd;
@@ -131,7 +133,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       }
       final freight = await FreightService.instance.calculate(rows);
       final inland = await CustomerBenefitService.instance
-          .inlandTextForRows(widget.routeLabel, rows);
+          .inlandRuleForRows(widget.routeLabel, rows);
       final extraCosts = await ReceiptExtraCostService.instance.list(
         route: widget.routeLabel,
         year: widget.year,
@@ -149,7 +151,9 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _bankStrip = assets[5];
         _rows = rows;
         _freight = freight;
-        _inlandDeliveryText = inland;
+        _inlandDeliveryText = inland?.toStatementText() ?? '';
+        _inlandDeliveryColor = inland == null ? null : DocumentDeliveryStyle.fromProfile(
+          inland.deliveryType, prepaid: inland.isPrepaid);
         _extraCosts = extraCosts;
         _loading = false;
       });
@@ -168,6 +172,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         receiptNumber: widget.receiptNumber,
         voyage: widget.voyage,
         inlandDeliveryText: _inlandDeliveryText,
+        inlandDeliveryColor: _inlandDeliveryColor,
         extraCosts: _extraCosts,
         logo: _logo!,
         qrUsd: _qrUsd!,
@@ -409,6 +414,7 @@ class DigitalStatementPainter extends CustomPainter {
     required this.receiptNumber,
     required this.voyage,
     required this.inlandDeliveryText,
+    this.inlandDeliveryColor,
     required this.extraCosts,
     required this.logo,
     required this.qrUsd,
@@ -424,6 +430,7 @@ class DigitalStatementPainter extends CustomPainter {
   final String receiptNumber;
   final String voyage;
   final String inlandDeliveryText;
+  final Color? inlandDeliveryColor;
   final List<ExtraCostItem> extraCosts;
   final ui.Image logo;
   final ui.Image qrUsd;
@@ -596,7 +603,7 @@ class DigitalStatementPainter extends CustomPainter {
         );
         _text(
           c,
-          MoneyFormat.usd(extra.amountUsd),
+          MoneyFormat.usdNumber(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
           19,
           bold: true,
@@ -612,7 +619,7 @@ class DigitalStatementPainter extends CustomPainter {
       final volumeFreight = f == null ? 0.0 : f.volumeWeight * f.rate;
       final values = <String>[
         _s(row['box_number']),
-        f == null ? '-' : '\$ ${f.rate.toStringAsFixed(2)}',
+        f == null ? '-' : MoneyFormat.usdNumber(f.rate),
         _s(row['quantity']).isEmpty ? '1' : _s(row['quantity']),
         f == null ? '-' : _fmtWeight(unitActual),
         f == null ? '-' : _fmtWeight(f.actualWeight),
@@ -621,9 +628,9 @@ class DigitalStatementPainter extends CustomPainter {
         _s(row['height_cm']),
         f == null ? '-' : _fmtWeight(unitVolume),
         f == null ? '-' : _fmtWeight(f.volumeWeight),
-        f == null ? '-' : MoneyFormat.usd(actualFreight),
-        f == null ? '-' : MoneyFormat.usd(volumeFreight),
-        f == null ? '-' : MoneyFormat.usd(f.grossAmountUsd),
+        f == null ? '-' : MoneyFormat.usdNumber(actualFreight),
+        f == null ? '-' : MoneyFormat.usdNumber(volumeFreight),
+        f == null ? '-' : MoneyFormat.usdNumber(f.grossAmountUsd),
       ];
       for (var col = 0; col < values.length; col++) {
         _text(c, values[col],
@@ -670,7 +677,7 @@ class DigitalStatementPainter extends CustomPainter {
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
-      13: MoneyFormat.usd(grossUsd),
+      13: MoneyFormat.usdNumber(grossUsd),
     };
     for (final e in summaryValues.entries) {
       _text(c, e.value,
@@ -679,19 +686,12 @@ class DigitalStatementPainter extends CustomPainter {
     }
 
     final docText = _docText;
-    final deliveryNote = rows
-        .map((e) => '${e['special_note_auto'] ?? e['special_note'] ?? ''}')
-        .join(' ');
-    Color? deliveryColor;
-    if (deliveryNote.contains('지방배송(선결제)')) {
-      deliveryColor = const Color(0xFF5B9BD5);
-    } else if (deliveryNote.contains('시내배송(선결제)')) {
-      deliveryColor = const Color(0xFFD6B18A);
-    } else if (deliveryNote.contains('지방배송')) {
-      deliveryColor = const Color(0xFFFFC000);
-    } else if (deliveryNote.contains('시내배송')) {
-      deliveryColor = const Color(0xFF92D050);
-    }
+    final deliveryColor = inlandDeliveryColor ?? DocumentDeliveryStyle.fromNotes(
+      rows.map((row) {
+        final automatic = '${row['special_note_auto'] ?? ''}'.trim();
+        return automatic.isNotEmpty ? automatic : '${row['special_note'] ?? ''}';
+      }),
+    );
     DocumentFormPainter.notes(c, layout,
       remark: _remarkText, remarkFontSize: docText.remarkFontSize,
       delivery: inlandDeliveryText, deliveryColor: deliveryColor);
@@ -721,16 +721,16 @@ class DigitalStatementPainter extends CustomPainter {
         discountableExtraTotal * additionalDiscountPercent;
 
     DocumentFormPainter.totals(c, layout, adjustments: [
-      ('운임 총합', '', MoneyFormat.usd(grossUsd)),
+      ('운임 총합', '', MoneyFormat.usdNumber(grossUsd)),
       ('할인', autoDiscountPctText.isEmpty ? '-' : autoDiscountPctText,
-        autoDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usd(regularDiscountUsd)}'),
+        autoDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usdNumber(regularDiscountUsd)}'),
       (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName,
         additionalDiscountPctText.isEmpty ? '-' : additionalDiscountPctText,
-        additionalDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usd(specialDiscountUsd)}'),
+        additionalDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usdNumber(specialDiscountUsd)}'),
       ('세금 계산서(VAT)', '-', '-'),
     ], label: '최종 명세서 총액', amounts: [
-      MoneyFormat.usd(finalUsd), MoneyFormat.kip(finalUsd * freight.rates.appliedKip),
-      MoneyFormat.thb(finalUsd * freight.rates.appliedThb), MoneyFormat.krw(finalUsd * freight.rates.appliedKrw),
+      MoneyFormat.usdNumber(finalUsd), MoneyFormat.kipNumber(finalUsd * freight.rates.appliedKip),
+      MoneyFormat.thbNumber(finalUsd * freight.rates.appliedThb), MoneyFormat.krwNumber(finalUsd * freight.rates.appliedKrw),
     ]);
     DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
@@ -800,7 +800,7 @@ class StatementDocumentRenderer {
     }
     final freight = await FreightService.instance.calculate(rows);
     final inland = await CustomerBenefitService.instance
-        .inlandTextForRows(request.routeLabel, rows);
+        .inlandRuleForRows(request.routeLabel, rows);
     final extraCosts = await ReceiptExtraCostService.instance.list(
       route: request.routeLabel,
       year: request.year,
@@ -818,7 +818,9 @@ class StatementDocumentRenderer {
       freight: freight,
       receiptNumber: request.receiptNumber,
       voyage: request.voyage,
-      inlandDeliveryText: inland,
+      inlandDeliveryText: inland?.toStatementText() ?? '',
+      inlandDeliveryColor: inland == null ? null : DocumentDeliveryStyle.fromProfile(
+        inland.deliveryType, prepaid: inland.isPrepaid),
       extraCosts: extraCosts,
       logo: assets[0],
       qrUsd: assets[1],
@@ -875,6 +877,5 @@ class StatementDocumentRenderer {
     }
   }
 }
-
 
 

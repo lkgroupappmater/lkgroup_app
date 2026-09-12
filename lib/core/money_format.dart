@@ -29,6 +29,8 @@ class MoneyFormat {
   static String kipNumber(num value) => number(roundKip(value));
   static String thbNumber(num value) => number(roundThb(value));
   static String krwNumber(num value) => number(roundKrw(value));
+  // Printed forms already have USD/KIP/THB/KRW column or row labels.
+  static String usdNumber(num value) => number(value, decimals: 2);
 
   static String usd(num value) => '\$ ${number(value, decimals: 2)}';
   static String kip(num value) => '₭ ${kipNumber(value)}';

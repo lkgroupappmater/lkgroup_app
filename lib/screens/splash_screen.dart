@@ -93,7 +93,17 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'LK Trading Total Solution app by LK Group',
+                    'LK Trading Total Solution app',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF27866F),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'By LK Group',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF27866F),
