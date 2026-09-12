@@ -11,7 +11,7 @@ void main() {
   runApp(
     CargoFlowApp(
       initialize: _initializeServices,
-      onLogoReady: () async {
+      onWelcomeReady: () async {
         binding.allowFirstFrame();
         await binding.waitUntilFirstFrameRasterized;
       },

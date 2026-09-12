@@ -63,6 +63,10 @@ jobs:
           name: lkgroup-native-test-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 3
+      # Exercise release-only plugin resource linking as well as debug startup.
+      # This APK is a build check; OTA installation uses shorebird-deploy below.
+      - name: Verify release APK resource linking
+        run: flutter build apk --release
   native-startup:
     needs: validate
     runs-on: ubuntu-latest
