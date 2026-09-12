@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <application>
         <activity android:name=".StartupPreviewActivity"
-            android:theme="@style/LaunchTheme" android:exported="true" />
+            android:theme="@style/LaunchTheme" android:exported="true"
+            android:enabled="false" android:label="LK Startup Check">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

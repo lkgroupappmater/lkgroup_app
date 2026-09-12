@@ -2,6 +2,8 @@
 from pathlib import Path
 import subprocess
 import time
+import re
+import xml.etree.ElementTree as ET
 from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,15 +35,36 @@ def verify(path):
     print(f'{path.name}: full native LK GROUP logo, {actual.size}, silhouette overlap {overlap:.1%}')
 
 
+def launch_from_home():
+    # Android 12 intentionally omits the system icon for adb/IDE starts.
+    # Use the actual launcher UI, as a person opening the installed app does.
+    adb('shell', 'input', 'keyevent', '3')
+    width, height = map(int, re.search(r'(\d+)x(\d+)',
+        adb('shell', 'wm', 'size').decode()).groups())
+    time.sleep(1)
+    adb('shell', 'input', 'swipe', str(width // 2), str(height * 4 // 5),
+        str(width // 2), str(height // 5), '400')
+    time.sleep(1)
+    adb('shell', 'uiautomator', 'dump', '/sdcard/lk-launcher.xml')
+    root = ET.fromstring(adb('shell', 'cat', '/sdcard/lk-launcher.xml'))
+    for node in root.iter('node'):
+        if 'LK Startup Check' in (node.get('text', ''), node.get('content-desc', '')):
+            x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
+            adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+            return
+    (OUT / 'launcher-not-found.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    raise AssertionError('Debug fixture icon was not found in the launcher')
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     adb('install', '-r', str(ROOT / 'build/native-apk/app-debug.apk'))
     adb('shell', 'input', 'keyevent', '82')
+    adb('shell', 'pm', 'enable', 'com.lkgrouptrading.app/.StartupPreviewActivity')
     for mode in ('no', 'yes'):
         adb('shell', 'cmd', 'uimode', 'night', mode)
         adb('shell', 'am', 'force-stop', 'com.lkgrouptrading.app')
-        adb('shell', 'am', 'start', '-n',
-            'com.lkgrouptrading.app/.StartupPreviewActivity')
+        launch_from_home()
         time.sleep(1)
         path = OUT / f'android31-night-{mode}.png'
         path.write_bytes(adb('exec-out', 'screencap', '-p'))
