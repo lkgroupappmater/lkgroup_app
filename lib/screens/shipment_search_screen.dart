@@ -39,11 +39,12 @@ class ShipmentSearchBody extends StatefulWidget {
 
 class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefreshState<ShipmentSearchBody> {
   int _searchRequest = 0;
+  bool _searching = false;
   @override
   Set<String> get autoRefreshTopics => const {'shipments', 'content'};
   @override
   bool get autoRefreshAllowed => widget.isLoggedIn && widget.currentUser != null &&
-      _selectedIds.isEmpty && !_loadingUnknownRecipients;
+      _selectedIds.isEmpty && !_loadingUnknownRecipients && !_searching;
 
   String get _queryKey => [widget.currentUser?.id, _selectedRouteLabel, _year, _voyage,
       _invoiceCtrl.text, _recipientCtrl.text, _phoneCtrl.text].join('\u0000');
@@ -589,6 +590,18 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
       ],
     );
   }
+
+  Future<void> _submitSearch() async {
+    if (_searching) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _searching = true);
+    try {
+      await _search();
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
   Future<void> _search({bool background = false}) async {
     final key = _queryKey;
     final request = ++_searchRequest;
@@ -1009,7 +1022,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
           SizedBox(
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: _search,
+              onPressed: _searching ? null : _submitSearch,
               icon: const Icon(Icons.search_rounded),
               label: Text(_t('cargo_search')),
               style: ElevatedButton.styleFrom(
@@ -1546,6 +1559,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
       TextField(
         controller: controller,
         keyboardType: type,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _submitSearch(),
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon),

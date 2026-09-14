@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../widgets/submit_search_field.dart';
 
 class AdminAccountManagementScreen extends StatefulWidget {
   const AdminAccountManagementScreen({super.key});
@@ -14,6 +15,7 @@ class AdminAccountManagementScreen extends StatefulWidget {
 class _AdminAccountManagementScreenState
     extends State<AdminAccountManagementScreen> {
   final _search = TextEditingController();
+  String _submittedSearch = '';
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _company = TextEditingController();
@@ -58,7 +60,7 @@ class _AdminAccountManagementScreenState
       );
 
   List<AppUser> get _filtered {
-    final query = _search.text.trim().toLowerCase();
+    final query = _submittedSearch.trim().toLowerCase();
     if (query.isEmpty) return _users;
     return _users.where((user) {
       return user.id.toLowerCase().contains(query) ||
@@ -220,9 +222,9 @@ class _AdminAccountManagementScreenState
           const Text('총괄 관리자 전용',
               style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          TextField(
+          SubmitSearchField(
             controller: _search,
-            onChanged: (_) => setState(() {}),
+            onSearch: (value) => setState(() => _submittedSearch = value),
             decoration: _input('회원 계정, 고객 이름, 전화번호 검색').copyWith(
               prefixIcon: const Icon(Icons.search),
             ),

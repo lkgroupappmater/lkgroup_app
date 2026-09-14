@@ -187,6 +187,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     return '$prefix$raw';
   }
 
+  void _submitSearch() {
+    if (_busy) return;
+    FocusScope.of(context).unfocus();
+    _search();
+  }
+
   Future<void> _search() async {
     final key = _queryKey;
     setState(() => _busy = true);
@@ -1093,6 +1099,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               const SizedBox(height: 10),
               TextField(
                 controller: _boxNumberController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _submitSearch(),
                 keyboardType: RouteCatalog.boxPrefixFor(_route).isEmpty
                     ? TextInputType.text
                     : TextInputType.number,
@@ -1121,6 +1129,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               const SizedBox(height: 10),
               TextField(
                 controller: _invoiceController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _submitSearch(),
                 decoration: _decoration(_l('송장번호'), Icons.receipt_long_outlined),
               ),
             ],
@@ -1128,6 +1138,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               const SizedBox(height: 10),
               TextField(
                 controller: _nameController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _submitSearch(),
                 decoration: _decoration(_l('이름/라오스 수령인'), Icons.person_outline),
               ),
             ],
@@ -1135,6 +1147,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               const SizedBox(height: 10),
               TextField(
                 controller: _phoneController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _submitSearch(),
                 keyboardType: TextInputType.phone,
                 decoration: _decoration(_l('연락처'), Icons.phone_outlined),
               ),
@@ -1147,7 +1161,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                     child: SizedBox(
                       height: 46,
                       child: ElevatedButton.icon(
-                        onPressed: _busy ? null : _search,
+                        onPressed: _busy ? null : _submitSearch,
                         icon: const Icon(Icons.search),
                         label: Text(_l(_busy ? '검색 중...' : '화물 검색')),
                         style: ElevatedButton.styleFrom(
@@ -1174,7 +1188,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               SizedBox(
                 height: 46,
                 child: ElevatedButton.icon(
-                  onPressed: _busy ? null : _search,
+                  onPressed: _busy ? null : _submitSearch,
                   icon: const Icon(Icons.search),
                   label: Text(_l(_busy ? '검색 중...' : '화물 검색')),
                   style: ElevatedButton.styleFrom(

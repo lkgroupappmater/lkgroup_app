@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../models/cargo_receiving.dart';
 import '../data/dashboard_mock_data.dart';
+import '../widgets/submit_search_field.dart';
 
 class CargoReceivingSearchScreen extends StatefulWidget {
   const CargoReceivingSearchScreen({super.key});
@@ -49,9 +50,9 @@ class _CargoReceivingSearchScreenState
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: TextField(
+            child: SubmitSearchField(
               controller: _searchController,
-              onChanged: (v) => setState(() => _query = v),
+              onSearch: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 hintText: '입고번호 · 인보이스번호 · 수하인 · 연락처',
                 hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
@@ -61,7 +62,6 @@ class _CargoReceivingSearchScreenState
                         icon: const Icon(Icons.clear, color: Colors.grey),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _query = '');
                         },
                       )
                     : null,

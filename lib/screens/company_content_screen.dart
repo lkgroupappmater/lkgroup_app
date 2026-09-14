@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../services/content_service.dart';
 import '../widgets/content_media.dart';
+import '../widgets/submit_search_field.dart';
 
 class CompanyContentScreen extends StatefulWidget {
   const CompanyContentScreen({super.key,required this.language});
@@ -14,6 +15,9 @@ class CompanyContentScreen extends StatefulWidget {
 class _CompanyContentScreenState extends State<CompanyContentScreen> {
   late Future<List<Map<String,dynamic>>> _future;
   String _category='all',_query='';
+  final _searchController = TextEditingController();
+  @override
+  void dispose() { _searchController.dispose(); super.dispose(); }
   String _s(String ko,String en,String lo)=>sharedText(widget.language,ko,en,lo);
   Map<String,String> get _categories=>{'all':_s('전체','All','ທັງໝົດ'),'company':_s('회사 소개','Company','ບໍລິສັດ'),'case':_s('주요 실적','Projects','ຜົນງານ'),'activity':_s('기업 활동','Activities','ກິດຈະກຳ'),'csr':'LifeTogether CSR','media':_s('뉴스·자료실','News / resources','ຂ່າວ / ຂໍ້ມູນ'),'guide':_s('고객 이용 안내','Customer guides','ຄຳແນະນຳລູກຄ້າ'),'service':_s('서비스 안내','Services','ບໍລິການ')};
   @override
@@ -34,7 +38,7 @@ class _CompanyContentScreenState extends State<CompanyContentScreen> {
     body:Column(children:[
       Padding(padding:const EdgeInsets.all(14),child:Column(children:[
         DropdownButtonFormField<String>(initialValue:_category,isExpanded:true,items:_categories.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v)=>setState(()=>_category=v??'all')),
-        TextField(decoration:InputDecoration(prefixIcon:const Icon(Icons.search),hintText:_s('제목·내용 검색','Search title or content','ຄົ້ນຫາຫົວຂໍ້ ຫຼື ເນື້ອຫາ')),onChanged:(v)=>setState(()=>_query=v.trim().toLowerCase())),
+        SubmitSearchField(controller:_searchController,searchLabel:_s('검색','Search','ຄົ້ນຫາ'),decoration:InputDecoration(prefixIcon:const Icon(Icons.search),hintText:_s('제목·내용 검색','Search title or content','ຄົ້ນຫາຫົວຂໍ້ ຫຼື ເນື້ອຫາ')),onSearch:(v)=>setState(()=>_query=v.trim().toLowerCase())),
       ])),
       Expanded(child:FutureBuilder<List<Map<String,dynamic>>>(future:_future,builder:(context,snapshot){
         if(snapshot.connectionState==ConnectionState.waiting)return const Center(child:CircularProgressIndicator());

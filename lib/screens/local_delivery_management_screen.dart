@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
 import '../services/customer_benefit_service.dart';
+import '../widgets/submit_search_field.dart';
 
 class LocalDeliveryManagementScreen extends StatefulWidget {
   const LocalDeliveryManagementScreen({super.key});
@@ -14,6 +15,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   List<LocalDeliveryRule> _rules = const [];
   String _route = 'kr_la_sea';
   String _query = '';
+  final _searchController = TextEditingController();
   bool _loading = true;
 
   List<LocalDeliveryRule> get _visible => _rules.where((r) {
@@ -28,6 +30,12 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -189,9 +197,10 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
                           onChanged: (v) => setState(() => _route = v ?? _route),
                         ),
                         const SizedBox(height: 8),
-                        TextField(
+                        SubmitSearchField(
+                          controller: _searchController,
                           decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: '이름 / 전화번호 / 업체 / 주소 검색', border: OutlineInputBorder()),
-                          onChanged: (v) => setState(() => _query = v),
+                          onSearch: (v) => setState(() => _query = v),
                         ),
                       ],
                     ),

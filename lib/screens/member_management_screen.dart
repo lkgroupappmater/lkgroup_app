@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../utils/form_validators.dart';
+import '../widgets/submit_search_field.dart';
 
 class MemberManagementScreen extends StatefulWidget {
   const MemberManagementScreen({super.key});
@@ -16,6 +17,7 @@ class MemberManagementScreen extends StatefulWidget {
 
 class _MemberManagementScreenState extends State<MemberManagementScreen> {
   final _search = TextEditingController();
+  String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
   bool _loading = false;
 
@@ -81,7 +83,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   }
 
   List<Map<String, dynamic>> get _filteredMembers {
-    final query = _search.text.trim().toLowerCase();
+    final query = _submittedSearch.trim().toLowerCase();
     if (query.isEmpty) return const [];
     final myId = Supabase.instance.client.auth.currentUser?.id;
     return _members.where((m) {
@@ -555,16 +557,16 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
+                  SubmitSearchField(
                     controller: _search,
-                    onChanged: (_) => setState(() {}),
+                    onSearch: (value) => setState(() => _submittedSearch = value),
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),
                       hintText: '이름·이메일·전화번호 검색',
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (_search.text.trim().isNotEmpty && list.isEmpty)
+                  if (_submittedSearch.trim().isNotEmpty && list.isEmpty)
                     const Card(child: ListTile(title: Text('검색된 회원이 없습니다.'))),
                   ...list.map(_memberCard),
                   const SizedBox(height: 18),
