@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
+import '../core/approval_batch.dart';
+import '../models/app_user.dart';
+import '../services/auth_service.dart';
+import '../services/approval_batch_service.dart';
+import '../widgets/approval_batch_editor.dart';
 import '../services/shipment_service.dart';
 import '../services/unknown_recipient_service.dart';
 
@@ -17,7 +22,233 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   List<Map<String, dynamic>> _invoiceCorrections = const [];
   List<Map<String, dynamic>> _autoUnmatched = const [];
   List<Map<String, dynamic>> _incomplete = const [];
-  final Set<int> _checked = <int>{};
+  final Set<String> _selected = {};
+  final Map<String, Map<String, dynamic>> _batchDrafts = {};
+  bool _processing = false;
+  bool _batchDialogOpen = false;
+  String _progress = '';
+
+  List<Map<String, dynamic>> _rowsFor(ApprovalKind kind) => switch (kind) {
+    ApprovalKind.changes => _requests,
+    ApprovalKind.invoiceClaims => _invoiceCorrections,
+    ApprovalKind.unknownClaims => _unknownClaims,
+    ApprovalKind.autoUnmatched => _autoUnmatched,
+    ApprovalKind.incomplete => _incomplete,
+  };
+
+  List<ApprovalItem> _itemsFor(ApprovalKind kind) =>
+      _rowsFor(kind).map((row) => ApprovalItem(kind, row)).toList();
+
+  void _pruneSelection() {
+    final keys = {
+      for (final kind in ApprovalKind.values)
+        ..._itemsFor(kind).map((item) => item.key),
+    };
+    _selected.retainAll(keys);
+    _batchDrafts.removeWhere((key, _) => !keys.contains(key));
+  }
+
+  Widget _selectionCheckbox(ApprovalKind kind, Map<String, dynamic> row) {
+    final key = ApprovalItem(kind, row).key;
+    return Checkbox(
+      value: _selected.contains(key),
+      onChanged: _processing
+          ? null
+          : (value) => setState(() {
+              value == true ? _selected.add(key) : _selected.remove(key);
+            }),
+    );
+  }
+
+  Widget _selectionToolbar(ApprovalKind kind) {
+    final items = _itemsFor(kind);
+    final count = items.where((item) => _selected.contains(item.key)).length;
+    Widget action(String label, String action, {bool edit = false}) =>
+        TextButton(
+          onPressed: count == 0 || _processing
+              ? null
+              : () => edit ? _editBatch(kind) : _runBatch(kind, action),
+          child: Text(label),
+        );
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(
+              tristate: true,
+              value: count == 0
+                  ? false
+                  : count == items.length
+                  ? true
+                  : null,
+              onChanged: _processing
+                  ? null
+                  : (_) => setState(() {
+                      if (count == items.length) {
+                        _selected.removeAll(items.map((item) => item.key));
+                      } else {
+                        _selected.addAll(items.map((item) => item.key));
+                      }
+                    }),
+            ),
+            const Text('전체 선택'),
+          ],
+        ),
+        Text('$count / ${items.length}건 선택'),
+        if (kind == ApprovalKind.changes) ...[
+          action('선택 수정 후 승인', 'modified_approve', edit: true),
+          action('선택 승인', 'approve'),
+          action('선택 거절', 'reject'),
+        ] else if (kind == ApprovalKind.invoiceClaims ||
+            kind == ApprovalKind.unknownClaims) ...[
+          action('선택 승인', 'approve'),
+          action('선택 거절', 'reject'),
+        ] else if (kind == ApprovalKind.autoUnmatched) ...[
+          action('선택 수정 후 정상화', 'resolve', edit: true),
+          action('선택 불명 유지', 'keep'),
+        ] else ...[
+          action('선택 수정', 'edit', edit: true),
+          action('선택 확정/잠금', 'complete'),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _editBatch(ApprovalKind kind) async {
+    if (_processing || _batchDialogOpen) return;
+    final items = _itemsFor(kind)
+        .where((item) => _selected.contains(item.key))
+        .toList();
+    if (items.isEmpty) return;
+    _batchDialogOpen = true;
+    final values = await showDialog<Map<String, Map<String, dynamic>>>(
+      context: context,
+      builder: (_) =>
+          ApprovalBatchEditor(items: items, savedDrafts: _batchDrafts),
+    );
+    _batchDialogOpen = false;
+    if (!mounted || values == null) return;
+    _batchDrafts.addAll(values);
+    await _runBatch(
+      kind,
+      kind == ApprovalKind.changes
+          ? 'modified_approve'
+          : kind == ApprovalKind.autoUnmatched
+          ? 'resolve'
+          : 'edit',
+    );
+  }
+
+  Future<void> _runBatch(ApprovalKind kind, String action) async {
+    if (_processing || _loading) return;
+    final items = _itemsFor(kind)
+        .where((item) => _selected.contains(item.key))
+        .toList();
+    if (items.isEmpty) return;
+    final owner = AuthService.instance.currentUser;
+    if (owner?.role != UserRole.admin) {
+      _message('총괄 관리자 권한이 필요합니다.');
+      return;
+    }
+    setState(() {
+      _processing = true;
+      _progress = '';
+    });
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('선택 ${items.length}건 일괄 처리'),
+          content: Text(
+            '요청 내용과 실제 화물·송장 정보를 확인하셨습니까?\n선택한 ${items.length}건만 처리합니다.\n${action == 'complete'
+                ? '현재 값으로 확인 완료하고 데이터 잠금을 적용합니다.'
+                : action == 'keep'
+                ? '수취인 불명 상태를 유지하고 확인 완료합니다.'
+                : action == 'reject'
+                ? '선택한 요청을 거절합니다.'
+                : '각 항목의 요청 값 또는 검토한 수정 값을 반영합니다.'}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('확인 후 처리'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      final service = ApprovalBatchService();
+      final result = await processApprovalBatch(
+        items: items,
+        canContinue: () =>
+            mounted &&
+            AuthService.instance.currentUser?.id == owner!.id &&
+            AuthService.instance.currentUser?.role == UserRole.admin,
+        worker: (item) => service.apply(
+          item,
+          action,
+          changes:
+              const ['modified_approve', 'resolve', 'edit'].contains(action)
+              ? _batchDrafts[item.key] ?? const {}
+              : const {},
+        ),
+        onProgress: (done, total) {
+          if (mounted) setState(() => _progress = '$done / $total');
+        },
+      );
+      for (final key in result.succeeded) {
+        _selected.remove(key);
+        _batchDrafts.remove(key);
+      }
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      final summary =
+          '일괄 처리 완료 · 성공 ${result.succeeded.length}건 · 실패 ${result.failures.length}건';
+      if (result.failures.isEmpty) {
+        _message(summary);
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(summary),
+            content: SingleChildScrollView(
+              child: Text(
+                result.failures.entries
+                    .map((entry) {
+                      final item = items.firstWhere(
+                        (item) => item.key == entry.key,
+                      );
+                      return '${item.label}: ${entry.value}';
+                    })
+                    .join('\n\n'),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted)
+        setState(() {
+          _processing = false;
+          _progress = '';
+        });
+    }
+  }
+
   final Set<int> _editing = <int>{};
   final Map<int, Map<String, TextEditingController>> _controllers = {};
   bool _loading = true;
@@ -51,11 +282,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           .toSet()
           .toList(growable: false);
       if (shipmentIds.isNotEmpty) {
-        final shipmentRows =
-            await ShipmentService.instance.getRowsByIds(shipmentIds);
+        final shipmentRows = await ShipmentService.instance.getRowsByIds(
+          shipmentIds,
+        );
         final shipmentById = <String, Map<String, dynamic>>{
-          for (final shipment in shipmentRows)
-            '${shipment['id']}': shipment,
+          for (final shipment in shipmentRows) '${shipment['id']}': shipment,
         };
         for (final row in rows) {
           final shipmentId = '${row['shipment_id'] ?? ''}'.trim();
@@ -77,35 +308,35 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         }
       }
 
-      final unknownClaims =
-          await UnknownRecipientService.instance.listPendingClaimsForAdmin();
+      final unknownClaims = await UnknownRecipientService.instance
+          .listPendingClaimsForAdmin();
       final invoiceCorrections = await UnknownRecipientService.instance
           .listPendingInvoiceCorrectionsForAdmin();
-      final autoUnmatched =
-          await UnknownRecipientService.instance.listAutoUnmatchedForAdmin();
+      final autoUnmatched = await UnknownRecipientService.instance
+          .listAutoUnmatchedForAdmin();
       final incomplete = <Map<String, dynamic>>[
         ...await UnknownRecipientService.instance.listIncompleteForAdmin(),
       ];
-      final manualUncertain =
-          await ShipmentService.instance.listManualUncertainForAdmin();
-      final incompleteById=<String,Map<String,dynamic>>{
-        for(final row in incomplete)
+      final manualUncertain = await ShipmentService.instance
+          .listManualUncertainForAdmin();
+      final incompleteById = <String, Map<String, dynamic>>{
+        for (final row in incomplete)
           '${row['shipment_id'] ?? row['id'] ?? ''}': row,
       };
-      for(final row in manualUncertain){
-        final id='${row['id'] ?? ''}';
-        if(id.isEmpty)continue;
-        final existing=incompleteById[id];
-        if(existing!=null){
-          existing['manual_uncertain']=true;
+      for (final row in manualUncertain) {
+        final id = '${row['id'] ?? ''}';
+        if (id.isEmpty) continue;
+        final existing = incompleteById[id];
+        if (existing != null) {
+          existing['manual_uncertain'] = true;
           existing['reason'] ??= '관리자 수동 불확실 표시';
-        }else{
-          final copy=Map<String,dynamic>.from(row);
-          copy['shipment_id']=id;
-          copy['manual_uncertain']=true;
-          copy['reason']='관리자 수동 불확실 표시';
+        } else {
+          final copy = Map<String, dynamic>.from(row);
+          copy['shipment_id'] = id;
+          copy['manual_uncertain'] = true;
+          copy['reason'] = '관리자 수동 불확실 표시';
           incomplete.add(copy);
-          incompleteById[id]=copy;
+          incompleteById[id] = copy;
         }
       }
       if (!mounted) return;
@@ -115,7 +346,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         _invoiceCorrections = invoiceCorrections;
         _autoUnmatched = autoUnmatched;
         _incomplete = incomplete;
-        _checked.clear();
+        _pruneSelection();
         _editing.clear();
       });
     } catch (error) {
@@ -132,13 +363,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     return _controllers.putIfAbsent(id, () {
       String value(String key) => '${r[key] ?? ''}';
       return {
-        'invoice_number':
-            TextEditingController(text: value('invoice_number')),
+        'invoice_number': TextEditingController(text: value('invoice_number')),
         'sender_name': TextEditingController(text: value('sender_name')),
-        'consignee_name':
-            TextEditingController(text: value('consignee_name')),
-        'consignee_phone':
-            TextEditingController(text: value('consignee_phone')),
+        'consignee_name': TextEditingController(text: value('consignee_name')),
+        'consignee_phone': TextEditingController(
+          text: value('consignee_phone'),
+        ),
         'contents': TextEditingController(text: value('contents')),
         'package_type': TextEditingController(text: value('package_type')),
         'quantity': TextEditingController(text: value('quantity')),
@@ -147,10 +377,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         'length_cm': TextEditingController(text: value('length_cm')),
         'width_cm': TextEditingController(text: value('width_cm')),
         'height_cm': TextEditingController(text: value('height_cm')),
-        'receipt_number':
-            TextEditingController(text: value('receipt_number')),
-        'unloading_zone':
-            TextEditingController(text: value('unloading_zone')),
+        'receipt_number': TextEditingController(text: value('receipt_number')),
+        'unloading_zone': TextEditingController(text: value('unloading_zone')),
         'received_at': TextEditingController(text: value('received_at')),
       };
     });
@@ -214,8 +442,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   Future<void> _review(Map<String, dynamic> r, String action) async {
     final id = (r['request_id'] as num).toInt();
     try {
-      final adminChanges =
-          action == 'modified_approve' ? _adminChanges(r) : <String, dynamic>{};
+      final adminChanges = action == 'modified_approve'
+          ? _adminChanges(r)
+          : <String, dynamic>{};
       await ShipmentService.instance.reviewChangeRequest(
         requestId: id,
         action: action,
@@ -226,8 +455,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         action == 'reject'
             ? '거절되었습니다.'
             : action == 'modified_approve'
-                ? '수정 후 승인되었습니다.'
-                : '승인되었습니다.',
+            ? '수정 후 승인되었습니다.'
+            : '승인되었습니다.',
       );
       await _load();
     } catch (error) {
@@ -237,11 +466,16 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   Future<void> _resolveAutoUnmatched(Map<String, dynamic> row) async {
     final name = TextEditingController(text: '${row['consignee_name'] ?? ''}');
-    final phone = TextEditingController(text: '${row['consignee_phone'] ?? ''}');
-    final invoice = TextEditingController(text: '${row['invoice_number'] ?? ''}');
+    final phone = TextEditingController(
+      text: '${row['consignee_phone'] ?? ''}',
+    );
+    final invoice = TextEditingController(
+      text: '${row['invoice_number'] ?? ''}',
+    );
     final notes = TextEditingController(text: '${row['notes'] ?? ''}');
 
-    final save = await showDialog<bool>(
+    final save =
+        await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text('수취인 불명 데이터 정상화'),
@@ -324,8 +558,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   Future<void> _keepAutoUnmatched(Map<String, dynamic> row) async {
     try {
-      await UnknownRecipientService.instance
-          .keepAutoUnmatched((row['queue_id'] as num).toInt());
+      await UnknownRecipientService.instance.keepAutoUnmatched(
+        (row['queue_id'] as num).toInt(),
+      );
       if (!mounted) return;
       _message('수취인 불명 상태로 확인 완료했습니다. 화물은 XX / 구획 F로 유지됩니다.');
       await _load();
@@ -338,24 +573,25 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     Map<String, dynamic> row, {
     required bool lock,
   }) async {
-    final invoice =
-        TextEditingController(text: '${row['invoice_number'] ?? ''}');
-    final name =
-        TextEditingController(text: '${row['consignee_name'] ?? ''}');
-    final phone =
-        TextEditingController(text: '${row['consignee_phone'] ?? ''}');
-    final receipt =
-        TextEditingController(text: '${row['receipt_number'] ?? ''}');
+    final invoice = TextEditingController(
+      text: '${row['invoice_number'] ?? ''}',
+    );
+    final name = TextEditingController(text: '${row['consignee_name'] ?? ''}');
+    final phone = TextEditingController(
+      text: '${row['consignee_phone'] ?? ''}',
+    );
+    final receipt = TextEditingController(
+      text: '${row['receipt_number'] ?? ''}',
+    );
     final notes = TextEditingController(text: '${row['notes'] ?? ''}');
     String? receiptWarning;
 
-    final save = await showDialog<bool>(
+    final save =
+        await showDialog<bool>(
           context: context,
           builder: (dialogContext) => StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
-              title: Text(
-                lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정',
-              ),
+              title: Text(lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -431,14 +667,14 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                   onPressed: () async {
                     final check = await UnknownRecipientService.instance
                         .checkReceiptNumber(
-                      shipmentId:
-                          '${row['shipment_id'] ?? row['id'] ?? ''}',
-                      receiptNumber: receipt.text,
-                    );
+                          shipmentId:
+                              '${row['shipment_id'] ?? row['id'] ?? ''}',
+                          receiptNumber: receipt.text,
+                        );
                     if (!context.mounted) return;
                     if (check['duplicate'] == true) {
-                      final suggested =
-                          '${check['suggested_receipt'] ?? ''}'.trim();
+                      final suggested = '${check['suggested_receipt'] ?? ''}'
+                          .trim();
                       setDialogState(() {
                         receiptWarning = suggested.isEmpty
                             ? '이미 사용 중인 영수번호입니다.'
@@ -466,7 +702,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
     if (save) {
       try {
-        final reviewedShipmentId='${row['shipment_id'] ?? row['id'] ?? ''}';
+        final reviewedShipmentId = '${row['shipment_id'] ?? row['id'] ?? ''}';
         await UnknownRecipientService.instance.reviewIncomplete(
           shipmentId: reviewedShipmentId,
           invoiceNumber: invoice.text,
@@ -476,18 +712,14 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           notes: notes.text,
           lock: lock,
         );
-        if(row['manual_uncertain']==true){
+        if (row['manual_uncertain'] == true) {
           await ShipmentService.instance.setManualUncertain(
             reviewedShipmentId,
             false,
           );
         }
         if (mounted) {
-          _message(
-            lock
-                ? '불확실 데이터를 확인 완료하고 잠금했습니다.'
-                : '불확실 데이터를 수정했습니다.',
-          );
+          _message(lock ? '불확실 데이터를 확인 완료하고 잠금했습니다.' : '불확실 데이터를 수정했습니다.');
           await _load();
         }
       } catch (error) {
@@ -502,6 +734,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     receipt.dispose();
     notes.dispose();
   }
+
   Widget _incompleteCard(Map<String, dynamic> row) {
     return Card(
       color: const Color(0xFFFFFBF2),
@@ -513,6 +746,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _selectionCheckbox(ApprovalKind.incomplete, row),
                 Expanded(
                   child: Text(
                     '${row['box_number'] ?? ''} · ${row['invoice_number'] ?? ''}',
@@ -587,6 +821,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       ),
     );
   }
+
   Widget _autoUnmatchedCard(Map<String, dynamic> row) {
     return Card(
       color: const Color(0xFFFFF6F6),
@@ -595,12 +830,19 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${row['box_number'] ?? ''} · ${row['invoice_number'] ?? ''}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+            Row(
+              children: [
+                _selectionCheckbox(ApprovalKind.autoUnmatched, row),
+                Expanded(
+                  child: Text(
+                    '${row['box_number'] ?? ''} · ${row['invoice_number'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
             Text(
               '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
@@ -648,6 +890,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       ),
     );
   }
+
   Future<void> _reviewUnknownClaim(
     Map<String, dynamic> claim,
     String action,
@@ -656,7 +899,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     final approve = action == 'approve';
 
     if (approve) {
-      final ok = await showDialog<bool>(
+      final ok =
+          await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
               title: const Text('수취인 불명 화물 확인 승인'),
@@ -691,9 +935,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       );
       if (!mounted) return;
       _message(
-        approve
-            ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.'
-            : '수취인 불명 화물 확인 요청을 거절했습니다.',
+        approve ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.' : '수취인 불명 화물 확인 요청을 거절했습니다.',
       );
       await _load();
     } catch (error) {
@@ -707,7 +949,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   ) async {
     final approve = action == 'approve';
     if (approve) {
-      final ok = await showDialog<bool>(
+      final ok =
+          await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
               title: const Text('송장 뒷자리 화물 정보 정정 승인'),
@@ -747,48 +990,35 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     }
   }
 
-  Future<void> _bulk(String action) async {
-    final ids = _checked.toList();
-    for (final id in ids) {
-      final r = _requests.firstWhere(
-        (item) => (item['request_id'] as num).toInt() == id,
-      );
-      await ShipmentService.instance.reviewChangeRequest(
-        requestId: id,
-        action: action,
-      );
-    }
-    if (!mounted) return;
-    _message(
-      action == 'reject'
-          ? '체크된 요청을 거절했습니다.'
-          : '체크된 요청을 승인했습니다.',
-    );
-    await _load();
-  }
-
   void _message(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('화물 내용 변경 승인 관리'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-        ),
-        backgroundColor: AppColors.background,
-        body: _loading
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_processing,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('화물 내용 변경 승인 관리'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+      ),
+      backgroundColor: AppColors.background,
+      body: AbsorbPointer(
+        absorbing: _processing,
+        child: _loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    if (_processing) ...[
+                      const LinearProgressIndicator(),
+                      Text('일괄 처리 중 $_progress'),
+                    ],
                     if (_incomplete.isNotEmpty) ...[
                       const Text(
                         '불확실 / 확인 필요 데이터',
@@ -804,6 +1034,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
+                      _selectionToolbar(ApprovalKind.incomplete),
                       ..._incomplete.map(_incompleteCard),
                       const SizedBox(height: 14),
                       const Divider(),
@@ -824,6 +1055,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
+                      _selectionToolbar(ApprovalKind.autoUnmatched),
                       ..._autoUnmatched.map(_autoUnmatchedCard),
                       const SizedBox(height: 14),
                       const Divider(),
@@ -839,6 +1071,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
+                      _selectionToolbar(ApprovalKind.unknownClaims),
                       ..._unknownClaims.map(_unknownClaimCard),
                       const SizedBox(height: 14),
                       const Divider(),
@@ -859,67 +1092,33 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
+                      _selectionToolbar(ApprovalKind.invoiceClaims),
                       ..._invoiceCorrections.map(_invoiceCorrectionCard),
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 8),
                     ],
-                    if (_requests.isEmpty && _unknownClaims.isEmpty && _invoiceCorrections.isEmpty && _autoUnmatched.isEmpty && _incomplete.isEmpty)
+                    if (_requests.isEmpty &&
+                        _unknownClaims.isEmpty &&
+                        _invoiceCorrections.isEmpty &&
+                        _autoUnmatched.isEmpty &&
+                        _incomplete.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
                         child: Center(
-                          child: Text(
-                            '대기 중인 화물 내용 변경 승인 요청이 없습니다.',
-                          ),
+                          child: Text('대기 중인 화물 내용 변경 승인 요청이 없습니다.'),
                         ),
                       ),
                     if (_requests.isNotEmpty) ...[
-                      CheckboxListTile(
-                        value: _checked.length == _requests.length,
-                        onChanged: (v) => setState(() {
-                          if (v == true) {
-                            _checked.addAll(
-                              _requests.map(
-                                (r) => (r['request_id'] as num).toInt(),
-                              ),
-                            );
-                          } else {
-                            _checked.clear();
-                          }
-                        }),
-                        title: const Text(
-                          '전체 선택',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      _selectionToolbar(ApprovalKind.changes),
                       ..._requests.map(_requestCard),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _checked.isEmpty
-                                  ? null
-                                  : () => _bulk('reject'),
-                              child: const Text('체크된 요청 전체 거절'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: _checked.isEmpty
-                                  ? null
-                                  : () => _bulk('approve'),
-                              child: const Text('체크된 요청 전체 승인'),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ],
                 ),
               ),
-      );
+      ),
+    ),
+  );
 
   Widget _unknownClaimCard(Map<String, dynamic> claim) {
     return Card(
@@ -929,15 +1128,18 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
+                _selectionCheckbox(ApprovalKind.unknownClaims, claim),
                 Icon(Icons.help_outline, color: Colors.orange),
                 SizedBox(width: 6),
-                Text(
-                  '수취인 불명 · 본인 화물 확인 요청',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    '수취인 불명 · 본인 화물 확인 요청',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1011,15 +1213,18 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
+                _selectionCheckbox(ApprovalKind.invoiceClaims, request),
                 Icon(Icons.verified_user_outlined, color: AppColors.primary),
                 SizedBox(width: 6),
-                Text(
-                  '수취인 정보 오류 정정 요청',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    '수취인 정보 오류 정정 요청',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1053,14 +1258,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () =>
-                      _reviewInvoiceCorrection(request, 'reject'),
+                  onPressed: () => _reviewInvoiceCorrection(request, 'reject'),
                   child: const Text('거절'),
                 ),
                 const SizedBox(width: 6),
                 FilledButton(
-                  onPressed: () =>
-                      _reviewInvoiceCorrection(request, 'approve'),
+                  onPressed: () => _reviewInvoiceCorrection(request, 'approve'),
                   child: const Text('확인 후 정정 승인'),
                 ),
               ],
@@ -1074,8 +1277,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   Widget _requestCard(Map<String, dynamic> r) {
     final id = (r['request_id'] as num).toInt();
     final editing = _editing.contains(id);
-    final requested =
-        Map<String, dynamic>.from(r['requested_changes'] ?? const {});
+    final requested = Map<String, dynamic>.from(
+      r['requested_changes'] ?? const {},
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1084,14 +1288,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           children: [
             Row(
               children: [
-                Checkbox(
-                  value: _checked.contains(id),
-                  onChanged: (v) => setState(
-                    () => v == true
-                        ? _checked.add(id)
-                        : _checked.remove(id),
-                  ),
-                ),
+                _selectionCheckbox(ApprovalKind.changes, r),
                 Expanded(
                   child: Text(
                     '${r['box_number'] ?? ''} · ${r['invoice_number'] ?? ''}',
@@ -1139,10 +1336,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
             ),
 
             const SizedBox(height: 8),
-            const Text(
-              '요청 내용',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            const Text('요청 내용', style: TextStyle(fontWeight: FontWeight.bold)),
             Text(_changesText(requested, r)),
             if (editing) ...[
               const Divider(height: 22),
@@ -1159,13 +1353,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                   spacing: 8,
                   children: [
                     OutlinedButton(
-                      onPressed: () =>
-                          setState(() => _editing.remove(id)),
+                      onPressed: () => setState(() => _editing.remove(id)),
                       child: const Text('취소'),
                     ),
                     FilledButton(
-                      onPressed: () =>
-                          _review(r, 'modified_approve'),
+                      onPressed: () => _review(r, 'modified_approve'),
                       child: const Text('수정 후 승인'),
                     ),
                   ],
@@ -1206,22 +1398,21 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       String label, {
       bool number = false,
       int maxLines = 1,
-    }) =>
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: TextField(
-            controller: c[key],
-            maxLines: maxLines,
-            keyboardType: number
-                ? const TextInputType.numberWithOptions(decimal: true)
-                : TextInputType.text,
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-          ),
-        );
+    }) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        controller: c[key],
+        maxLines: maxLines,
+        keyboardType: number
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : TextInputType.text,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+    );
 
     return [
       field('invoice_number', '송장번호'),
@@ -1239,24 +1430,16 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       field('notes', '기타 내용', maxLines: 2),
       Row(
         children: [
-          Expanded(
-            child: field('weight_kg', '무게(kg)', number: true),
-          ),
+          Expanded(child: field('weight_kg', '무게(kg)', number: true)),
           const SizedBox(width: 8),
-          Expanded(
-            child: field('length_cm', '가로(cm)', number: true),
-          ),
+          Expanded(child: field('length_cm', '가로(cm)', number: true)),
         ],
       ),
       Row(
         children: [
-          Expanded(
-            child: field('width_cm', '세로(cm)', number: true),
-          ),
+          Expanded(child: field('width_cm', '세로(cm)', number: true)),
           const SizedBox(width: 8),
-          Expanded(
-            child: field('height_cm', '높이(cm)', number: true),
-          ),
+          Expanded(child: field('height_cm', '높이(cm)', number: true)),
         ],
       ),
       Row(
@@ -1306,16 +1489,16 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       return text;
     }
 
-    return changes.entries.map((e) {
-      final label = labels[e.key] ?? e.key;
-      if (e.key == 'received_at') {
-        return '$label: ${clean(e.value)}';
-      }
-      final before = clean(current[e.key]);
-      final after = clean(e.value);
-      return '$label: $before → $after';
-    }).join('\n');
+    return changes.entries
+        .map((e) {
+          final label = labels[e.key] ?? e.key;
+          if (e.key == 'received_at') {
+            return '$label: ${clean(e.value)}';
+          }
+          final before = clean(current[e.key]);
+          final after = clean(e.value);
+          return '$label: $before → $after';
+        })
+        .join('\n');
   }
 }
-
-

@@ -202,6 +202,10 @@ declare
   v_year integer;
   v_voyage text;
 begin
+  if auth.uid() is null or public.current_role() is distinct from 'admin' then
+    raise exception '관리자(총괄) 권한이 필요합니다.';
+  end if;
+
   if coalesce(btrim(p_shipment_id),'')='' then
     raise exception '화물 ID가 비어 있습니다.';
   end if;
