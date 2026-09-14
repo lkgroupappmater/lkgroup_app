@@ -185,20 +185,25 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       );
       if (confirmed != true || !mounted) return;
       final service = ApprovalBatchService();
+      final conflicts = conflictingApprovalKeys(items, action);
       final result = await processApprovalBatch(
         items: items,
         canContinue: () =>
             mounted &&
             AuthService.instance.currentUser?.id == owner!.id &&
             AuthService.instance.currentUser?.role == UserRole.admin,
-        worker: (item) => service.apply(
-          item,
-          action,
-          changes:
-              const ['modified_approve', 'resolve', 'edit'].contains(action)
-              ? _batchDrafts[item.key] ?? const {}
-              : const {},
-        ),
+        worker: (item) async {
+          if (conflicts.contains(item.key))
+            throw StateError('같은 화물에 여러 소유 확인 요청이 선택되어 있습니다. 한 요청만 선택해 주세요.');
+          await service.apply(
+            item,
+            action,
+            changes:
+                const ['modified_approve', 'resolve', 'edit'].contains(action)
+                ? _batchDrafts[item.key] ?? const {}
+                : const {},
+          );
+        },
         onProgress: (done, total) {
           if (mounted) setState(() => _progress = '$done / $total');
         },
@@ -1001,7 +1006,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     canPop: !_processing,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('화물 내용 변경 승인 관리'),
+        title: Text(_processing ? '일괄 처리 중 $_progress' : '화물 내용 변경 승인 관리'),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
       ),

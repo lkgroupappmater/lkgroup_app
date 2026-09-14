@@ -13,6 +13,30 @@ ApprovalItem change(int id, String name) => ApprovalItem(ApprovalKind.changes, {
 
 void main() {
   test(
+    'competing claims are reported together instead of approving the first',
+    () {
+      final one = ApprovalItem(ApprovalKind.invoiceClaims, {
+        'request_id': 1,
+        'shipment_id': 9,
+      });
+      final two = ApprovalItem(ApprovalKind.invoiceClaims, {
+        'request_id': 2,
+        'shipment_id': 9,
+      });
+      final three = ApprovalItem(ApprovalKind.invoiceClaims, {
+        'request_id': 3,
+        'shipment_id': 10,
+      });
+      expect(conflictingApprovalKeys([one, two, three], 'approve'), {
+        one.key,
+        two.key,
+      });
+      expect(conflictingApprovalKeys([one, two], 'reject'), isEmpty);
+      expect(conflictingApprovalKeys([one, three], 'approve'), isEmpty);
+    },
+  );
+
+  test(
     'per-row edits preserve requests and send only actual admin overrides',
     () {
       final first = ApprovalDraft(change(1, 'Alice'));

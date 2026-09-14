@@ -171,3 +171,21 @@ Future<ApprovalBatchResult> processApprovalBatch({
   }
   return result;
 }
+
+/// Competing ownership requests need an explicit choice, not list-order approval.
+Set<String> conflictingApprovalKeys(List<ApprovalItem> items, String action) {
+  if (action != 'approve') return {};
+  final groups = <String, List<String>>{};
+  for (final item in items) {
+    if (item.kind != ApprovalKind.invoiceClaims &&
+        item.kind != ApprovalKind.unknownClaims)
+      continue;
+    final shipment = '${item.row['shipment_id'] ?? ''}';
+    if (shipment.isNotEmpty)
+      (groups['${item.kind.name}:$shipment'] ??= []).add(item.key);
+  }
+  return {
+    for (final keys in groups.values)
+      if (keys.toSet().length > 1) ...keys,
+  };
+}
