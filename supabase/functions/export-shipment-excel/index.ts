@@ -1,3 +1,4 @@
+import { receiptOrderFormulas, fixedDiscountFormulas, RECEIPT_RULE_VERSION } from './receipt-order.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
@@ -142,6 +143,20 @@ function blankCell(ref: string, style: string): string {
   return `<c r="${ref}"${style}></c>`;
 }
 
+function upgradeReceiptOrder(sheetXml: string, routeKey: string): string {
+  if (!['kr_la_sea','kr_la_air'].includes(routeKey)) return sheetXml;
+  const rows = [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6);
+  if (!rows.length || !/<c\b[^>]*r="AK6"/.test(sheetXml)) return sheetXml;
+  const last = Math.max(...rows);
+  return sheetXml.replace(/<c\b[^>]*r="(N|Y|Z|AB|AC|AK|AL|AM|T|AD)(\d+)"[^>]*>[\s\S]*?<\/c>/g, (cell, column, rowText) => {
+    const row = Number(rowText);
+    if (row < 6 || row > last || !/<f\b/.test(cell)) return cell;
+    const formulas = {...receiptOrderFormulas(row, last, routeKey === 'kr_la_air' ? 'LKA' : 'LKS'), ...fixedDiscountFormulas(row)};
+    const formula = formulas[column as keyof typeof formulas];
+    return cell.replace(/<f\b[^>]*(?:\/>|>[\s\S]*?<\/f>)/, `<f>${escXml(formula)}</f>`);
+  });
+}
+
 function updateCellPreservingFormula(
   rowXml: string,
   rowNumber: number,
@@ -158,7 +173,14 @@ function updateCellPreservingFormula(
   // 원본 Excel의 수식 셀은 절대 지우거나 값 셀로 바꾸지 않습니다.
   if (existing) {
     const body = existing[3] ?? '';
-    if (/<f\b/.test(body)) return rowXml;
+    if (/<f\b/.test(body)) {
+      if (!['N','O','P'].includes(column)) return rowXml;
+      const attrs = `${existing[1]}r="${ref}"${existing[2]}`.replace(/\s+t="[^"]*"/g, '');
+      const cached = `<v>${escXml(value ?? '')}</v>`;
+      const nextBody = /<v>[\s\S]*?<\/v>/.test(body)
+        ? body.replace(/<v>[\s\S]*?<\/v>/,cached) : body + cached;
+      return rowXml.replace(existing[0],`<c${attrs} t="str">${nextBody}</c>`);
+    }
   }
 
   // DB 값이 비어 있으면 원본 템플릿의 기본값/수식/구획값을 그대로 유지합니다.
@@ -242,6 +264,30 @@ function updateExchangeRates(
   }
 
   files[path] = strToU8(xml);
+  // The approved originals contain old hard-coded statement adjustments.
+  // Generated statements follow the same live source + adjustment as Row data.
+  if (usesCurrencyLabels) {
+    const workbook = strFromU8(files['xl/workbook.xml']);
+    for (const match of workbook.matchAll(/<sheet\b[^>]*name="([^"]+)"[^>]*>/g)) {
+      if (!/^(LKS|LKA)\s*(\d+|XX)$/i.test(match[1])) continue;
+      const statementPath = workbookSheetPath(files, match[1]);
+      if (!statementPath || !files[statementPath]) continue;
+      let statement = strFromU8(files[statementPath]);
+      const currencies = [[rates.baseKip,rates.kipAdjustment],[rates.baseThb,rates.thbAdjustment],[rates.baseKrw,rates.krwAdjustment]];
+      currencies.forEach(([base,adjustment],index) => {
+        const row = index + 2, sourceRow = index + 3;
+        for (const [column,formula,value] of [
+          ['U',`'Row data'!$C$${sourceRow}`,base],
+          ['V',`'Row data'!$D$${sourceRow}`,adjustment],
+          ['W',`U${row}+V${row}`,base+adjustment],
+        ] as Array<[string,string,number]>) {
+          const ref = `${column}${row}`;
+          statement = setCachedFormulaValue(setFormulaCellInSheet(statement,ref,formula),ref,value,true);
+        }
+      });
+      files[statementPath] = strToU8(statement);
+    }
+  }
 }
 
 function excelDateSerial(value: unknown): number | null {
@@ -318,16 +364,15 @@ function updateCargoSheet(
   }
 
   const firstDataRow = headerRow + 1;
-  const rows = [...sheetXml.matchAll(
-    /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
-  )];
-  const candidateRows = rows
-    .map((m) => ({ number: Number(m[1]), xml: m[0] }))
-    .filter((r) => r.number >= firstDataRow);
+  const rowPattern = /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g;
+  let candidateRowCount = 0;
+  for (const match of sheetXml.matchAll(rowPattern)) {
+    if (Number(match[1]) >= firstDataRow) candidateRowCount += 1;
+  }
 
-  if (shipments.length > candidateRows.length) {
+  if (shipments.length > candidateRowCount) {
     throw new Error(
-      `현재 템플릿 화물 행 ${candidateRows.length}개보다 DB 화물 ${shipments.length}개가 많습니다. ` +
+      `현재 템플릿 화물 행 ${candidateRowCount}개보다 DB 화물 ${shipments.length}개가 많습니다. ` +
       '행 자동 확장은 다음 단계에서 해당 노선 명세서 구조와 함께 적용해야 합니다.',
     );
   }
@@ -360,47 +405,65 @@ function updateCargoSheet(
     if (box) shipmentByBox.set(box, shipment);
   }
 
-  let output = sheetXml;
   const matchedBoxes = new Set<string>();
-
-  for (const candidate of candidateRows) {
-    const bRe = new RegExp(
-      `<c\\b[^>]*r="B${candidate.number}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
-    );
-    const bMatch = candidate.xml.match(bRe);
-    if (!bMatch) continue;
-
-    const fixedBox = cellText(bMatch[0], strings).trim();
-    if (!fixedBox) continue;
-
-    const sourceShipment = shipmentByBox.get(fixedBox.toUpperCase());
-    if (!sourceShipment) continue;
-    const manualNote = String(sourceShipment.notes ?? '').trim();
-    const autoNote = String(sourceShipment.special_note_auto ?? '').trim();
-    const shipment = {
-      ...sourceShipment,
-      notes: [manualNote, autoNote]
-        .filter((v, i, a) => v && a.indexOf(v) === i)
-        .join(' / '),
-    };
-
-    matchedBoxes.add(fixedBox.toUpperCase());
-    let rowXml = candidate.xml;
-
-    // B열은 템플릿 고정 번호이므로 절대 덮어쓰지 않습니다.
-    for (const [column, key, kind] of mapping) {
-      if (column === 'B') continue;
-      rowXml = updateCellPreservingFormula(
-        rowXml,
-        candidate.number,
-        column,
-        shipment[key],
-        kind,
+  // 한 행을 바꿀 때마다 수 MB짜리 worksheet 전체를 다시 복사하면
+  // 418행 기준으로 수 GB 규모의 임시 문자열 작업이 발생해 Edge CPU 한도를 넘습니다.
+  // worksheet 전체는 한 번만 순회하고, callback 안에서 해당 행만 갱신합니다.
+  const output = sheetXml.replace(
+    /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
+    (candidateXml, rowText) => {
+      const rowNumber = Number(rowText);
+      if (rowNumber < firstDataRow) return candidateXml;
+      const bRe = new RegExp(
+        `<c\\b[^>]*r="B${rowNumber}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
       );
-    }
+      const bMatch = String(candidateXml).match(bRe);
+      if (!bMatch) return candidateXml;
 
-    output = output.replace(candidate.xml, rowXml);
-  }
+      const fixedBox = cellText(bMatch[0], strings).trim();
+      if (!fixedBox) return candidateXml;
+
+      const normalizedBox = fixedBox.toUpperCase();
+      const sourceShipment = shipmentByBox.get(normalizedBox);
+      if (!sourceShipment) {
+        // A voyage template may contain deleted/old cargo. Keep fixed box slots
+        // and formulas, but clear the editable inputs for absent database rows.
+        let emptyRow = String(candidateXml);
+        for (const column of ['C','D','E','F','G','H','I','J','K','L','M','Q']) {
+          emptyRow = updateCell(emptyRow, rowNumber, column, '', 'text');
+        }
+        for (const column of ['N','O','P']) {
+          emptyRow = updateCellPreservingFormula(emptyRow,rowNumber,column,'','text');
+        }
+        return emptyRow;
+      }
+      const manualNote = String(sourceShipment.notes ?? '').trim();
+      const autoNote = String(sourceShipment.special_note_auto ?? '').trim();
+      const shipment = {
+        ...sourceShipment,
+        notes: [manualNote, autoNote]
+          .filter((v, i, a) => v && a.indexOf(v) === i)
+          .join(' / '),
+      };
+
+      matchedBoxes.add(normalizedBox);
+      let rowXml = String(candidateXml);
+
+      // B열은 템플릿 고정 번호이므로 절대 덮어쓰지 않습니다.
+      for (const [column, key, kind] of mapping) {
+        if (column === 'B') continue;
+        rowXml = updateCellPreservingFormula(
+          rowXml,
+          rowNumber,
+          column,
+          shipment[key],
+          kind,
+        );
+      }
+
+      return rowXml;
+    },
+  );
 
   const missing = [...shipmentByBox.keys()].filter((box) => !matchedBoxes.has(box));
   if (missing.length > 0) {
@@ -602,148 +665,6 @@ function receiptIsTrulyUnknown(name: unknown, phone: unknown): boolean {
     : receiptPhoneIsUncertain(phone);
 }
 
-function assignReceiptNumbers(
-  shipments: Record<string, unknown>[],
-  routeKey: string,
-  runtimeReceiptPrefix = '',
-): Record<string, unknown>[] {
-  const prefix = runtimeReceiptPrefix.trim() || routeReceiptPrefix(routeKey);
-  if (!prefix) return shipments;
-
-  const unknownReceipt =
-    routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
-      ? `${prefix} XX`
-      : `${prefix}XX`;
-  const normalizedShipments = shipments.map((shipment) => {
-    const unknown = receiptIsTrulyUnknown(
-      shipment.consignee_name,
-      shipment.consignee_phone,
-    );
-    return unknown
-      ? {
-          ...shipment,
-          recipient_unknown: true,
-          receipt_number: unknownReceipt,
-          unloading_zone: 'F',
-        }
-      : { ...shipment, recipient_unknown: false };
-  });
-
-  // 정상 정보는 전체 이름 + 전화번호로 묶습니다. 마스킹 전화번호는
-  // 첫 번째 정상 이름이 기존 영수증 하나로만 확인될 때 그 번호를 따릅니다.
-  const groupToReceipt = new Map<string, string>();
-  const knownReceiptsByFirstName = new Map<string, Set<string>>();
-  const knownGroupKeysByFirstName = new Map<string, Set<string>>();
-  let next = 1;
-
-  const isPark = (name: unknown) => {
-    const first = firstReceiptNameToken(name).replace(/\s+/g, '');
-    return first === '박성호' || first === '박성호대표';
-  };
-
-  const groupKey = (shipment: Record<string, unknown>): string => {
-    const fullName = normalizeReceiptName(shipment.consignee_name);
-    const firstName = firstReceiptNameToken(shipment.consignee_name);
-    const phone = normalizePhone(shipment.consignee_phone);
-    if (!receiptPhoneIsUncertain(shipment.consignee_phone)) {
-      return fullName
-        ? `NAMEPHONE|${fullName}|${phone.slice(-8)}`
-        : `PHONE|${phone.slice(-8)}`;
-    }
-    return firstName ? `NAME|${firstName}` : '';
-  };
-
-  // Collect trustworthy name+phone groups before numbering. This makes a
-  // masked-phone row such as "이우용 / 이*용" follow the unique normal
-  // "이우용" group even when the masked row appears first in the sheet.
-  for (const shipment of normalizedShipments) {
-    if (shipment.recipient_unknown === true ||
-        receiptPhoneIsUncertain(shipment.consignee_phone)) continue;
-    const first = firstReceiptNameToken(shipment.consignee_name);
-    const key = groupKey(shipment);
-    if (!first || !key) continue;
-    const values = knownGroupKeysByFirstName.get(first) ?? new Set<string>();
-    values.add(key);
-    knownGroupKeysByFirstName.set(first, values);
-  }
-
-  // 기존 영수번호가 있으면 우선 그대로 유지하고 다음 번호 계산.
-  for (const shipment of normalizedShipments) {
-    const existing = String(shipment.receipt_number ?? '').trim();
-    if (shipment.recipient_unknown === true) continue;
-    if (isPark(shipment.consignee_name)) {
-      const parkReceipt = routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
-        ? `${prefix} 100`
-        : `${prefix}100`;
-      groupToReceipt.set(groupKey(shipment), parkReceipt);
-      continue;
-    }
-    const recoverableXx =
-      /\bXX\s*$/i.test(existing);
-    if (existing && !recoverableXx) {
-      const m = existing.match(/(\d+)\s*$/);
-      if (m) next = Math.max(next, Number(m[1]) + 1);
-      const key = groupKey(shipment);
-      if (key) groupToReceipt.set(key, existing);
-      if (!receiptPhoneIsUncertain(shipment.consignee_phone)) {
-        const first = firstReceiptNameToken(shipment.consignee_name);
-        if (first) {
-          const values = knownReceiptsByFirstName.get(first) ?? new Set<string>();
-          values.add(existing);
-          knownReceiptsByFirstName.set(first, values);
-        }
-      }
-    }
-  }
-
-  const allocateReceipt = (key: string): string => {
-    const prior = groupToReceipt.get(key);
-    if (prior) return prior;
-    if (next === 100) next = 101;
-    const receipt = routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
-      ? `${prefix} ${String(next).padStart(2, '0')}`
-      : `${prefix}${String(next).padStart(2, '0')}`;
-    groupToReceipt.set(key, receipt);
-    next += 1;
-    return receipt;
-  };
-
-  return normalizedShipments.map((shipment) => {
-    const existing = String(shipment.receipt_number ?? '').trim();
-    if (shipment.recipient_unknown === true) return shipment;
-    if (isPark(shipment.consignee_name)) {
-      return {
-        ...shipment,
-        receipt_number: routeKey === 'kr_la_sea' || routeKey === 'kr_la_air'
-          ? `${prefix} 100`
-          : `${prefix}100`,
-        unloading_zone: '102',
-      };
-    }
-    const recoverableXx =
-      /\bXX\s*$/i.test(existing);
-    if (existing && !recoverableXx) return shipment;
-
-    const key = groupKey(shipment);
-    if (!key) return shipment;
-
-    let receipt = groupToReceipt.get(key);
-    if (!receipt && receiptPhoneIsUncertain(shipment.consignee_phone)) {
-      const first = firstReceiptNameToken(shipment.consignee_name);
-      const known = knownReceiptsByFirstName.get(first);
-      if (known?.size === 1) receipt = [...known][0];
-      if (!receipt) {
-        const normalGroups = knownGroupKeysByFirstName.get(first);
-        if (normalGroups?.size === 1) {
-          receipt = allocateReceipt([...normalGroups][0]);
-        }
-      }
-    }
-    if (!receipt) receipt = allocateReceipt(key);
-
-    return { ...shipment, receipt_number: receipt };
-  });
-}
 
 function setStringCellInSheet(sheetXml: string, ref: string, value: string): string {
   const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
@@ -1542,111 +1463,11 @@ function appendDocumentAutomationBlock(
     const first = rows[0];
     const name = String(first.consignee_name ?? '').trim();
     const phone = String(first.consignee_phone ?? '').trim();
-    const nameTokens = (v: unknown) => {
-      const full = normalizeName(v);
-      const parts = String(v ?? '')
-        .split(/[/,;|()\\]+/)
-        .map(x => normalizeName(x))
-        .filter(x => x !== '' && !/[*?]/.test(x));
-      return [...new Set([full, ...parts].filter(
-        x => x !== '' && !/[*?]/.test(x),
-      ))];
-    };
-
-    const shipmentTokens = new Set(nameTokens(name));
-
-    const exactFullName = (a: unknown, b: unknown) => {
-      const aa = String(a ?? '').trim().toLowerCase().replace(/\s+/g, '');
-      const bb = String(b ?? '').trim().toLowerCase().replace(/\s+/g, '');
-      return aa !== '' && aa === bb;
-    };
     const isPrepaid = (value: unknown) => {
       const key = String(value ?? '').toLowerCase().replace(/[\s_-]+/g, '');
-      return key.includes('선결제') ||
-        key.includes('선결재') ||
-        key.includes('선불') ||
-        key.includes('prepaid') ||
-        key.includes('payinadvance');
+      return ['선결제','선결재','선불','prepaid','payinadvance'].some(token => key.includes(token));
     };
-
-    const rankedDeliveries = deliveries
-      .map((x, index) => {
-        const candidateNames = [
-          x.customer_name,
-          x.alternate_name,
-          x.company_name,
-        ].filter(v => String(v ?? '').trim() !== '');
-
-        let exactName = false;
-        let partialNameRank = 9999;
-        for (const candidateName of candidateNames) {
-          if (exactFullName(name, candidateName)) {
-            exactName = true;
-          }
-
-          const candidateTokens = new Set(nameTokens(candidateName));
-          const overlap = [...candidateTokens].filter(token =>
-            shipmentTokens.has(token),
-          ).length;
-          if (overlap === 0) continue;
-          const everyShipmentTokenExists = [...shipmentTokens]
-            .every(token => candidateTokens.has(token));
-          const everyCandidateTokenExists = [...candidateTokens]
-            .every(token => shipmentTokens.has(token));
-          partialNameRank = Math.min(
-            partialNameRank,
-            everyShipmentTokenExists && everyCandidateTokenExists
-              ? 0
-              : (everyShipmentTokenExists || everyCandidateTokenExists
-                ? 10 + Math.abs(shipmentTokens.size - candidateTokens.size)
-                : 50 - overlap),
-          );
-        }
-
-        const prepaid = isPrepaid(x.paid_by);
-        const samePhone = phoneMatch(phone, x.phone);
-        const matchRank = prepaid
-          ? (exactName ? 0 : 9999)
-          : (exactName && samePhone
-            ? 10
-            : exactName
-              ? 20
-              : partialNameRank < 9999 && samePhone
-                ? 30 + partialNameRank
-                : samePhone
-                  ? 100
-                  : partialNameRank < 9999
-                    ? 200 + partialNameRank
-                    : 9999);
-
-        const hasDestination =
-          String(x.destination_address ?? '').trim() !== '';
-        const preferred = x.preferred === true;
-        const sourceNo = Number(x.source_no ?? 999999);
-
-        return {
-          row: x,
-          index,
-          matchRank,
-          hasDestination,
-          preferred,
-          sourceNo: Number.isFinite(sourceNo) ? sourceNo : 999999,
-        };
-      })
-      .filter(x => x.matchRank < 9999)
-      .sort((a, b) =>
-        a.matchRank - b.matchRank ||
-        Number(b.preferred) - Number(a.preferred) ||
-        Number(b.hasDestination) - Number(a.hasDestination) ||
-        a.sourceNo - b.sourceNo ||
-        a.index - b.index
-      );
-
-    // Customer/name matching remains the first boundary.
-    // Local company + Destination pairing is resolved inside the SAME
-    // customer/source block when BASE Excel is imported.
-    // Do NOT jump to another same-phone profile merely because it has an address.
-    const d = rankedDeliveries[0]?.row;
+    const d = deliveries.find(x => String(x.id) === String(first.automation_delivery_profile_id));
     const prepaid = d ? isPrepaid(d.paid_by) : false;
     const type = d
       ? (String(d.delivery_type ?? '') === 'city'
@@ -1654,7 +1475,7 @@ function appendDocumentAutomationBlock(
         : (prepaid ? 'province_prepaid' : 'province'))
       : '';
     const rawSourceNo = Number(d?.source_no ?? 0);
-    const displaySourceNo = rawSourceNo >= 10000 ? rawSourceNo - 10000 : rawSourceNo;
+    const displaySourceNo = Number(d?.original_source_no ?? (rawSourceNo >= 10000 ? rawSourceNo - 10000 : rawSourceNo));
     const delivery = d ? [
       displaySourceNo > 0 ? `No. ${displaySourceNo}` : '',
       d.alternate_name || d.customer_name || name,
@@ -1681,6 +1502,75 @@ function appendDocumentAutomationBlock(
   xml = `${xml.substring(0, close)}${out.join('')}${xml.substring(close)}`;
   files[path] = strToU8(xml);
 }
+
+function populateDeliveryCostInputSheet(
+  files: Record<string, Uint8Array>,
+  extraCosts: Record<string, unknown>[],
+): void {
+  const path = workbookSheetPath(files, '배송비 입력');
+  if (!path || !files[path] || extraCosts.length === 0) return;
+
+  const costs: Array<{
+    receipt: string;
+    name: string;
+    amount: number;
+    discounted: boolean;
+  }> = [];
+  for (const item of extraCosts) {
+    const receipt = String(item.receipt_number ?? '').trim();
+    const amount = Number(item.amount_usd ?? 0);
+    if (!receipt || !Number.isFinite(amount) || amount < 0) continue;
+    costs.push({
+      receipt,
+      name: String(item.cost_name ?? '').trim() || '배송비',
+      amount,
+      discounted: item.discount_applies === true,
+    });
+  }
+  if (costs.length === 0) return;
+
+  let xml = strFromU8(files[path]);
+  const strings = sharedStrings(files);
+  const receiptRows = new Map<string, number>();
+  const overflowRows: number[] = [];
+  for (const match of xml.matchAll(
+    /<c\b[^>]*r="A(\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+  )) {
+    const row = Number(match[1]);
+    if (row < 5 || row > 405) continue;
+    const receipt = cellText(match[0], strings).trim();
+    if (row <= 205 && receipt) receiptRows.set(receipt, row);
+    if (row >= 206 && !receipt) overflowRows.push(row);
+  }
+
+  const usedReceiptRows = new Set<string>();
+  let overflowIndex = 0;
+  for (const cost of costs) {
+    let row: number | undefined;
+    if (!usedReceiptRows.has(cost.receipt)) {
+      row = receiptRows.get(cost.receipt);
+      if (row) usedReceiptRows.add(cost.receipt);
+    }
+    if (!row) {
+      row = overflowRows[overflowIndex++];
+      if (!row) {
+        throw new Error(
+          '배송비 입력 시트의 추가 비용 행이 부족합니다. BASE의 입력 범위를 확인해 주세요.',
+        );
+      }
+      xml = setStringCellInSheet(xml, `A${row}`, cost.receipt);
+    }
+    xml = setStringCellInSheet(xml, `C${row}`, cost.name);
+    xml = setNumericCellInSheet(xml, `D${row}`, cost.amount);
+    xml = setStringCellInSheet(
+      xml,
+      `E${row}`,
+      cost.discounted ? '적용' : '미적용',
+    );
+  }
+  files[path] = strToU8(xml);
+}
+
 function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): string {
   const rowNumber = Number(ref.match(/\d+$/)?.[0] ?? 0);
   const column = ref.match(/^[A-Z]+/)?.[0] ?? '';
@@ -1985,42 +1875,34 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     if (voyageTemplateError) throw voyageTemplateError;
 
-    let template = voyageTemplate;
-    let templateSource = 'voyage';
+    const { data: baseTemplate, error: baseTemplateError } = await admin
+      .from('shipment_excel_base_templates')
+      .select('route_key,route_label,file_name,storage_path,prefer_for_export')
+      .eq('route_key', routeKey).eq('active', true).maybeSingle();
+    if (baseTemplateError) throw baseTemplateError;
+    const useBase = baseTemplate && (!voyageTemplate || baseTemplate.prefer_for_export);
+    const template = useBase ? {...baseTemplate,shipment_year:shipmentYear,voyage} : voyageTemplate;
+    const templateSource = useBase ? 'base' : 'voyage';
+    if (!template) return json(404,{error:'해당 운송 경로의 기본 Excel 폼과 항차별 변경 폼이 모두 없습니다.'});
 
-    if (!template) {
-      const { data: baseTemplate, error: baseTemplateError } = await admin
-        .from('shipment_excel_base_templates')
-        .select('route_key,route_label,file_name,storage_path')
-        .eq('route_key', routeKey)
-        .eq('active', true)
-        .maybeSingle();
-      if (baseTemplateError) throw baseTemplateError;
-      if (!baseTemplate) {
-        return json(404, {
-          error: '해당 운송 경로의 기본 Excel 폼과 항차별 변경 폼이 모두 없습니다.',
-        });
-      }
-      template = {
-        ...baseTemplate,
-        shipment_year: shipmentYear,
-        voyage,
-      };
-      templateSource = 'base';
+    let templateBlob: Blob;
+    if (String(template.storage_path).startsWith('database://')) {
+      const sourceHash = String(template.storage_path).slice(11);
+      if (!/^[0-9a-f]{64}$/.test(sourceHash)) throw new Error('잘못된 기준 원본 식별자');
+      const {data:source,error:sourceError} = await admin.from('shipment_excel_source_files')
+        .select('content_base64,byte_size').eq('sha256',sourceHash).single();
+      if(sourceError || !source) throw sourceError ?? new Error('기준 원본을 찾을 수 없습니다.');
+      const bytes=Uint8Array.from(atob(source.content_base64),c=>c.charCodeAt(0));
+      const actualHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))]
+        .map(v=>v.toString(16).padStart(2,'0')).join('');
+      if(bytes.length!==source.byte_size||actualHash!==sourceHash)throw new Error('기준 원본 무결성 확인 실패');
+      templateBlob=new Blob([bytes]);
+    } else {
+      const {data,error}=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
+      if(error||!data)throw error??new Error('원본 템플릿 다운로드 실패');
+      templateBlob=data;
     }
 
-    const { data: templateBlob, error: downloadError } = await admin.storage
-      .from('shipment-excel-templates')
-      .download(template.storage_path);
-    if (downloadError || !templateBlob) {
-      throw downloadError ?? new Error('원본 템플릿 다운로드 실패');
-    }
-
-    const requestShipmentRows = Array.isArray(body.shipment_rows)
-      ? body.shipment_rows
-          .filter((row) => row != null && typeof row === 'object' && !Array.isArray(row))
-          .map((row) => row as Record<string, unknown>)
-      : [];
     const shipmentRouteLabel =
       requestedRouteLabel ||
       String(routeDefinition?.display_name ?? '').trim() ||
@@ -2033,6 +1915,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       .eq('route', shipmentRouteLabel)
       .eq('shipment_year', shipmentYear)
       .eq('voyage', voyage)
+      .is('deleted_at', null)
       .is('deletion_requested_at', null)
       .order('box_number', { ascending: true })
       .order('id', { ascending: true });
@@ -2046,50 +1929,23 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const exportShipmentRows =
       (shipments ?? []) as Record<string, unknown>[];
 
-    const enrichedShipments = assignReceiptNumbers(
-      exportShipmentRows,
-      routeKey,
-      String(routeDefinition?.receipt_prefix ?? ''),
-    ).map((shipment) => {
-      if (
-        routeKey === 'kr_la_air' &&
-        String(shipment.unloading_zone ?? '').trim() === ''
-      ) {
-        return { ...shipment, unloading_zone: '102' };
-      }
-      return shipment;
-    });
-
-    // 새로 자동 부여된 영수번호는 DB에도 저장하여 다음 조회/다운로드와 앱 화면이 동일하게 유지됩니다.
-    for (const shipment of enrichedShipments) {
-      const id = Number(shipment.id);
-      const receipt = String(shipment.receipt_number ?? '').trim();
-      const original = (shipments ?? []).find((row) => Number(row.id) === id);
-      const originalReceipt = String(original?.receipt_number ?? '').trim();
-      const originalZone = String(original?.unloading_zone ?? '').trim();
-      const originalWasRecoverableXx =
-        /\bXX\s*$/i.test(originalReceipt) &&
-        String(shipment.consignee_name ?? '').trim() !== '' &&
-        normalizePhone(shipment.consignee_phone) !== '' &&
-        !/\bXX\s*$/i.test(receipt);
-      const trueUnknownNeedsRepair =
-        shipment.recipient_unknown === true &&
-        (originalReceipt !== receipt || originalZone !== 'F');
-      if (
-        id &&
-        receipt &&
-        (!originalReceipt || originalWasRecoverableXx || trueUnknownNeedsRepair)
-      ) {
-        const updateValues = shipment.recipient_unknown === true
-          ? { receipt_number: receipt, unloading_zone: 'F' }
-          : { receipt_number: receipt };
-        const { error: receiptUpdateError } = await admin
-          .from('shipments')
-          .update(updateValues)
-          .eq('id', id);
-        if (receiptUpdateError) throw receiptUpdateError;
-      }
+    // Receipt numbers are assigned only by the common database automation.
+    // Export never performs an independent allocation or writes shipment rows.
+    const enrichedShipments = exportShipmentRows;
+    if (enrichedShipments.some(row => !String(row.receipt_number ?? '').trim())) {
+      throw new Error('명세서 번호 정리가 필요합니다. 항차 자료를 새로고침한 뒤 다시 다운로드하세요.');
     }
+
+    const customerSet = [...new Map(enrichedShipments.map(row => [
+      JSON.stringify([row.consignee_name || '', row.consignee_phone || '']),
+      {name: row.consignee_name || '', phone: row.consignee_phone || ''},
+    ])).values()];
+    const {data: deliveryMatches, error: deliveryMatchError} = await admin.rpc(
+      'lk_excel_delivery_matches', {p_route_key: routeKey, p_customers: customerSet},
+    );
+    if (deliveryMatchError) throw deliveryMatchError;
+    const deliveryMap = new Map((deliveryMatches ?? []).map((m: Record<string, unknown>) => [JSON.stringify([m.name,m.phone]),m.id]));
+    for (const row of enrichedShipments) row.automation_delivery_profile_id = deliveryMap.get(JSON.stringify([row.consignee_name || '',row.consignee_phone || ''])) ?? null;
 
     const { data: exchangeRateRows, error: exchangeRateError } = await admin
       .from('exchange_rate_settings')
@@ -2121,9 +1977,11 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: receiptExtraCosts, error: receiptExtraCostsError } =
       await admin
         .from('receipt_extra_costs')
-        .select('voyage,receipt_number,cost_name,amount_usd,discount_applies')
+        .select('id,voyage,receipt_number,cost_name,amount_usd,discount_applies,delivery_type')
         .eq('route', shipmentRouteLabel)
-        .eq('shipment_year', shipmentYear);
+        .eq('shipment_year', shipmentYear)
+        .order('receipt_number', { ascending: true })
+        .order('id', { ascending: true });
 
     if (receiptExtraCostsError) throw receiptExtraCostsError;
 
@@ -2170,7 +2028,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const { data: localDeliveryProfiles, error: localDeliveryError } = await admin
       .from('local_delivery_profiles')
-      .select('source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes,preferred')
+      .select('source_no,original_source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes,preferred')
       .eq('route_key', routeKey)
       .eq('active', true)
       .order('preferred', { ascending: false })
@@ -2205,14 +2063,18 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const original = new Uint8Array(await templateBlob.arrayBuffer());
     console.log('[EXCEL200C] unzip start', original.byteLength);
-    const files = unzipSync(original);
+    // calcChain은 아래에서 어차피 제거됩니다. 압축 해제 단계부터 제외하면
+    // 큰 BASE 파일에서 불필요한 inflate/메모리 사용을 피할 수 있습니다.
+    const files = unzipSync(original, {
+      filter: (entry) => entry.name !== 'xl/calcChain.xml',
+    });
     console.log('[EXCEL200C] unzip done');
 
     const targetPath = workbookSheetPath(files, '물품 입고 내역');
     const strings = sharedStrings(files);
 
     if (targetPath && files[targetPath]) {
-      const sheetXml = strFromU8(files[targetPath]);
+      const sheetXml = upgradeReceiptOrder(strFromU8(files[targetPath]), routeKey);
       files[targetPath] = strToU8(
         updateCargoSheet(
           sheetXml,
@@ -2283,6 +2145,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       shipmentYear,
       voyage,
     );
+    // The App and website store receipt costs in the same DB table. When the
+    // approved BASE contains the input sheet, mirror those values into it so
+    // downloaded Excel statements use the same delivery-cost source.
+    populateDeliveryCostInputSheet(files, voyageExtraCosts);
     appendDocumentAutomationBlock(
       files,
       enrichedShipments,
@@ -2357,6 +2223,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(200, {
       ok: true,
       file_name: outputFileName,
+      automation_version: RECEIPT_RULE_VERSION,
       storage_path: exportPath,
       shipment_count: shipments?.length ?? 0,
       mode: 'archive-preserving-cargo-list-v2',
@@ -2383,13 +2250,3 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
-
-
-
-
-
-
-
-
-
