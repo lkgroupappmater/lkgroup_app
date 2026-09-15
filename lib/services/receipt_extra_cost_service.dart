@@ -7,20 +7,25 @@ class ExtraCostItem {
     required this.name,
     required this.amountUsd,
     this.discountApplies = false,
+    this.deliveryType,
+    this.pending = false,
   });
 
   final int? id;
   final String name;
   final double amountUsd;
   final bool discountApplies;
+  final String? deliveryType;
+  final bool pending;
 
   factory ExtraCostItem.fromMap(Map<String, dynamic> row) => ExtraCostItem(
-        id: (row['id'] as num?)?.toInt(),
-        name: '${row['cost_name'] ?? row['name'] ?? ''}'.trim(),
-        amountUsd:
-            double.tryParse('${row['amount_usd'] ?? row['amount'] ?? 0}') ?? 0,
-        discountApplies: row['discount_applies'] == true,
-      );
+    id: (row['id'] as num?)?.toInt(),
+    name: '${row['cost_name'] ?? row['name'] ?? ''}'.trim(),
+    amountUsd:
+        double.tryParse('${row['amount_usd'] ?? row['amount'] ?? 0}') ?? 0,
+    discountApplies: row['discount_applies'] == true,
+    deliveryType: row['delivery_type'] as String?,
+  );
 }
 
 class ReceiptExtraCostService {
@@ -35,7 +40,7 @@ class ReceiptExtraCostService {
   }) async {
     if (!SupabaseConfig.isConfigured) return const [];
     final raw = await SupabaseService.client.rpc(
-      'list_receipt_extra_costs',
+      'list_receipt_extra_costs_v2',
       params: {
         'p_route': route.trim(),
         'p_year': year,
@@ -57,10 +62,11 @@ class ReceiptExtraCostService {
     required String name,
     required double amountUsd,
     bool discountApplies = false,
+    String? deliveryType,
   }) async {
     if (!SupabaseConfig.isConfigured) return;
     await SupabaseService.client.rpc(
-      'save_receipt_extra_cost',
+      'save_receipt_extra_cost_v2',
       params: {
         'p_id': id,
         'p_route': route.trim(),
@@ -70,6 +76,7 @@ class ReceiptExtraCostService {
         'p_cost_name': name.trim(),
         'p_amount_usd': amountUsd,
         'p_discount_applies': discountApplies,
+        'p_delivery_type': deliveryType,
       },
     );
   }

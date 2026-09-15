@@ -1,3 +1,4 @@
+import '../core/receipt_delivery_cost.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -154,7 +155,14 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _inlandDeliveryText = inland?.toStatementText() ?? '';
         _inlandDeliveryColor = inland == null ? null : DocumentDeliveryStyle.fromProfile(
           inland.deliveryType, prepaid: inland.isPrepaid);
-        _extraCosts = extraCosts;
+        _extraCosts = ReceiptDeliveryCost.forStatement(
+          extraCosts,
+          ReceiptDeliveryCost.prepaidType(
+            rows,
+            profileType: inland?.deliveryType,
+            profilePrepaid: inland?.isPrepaid ?? false,
+          ),
+        );
         _loading = false;
       });
     } catch (error) {
@@ -603,7 +611,7 @@ class DigitalStatementPainter extends CustomPainter {
         );
         _text(
           c,
-          MoneyFormat.usdNumber(extra.amountUsd),
+          extra.pending ? '' : MoneyFormat.usdNumber(extra.amountUsd),
           Rect.fromLTRB(cols[13] + 3, y + 2, cols[14] - 3, y + rowH - 2),
           19,
           bold: true,
@@ -821,7 +829,14 @@ class StatementDocumentRenderer {
       inlandDeliveryText: inland?.toStatementText() ?? '',
       inlandDeliveryColor: inland == null ? null : DocumentDeliveryStyle.fromProfile(
         inland.deliveryType, prepaid: inland.isPrepaid),
-      extraCosts: extraCosts,
+      extraCosts: ReceiptDeliveryCost.forStatement(
+        extraCosts,
+        ReceiptDeliveryCost.prepaidType(
+          rows,
+          profileType: inland?.deliveryType,
+          profilePrepaid: inland?.isPrepaid ?? false,
+        ),
+      ),
       logo: assets[0],
       qrUsd: assets[1],
       qrKip: assets[2],

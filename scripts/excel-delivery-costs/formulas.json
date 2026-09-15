@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "inputSheet": "배송비 입력",
+  "inputStart": 5,
+  "inputEnd": 205,
+  "inputFormulas": {
+    "B": "=IFERROR(INDEX('물품 입고 내역'!$R$6:$R${sourceEnd},MATCH(A{row},'물품 입고 내역'!$N$6:$N${sourceEnd},0)),\"\")",
+    "C": "=IF(AND(OR(ISNUMBER(SEARCH(\"선결제\",B{row})),ISNUMBER(SEARCH(\"선결재\",B{row})),ISNUMBER(SEARCH(\"선불\",B{row})),ISNUMBER(SEARCH(\"prepaid\",B{row}))),ISNUMBER(SEARCH(\"지방\",B{row}))),\"지방배송\",IF(AND(OR(ISNUMBER(SEARCH(\"선결제\",B{row})),ISNUMBER(SEARCH(\"선결재\",B{row})),ISNUMBER(SEARCH(\"선불\",B{row})),ISNUMBER(SEARCH(\"prepaid\",B{row}))),ISNUMBER(SEARCH(\"시내\",B{row}))),\"시내배송\",\"\"))",
+    "F": "=IFERROR(INDEX('물품 입고 내역'!$E$6:$E${sourceEnd},MATCH(A{row},'물품 입고 내역'!$N$6:$N${sourceEnd},0)),\"\")",
+    "G": "=IF(C{row}=\"\",\"\",IF(ISBLANK(D{row}),\"금액 입력 필요\",IF(AND(ISNUMBER(D{row}),D{row}>=0),\"입력 완료\",\"금액 확인\")))"
+  },
+  "helpers": {
+    "W6": "=IF($W$9=0,\"\",IF(INDEX('배송비 입력'!$C$5:$C$205,$W$9)=\"\",\"\",INDEX('배송비 입력'!$C$5:$C$205,$W$9)))",
+    "W7": "=IF(OR($W$9=0,$W$6=\"\"),\"\",IF(ISBLANK(INDEX('배송비 입력'!$D$5:$D$205,$W$9)),\"\",INDEX('배송비 입력'!$D$5:$D$205,$W$9)))",
+    "W8": "=IF($W$9=0,FALSE,INDEX('배송비 입력'!$E$5:$E$205,$W$9)=\"적용\")",
+    "W9": "=IFERROR(MATCH($N$2,'배송비 입력'!$A$5:$A$205,0),0)",
+    "W10": "=COUNTIF('물품 입고 내역'!$N$6:$N${sourceEnd},$N$2)",
+    "W11": "=IF($W$8,0,N($W$7))"
+  },
+  "detailFormulas": {
+    "B": "=IF(AND($W$6<>\"\",$A{row}=$W$10+1),$W$6,IFERROR(VLOOKUP($N$2&\"_\"&$A{row},'물품 입고 내역'!$A$6:$M${sourceEnd},2,FALSE),\"\"))",
+    "N": "=IF(AND($W$6<>\"\",$A{row}=$W$10+1),IF(ISNUMBER($W$7),$W$7,\"\"),IF(AND(L{row}=\"\",M{row}=\"\"),0,MAX(L{row}:M{row})))"
+  },
+  "automaticDiscount": "=IFERROR(MAX(0,N{grossRow}-$W$11)*MAX(0,MIN(1,M{autoRow})),0)",
+  "fixedDiscount": "=IFERROR(MIN(MAX(0,M{fixedRow}),MAX(0,N{grossRow}-$W$11-N{autoRow})),0)"
+}

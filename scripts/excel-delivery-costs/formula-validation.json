@@ -1,0 +1,151 @@
+{
+  "engine": "Artifact Tool",
+  "originalXlsmModified": false,
+  "nativeExcelMacroVerified": false,
+  "scenarios": [
+    {
+      "route": "LKS",
+      "case": "province-default",
+      "netUsd": 92,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "city-default",
+      "netUsd": 92,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "explicit-discount",
+      "netUsd": 88,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "full-freight-discount",
+      "netUsd": 20,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "oversize-fixed-discount",
+      "netUsd": 20,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "blank-not-zero",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "explicit-zero",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "ordinary-no-fee",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "last-cargo-0",
+      "deliveryRow": 6,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "last-cargo-9",
+      "deliveryRow": 15,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "last-cargo-10",
+      "deliveryRow": 16,
+      "passed": true
+    },
+    {
+      "route": "LKS",
+      "case": "last-cargo-11",
+      "deliveryRow": 17,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "province-default",
+      "netUsd": 92,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "city-default",
+      "netUsd": 92,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "explicit-discount",
+      "netUsd": 88,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "full-freight-discount",
+      "netUsd": 20,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "oversize-fixed-discount",
+      "netUsd": 20,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "blank-not-zero",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "explicit-zero",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "ordinary-no-fee",
+      "netUsd": 72,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "last-cargo-0",
+      "deliveryRow": 6,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "last-cargo-9",
+      "deliveryRow": 15,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "last-cargo-10",
+      "deliveryRow": 16,
+      "passed": true
+    },
+    {
+      "route": "LKA",
+      "case": "last-cargo-11",
+      "deliveryRow": 17,
+      "passed": true
+    }
+  ]
+}

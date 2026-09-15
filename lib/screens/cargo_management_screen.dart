@@ -1,3 +1,5 @@
+import '../core/receipt_delivery_cost.dart';
+import '../services/customer_benefit_service.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2204,9 +2206,22 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       return;
     }
 
-    final name = TextEditingController();
+    final inland = await CustomerBenefitService.instance.inlandRuleForRows(
+      route,
+      rows,
+    );
+    final prepaidType = ReceiptDeliveryCost.prepaidType(
+      rows,
+      profileType: inland?.deliveryType,
+      profilePrepaid: inland?.isPrepaid ?? false,
+    );
+    final name = TextEditingController(
+      text: ReceiptDeliveryCost.name(prepaidType),
+    );
     final amount = TextEditingController();
     int? editingId;
+    String? deliveryType = prepaidType;
+    var saving = false;
     var discountApplies = false;
     var items = await ReceiptExtraCostService.instance.list(
       route: route,
@@ -2215,6 +2230,16 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       receiptNumber: receipt,
     );
     if (!mounted) return;
+    for (final item in items) {
+      if (prepaidType != null &&
+          ReceiptDeliveryCost.typeOf(item) == prepaidType) {
+        editingId = item.id;
+        name.text = item.name;
+        amount.text = item.amountUsd.toStringAsFixed(2);
+        discountApplies = item.discountApplies;
+        break;
+      }
+    }
 
     await showDialog<void>(
       context: context,
@@ -2253,26 +2278,56 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                             children: [
                               IconButton(
                                 tooltip: _l('편집'),
-                                onPressed: () {
-                                  setDialogState(() => editingId = e.id);
-                                  name.text = e.name;
-                                  amount.text = e.amountUsd.toStringAsFixed(2);
-                                  setDialogState(
-                                    () => discountApplies = e.discountApplies,
-                                  );
-                                },
+                                onPressed: saving
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          editingId = e.id;
+                                          deliveryType =
+                                              ReceiptDeliveryCost.typeOf(e);
+                                        });
+                                        name.text = e.name;
+                                        amount.text = e.amountUsd
+                                            .toStringAsFixed(2);
+                                        setDialogState(
+                                          () => discountApplies =
+                                              e.discountApplies,
+                                        );
+                                      },
                                 icon: const Icon(Icons.edit_outlined, size: 19),
                               ),
                               IconButton(
                                 tooltip: _l('삭제'),
-                                onPressed: e.id == null
+                                onPressed: saving || e.id == null
                                     ? null
                                     : () async {
-                                        await ReceiptExtraCostService.instance
-                                            .delete(e.id!);
-                                        await reload();
+                                        setDialogState(() => saving = true);
+                                        try {
+                                          await ReceiptExtraCostService.instance
+                                              .delete(e.id!);
+                                          if (!dialogContext.mounted) return;
+                                          if (editingId == e.id) {
+                                            editingId = null;
+                                            deliveryType = null;
+                                            name.clear();
+                                            amount.clear();
+                                            discountApplies = false;
+                                          }
+                                          await reload();
+                                        } catch (error) {
+                                          if (mounted)
+                                            _message('${_l('삭제 실패')}: $error');
+                                        } finally {
+                                          if (dialogContext.mounted)
+                                            setDialogState(
+                                              () => saving = false,
+                                            );
+                                        }
                                       },
-                                icon: const Icon(Icons.delete_outline, size: 19),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 19,
+                                ),
                               ),
                             ],
                           ),
@@ -2291,8 +2346,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                     const SizedBox(height: 8),
                     TextField(
                       controller: amount,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
                         labelText: _l('금액 (USD)'),
                         border: const OutlineInputBorder(),
@@ -2304,13 +2360,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                       value: discountApplies,
                       title: Text(_l('할인 적용')),
                       subtitle: Text(
-                        _l(
-                          '체크 시 해당 고객의 할인율을 이 기타 비용에도 적용합니다. 기본은 미체크입니다.',
-                        ),
+                        _l('지방·시내배송비는 기본 할인 미적용입니다. 체크한 비용에만 고객 할인율을 적용합니다.'),
                       ),
-                      onChanged: (v) => setDialogState(
-                        () => discountApplies = v == true,
-                      ),
+                      onChanged: saving
+                          ? null
+                          : (v) => setDialogState(
+                              () => discountApplies = v == true,
+                            ),
                     ),
                   ],
                 ),
@@ -2318,38 +2374,66 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: saving
+                    ? null
+                    : () {
+                        name.clear();
+                        amount.clear();
+                        setDialogState(() {
+                          editingId = null;
+                          deliveryType = null;
+                          discountApplies = false;
+                        });
+                      },
+                child: Text(_l('새 비용 추가')),
+              ),
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(dialogContext),
                 child: Text(_l('닫기')),
               ),
               FilledButton.icon(
-                onPressed: () async {
-                  final value = double.tryParse(amount.text.trim());
-                  if (name.text.trim().isEmpty || value == null || value < 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(_l('비용 이름과 금액을 확인해 주세요.')),
-                      ),
-                    );
-                    return;
-                  }
-                  await ReceiptExtraCostService.instance.save(
-                    id: editingId,
-                    route: route,
-                    year: year,
-                    voyage: voyage,
-                    receiptNumber: receipt,
-                    name: name.text,
-                    amountUsd: value,
-                    discountApplies: discountApplies,
-                  );
-                  name.clear();
-                  amount.clear();
-                  setDialogState(() {
-                    editingId = null;
-                    discountApplies = false;
-                  });
-                  await reload();
-                },
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final value = double.tryParse(amount.text.trim());
+                        if (name.text.trim().isEmpty ||
+                            value == null ||
+                            !value.isFinite ||
+                            value < 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(_l('비용 이름과 금액을 확인해 주세요.'))),
+                          );
+                          return;
+                        }
+                        setDialogState(() => saving = true);
+                        try {
+                          await ReceiptExtraCostService.instance.save(
+                            id: editingId,
+                            route: route,
+                            year: year,
+                            voyage: voyage,
+                            receiptNumber: receipt,
+                            name: name.text,
+                            amountUsd: value,
+                            discountApplies: discountApplies,
+                            deliveryType: deliveryType,
+                          );
+                          if (!dialogContext.mounted) return;
+                          name.clear();
+                          amount.clear();
+                          setDialogState(() {
+                            editingId = null;
+                            deliveryType = null;
+                            discountApplies = false;
+                          });
+                          await reload();
+                        } catch (error) {
+                          if (mounted) _message('${_l('저장 실패')}: $error');
+                        } finally {
+                          if (dialogContext.mounted)
+                            setDialogState(() => saving = false);
+                        }
+                      },
                 icon: const Icon(Icons.add_card_outlined, size: 18),
                 label: Text(_l(editingId == null ? '추가' : '수정 저장')),
               ),
