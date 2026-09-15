@@ -23,6 +23,8 @@ String contentUuid() {
 }
 
 Future<String> contentMediaUrl(Map<String, dynamic> item, String bucket) async {
+  final sitePath = RegExp(r'^site:([a-zA-Z0-9/_-]+\.(?:jpg|jpeg|png|webp))$').firstMatch('${item['path'] ?? ''}');
+  if (bucket == 'website-content' && sitePath != null) return 'https://lkgrouptrading.com/assets/${sitePath.group(1)}';
   final external = Uri.tryParse('${item['url'] ?? ''}');
   if (external != null && external.scheme == 'https' && external.host.isNotEmpty) return external.toString();
   return SupabaseService.client.storage.from(bucket).createSignedUrl('${item['path']}', 60);

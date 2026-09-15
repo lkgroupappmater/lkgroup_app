@@ -12,13 +12,22 @@ class ContentService {
   static SupabaseClient? get _client =>
       SupabaseConfig.isConfigured ? Supabase.instance.client : null;
 
+  static String companyArticleDate(Map<String, dynamic> row) =>
+      '${row['event_date'] ?? row['original_published_at'] ?? row['published_at'] ?? ''}'.split('T').first;
+
+  static int compareCompanyArticles(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final date = companyArticleDate(b).compareTo(companyArticleDate(a));
+    return date != 0 ? date : '${a['id']}'.compareTo('${b['id']}');
+  }
+
   static Future<List<Map<String,dynamic>>> fetchCompanyArticles({AppLanguage language=AppLanguage.korean}) async {
     final client=_client; if(client==null)return [];
     final rows=await client.from('website_articles').select()
         .eq('status','published').eq('verified',true)
         .lte('published_at',DateTime.now().toUtc().toIso8601String())
         .order('published_at',ascending:false).limit(500);
-    return _localizedRows(List<Map<String,dynamic>>.from(rows),language,const ['title','summary','body']);
+    final articles = List<Map<String,dynamic>>.from(rows)..sort(compareCompanyArticles);
+    return _localizedRows(articles,language,const ['title','summary','body']);
   }
 
   static Future<List<Map<String, dynamic>>> fetchSchedules({
