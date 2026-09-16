@@ -4,6 +4,59 @@ String domesticText(AppLanguage language, String key) =>
     (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
 
 const domesticWords = <String, List<String>>{
+  "route": ["운송경로", "Transport route", "ເສັ້ນທາງ"],
+  "year": ["연도", "Year", "ປີ"],
+  "voyage": ["항차", "Voyage", "ຖ້ຽວຂົນສົ່ງ"],
+  "receipt": ["명세서 번호", "Statement number", "ເລກໃບແຈ້ງລາຍການ"],
+  "statement": [
+    "명세서 전체 연결",
+    "Link entire statement",
+    "ເຊື່ອມໃບແຈ້ງລາຍການທັງໝົດ",
+  ],
+  "linkMode": ["연결 대상", "Link to", "ເຊື່ອມກັບ"],
+  "standalone": ["별도 국내배송", "Standalone delivery", "ການຈັດສົ່ງແຍກ"],
+  "chooseCarrier": ["배송업체 선택", "Choose a carrier", "ເລືອກບໍລິສັດ"],
+  "recommend": [
+    "번호로 업체 추천",
+    "Suggest carrier from number",
+    "ແນະນຳບໍລິສັດຈາກເລກ",
+  ],
+  "recommendHint": [
+    "번호 형식에 따른 참고 추천입니다. 실제 업체를 확인해 선택하거나 변경하세요.",
+    "Format-based suggestion only. Confirm the carrier; you can choose another.",
+    "ຄຳແນະນຳຈາກຮູບແບບເລກ. ກວດບໍລິສັດ ແລະ ປ່ຽນໄດ້.",
+  ],
+  "noRecommendation": [
+    "번호만으로 업체를 구분하기 어렵습니다. 직접 선택하세요.",
+    "Carrier cannot be identified from this number. Choose manually.",
+    "ລະບຸບໍລິສັດບໍ່ໄດ້. ກະລຸນາເລືອກເອງ.",
+  ],
+  "identityEditHint": [
+    "업체·번호 변경 시 기존 배송사 이력은 초기화되며 직원 기록과 사진은 유지됩니다.",
+    "Changing carrier or number clears carrier history; staff entries and photos remain.",
+    "ປ່ຽນບໍລິສັດ/ເລກຈະລ້າງປະຫວັດຂົນສົ່ງ; ເກັບບັນທຶກພະນັກງານແລະຮູບ.",
+  ],
+  "trackingSearch": [
+    "송장번호로 조회 (관리용)",
+    "Tracking-number lookup (operations)",
+    "ຄົ້ນດ້ວຍເລກໃບສົ່ງ (ຈັດການ)",
+  ],
+  "INVALID_STATEMENT": [
+    "운송경로·연도·항차·명세서 번호를 확인하세요.",
+    "Check route, year, voyage and statement number.",
+    "ກວດເສັ້ນທາງ, ປີ, ຖ້ຽວ ແລະ ເລກໃບແຈ້ງລາຍການ.",
+  ],
+  "AMBIGUOUS_STATEMENT": [
+    "명세서 번호를 LKS/LKA 등의 접두어까지 입력하세요.",
+    "Include the statement prefix, such as LKS or LKA.",
+    "ປ້ອນຄຳນຳໜ້າເລກ ເຊັ່ນ LKS ຫຼື LKA.",
+  ],
+  "STATEMENT_NOT_FOUND": [
+    "연결할 명세서를 찾을 수 없습니다. 조회 조건을 확인하세요.",
+    "Statement not found. Check the search fields.",
+    "ບໍ່ພົບໃບແຈ້ງລາຍການ. ກວດຂໍ້ມູນຄົ້ນຫາ.",
+  ],
+
   "status": ["배송 상태", "Delivery status", "ສະຖານະຈັດສົ່ງ"],
   "title": [
     "라오스 국내배송 조회",
@@ -22,9 +75,9 @@ const domesticWords = <String, List<String>>{
   "add": ["송장 등록", "Register waybill", "ລົງທະບຽນໃບສົ່ງ"],
   "list": ["등록된 송장", "Registered waybills", "ໃບສົ່ງທີ່ລົງທະບຽນ"],
   "hint": [
-    "업체를 선택하고 송장번호 전체를 입력하세요.",
-    "Choose a carrier and enter the full tracking number.",
-    "ເລືອກບໍລິສັດ ແລະ ປ້ອນເລກໃບສົ່ງຄົບຖ້ວນ.",
+    "운송경로·연도·항차와 명세서 번호로 연결된 모든 국내배송을 확인하세요.",
+    "Find all linked deliveries by route, year, voyage and statement number.",
+    "ຄົ້ນການຈັດສົ່ງດ້ວຍເສັ້ນທາງ, ປີ, ຖ້ຽວ ແລະ ເລກໃບແຈ້ງລາຍການ.",
   ],
   "loading": [
     "배송 이력을 확인하고 있습니다…",
@@ -32,8 +85,8 @@ const domesticWords = <String, List<String>>{
     "ກຳລັງກວດປະຫວັດການຈັດສົ່ງ…",
   ],
   "empty": [
-    "등록된 송장을 찾을 수 없습니다. 번호와 업체를 확인해 주세요.",
-    "No registered waybill found. Check the number and carrier.",
+    "연결된 국내배송을 찾을 수 없습니다. 조회 조건과 명세서 등록 정보를 확인해 주세요.",
+    "No linked deliveries found. Check the search fields and statement registration.",
     "ບໍ່ພົບໃບສົ່ງ. ກວດເລກ ແລະ ບໍລິສັດ.",
   ],
   "city": ["시내", "City", "ໃນເມືອງ"],
