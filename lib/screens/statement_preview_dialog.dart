@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as image_lib;
 
 import '../core/money_format.dart';
+import '../core/document_amounts.dart';
 import '../core/document_delivery_style.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
@@ -679,7 +680,7 @@ class DigitalStatementPainter extends CustomPainter {
     final totalDiscountUsd =
         freight.discountTotalUsd + extraDiscountUsd;
     final grossUsd = freight.grossTotalUsd + extraTotal;
-    final finalUsd = grossUsd - totalDiscountUsd;
+    final untaxedUsd = grossUsd - totalDiscountUsd;
     final summaryValues = <int, String>{
       1: '합계',
       3: _fmtWeight(totalQty),
@@ -721,24 +722,50 @@ class DigitalStatementPainter extends CustomPainter {
     }
     final autoDiscountPctText = patch199Pct(autoDiscountPercent);
     final additionalDiscountPctText = patch199Pct(additionalDiscountPercent);
-    final regularDiscountUsd = freight.lines.fold<double>(
+    final rawRegularDiscountUsd = freight.lines.fold<double>(
           0, (sum, line) => sum + line.autoDiscountAmountUsd) +
         discountableExtraTotal * autoDiscountPercent;
-    final specialDiscountUsd = freight.lines.fold<double>(
+    final rawSpecialDiscountUsd = freight.lines.fold<double>(
           0, (sum, line) => sum + line.additionalDiscountAmountUsd) +
         discountableExtraTotal * additionalDiscountPercent;
 
-    DocumentFormPainter.totals(c, layout, adjustments: [
-      ('운임 총합', '', MoneyFormat.usdNumber(grossUsd)),
-      ('할인', autoDiscountPctText.isEmpty ? '-' : autoDiscountPctText,
-        autoDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usdNumber(regularDiscountUsd)}'),
-      (additionalDiscountName.isEmpty ? '추가 할인' : additionalDiscountName,
-        additionalDiscountPctText.isEmpty ? '-' : additionalDiscountPctText,
-        additionalDiscountPctText.isEmpty ? '-' : '-${MoneyFormat.usdNumber(specialDiscountUsd)}'),
-      ('세금 계산서(VAT)', '-', '-'),
+    final accounting = const ['kr_la_sea', 'kr_la_air', 'la_kr_air_exp']
+        .contains(RouteCatalog.keyFor(routeLabel));
+    final routeKey = RouteCatalog.keyFor(routeLabel);
+    final excelRules = DocumentAmounts.usesExcelRules(routeKey);
+    final vatRate = DocumentAmounts.vatRate(routeKey,
+        rows.isEmpty ? '' : _s(rows.first['special_note_auto']));
+    final totals = DocumentAmounts.totals(gross: grossUsd,
+        exempt: extraTotal - discountableExtraTotal,
+        regular: rawRegularDiscountUsd, special: rawSpecialDiscountUsd,
+        vatRate: vatRate);
+    final regularDiscountUsd = excelRules ? totals.regular : rawRegularDiscountUsd;
+    final specialDiscountUsd = excelRules ? totals.special : rawSpecialDiscountUsd;
+    final finalUsd = excelRules ? totals.total : untaxedUsd;
+    final eligible = grossUsd - extraTotal + discountableExtraTotal;
+    final regularPct = excelRules
+        ? patch199Pct(eligible > 0 ? regularDiscountUsd / eligible : 0)
+        : autoDiscountPctText;
+    final specialPct = excelRules
+        ? patch199Pct(eligible > 0 ? specialDiscountUsd / eligible : 0)
+        : additionalDiscountPctText;
+    String totalUsd(num value) => accounting
+        ? MoneyFormat.documentUsdNumber(value) : MoneyFormat.usdNumber(value);
+    DocumentFormPainter.totals(c, layout, accounting: accounting, adjustments: [
+      ('운임 총합', '', totalUsd(grossUsd)),
+      ('할인', regularPct.isEmpty ? '-' : regularPct,
+        regularPct.isEmpty ? '-' : '${accounting ? '' : '-'}${totalUsd(regularDiscountUsd)}'),
+      (additionalDiscountName.isEmpty ? (accounting ? '특별할인' : '추가 할인') : additionalDiscountName,
+        specialPct.isEmpty ? '-' : specialPct,
+        specialPct.isEmpty ? '-' : '${accounting ? '' : '-'}${totalUsd(specialDiscountUsd)}'),
+      ('세금 계산서(VAT)', vatRate > 0 ? patch199Pct(vatRate) : '-',
+        vatRate > 0 ? totalUsd(totals.vat) : '-'),
     ], label: '최종 명세서 총액', amounts: [
-      MoneyFormat.usdNumber(finalUsd), MoneyFormat.kipNumber(finalUsd * freight.rates.appliedKip),
-      MoneyFormat.thbNumber(finalUsd * freight.rates.appliedThb), MoneyFormat.krwNumber(finalUsd * freight.rates.appliedKrw),
+      totalUsd(finalUsd), MoneyFormat.kipNumber(finalUsd * freight.rates.appliedKip),
+      excelRules
+          ? MoneyFormat.number(DocumentAmounts.thb(finalUsd * freight.rates.appliedThb))
+          : MoneyFormat.thbNumber(finalUsd * freight.rates.appliedThb),
+      MoneyFormat.krwNumber(finalUsd * freight.rates.appliedKrw),
     ]);
     DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
@@ -892,5 +919,3 @@ class StatementDocumentRenderer {
     }
   }
 }
-
-

@@ -1,4 +1,5 @@
 import { receiptOrderFormulas, fixedDiscountFormulas, RECEIPT_RULE_VERSION } from './receipt-order.mjs';
+import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
@@ -2149,6 +2150,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // approved BASE contains the input sheet, mirror those values into it so
     // downloaded Excel statements use the same delivery-cost source.
     populateDeliveryCostInputSheet(files, voyageExtraCosts);
+    formatStatementAmounts(files, routeKey);
     appendDocumentAutomationBlock(
       files,
       enrichedShipments,
