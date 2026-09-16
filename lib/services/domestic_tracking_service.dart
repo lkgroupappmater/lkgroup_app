@@ -8,6 +8,19 @@ class DomesticTrackingException implements Exception {
 }
 
 class DomesticTrackingService {
+  // Only validated formats select a carrier; numeric identifiers stay a suggestion.
+  static String? detectCarrier(String value) {
+    final n = value.toUpperCase().replaceAll(RegExp(r'\s'), '');
+    if (RegExp(r'^VTE\d{11}$').hasMatch(n)) return 'HAL';
+    if (RegExp(r'^JTLA\d{12}$').hasMatch(n)) return 'JT';
+    if (RegExp(r'^VT\d{3}-\d{5}-\d{5}$').hasMatch(n) ||
+        RegExp(r'^VT\d{13}$').hasMatch(n)) return 'MIXAY';
+    return null;
+  }
+
+  static bool isAnsCandidate(String value) =>
+      RegExp(r'^\d{13}$').hasMatch(value.trim());
+
   static const carriers = <String, String>{
     'HAL': 'HAL · Houng Aloun',
     'ANS': 'ANS · Anousith',

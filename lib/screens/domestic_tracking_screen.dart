@@ -7,8 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_language.dart';
 import '../core/domestic_tracking_text.dart';
+import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/domestic_tracking_service.dart';
+import '../services/shipment_filter_options_service.dart';
 
 class DomesticTrackingScreen extends StatefulWidget {
   const DomesticTrackingScreen({
@@ -27,6 +29,10 @@ class DomesticTrackingScreen extends StatefulWidget {
 class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   final _number = TextEditingController();
   String _carrier = '';
+  String _route = '', _year = '', _voyage = '';
+  String _mode = 'statement_lookup';
+  Map<String, dynamic> _submitted = {};
+  List<ShipmentBatchOption> _batches = [];
   bool _busy = false, _more = false;
   int _page = 0;
   String? _message;
@@ -41,6 +47,16 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   void initState() {
     super.initState();
     if (widget.manage && isOperator) _list();
+    if (widget.user != null && !widget.manage) _loadFilters();
+  }
+
+  Future<void> _loadFilters() async {
+    try {
+      final rows = await ShipmentFilterOptionsService.instance.listBatches();
+      if (mounted) setState(() => _batches = rows);
+    } catch (_) {
+      // Exact statement lookup remains available if optional filters cannot load.
+    }
   }
 
   @override
@@ -66,7 +82,9 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             .map((x) => Map<String, dynamic>.from(x))
             .toList();
         _more = data['has_more'] == true;
-        _message = _rows.isEmpty ? t('empty') : null;
+        _message = _rows.isEmpty
+            ? t((data['cargo_count'] as num? ?? 0) > 0 ? 'noLinked' : 'empty')
+            : null;
       });
     } catch (e) {
       if (mounted) setState(() => _message = error(e));
@@ -75,11 +93,36 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
     }
   }
 
-  Future<void> _list() => _run('list', {'page': _page});
-  Future<void> _lookup([Map<String, dynamic>? r]) => _run('lookup', {
-    'carrier': r?['carrier'] ?? _carrier,
-    'tracking_number': r?['tracking_number'] ?? _number.text,
-  });
+  Future<void> _list() {
+    _mode = 'list';
+    return _run('list', {'page': _page});
+  }
+  Future<void> _loadPage() => _mode == 'list'
+      ? _list()
+      : _run('statement_lookup', {..._submitted, 'page': _page});
+  Future<void> _lookup([Map<String, dynamic>? r]) {
+    if (r != null && _mode != 'statement_lookup') {
+      return _run('lookup', {'carrier': r['carrier'], 'tracking_number': r['tracking_number']});
+    }
+    if (!widget.manage) {
+      if (r == null) {
+        _page = 0;
+        _mode = 'statement_lookup';
+        _submitted = {
+          'statement_number': _number.text.trim(),
+          'route': _route,
+          'shipment_year': _year,
+          'voyage': _voyage,
+        };
+      }
+      return _loadPage();
+    }
+    _mode = 'lookup';
+    return _run('lookup', {
+      'carrier': r?['carrier'] ?? _carrier,
+      'tracking_number': r?['tracking_number'] ?? _number.text,
+    });
+  }
   Future<void> _edit([Map<String, dynamic>? row]) async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
@@ -87,7 +130,10 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             DomesticWaybillEditor(language: widget.language, row: row),
       ),
     );
-    if (result != null && mounted) await _lookup(result);
+    if (result != null && mounted) {
+      _mode = 'lookup';
+      await _lookup(result);
+    }
   }
 
   Future<void> _addEvent(Map<String, dynamic> row) async {
@@ -113,9 +159,10 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
         : ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(t('hint')),
+              Text(t(widget.manage ? 'manageHint' : 'hint')),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
+              if (!widget.manage) _filters(),
+              if (widget.manage) DropdownButtonFormField<String>(
                 initialValue: _carrier,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: t('carrier')),
@@ -132,8 +179,8 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: _number,
-                maxLength: 40,
-                decoration: InputDecoration(labelText: t('tracking')),
+                maxLength: widget.manage ? 40 : 80,
+                decoration: InputDecoration(labelText: t(widget.manage ? 'tracking' : 'statement')),
                 onSubmitted: _busy ? null : (_) => _lookup(),
               ),
               FilledButton.icon(
@@ -179,7 +226,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
                             ? null
                             : () {
                                 _page--;
-                                _list();
+                                _loadPage();
                               },
                         child: Text(t('prev')),
                       ),
@@ -189,7 +236,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
                             ? null
                             : () {
                                 _page++;
-                                _list();
+                                _loadPage();
                               },
                         child: Text(t('more')),
                       ),
@@ -198,6 +245,27 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             ],
           ),
   );
+  Widget _filters() {
+    final routes = {...routeLabels, ..._batches.map((b) => b.route)}.toList();
+    final years = _batches.where((b) => _route.isEmpty || b.route == _route)
+        .map((b) => b.year.toString()).toSet().toList()..sort((a,b) => b.compareTo(a));
+    final voyages = _batches.where((b) => (_route.isEmpty || b.route == _route) &&
+        (_year.isEmpty || b.year.toString() == _year)).map((b) => b.voyage).toSet().toList()..sort();
+    Widget select(String key, String value, List<String> values, ValueChanged<String> onChanged) =>
+        Padding(padding: const EdgeInsets.only(bottom: 12), child: DropdownButtonFormField<String>(
+          key: ValueKey('$key-$value-${values.join(',')}'), initialValue: value,
+          isExpanded: true, decoration: InputDecoration(labelText: t(key)),
+          items: [DropdownMenuItem(value: '', child: Text(t('any'))),
+            ...values.map((v) => DropdownMenuItem(value: v,
+              child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : v)))],
+          onChanged: _busy ? null : (v) => setState(() => onChanged(v ?? '')),
+        ));
+    return Column(children: [
+      select('route', _route, routes, (v) { _route = v; _year = ''; _voyage = ''; }),
+      select('year', _year, years, (v) { _year = v; _voyage = ''; }),
+      select('voyage', _voyage, voyages, (v) => _voyage = v),
+    ]);
+  }
   Widget _card(Map<String, dynamic> r) {
     final photo = r['photo_url'] as String?;
     final integration = r['integration'];
@@ -232,7 +300,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             ),
             if (cargo is Map)
               Text(
-                '${cargo['box_number']} · ${cargo['route']} · ${cargo['shipment_year']} / ${cargo['voyage']}',
+                '${cargo['invoice_number'] ?? cargo['box_number']} · ${cargo['box_number']}\n${RouteCatalog.localizedLabel('${cargo['route'] ?? ''}', widget.language)} · ${cargo['shipment_year']} / ${cargo['voyage']}',
               ),
             const SizedBox(height: 12),
             Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
@@ -397,7 +465,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
       _name = TextEditingController(),
       _phone = TextEditingController(),
       _cargoQuery = TextEditingController();
-  String _carrier = 'HAL', _kind = 'province', _service = 'domestic';
+  String _carrier = '', _kind = 'province', _service = 'domestic';
+  bool _carrierChosen = false, _standalone = false;
   int? _cargo;
   List<Map<String, dynamic>> _cargoRows = [];
   Uint8List? _photo;
@@ -416,6 +485,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
       _name.text = r['receiver_name'] ?? '';
       _phone.text = r['receiver_phone'] ?? '';
       _cargo = r['shipment_id'];
+      _standalone = _cargo == null;
+      _carrierChosen = true;
       if (r['cargo'] is Map)
         _cargoRows = [Map<String, dynamic>.from(r['cargo'])];
     }
@@ -514,6 +585,42 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
     }
   }
 
+  void _detect(String value) {
+    if (_carrierChosen) return;
+    setState(() => _carrier = DomesticTrackingService.detectCarrier(value) ?? '');
+  }
+
+  Widget _cargoSelector() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(t('cargo'), style: Theme.of(context).textTheme.titleMedium),
+    TextField(controller: _cargoQuery, enabled: !_busy && !_standalone,
+      decoration: InputDecoration(labelText: t('cargoSearch')),
+      onSubmitted: (_) => _findCargo()),
+    TextButton.icon(onPressed: _finding || _busy || _standalone ? null : _findCargo,
+      icon: const Icon(Icons.search), label: Text(t('search'))),
+    DropdownButtonFormField<int>(
+      key: ValueKey('cargo-$_cargo-${_cargoRows.length}-$_standalone'),
+      initialValue: _cargo ?? 0, isExpanded: true,
+      decoration: InputDecoration(labelText: t('selectCargo')),
+      items: [DropdownMenuItem(value: 0, child: Text(t('selectCargo'))),
+        ..._cargoRows.map((r) => DropdownMenuItem(value: r['id'] as int,
+          child: Text('${r['invoice_number'] ?? r['box_number']} · ${r['box_number']} · ${r['shipment_year']} / ${r['voyage']}',
+            overflow: TextOverflow.ellipsis)))],
+      validator: (_) => !_standalone && _cargo == null ? t('CARGO_REQUIRED') : null,
+      onChanged: _busy || _standalone ? null : (v) => setState(() {
+        _cargo = v == 0 ? null : v;
+        final matches = _cargoRows.where((r) => r['id'] == _cargo);
+        if (matches.isNotEmpty) {
+          _name.text = '${matches.first['consignee_name'] ?? ''}';
+          _phone.text = '${matches.first['consignee_phone'] ?? ''}';
+        }
+      }),
+    ),
+    CheckboxListTile(contentPadding: EdgeInsets.zero, value: _standalone,
+      title: Text(t('unlinked')),
+      onChanged: _busy ? null : (v) => setState(() { _standalone = v ?? false; if (_standalone) _cargo = null; })),
+    const SizedBox(height: 16),
+  ]);
+
   Widget _choice(
     String label,
     String value,
@@ -539,31 +646,33 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: _carrier,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: t('carrier')),
-            items: DomesticTrackingService.carriers.entries
-                .map(
-                  (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
-                )
-                .toList(),
-            onChanged: _busy || widget.row != null
-                ? null
-                : (v) => setState(() => _carrier = v!),
-          ),
-          const SizedBox(height: 16),
+          _cargoSelector(),
           TextFormField(
             controller: _number,
             readOnly: widget.row != null,
             maxLength: 40,
             decoration: InputDecoration(labelText: t('tracking')),
-            validator: (v) =>
-                RegExp(r'^[A-Za-z0-9][A-Za-z0-9\s-]{5,39}$')
-                    .hasMatch(v?.trim() ?? '')
-                ? null
-                : t('INVALID_TRACKING'),
+            onChanged: _detect,
+            validator: (v) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9\s-]{5,39}$').hasMatch(v?.trim() ?? '')
+                ? null : t('INVALID_TRACKING'),
           ),
+          DropdownButtonFormField<String>(
+            key: ValueKey('carrier-$_carrier'),
+            initialValue: _carrier,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: t('carrier')),
+            items: [DropdownMenuItem(value: '', child: Text(t('selectCarrier'))), ...DomesticTrackingService.carriers.entries
+                .map(
+                  (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                )
+                ],
+            validator: (v) => (v ?? '').isEmpty ? t('selectCarrier') : null,
+            onChanged: _busy || widget.row != null
+                ? null
+                : (v) => setState(() { _carrier = v!; _carrierChosen = v.isNotEmpty; }),
+          ),
+          if (widget.row == null) Padding(padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(t(DomesticTrackingService.isAnsCandidate(_number.text) ? 'ansCandidate' : 'detectHint'))),
           _choice('kind', _kind, [
             'city',
             'province',
@@ -575,37 +684,6 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
             'ecommerce',
             'express',
           ], (v) => setState(() => _service = v!)),
-          Text(t('cargo')),
-          TextField(
-            controller: _cargoQuery,
-            decoration: InputDecoration(labelText: t('cargoSearch')),
-            onSubmitted: (_) => _findCargo(),
-          ),
-          TextButton.icon(
-            onPressed: _finding || _busy ? null : _findCargo,
-            icon: const Icon(Icons.search),
-            label: Text(t('search')),
-          ),
-          DropdownButtonFormField<int>(
-            key: ValueKey('cargo-$_cargo-${_cargoRows.length}'),
-            initialValue: _cargo ?? 0,
-            isExpanded: true,
-            items: [
-              DropdownMenuItem(value: 0, child: Text(t('unlinked'))),
-              ..._cargoRows.map(
-                (r) => DropdownMenuItem(
-                  value: r['id'] as int,
-                  child: Text(
-                    '${r['box_number']} · ${r['shipment_year']} / ${r['voyage']} · ${r['consignee_name'] ?? r['route']}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ],
-            onChanged: _busy
-                ? null
-                : (v) => setState(() => _cargo = v == 0 ? null : v),
-          ),
           const SizedBox(height: 16),
           TextField(
             controller: _name,

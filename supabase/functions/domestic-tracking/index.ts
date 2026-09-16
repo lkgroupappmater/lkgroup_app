@@ -23,7 +23,8 @@ Deno.serve(async req=>{
   let b:any;try{b=JSON.parse(raw)}catch{throw new ApiError(400,'INVALID_REQUEST')}
   must(b&&typeof b==='object'&&!Array.isArray(b),'INVALID_REQUEST');
   const manager=['admin','staff'].includes(profile.role),partner=profile.role==='partner';
-  const shipment=async(id:number|null)=>id?dbResult(await db.from('shipments').select('id,box_number,route,shipment_year,voyage,customer_id,consignee_name,consignee_phone,deleted_at,deletion_requested_at').eq('id',id).maybeSingle()):null;
+  const cargoFields='id,box_number,invoice_number,route,shipment_year,voyage,customer_id,consignee_name,consignee_phone,deleted_at,deletion_requested_at';
+  const shipment=async(id:number|null)=>id?dbResult(await db.from('shipments').select(cargoFields).eq('id',id).maybeSingle()):null;
   async function serialize(row:any,full=false){
    const s=await shipment(row.shipment_id);const own=canSeePhoto(profile,row,s),visible=full||own;
    let photo_url=null;if(row.photo_path&&own){const result=await db.storage.from('domestic-waybills').createSignedUrl(row.photo_path,600);if(!result.error)photo_url=result.data.signedUrl;}
@@ -32,7 +33,7 @@ Deno.serve(async req=>{
     status:row.status,events:row.events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
     official_url:carrierUrl(row.carrier,row.tracking_number),integration:CARRIERS[row.carrier].mode,
     has_photo:!!row.photo_path,photo_url,photo_restricted:!!row.photo_path&&!own,
-    ...(visible?{shipment_id:row.shipment_id,cargo:s?{id:s.id,box_number:s.box_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage}:null,receiver_name:row.receiver_name,receiver_phone:row.receiver_phone}:{}),
+    ...(visible?{shipment_id:row.shipment_id,cargo:s?{id:s.id,box_number:s.box_number,invoice_number:s.invoice_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage}:null,receiver_name:row.receiver_name,receiver_phone:row.receiver_phone}:{}),
     created_at:row.created_at,updated_at:row.updated_at,can_manage:manager};
   }
   async function sync(row:any){
@@ -55,6 +56,35 @@ Deno.serve(async req=>{
    }
    return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).select().single());
   }
+  if(b.action==='statement_lookup'){
+   const number=text(b.statement_number,80).toUpperCase();
+   must(/^[A-Z0-9][A-Z0-9./_-]{0,79}$/.test(number),'INVALID_STATEMENT');
+   const route=text(b.route,160),voyage=text(b.voyage,40);
+   const year=b.shipment_year==null||b.shipment_year===''?null:Number(b.shipment_year);
+   must(year===null||Number.isInteger(year)&&year>=1900&&year<=2200,'INVALID_YEAR');
+   const page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
+   // Query exact identifiers only. Underscores must not become LIKE wildcards.
+   const pattern=number.replace(/_/g,'\\_');
+   const found=new Map<number,any>();
+   for(const field of ['invoice_number','box_number']){
+    let q=db.from('shipments').select(cargoFields).is('deleted_at',null).is('deletion_requested_at',null).ilike(field,pattern);
+    if(route)q=q.eq('route',route);if(year!==null)q=q.eq('shipment_year',year);
+    const rows=dbResult(await q.order('id').limit(101));
+    must(rows.length<=100,'NARROW_SEARCH');
+    for(const s of rows){
+     if(voyage&&String(s.voyage??'').replace(/^0+/,'')!==voyage.replace(/^0+/,''))continue;
+     // A statement lookup must not reveal another customer's linked waybills.
+     if(canSeePhoto(profile,{},s))found.set(s.id,s);
+    }
+   }
+   if(!found.size)return json(200,{parcels:[],has_more:false,cargo_count:0});
+   const rows=dbResult(await db.from('domestic_parcels').select('*').in('shipment_id',[...found.keys()]).order('shipment_id').order('created_at').order('id').range(page*20,page*20+20));
+   const parcels=[];
+   for(let i=0;i<Math.min(rows.length,20);i+=4){
+    parcels.push(...await Promise.all(rows.slice(i,Math.min(i+4,20)).map(async(r:any)=>serialize(await sync(r)))));
+   }
+   return json(200,{parcels,has_more:rows.length>20,cargo_count:found.size});
+  }
   if(b.action==='lookup'){
    const number=trackingNumber(b.tracking_number);must(!b.carrier||CARRIERS[b.carrier],'INVALID_CARRIER');
    let q=db.from('domestic_parcels').select('*').eq('tracking_number',number);if(b.carrier)q=q.eq('carrier',b.carrier);
@@ -70,8 +100,13 @@ Deno.serve(async req=>{
   }
   if(b.action==='cargo_search'){
    must(manager,'FORBIDDEN',403);const q=text(b.query,50);must(q.length>=2,'SEARCH_TOO_SHORT');
-   const rows=dbResult(await db.from('shipments').select('id,box_number,invoice_number,route,shipment_year,voyage,consignee_name,consignee_phone').is('deleted_at',null).is('deletion_requested_at',null).ilike('box_number','%'+q.replace(/[%_]/g,'')+'%').order('id',{ascending:false}).limit(30));
-   return json(200,{cargo:rows});
+   must(/^[A-Za-z0-9./_-]+$/.test(q),'INVALID_STATEMENT');
+   const found=new Map<number,any>();
+   for(const field of ['invoice_number','box_number']){
+    const rows=dbResult(await db.from('shipments').select('id,box_number,invoice_number,route,shipment_year,voyage,consignee_name,consignee_phone').is('deleted_at',null).is('deletion_requested_at',null).ilike(field,'%'+q.replace(/_/g,'\\_')+'%').order('id',{ascending:false}).limit(30));
+    for(const row of rows)found.set(row.id,row);
+   }
+   return json(200,{cargo:[...found.values()].sort((a,b)=>b.id-a.id).slice(0,30)});
   }
   must(manager,'FORBIDDEN',403);
   if(b.action==='save'){

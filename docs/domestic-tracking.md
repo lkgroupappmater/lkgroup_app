@@ -31,3 +31,10 @@ Run `node --test supabase/functions/domestic-tracking/*.test.mjs` (Node 24), Flu
 ## Public search first
 
 The owner prefers matching registered carrier + tracking number against the public website, without carrier contracts or partner API credentials. HAL already uses the public tracking service. ANS opens the public result directly. J&T and Lao Post preserve the number in their public search URLs, but their human-verification steps prevent unattended aggregation. Browser-rendered results are not yet imported into the central timeline. Do not represent external links as automatic data synchronization.
+# Statement-based lookup (2026-09-16)
+
+The app customer page accepts a full statement (`invoice_number`) or cargo (`box_number`) identifier, with optional route, year and voyage filters. It does not ask customers to choose a domestic carrier. Results include all linked waybills, paged 20 at a time. Searching remains an explicit submit action. The new `statement_lookup` server action requires an active account and only returns cargo accessible under the existing domestic photo ownership check. Deleted cargo is excluded. Existing carrier lookup and staff APIs remain compatible with the currently published website.
+
+Staff registration starts with a statement/cargo search. A standalone domestic delivery requires an explicit selection. Recognized HAL, J&T and Mixay number formats suggest a carrier automatically; staff can override it. Thirteen-digit numbers only display an ANS suggestion, as digits alone are not unique to that carrier. Attachments remain private and use expiring signed URLs.
+
+Website rollout is separate: its existing Sites project must be accessible before editing or publishing its customer page. Do not create a replacement site.
