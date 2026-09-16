@@ -11,6 +11,9 @@ class MoneyFormat {
 
   static final NumberFormat _whole = NumberFormat('#,##0', 'en_US');
   static final NumberFormat _two = NumberFormat('#,##0.00', 'en_US');
+  static final NumberFormat _one = NumberFormat('#,##0.0', 'en_US');
+
+  static String documentUsdNumber(num value) => _one.format(value);
 
   static String number(num value, {int decimals = 0}) {
     if (decimals <= 0) return _whole.format(value);

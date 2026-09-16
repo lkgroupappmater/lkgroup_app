@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/money_format.dart';
+import '../core/document_amounts.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
 import '../core/document_form_style.dart';
@@ -537,20 +538,27 @@ class DigitalQuotationPainter extends CustomPainter {
     final docText = _docText;
     DocumentFormPainter.notes(c, layout,
       remark: docText.remark, remarkFontSize: docText.remarkFontSize);
+    final accounting = const ['kr_la_sea', 'kr_la_air', 'la_kr_air_exp']
+        .contains(RouteCatalog.keyFor(routeLabel));
+    String totalUsd(num value) => accounting
+        ? MoneyFormat.documentUsdNumber(value) : MoneyFormat.usdNumber(value);
     final discountLabel = safeDiscountPercent > 0
         ? '${safeDiscountPercent.toStringAsFixed(safeDiscountPercent == safeDiscountPercent.roundToDouble() ? 0 : 1)}%'
         : '-';
     final discountValue =
-        safeDiscountPercent > 0 ? '-${MoneyFormat.usdNumber(discountAmount)}' : '-';
+        safeDiscountPercent > 0 ? '${accounting ? '' : '-'}${totalUsd(discountAmount)}' : '-';
 
-    DocumentFormPainter.totals(c, layout, adjustments: [
-      ('운임 총합', '', MoneyFormat.usdNumber(grossUsd)),
+    DocumentFormPainter.totals(c, layout, accounting: accounting, adjustments: [
+      ('운임 총합', '', totalUsd(grossUsd)),
       ('할인', discountLabel, discountValue),
-      ('추가 할인', '-', '-'),
+      (accounting ? '특별할인' : '추가 할인', '-', '-'),
       ('세금 계산서(VAT)', '-', '-'),
     ], label: '최종 가견적 총액', amounts: [
-      MoneyFormat.usdNumber(usd), MoneyFormat.kipNumber(usd * rates.appliedKip),
-      MoneyFormat.thbNumber(usd * rates.appliedThb), MoneyFormat.krwNumber(usd * rates.appliedKrw),
+      totalUsd(usd), MoneyFormat.kipNumber(usd * rates.appliedKip),
+      DocumentAmounts.usesExcelRules(RouteCatalog.keyFor(routeLabel))
+          ? MoneyFormat.number(DocumentAmounts.thb(usd * rates.appliedThb))
+          : MoneyFormat.thbNumber(usd * rates.appliedThb),
+      MoneyFormat.krwNumber(usd * rates.appliedKrw),
     ]);
     DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
@@ -570,8 +578,6 @@ class DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DigitalQuotationPainter oldDelegate) => true;
 }
-
-
 
 
 

@@ -91,7 +91,8 @@ class DocumentFormPainter {
 
   static void totals(Canvas c, DocumentFormLayout layout,
       {required List<(String, String, String)> adjustments,
-      required String label, required List<String> amounts}) {
+      required String label, required List<String> amounts,
+      bool accounting = false}) {
     assert(adjustments.length == 4 && amounts.length == 4);
     const left = DocumentFormStyle.totalsLeft;
     const w = DocumentFormStyle.contentWidth - left;
@@ -102,11 +103,18 @@ class DocumentFormPainter {
       final row = adjustments[i];
       DocumentFormStyle.drawText(c, row.$1,
         Rect.fromLTWH(left + 10, r.top + 3, w * .46 - 10, r.height - 6), 18, bold: true);
-      DocumentFormStyle.drawText(c, row.$2,
+      DocumentFormStyle.drawText(c,
+        accounting && i > 0 && (row.$2.isEmpty || row.$2 == '-') ? '0%' : row.$2,
         Rect.fromLTWH(left + w * .48, r.top + 3, w * .18, r.height - 6), 18,
         bold: true, center: true);
-      DocumentFormStyle.drawText(c, row.$3,
-        Rect.fromLTWH(left + w * .67, r.top + 3, w * .33 - 10, r.height - 6), 18,
+      if (accounting) {
+        DocumentFormStyle.drawText(c, r'$',
+          Rect.fromLTWH(left + w * .67, r.top + 3, 18, r.height - 6), 18,
+          bold: true);
+      }
+      DocumentFormStyle.drawText(c, accounting && row.$3 == '-' ? '0.0' : row.$3,
+        Rect.fromLTWH(left + w * .67 + (accounting ? 22 : 0), r.top + 3,
+          w * .33 - 10 - (accounting ? 22 : 0), r.height - 6), 18,
         bold: true, right: true);
     }
     final top = layout.summaryTop + adjustmentHeight * 4;
@@ -117,6 +125,7 @@ class DocumentFormPainter {
       Rect.fromLTWH(left + 8, top + 6, labelWidth - 16, height - 12), 22,
       center: true, bold: true);
     const currencies = ['USD', 'KIP', 'THB', 'KRW'];
+    const symbols = [r'$', '₭', '฿', '₩'];
     const fills = [DocumentFormStyle.currencyUsd, DocumentFormStyle.currencyKip,
       DocumentFormStyle.currencyThb, DocumentFormStyle.currencyKrw];
     for (var i = 0; i < 4; i++) {
@@ -124,8 +133,12 @@ class DocumentFormPainter {
       box(c, r, fills[i]);
       DocumentFormStyle.drawText(c, currencies[i],
         Rect.fromLTWH(r.left + 10, r.top + 2, 54, r.height - 4), 20, bold: true);
+      if (accounting) {
+        DocumentFormStyle.drawText(c, symbols[i],
+          Rect.fromLTWH(r.left + 68, r.top + 2, 22, r.height - 4), 20, bold: true);
+      }
       DocumentFormStyle.drawText(c, amounts[i],
-        Rect.fromLTRB(r.left + 64, r.top + 2, r.right - 8, r.bottom - 2), 20,
+        Rect.fromLTRB(r.left + (accounting ? 94 : 64), r.top + 2, r.right - 8, r.bottom - 2), 20,
         bold: true, right: true);
     }
   }

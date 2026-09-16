@@ -6,6 +6,8 @@ import '../config/supabase_config.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
+import '../core/money_format.dart';
+import '../core/document_amounts.dart';
 import '../core/ui_localizations.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
@@ -166,6 +168,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             const SizedBox(height: 10),
             TextField(
               controller: amountController,
+              textAlign: TextAlign.right,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
@@ -173,6 +176,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               ],
               decoration: InputDecoration(
                 labelText: _u('금액 (USD)'),
+                prefixText: r'$ ',
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -911,6 +915,19 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final kip = rates == null ? null : finalUsd * rates.appliedKip;
     final thb = rates == null ? null : finalUsd * rates.appliedThb;
     final krw = rates == null ? null : finalUsd * rates.appliedKrw;
+    final routeKey = RouteCatalog.keyFor(result.route);
+    final accounting = const ['kr_la_sea', 'kr_la_air', 'la_kr_air_exp'].contains(routeKey);
+    Widget amountRow(String label, String symbol, String number) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+        SizedBox(width: 170, child: Row(children: [Text(symbol),
+          Expanded(child: Text(number, textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.bold))),
+        ])),
+      ]),
+    );
+
 
     return Card(
       child: Padding(
@@ -993,7 +1010,16 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               ),
             ],
             const Divider(),
-            Align(
+            if (accounting) ...[
+              amountRow(_uf('할인 전  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(grossUsd)),
+              amountRow('${_t('discount')} ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 2)}%', r'$',
+                  MoneyFormat.documentUsdNumber(discountAmount == 0 ? 0 : -discountAmount)),
+              amountRow(_uf('총 운임  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(finalUsd)),
+              if (kip != null && rates!.appliedKip > 0) amountRow('KIP', '₭', MoneyFormat.kipNumber(kip)),
+              if (thb != null && rates!.appliedThb > 0) amountRow('THB', '฿', DocumentAmounts.usesExcelRules(routeKey)
+                  ? MoneyFormat.number(DocumentAmounts.thb(thb)) : MoneyFormat.thbNumber(thb)),
+              if (krw != null && rates!.appliedKrw > 0) amountRow('KRW', '₩', MoneyFormat.krwNumber(krw)),
+            ] else Align(
               alignment: Alignment.centerRight,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
