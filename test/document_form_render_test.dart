@@ -218,10 +218,10 @@ void main() {
     final canvas = Canvas(recorder);
     canvas.drawRect(Rect.fromLTWH(0, 0, 1800, q.documentHeight), Paint()..color = Colors.white);
     canvas.translate(18, 18);
-    DocumentFormPainter.totals(canvas, layout, adjustments: [
-      ('운임 총합', '', '27.00'), ('할인', '100%', '-20.00'),
-      ('추가 할인', '-', '-'), ('세금 계산서(VAT)', '-', '-'),
-    ], label: '최종 가견적 총액', amounts: ['7.00', '170,000', '242', '9,700']);
+    DocumentFormPainter.totals(canvas, layout, accounting: true, adjustments: [
+      ('운임 총합', '', '27.0'), ('할인', '100%', '20.0'),
+      ('특별할인', '-', '-'), ('세금 계산서(VAT)', '-', '-'),
+    ], label: '최종 가견적 총액', amounts: ['7.0', '170,000', '250', '9,700']);
     final picture = recorder.endRecording();
     final expected = await picture.toImage(1800, q.documentHeight.ceil());
     picture.dispose();
