@@ -4,6 +4,7 @@ String domesticText(AppLanguage language, String key) =>
     (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
 
 const domesticWords = <String, List<String>>{
+  "status": ["배송 상태", "Delivery status", "ສະຖານະຈັດສົ່ງ"],
   "title": [
     "라오스 국내배송 조회",
     "Laos domestic tracking",

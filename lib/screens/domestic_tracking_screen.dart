@@ -724,7 +724,7 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> {
           initialValue: _status,
           isExpanded: true,
           decoration: InputDecoration(
-            labelText: AppStrings.get(widget.language, 'status'),
+            labelText: t('status'),
           ),
           items: DomesticTrackingService.statuses
               .map((s) => DropdownMenuItem(value: s, child: Text(t(s))))
