@@ -341,10 +341,15 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.only(top: 3, right: 12),
-                      child: Icon(
-                        Icons.radio_button_checked,
-                        size: 16,
-                        color: Color(0xff315b9c),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xff315b9c),
+                          ),
+                        ),
                       ),
                     ),
                     Expanded(
@@ -615,7 +620,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
           ),
           OutlinedButton.icon(
             onPressed: _busy ? null : _pick,
-            icon: const Icon(Icons.add_photo_alternate_outlined),
+            icon: const Icon(Icons.image_outlined),
             label: Text(t('photoInput')),
           ),
           if (_photo != null) ...[
@@ -723,9 +728,7 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> {
         DropdownButtonFormField<String>(
           initialValue: _status,
           isExpanded: true,
-          decoration: InputDecoration(
-            labelText: t('status'),
-          ),
+          decoration: InputDecoration(labelText: t('status')),
           items: DomesticTrackingService.statuses
               .map((s) => DropdownMenuItem(value: s, child: Text(t(s))))
               .toList(),

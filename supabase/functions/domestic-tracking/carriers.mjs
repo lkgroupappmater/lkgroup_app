@@ -17,6 +17,8 @@ export function carrierUrl(code, number) {
   const n=encodeURIComponent(trackingNumber(number));
   if(code==='HAL')return `https://halexpress.la/parcel?search=${n}`;
   if(code==='ANS')return `https://app.anousith.express/landing/search_tracking/search_item?_bill_detail=${n}&n_home=2`;
+  if(code==='JT')return `https://www.jtexpress.la/trajectoryQuery?waybillNo=${n}&flag=1`;
+  if(code==='LAOPOST')return `https://www.laopost.com.la/online-service/tracking?tracking-number=${n}`;
   return CARRIERS[code]?.url??null;
 }
 export function laoTimestamp(value) {

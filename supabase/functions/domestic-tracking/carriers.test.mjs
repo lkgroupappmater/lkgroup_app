@@ -12,6 +12,9 @@ test('full tracking identifiers normalize safely without allowing path or query 
  for(const value of ['123','../../private','123456?x=1','<script>','A'.repeat(41)])assert.throws(()=>trackingNumber(value));
  assert.equal(new URL(carrierUrl('HAL',number)).searchParams.get('search'),number);
  assert.equal(carrierUrl('MIXAY',number),null);
+ assert.equal(new URL(carrierUrl('ANS',number)).searchParams.get('_bill_detail'),number);
+ assert.equal(new URL(carrierUrl('JT',number)).searchParams.get('waybillNo'),number);
+ assert.equal(new URL(carrierUrl('LAOPOST',number)).searchParams.get('tracking-number'),number);
 });
 test('HAL distinguishes collection from completion, sorts events, strips contact fields',()=>{
  const r=normalizeHal(fixture,number);assert.equal(r.status,'delivered');
