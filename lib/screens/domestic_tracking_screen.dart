@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_language.dart';
 import '../core/domestic_tracking_text.dart';
+import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import '../services/domestic_tracking_service.dart';
 
@@ -27,6 +28,8 @@ class DomesticTrackingScreen extends StatefulWidget {
 class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   final _number = TextEditingController();
   String _carrier = '';
+  Map<String, dynamic> _statement = {};
+  Map<String, dynamic>? _activeStatement;
   bool _busy = false, _more = false;
   int _page = 0;
   String? _message;
@@ -56,7 +59,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
       _message = t('loading');
       _rows = [];
       _more = false;
-      if (action == 'lookup') _page = 0;
+      if (action != 'list') _page = 0;
     });
     try {
       final data = await DomesticTrackingService.call(action, args);
@@ -75,11 +78,26 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
     }
   }
 
-  Future<void> _list() => _run('list', {'page': _page});
-  Future<void> _lookup([Map<String, dynamic>? r]) => _run('lookup', {
-    'carrier': r?['carrier'] ?? _carrier,
-    'tracking_number': r?['tracking_number'] ?? _number.text,
-  });
+  Future<void> _list() {
+    _activeStatement = null;
+    return _run('list', {'page': _page});
+  }
+
+  Future<void> _lookupStatement() {
+    _activeStatement = Map<String, dynamic>.from(_statement);
+    return _run('statement_lookup', _activeStatement!);
+  }
+
+  Future<void> _lookup([Map<String, dynamic>? r]) {
+    if (r != null && _activeStatement != null)
+      return _run('statement_lookup', _activeStatement!);
+    _activeStatement = null;
+    return _run('lookup', {
+      'carrier': r?['carrier'] ?? _carrier,
+      'tracking_number': r?['tracking_number'] ?? _number.text,
+    });
+  }
+
   Future<void> _edit([Map<String, dynamic>? row]) async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
@@ -115,32 +133,52 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             children: [
               Text(t('hint')),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _carrier,
-                isExpanded: true,
-                decoration: InputDecoration(labelText: t('carrier')),
-                items: [
-                  DropdownMenuItem(value: '', child: Text(t('all'))),
-                  ...DomesticTrackingService.carriers.entries.map(
-                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
-                  ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _carrier = v ?? ''),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _number,
-                maxLength: 40,
-                decoration: InputDecoration(labelText: t('tracking')),
-                onSubmitted: _busy ? null : (_) => _lookup(),
+              DomesticStatementFields(
+                language: widget.language,
+                enabled: !_busy,
+                onChanged: (v) => _statement = v,
+                onSubmitted: _busy ? null : _lookupStatement,
               ),
               FilledButton.icon(
-                onPressed: _busy ? null : () => _lookup(),
+                onPressed: _busy ? null : _lookupStatement,
                 icon: const Icon(Icons.search),
                 label: Text(t('search')),
               ),
+              if (isOperator)
+                ExpansionTile(
+                  title: Text(t('trackingSearch')),
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _carrier,
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: t('carrier')),
+                      items: [
+                        DropdownMenuItem(value: '', child: Text(t('all'))),
+                        ...DomesticTrackingService.carriers.entries.map(
+                          (e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ),
+                        ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() => _carrier = v ?? ''),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _number,
+                      maxLength: 40,
+                      decoration: InputDecoration(labelText: t('tracking')),
+                      onSubmitted: _busy ? null : (_) => _lookup(),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : () => _lookup(),
+                      icon: const Icon(Icons.search),
+                      label: Text(t('search')),
+                    ),
+                  ],
+                ),
               if (isOperator)
                 Wrap(
                   spacing: 10,
@@ -233,6 +271,10 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
             if (cargo is Map)
               Text(
                 '${cargo['box_number']} · ${cargo['route']} · ${cargo['shipment_year']} / ${cargo['voyage']}',
+              ),
+            if (r['statement'] is Map)
+              Text(
+                '${t('receipt')}: ${r['statement']['receipt_number']} · ${r['statement']['route']} · ${r['statement']['shipment_year']} / ${r['statement']['voyage']}',
               ),
             const SizedBox(height: 12),
             Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
@@ -383,6 +425,195 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   }
 }
 
+class DomesticStatementFields extends StatefulWidget {
+  const DomesticStatementFields({
+    super.key,
+    required this.language,
+    required this.onChanged,
+    this.initialValue = const {},
+    this.enabled = true,
+    this.onSubmitted,
+    this.loadBatches,
+  });
+  final AppLanguage language;
+  final Map<String, dynamic> initialValue;
+  final ValueChanged<Map<String, dynamic>> onChanged;
+  final bool enabled;
+  final VoidCallback? onSubmitted;
+  final Future<List<Map<String, dynamic>>> Function()? loadBatches;
+  @override
+  State<DomesticStatementFields> createState() =>
+      _DomesticStatementFieldsState();
+}
+
+class _DomesticStatementFieldsState extends State<DomesticStatementFields> {
+  late final TextEditingController _receipt;
+  List<Map<String, dynamic>> _batches = [];
+  String? _route, _voyage, _error;
+  int? _year;
+  bool _loading = true;
+  String t(String k) => domesticText(widget.language, k);
+  List<String> get routes {
+    final all = _batches.map((b) => '${b['route']}').toSet().toList();
+    final order = RouteCatalog.routes;
+    all.sort((a, b) {
+      final x = order.indexOf(a), y = order.indexOf(b);
+      return (x < 0 ? 999 : x).compareTo(y < 0 ? 999 : y);
+    });
+    return all;
+  }
+
+  List<int> get years =>
+      _batches
+          .where((b) => b['route'] == _route)
+          .map((b) => (b['shipment_year'] as num).toInt())
+          .toSet()
+          .toList()
+        ..sort((a, b) => b.compareTo(a));
+  List<String> get voyages =>
+      _batches
+          .where((b) => b['route'] == _route && b['shipment_year'] == _year)
+          .map((b) => '${b['voyage']}')
+          .toSet()
+          .toList()
+        ..sort(
+          (a, b) => (int.tryParse(b) ?? 0).compareTo(int.tryParse(a) ?? 0),
+        );
+  void emit() => widget.onChanged({
+    'route': _route,
+    'shipment_year': _year,
+    'voyage': _voyage,
+    'receipt_number': _receipt.text,
+  });
+  @override
+  void initState() {
+    super.initState();
+    _receipt = TextEditingController(
+      text: '${widget.initialValue['receipt_number'] ?? ''}',
+    );
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final batches = widget.loadBatches != null
+          ? await widget.loadBatches!()
+          : (await DomesticTrackingService.call('options'))['batches'] as List;
+      if (!mounted) return;
+      setState(() {
+        _batches = batches.map((b) => Map<String, dynamic>.from(b)).toList();
+        _route = widget.initialValue['route'];
+        if (!routes.contains(_route)) _route = routes.firstOrNull;
+        _year = (widget.initialValue['shipment_year'] as num?)?.toInt();
+        if (!years.contains(_year)) _year = years.firstOrNull;
+        _voyage = widget.initialValue['voyage'];
+        if (!voyages.contains(_voyage)) _voyage = voyages.firstOrNull;
+        _loading = false;
+        _error = null;
+      });
+      emit();
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          _loading = false;
+          _error = t('REQUEST_FAILED');
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _receipt.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (_loading) const LinearProgressIndicator(),
+      if (_error != null) TextButton(onPressed: _load, child: Text(_error!)),
+      DropdownButtonFormField<String>(
+        key: ValueKey('route-$_route'),
+        initialValue: _route,
+        isExpanded: true,
+        decoration: InputDecoration(labelText: t('route')),
+        items: routes
+            .map(
+              (v) => DropdownMenuItem(
+                value: v,
+                child: Text(RouteCatalog.localizedLabel(v, widget.language)),
+              ),
+            )
+            .toList(),
+        onChanged: !widget.enabled || _loading
+            ? null
+            : (v) {
+                setState(() {
+                  _route = v;
+                  _year = years.firstOrNull;
+                  _voyage = voyages.firstOrNull;
+                });
+                emit();
+              },
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              key: ValueKey('year-$_route-$_year'),
+              initialValue: _year,
+              decoration: InputDecoration(labelText: t('year')),
+              items: years
+                  .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                  .toList(),
+              onChanged: !widget.enabled || _loading
+                  ? null
+                  : (v) {
+                      setState(() {
+                        _year = v;
+                        _voyage = voyages.firstOrNull;
+                      });
+                      emit();
+                    },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              key: ValueKey('voyage-$_route-$_year-$_voyage'),
+              initialValue: _voyage,
+              decoration: InputDecoration(labelText: t('voyage')),
+              items: voyages
+                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                  .toList(),
+              onChanged: !widget.enabled || _loading
+                  ? null
+                  : (v) {
+                      setState(() => _voyage = v);
+                      emit();
+                    },
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _receipt,
+        enabled: widget.enabled,
+        maxLength: 80,
+        decoration: InputDecoration(
+          labelText: t('receipt'),
+          hintText: 'LKS 08 / LKA 08',
+        ),
+        onChanged: (_) => emit(),
+        onSubmitted: (_) => widget.onSubmitted?.call(),
+      ),
+    ],
+  );
+}
+
 class DomesticWaybillEditor extends StatefulWidget {
   const DomesticWaybillEditor({super.key, required this.language, this.row});
   final AppLanguage language;
@@ -397,7 +628,13 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
       _name = TextEditingController(),
       _phone = TextEditingController(),
       _cargoQuery = TextEditingController();
-  String _carrier = 'HAL', _kind = 'province', _service = 'domestic';
+  String _carrier = '',
+      _kind = 'province',
+      _service = 'domestic',
+      _linkMode = 'statement';
+  Map<String, dynamic> _statement = {};
+  List<String> _recommended = [];
+  bool _recommending = false;
   int? _cargo;
   List<Map<String, dynamic>> _cargoRows = [];
   Uint8List? _photo;
@@ -416,6 +653,9 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
       _name.text = r['receiver_name'] ?? '';
       _phone.text = r['receiver_phone'] ?? '';
       _cargo = r['shipment_id'];
+      _linkMode = r['link_mode'] ?? (_cargo == null ? 'standalone' : 'cargo');
+      if (r['statement'] is Map)
+        _statement = Map<String, dynamic>.from(r['statement']);
       if (r['cargo'] is Map)
         _cargoRows = [Map<String, dynamic>.from(r['cargo'])];
     }
@@ -496,6 +736,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
         'delivery_kind': _kind,
         'service_kind': _service,
         'shipment_id': _cargo,
+        'link_mode': _linkMode,
+        'statement': _statement,
         'receiver_name': _name.text,
         'receiver_phone': _phone.text,
         if (_photo != null) 'photo': {'base64': base64Encode(_photo!)},
@@ -511,6 +753,31 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
         );
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _recommend() async {
+    if (_recommending || _number.text.trim().isEmpty) return;
+    final number = _number.text;
+    setState(() => _recommending = true);
+    try {
+      final result = await DomesticTrackingService.call('recommend_carrier', {
+        'tracking_number': number,
+      });
+      if (mounted && number == _number.text)
+        setState(() {
+          _recommended = List<String>.from(result['carriers']);
+          _message = _recommended.isEmpty ? t('noRecommendation') : null;
+        });
+    } catch (e) {
+      if (mounted)
+        setState(
+          () => _message = t(
+            e is DomesticTrackingException ? e.code : 'REQUEST_FAILED',
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _recommending = false);
     }
   }
 
@@ -540,22 +807,28 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
         padding: const EdgeInsets.all(20),
         children: [
           DropdownButtonFormField<String>(
+            key: ValueKey('carrier-$_carrier'),
             initialValue: _carrier,
             isExpanded: true,
             decoration: InputDecoration(labelText: t('carrier')),
-            items: DomesticTrackingService.carriers.entries
-                .map(
-                  (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
-                )
-                .toList(),
-            onChanged: _busy || widget.row != null
+            items: [
+              DropdownMenuItem(value: '', child: Text(t('chooseCarrier'))),
+              ...DomesticTrackingService.carriers.entries
+                  .map(
+                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  )
+                  .toList(),
+            ],
+            validator: (v) => DomesticTrackingService.carriers.containsKey(v)
                 ? null
-                : (v) => setState(() => _carrier = v!),
+                : t('chooseCarrier'),
+            onChanged: _busy ? null : (v) => setState(() => _carrier = v!),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _number,
-            readOnly: widget.row != null,
+            onChanged: (_) => setState(() => _recommended = []),
+            onEditingComplete: _recommend,
             maxLength: 40,
             decoration: InputDecoration(labelText: t('tracking')),
             validator: (v) =>
@@ -564,6 +837,27 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
                 ? null
                 : t('INVALID_TRACKING'),
           ),
+          TextButton(
+            onPressed: _busy || _recommending ? null : _recommend,
+            child: Text(t('recommend')),
+          ),
+          if (_recommended.isNotEmpty) ...[
+            Text(t('recommendHint')),
+            Wrap(
+              spacing: 8,
+              children: _recommended
+                  .map(
+                    (code) => ActionChip(
+                      label: Text(DomesticTrackingService.carriers[code]!),
+                      onPressed: _busy
+                          ? null
+                          : () => setState(() => _carrier = code),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (widget.row != null) Text(t('identityEditHint')),
           _choice('kind', _kind, [
             'city',
             'province',
@@ -575,37 +869,51 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
             'ecommerce',
             'express',
           ], (v) => setState(() => _service = v!)),
-          Text(t('cargo')),
-          TextField(
-            controller: _cargoQuery,
-            decoration: InputDecoration(labelText: t('cargoSearch')),
-            onSubmitted: (_) => _findCargo(),
-          ),
-          TextButton.icon(
-            onPressed: _finding || _busy ? null : _findCargo,
-            icon: const Icon(Icons.search),
-            label: Text(t('search')),
-          ),
-          DropdownButtonFormField<int>(
-            key: ValueKey('cargo-$_cargo-${_cargoRows.length}'),
-            initialValue: _cargo ?? 0,
-            isExpanded: true,
-            items: [
-              DropdownMenuItem(value: 0, child: Text(t('unlinked'))),
-              ..._cargoRows.map(
-                (r) => DropdownMenuItem(
-                  value: r['id'] as int,
-                  child: Text(
-                    '${r['box_number']} · ${r['shipment_year']} / ${r['voyage']} · ${r['consignee_name'] ?? r['route']}',
-                    overflow: TextOverflow.ellipsis,
+          _choice('linkMode', _linkMode, [
+            'statement',
+            'cargo',
+            'standalone',
+          ], (v) => setState(() => _linkMode = v!)),
+          if (_linkMode == 'statement')
+            DomesticStatementFields(
+              language: widget.language,
+              initialValue: _statement,
+              enabled: !_busy,
+              onChanged: (v) => _statement = v,
+            ),
+          if (_linkMode == 'cargo') ...[
+            Text(t('cargo')),
+            TextField(
+              controller: _cargoQuery,
+              decoration: InputDecoration(labelText: t('cargoSearch')),
+              onSubmitted: (_) => _findCargo(),
+            ),
+            TextButton.icon(
+              onPressed: _finding || _busy ? null : _findCargo,
+              icon: const Icon(Icons.search),
+              label: Text(t('search')),
+            ),
+            DropdownButtonFormField<int>(
+              key: ValueKey('cargo-$_cargo-${_cargoRows.length}'),
+              initialValue: _cargo ?? 0,
+              isExpanded: true,
+              items: [
+                DropdownMenuItem(value: 0, child: Text(t('unlinked'))),
+                ..._cargoRows.map(
+                  (r) => DropdownMenuItem(
+                    value: r['id'] as int,
+                    child: Text(
+                      '${r['box_number']} · ${r['shipment_year']} / ${r['voyage']} · ${r['consignee_name'] ?? r['route']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
-              ),
-            ],
-            onChanged: _busy
-                ? null
-                : (v) => setState(() => _cargo = v == 0 ? null : v),
-          ),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (v) => setState(() => _cargo = v == 0 ? null : v),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             controller: _name,

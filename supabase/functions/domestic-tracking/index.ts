@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { CARRIERS, STATUSES, trackingNumber, carrierUrl, fetchTracking, mergeEvents, canSeePhoto, laoTimestamp } from './carriers.mjs';
+import { receiptKey, statementInput, carrierRecommendation, mapLimited } from './statements.mjs';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const json=(status:number,data:unknown)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
 class ApiError extends Error{constructor(public status:number,code:string){super(code)}}
@@ -23,16 +24,32 @@ Deno.serve(async req=>{
   let b:any;try{b=JSON.parse(raw)}catch{throw new ApiError(400,'INVALID_REQUEST')}
   must(b&&typeof b==='object'&&!Array.isArray(b),'INVALID_REQUEST');
   const manager=['admin','staff'].includes(profile.role),partner=profile.role==='partner';
-  const shipment=async(id:number|null)=>id?dbResult(await db.from('shipments').select('id,box_number,route,shipment_year,voyage,customer_id,consignee_name,consignee_phone,deleted_at,deletion_requested_at').eq('id',id).maybeSingle()):null;
+  const shipment=async(id:number|null)=>id?dbResult(await db.from('shipments').select('id,box_number,route,shipment_year,voyage,receipt_number,customer_id,consignee_name,consignee_phone,deleted_at,deletion_requested_at').eq('id',id).maybeSingle()):null;
+  async function allRpc(name:string,args:any){
+   const rows=[];for(let page=0;;page++){const batch=dbResult(await db.rpc(name,args).range(page*500,page*500+499));rows.push(...batch);if(batch.length<500)return rows;}
+  }
+  const statements=new Map<string,Promise<any>>();
+  async function resolveStatement(input:any){
+   const value=statementInput(input),key=JSON.stringify(value);
+   if(!statements.has(key))statements.set(key,(async()=>{
+    const rows=await allRpc('domestic_statement_cargo',{p_route:value.route,p_year:value.shipment_year,p_voyage:value.voyage,p_receipt:value.receipt_number});
+    must(new Set(rows.map((r:any)=>receiptKey(r.receipt_number))).size<=1,'AMBIGUOUS_STATEMENT');
+    return {statement:{...value,receipt_number:rows[0]?.receipt_number??value.receipt_number},rows};
+   })());
+   return await statements.get(key);
+  }
+  const rowStatement=(r:any)=>r.statement_route?{route:r.statement_route,shipment_year:r.statement_year,voyage:r.statement_voyage,receipt_number:r.statement_receipt}:null;
   async function serialize(row:any,full=false){
-   const s=await shipment(row.shipment_id);const own=canSeePhoto(profile,row,s),visible=full||own;
+   const s=await shipment(row.shipment_id),statement=rowStatement(row);
+   const linked=statement?await resolveStatement(statement):null;
+   const own=statement?manager||partner||linked.rows.some((c:any)=>canSeePhoto(profile,{},c)):canSeePhoto(profile,row,s),visible=full||own;
    let photo_url=null;if(row.photo_path&&own){const result=await db.storage.from('domestic-waybills').createSignedUrl(row.photo_path,600);if(!result.error)photo_url=result.data.signedUrl;}
    return {id:row.id,carrier:row.carrier,carrier_name:CARRIERS[row.carrier].name,tracking_number:row.tracking_number,
     delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:row.origin,destination:row.destination,
     status:row.status,events:row.events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
     official_url:carrierUrl(row.carrier,row.tracking_number),integration:CARRIERS[row.carrier].mode,
     has_photo:!!row.photo_path,photo_url,photo_restricted:!!row.photo_path&&!own,
-    ...(visible?{shipment_id:row.shipment_id,cargo:s?{id:s.id,box_number:s.box_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage}:null,receiver_name:row.receiver_name,receiver_phone:row.receiver_phone}:{}),
+    ...(visible?{shipment_id:row.shipment_id,link_mode:statement?'statement':s?'cargo':'standalone',statement:statement??(s?.receipt_number?{route:s.route,shipment_year:s.shipment_year,voyage:s.voyage,receipt_number:s.receipt_number}:null),cargo:s?{id:s.id,box_number:s.box_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage,receipt_number:s.receipt_number}:null,receiver_name:row.receiver_name,receiver_phone:row.receiver_phone}:{}),
     created_at:row.created_at,updated_at:row.updated_at,can_manage:manager};
   }
   async function sync(row:any){
@@ -47,13 +64,28 @@ Deno.serve(async req=>{
     const latest=dbResult(await db.from('domestic_parcels').select('events,updated_at').eq('id',row.id).single());
     const events=mergeEvents(latest.events,result.events);
     update={events,status:result.status==='returned'?'returned':events[0]?.status??result.status,updated_at:new Date().toISOString(),origin:result.origin,destination:result.destination,sync_state:'synced',sync_error:null,synced_at:now.toISOString()};
-    const saved=dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('updated_at',latest.updated_at).select().maybeSingle());
+    const saved=dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).eq('updated_at',latest.updated_at).select().maybeSingle());
     return saved??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
    }catch(e){
     const code=String((e as Error).message);const known=['CONNECTION_REQUIRED','PLANNED','VERIFICATION_REQUIRED','AUTH_REQUIRED','NOT_FOUND','NO_EVENTS','ANS_ORIGINAL_NUMBER_REQUIRED','RATE_LIMITED','CARRIER_FORMAT_CHANGED'];
     update={sync_state:code==='PLANNED'?'planned':code==='VERIFICATION_REQUIRED'?'verification_required':'error',sync_error:known.includes(code)?code:'CARRIER_UNAVAILABLE'};
    }
-   return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).select().single());
+   return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).select().maybeSingle())??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
+  }
+  if(b.action==='options')return json(200,{batches:await allRpc('domestic_tracking_batches',{})});
+  if(b.action==='recommend_carrier'){
+   must(manager,'FORBIDDEN',403);return json(200,{carriers:carrierRecommendation(b.tracking_number)});
+  }
+  if(b.action==='statement_lookup'||b.action==='statement_resolve'){
+   if(b.action==='statement_resolve')must(manager,'FORBIDDEN',403);
+   const {statement,rows}=await resolveStatement(b);
+   const visible=manager||partner?rows:rows.filter((s:any)=>canSeePhoto(profile,{},s));
+   if(!visible.length)return json(200,b.action==='statement_resolve'?{statement:null,cargo:[]}:{parcels:[]});
+   if(b.action==='statement_resolve')return json(200,{statement,cargo:rows});
+   const parcels=await allRpc('domestic_parcels_for_statement',{p_route:statement.route,p_year:statement.shipment_year,p_voyage:statement.voyage,p_receipt:statement.receipt_number});
+   const ids=new Set(visible.map((s:any)=>s.id));
+   const authorized=parcels.filter((r:any)=>manager||partner||r.statement_route||ids.has(r.shipment_id));
+   return json(200,{statement,parcels:await mapLimited(authorized,async(r:any)=>serialize(await sync(r)))});
   }
   if(b.action==='lookup'){
    const number=trackingNumber(b.tracking_number);must(!b.carrier||CARRIERS[b.carrier],'INVALID_CARRIER');
@@ -70,19 +102,27 @@ Deno.serve(async req=>{
   }
   if(b.action==='cargo_search'){
    must(manager,'FORBIDDEN',403);const q=text(b.query,50);must(q.length>=2,'SEARCH_TOO_SHORT');
-   const rows=dbResult(await db.from('shipments').select('id,box_number,invoice_number,route,shipment_year,voyage,consignee_name,consignee_phone').is('deleted_at',null).is('deletion_requested_at',null).ilike('box_number','%'+q.replace(/[%_]/g,'')+'%').order('id',{ascending:false}).limit(30));
+   const rows=dbResult(await db.from('shipments').select('id,box_number,receipt_number,invoice_number,route,shipment_year,voyage,consignee_name,consignee_phone').is('deleted_at',null).is('deletion_requested_at',null).ilike('box_number','%'+q.replace(/[%_]/g,'')+'%').order('id',{ascending:false}).limit(30));
    return json(200,{cargo:rows});
   }
   must(manager,'FORBIDDEN',403);
   if(b.action==='save'){
    const id=b.id||crypto.randomUUID();must(uuid(id),'INVALID_ID');must(CARRIERS[b.carrier],'INVALID_CARRIER');
    const number=trackingNumber(b.tracking_number);const old=b.id?dbResult(await db.from('domestic_parcels').select('*').eq('id',id).maybeSingle()):null;
-   if(b.id){must(old,'NOT_FOUND',404);must(b.updated_at===old.updated_at,'RECORD_CHANGED',409);must(old.carrier===b.carrier&&old.tracking_number===number,'TRACKING_IMMUTABLE')}
+   if(b.id){must(old,'NOT_FOUND',404);must(b.updated_at===old.updated_at,'RECORD_CHANGED',409)}
    must(['city','province'].includes(b.delivery_kind),'INVALID_DELIVERY_KIND');must(['domestic','inbound','outbound','ecommerce','express'].includes(b.service_kind),'INVALID_SERVICE_KIND');
-   const shipment_id=b.shipment_id?Number(b.shipment_id):null;must(shipment_id===null||Number.isSafeInteger(shipment_id)&&shipment_id>0,'INVALID_CARGO');
+   const mode=b.link_mode??(b.shipment_id?'cargo':old?.statement_route?'statement':'standalone');must(['cargo','statement','standalone'].includes(mode),'INVALID_CARGO');
+   const statementLink=mode==='statement'?await resolveStatement(b.statement??rowStatement(old??{})):null;
+   if(statementLink)must(statementLink.rows.length,'STATEMENT_NOT_FOUND',404);
+   const shipment_id=mode==='cargo'?Number(b.shipment_id):null;must(shipment_id===null||Number.isSafeInteger(shipment_id)&&shipment_id>0,'INVALID_CARGO');
    const cargo=await shipment(shipment_id);if(shipment_id)must(cargo&&!cargo.deleted_at&&!cargo.deletion_requested_at,'INVALID_CARGO');
+   const receiver=cargo??statementLink?.rows[0];
    const value:any={id,carrier:b.carrier,tracking_number:number,shipment_id,delivery_kind:b.delivery_kind,service_kind:b.service_kind,
-    receiver_name:text(cargo?.consignee_name??b.receiver_name,160),receiver_phone:text(cargo?.consignee_phone??b.receiver_phone,40),updated_at:new Date().toISOString(),updated_by:user.id};
+    statement_route:statementLink?.statement.route??null,statement_year:statementLink?.statement.shipment_year??null,statement_voyage:statementLink?.statement.voyage??null,statement_receipt:statementLink?.statement.receipt_number??null,
+    receiver_name:text(receiver?.consignee_name??b.receiver_name,160),receiver_phone:text(receiver?.consignee_phone??b.receiver_phone,40),updated_at:new Date().toISOString(),updated_by:user.id};
+   if(old&&(old.carrier!==b.carrier||old.tracking_number!==number)){
+    const events=old.events.filter((e:any)=>e.source==='staff');Object.assign(value,{events,status:events[0]?.status??'registered',origin:'',destination:'',checked_at:null,synced_at:null,sync_state:'never',sync_error:null});
+   }
    let newPhoto:string|null=null;
    if(b.photo){
     must(typeof b.photo.base64==='string'&&b.photo.base64.length<=6990508,'FILE_TOO_LARGE',413);
@@ -109,5 +149,5 @@ Deno.serve(async req=>{
    return json(200,{parcel:await serialize(result,true)});
   }
   return json(400,{error:'INVALID_ACTION'});
- }catch(e){const code=(e as Error).message;if(e instanceof ApiError)return json(e.status,{error:code});if(code==='INVALID_TRACKING')return json(400,{error:code});console.error('domestic-tracking request failed:',e instanceof Error?e.name:'error');return json(500,{error:'REQUEST_FAILED'})}
+ }catch(e){const code=(e as Error).message;if(e instanceof ApiError)return json(e.status,{error:code});if(['INVALID_TRACKING','INVALID_STATEMENT'].includes(code))return json(400,{error:code});console.error('domestic-tracking request failed:',e instanceof Error?e.name:'error');return json(500,{error:'REQUEST_FAILED'})}
 });
