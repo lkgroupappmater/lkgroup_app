@@ -1,3 +1,5 @@
+import 'domestic_tracking_screen.dart';
+import '../core/domestic_tracking_text.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -194,7 +196,11 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
-    final items = <Map<String, Object?>>[];
+    final items = <Map<String, Object?>>[
+      {'label': domesticText(widget.language, 'manage'),
+       'icon': Icons.local_shipping_outlined,
+       'page': DomesticTrackingScreen(language: widget.language, user: user, manage: true)},
+    ];
 
     if (_isAdmin || _isStaff) {
       items.addAll([
