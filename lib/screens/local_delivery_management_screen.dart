@@ -1,3 +1,5 @@
+import '../core/app_language.dart';
+import '../services/shared_ui_text_service.dart';
 import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
@@ -5,13 +7,14 @@ import '../services/customer_benefit_service.dart';
 import '../widgets/submit_search_field.dart';
 
 class LocalDeliveryManagementScreen extends StatefulWidget {
-  const LocalDeliveryManagementScreen({super.key});
+  const LocalDeliveryManagementScreen({super.key, this.language = AppLanguage.korean});
+  final AppLanguage language;
 
   @override
   State<LocalDeliveryManagementScreen> createState() => _LocalDeliveryManagementScreenState();
 }
 
-class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementScreen> {
+class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementScreen> with SharedUiTextState {
   List<LocalDeliveryRule> _rules = const [];
   String _route = 'kr_la_sea';
   String _query = '';
@@ -174,7 +177,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('시내.지방 배송 list 관리')),
+        appBar: AppBar(title: Text(SharedUiTextService.instance.text('localDeliveries', widget.language.code, '시내.지방 배송 list 관리'))),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(),
           icon: const Icon(Icons.add_location_alt_outlined),
@@ -235,4 +238,5 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
               ),
       );
 }
+
 

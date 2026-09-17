@@ -1,4 +1,5 @@
 import 'app_language.dart';
+import '../services/shared_ui_text_service.dart';
 
 /// Cargo tracking/management-only fixed labels.
 ///
@@ -9,14 +10,9 @@ class CargoUiStrings {
   CargoUiStrings._();
 
   static String get(AppLanguage language, String korean) {
-    switch (language) {
-      case AppLanguage.korean:
-        return korean;
-      case AppLanguage.english:
-        return _english[korean] ?? korean;
-      case AppLanguage.lao:
-        return _lao[korean] ?? korean;
-    }
+    final fallback = language == AppLanguage.korean ? korean :
+        (language == AppLanguage.lao ? _lao : _english)[korean] ?? korean;
+    return SharedUiTextService.instance.korean(korean, language.code, fallback);
   }
 
   static String format(
@@ -507,3 +503,4 @@ class CargoUiStrings {
     '본인 화물 확인 요청 실패': 'ສົ່ງຄຳຂໍກວດສອບສິນຄ້າບໍ່ສຳເລັດ',
   };
 }
+

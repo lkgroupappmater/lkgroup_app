@@ -1,3 +1,4 @@
+import '../services/shared_ui_text_service.dart';
 import 'domestic_tracking_screen.dart';
 import '../core/domestic_tracking_text.dart';
 import 'package:flutter/material.dart';
@@ -37,14 +38,14 @@ class ManagementMenuScreen extends StatefulWidget {
   State<ManagementMenuScreen> createState() => _ManagementMenuScreenState();
 }
 
-class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
+class _ManagementMenuScreenState extends State<ManagementMenuScreen> with SharedUiTextState {
   Map<String, ManagementMenuStatus> _status = const {};
 
   bool get _isAdmin => widget.user.role == UserRole.admin;
   bool get _isStaff => widget.user.role == UserRole.staff;
 
   String _m(String korean) {
-    if (widget.language == AppLanguage.korean) return korean;
+    
     const english = <String, String>{
       '선적 일정 관리': 'Shipping Schedule',
       '공지 및 안내 관리': 'Notices',
@@ -83,8 +84,9 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
       '회원': 'ສະມາຊິກ',
       '통합 관리': 'ການຈັດການ',
     };
-    return (widget.language == AppLanguage.lao ? lao : english)[korean] ??
-        korean;
+    final fallback = widget.language == AppLanguage.korean ? korean :
+        (widget.language == AppLanguage.lao ? lao : english)[korean] ?? korean;
+    return SharedUiTextService.instance.korean(korean, widget.language.code, fallback);
   }
 
   @override
@@ -283,7 +285,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
           'label': _m('시내.지방 배송 list 관리'),
           'icon': Icons.local_shipping_outlined,
           'menuKey': 'local_delivery_management',
-          'page': const LocalDeliveryManagementScreen(),
+          'page': LocalDeliveryManagementScreen(language: widget.language),
         },
         {
           'label': _m('항차별 총액 관리'),
@@ -372,4 +374,5 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
     );
   }
 }
+
 

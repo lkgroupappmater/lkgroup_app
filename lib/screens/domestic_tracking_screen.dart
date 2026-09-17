@@ -1,3 +1,4 @@
+import '../services/shared_ui_text_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -31,7 +32,7 @@ class DomesticTrackingScreen extends StatefulWidget {
   State<DomesticTrackingScreen> createState() => _DomesticTrackingScreenState();
 }
 
-class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with WidgetsBindingObserver {
+class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with WidgetsBindingObserver, SharedUiTextState {
   final _number = TextEditingController();
   String _carrier = '', _queryType = 'statement';
   String _route = '', _year = '', _voyage = '';
@@ -516,7 +517,7 @@ class DomesticWaybillEditor extends StatefulWidget {
   State<DomesticWaybillEditor> createState() => _DomesticWaybillEditorState();
 }
 
-class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
+class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with SharedUiTextState {
   final _form = GlobalKey<FormState>();
   final _number = TextEditingController(), _name = TextEditingController(),
     _phone = TextEditingController(), _cargoQuery = TextEditingController(),
@@ -778,7 +779,7 @@ class DomesticEventEditor extends StatefulWidget {
   State<DomesticEventEditor> createState() => _DomesticEventEditorState();
 }
 
-class _DomesticEventEditorState extends State<DomesticEventEditor> {
+class _DomesticEventEditorState extends State<DomesticEventEditor> with SharedUiTextState {
   final _where = TextEditingController(),
       _description = TextEditingController();
   late final TextEditingController _when;
@@ -880,4 +881,5 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> {
     ),
   );
 }
+
 

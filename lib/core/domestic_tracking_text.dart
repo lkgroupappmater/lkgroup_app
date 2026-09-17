@@ -1,7 +1,9 @@
 import 'app_language.dart';
+import '../services/shared_ui_text_service.dart';
 
 String domesticText(AppLanguage language, String key) =>
-    (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
+    SharedUiTextService.instance.text('domestic.$key', language.code,
+      (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index]);
 
 const domesticWords = <String, List<String>>{
   "INVALID_BATCH": ["송장번호는 한 번에 1~20개까지 등록할 수 있습니다.", "Register 1–20 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–20 ເລກຕໍ່ຄັ້ງ."],
@@ -55,9 +57,9 @@ const domesticWords = <String, List<String>>{
   "retry": ["다시 시도", "Retry", "ລອງໃໝ່"],
   "status": ["배송 상태", "Delivery status", "ສະຖານະຈັດສົ່ງ"],
   "title": [
-    "명세서 통합 배송 조회",
-    "Statement delivery tracking",
-    "ຕິດຕາມການຈັດສົ່ງຕາມໃບລາຍການ",
+    "라오스 국내 배송 조회 & 관리",
+    "Laos Domestic Delivery Tracking & Management",
+    "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ",
   ],
   "manage": ["라오스 국내 배송 관리", "Laos Domestic Delivery Management", "ຈັດການຂົນສົ່ງພາຍໃນລາວ"],
   "carrier": ["배송업체", "Carrier", "ບໍລິສັດຂົນສົ່ງ"],
@@ -222,4 +224,5 @@ const domesticWords = <String, List<String>>{
     "ດຳເນີນການບໍ່ໄດ້. ລອງໃໝ່.",
   ],
 };
+
 

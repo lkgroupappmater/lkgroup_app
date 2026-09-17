@@ -1,4 +1,5 @@
 import 'app_language.dart';
+import '../services/shared_ui_text_service.dart';
 
 /// Fixed UI text shared by customer-facing screens.
 ///
@@ -8,8 +9,9 @@ class UiLocalizations {
   UiLocalizations._();
 
   static String get(AppLanguage language, String korean) {
-    if (language == AppLanguage.korean) return korean;
-    return (language == AppLanguage.lao ? _lao : _english)[korean] ?? korean;
+    final fallback = language == AppLanguage.korean ? korean :
+        (language == AppLanguage.lao ? _lao : _english)[korean] ?? korean;
+    return SharedUiTextService.instance.korean(korean, language.code, fallback);
   }
 
   static String format(
@@ -519,3 +521,4 @@ class UiLocalizations {
         'ຊ່ອງອັງກິດ ແລະ ລາວທີ່ວ່າງຈະຖືກແປອັດຕະໂນມັດ. ຂໍ້ຄວາມທີ່ປ້ອນເອງຈະຖືກເກັບເປັນຫຼັກ.',
   };
 }
+
