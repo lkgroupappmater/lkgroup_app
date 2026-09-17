@@ -69,3 +69,4 @@ export function canSeePhoto(profile,parcel,shipment) {
   const n=name(profile.name),p=phone(profile.phone);
   return !!n&&p.length===8&&n===name(shipment?.consignee_name??parcel.receiver_name)&&p===phone(shipment?.consignee_phone??parcel.receiver_phone);
 }
+
