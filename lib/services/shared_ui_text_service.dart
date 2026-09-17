@@ -58,7 +58,7 @@ class SharedUiTextService extends ChangeNotifier {
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final page = _loadPage != null
-            ? await _loadPage(offset, 500)
+            ? await _loadPage!(offset, 500)
             : await Supabase.instance.client.from('site_public_text')
                 .select('key,ko,en,lo,updated_at').order('key')
                 .range(offset, offset + 499).timeout(const Duration(seconds: 10));
