@@ -4,6 +4,7 @@ import 'app.dart';
 import 'config/supabase_config.dart';
 import 'services/route_catalog_service.dart';
 import 'services/live_data_service.dart';
+import 'services/shared_ui_text_service.dart';
 
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -28,4 +29,6 @@ Future<void> _initializeServices() async {
   await RouteCatalogService.instance.refresh();
 
   LiveDataService.instance.start();
+  SharedUiTextService.instance.start();
 }
+

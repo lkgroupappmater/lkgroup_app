@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/live_data_service.dart';
+import '../services/shared_ui_text_service.dart';
 
 final autoRefreshRouteObserver = RouteObserver<ModalRoute<dynamic>>();
 
@@ -43,6 +44,7 @@ mixin AutoRefreshState<T extends StatefulWidget> on State<T> implements RouteAwa
   void initState() {
     super.initState();
     LiveDataService.instance.addListener(_onDataChanged);
+    SharedUiTextService.instance.addListener(_onSharedTextChanged);
     FocusManager.instance.addListener(_tryRefresh);
   }
 
@@ -59,6 +61,10 @@ mixin AutoRefreshState<T extends StatefulWidget> on State<T> implements RouteAwa
     if (active && !_active) _pendingRefresh = true;
     _active = active;
     _tryRefresh();
+  }
+
+  void _onSharedTextChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onDataChanged() {
@@ -106,7 +112,9 @@ mixin AutoRefreshState<T extends StatefulWidget> on State<T> implements RouteAwa
     _refreshTimer?.cancel();
     autoRefreshRouteObserver.unsubscribe(this);
     LiveDataService.instance.removeListener(_onDataChanged);
+    SharedUiTextService.instance.removeListener(_onSharedTextChanged);
     FocusManager.instance.removeListener(_tryRefresh);
     super.dispose();
   }
 }
+

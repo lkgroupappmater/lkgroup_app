@@ -1,4 +1,6 @@
 // lib/core/app_language.dart
+import '../services/shared_ui_text_service.dart';
+import 'shared_ui_text_catalog.dart';
 
 enum AppLanguage { korean, english, lao }
 
@@ -310,6 +312,10 @@ class AppStrings {
     },
   };
 
-  static String get(AppLanguage language, String key) =>
-      values[language]?[key] ?? values[AppLanguage.korean]?[key] ?? key;
+  static String get(AppLanguage language, String key) {
+    final fallback = values[language]?[key] ?? values[AppLanguage.korean]?[key] ?? key;
+    final sharedKey = sharedAppTextKeys[key];
+    return sharedKey == null ? fallback : SharedUiTextService.instance.text(sharedKey, language.code, fallback);
+  }
 }
+
