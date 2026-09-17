@@ -11,7 +11,10 @@ export function decodePhotos(body) {
     if (typeof photo?.base64 !== 'string') throw Error('INVALID_IMAGE');
     if (photo.base64.length > 6990508) throw Error('FILE_TOO_LARGE');
     let bytes;
-    try { bytes = Uint8Array.from(atob(photo.base64), c => c.charCodeAt(0)); }
+    try {
+      const binary = atob(photo.base64); bytes = new Uint8Array(binary.length);
+      for (let i=0; i<binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    }
     catch { throw Error('INVALID_IMAGE'); }
     total += bytes.length;
     if (bytes.length > MAX_PHOTO_BYTES || total > MAX_PHOTOS_BYTES) throw Error('FILE_TOO_LARGE');
