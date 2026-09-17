@@ -98,6 +98,8 @@ void main() {
     expect(calls.last['statement'], statement); expect(tester.takeException(), isNull);
   });
   testWidgets('management lists one parent per statement and refresh preserves grouping', (tester) async {
+    tester.view.physicalSize = const Size(1000, 3200); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
     final actions = <String>[];
     final parcels = List.generate(2, (i) => <String,dynamic>{'id':'id$i','group_key':'same-statement','statement':statement,'carrier_name':'HAL','carrier':'HAL','tracking_number':'VTE1234567890$i','delivery_kind':'province','service_kind':'domestic','status':'delivered','integration':'auto','events':[],'photo_urls':[],'receiver_name':'원*연','receiver_phone':'020 5555 ****','recipient_masked':true,'origin':'','destination':'','can_manage':false});
     await tester.pumpWidget(MaterialApp(home: DomesticTrackingScreen(language: AppLanguage.korean,
