@@ -18,10 +18,12 @@ class DomesticTrackingScreen extends StatefulWidget {
     required this.language,
     this.user,
     this.manage = false,
+    this.loadFilterBatches,
   });
   final AppLanguage language;
   final AppUser? user;
   final bool manage;
+  final Future<List<ShipmentBatchOption>> Function()? loadFilterBatches;
   @override
   State<DomesticTrackingScreen> createState() => _DomesticTrackingScreenState();
 }
@@ -33,6 +35,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   String _mode = 'statement_lookup';
   Map<String, dynamic> _submitted = {};
   List<ShipmentBatchOption> _batches = [];
+  bool _filtersLoading = false, _filtersFailed = false;
   bool _busy = false, _more = false;
   int _page = 0;
   String? _message;
@@ -51,11 +54,20 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   }
 
   Future<void> _loadFilters() async {
+    if (_filtersLoading) return;
+    final owner = widget.user?.id;
+    setState(() { _filtersLoading = true; _filtersFailed = false; });
     try {
-      final rows = await ShipmentFilterOptionsService.instance.listBatches();
-      if (mounted) setState(() => _batches = rows);
+      final rows = await (widget.loadFilterBatches?.call() ??
+          ShipmentFilterOptionsService.instance.listBatches());
+      if (mounted && widget.user?.id == owner) setState(() {
+        _batches = rows.where((r) => r.route.trim().isNotEmpty &&
+            r.year >= 1900 && r.year <= 2200 && r.voyage.trim().isNotEmpty).toList();
+      });
     } catch (_) {
-      // Exact statement lookup remains available if optional filters cannot load.
+      if (mounted && widget.user?.id == owner) setState(() => _filtersFailed = true);
+    } finally {
+      if (mounted) setState(() => _filtersLoading = false);
     }
   }
 
@@ -246,11 +258,16 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
           ),
   );
   Widget _filters() {
-    final routes = {...routeLabels, ..._batches.map((b) => b.route)}.toList();
+    final routes = _batches.map((b) => b.route).toSet().toList()..sort();
     final years = _batches.where((b) => _route.isEmpty || b.route == _route)
         .map((b) => b.year.toString()).toSet().toList()..sort((a,b) => b.compareTo(a));
     final voyages = _batches.where((b) => (_route.isEmpty || b.route == _route) &&
-        (_year.isEmpty || b.year.toString() == _year)).map((b) => b.voyage).toSet().toList()..sort();
+        (_year.isEmpty || b.year.toString() == _year)).map((b) => b.voyage).toSet().toList()
+      ..sort((a, b) {
+        final an = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? -1;
+        final bn = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? -1;
+        return an == bn ? a.compareTo(b) : bn.compareTo(an);
+      });
     Widget select(String key, String value, List<String> values, ValueChanged<String> onChanged) =>
         Padding(padding: const EdgeInsets.only(bottom: 12), child: DropdownButtonFormField<String>(
           key: ValueKey('$key-$value-${values.join(',')}'), initialValue: value,
@@ -258,9 +275,15 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
           items: [DropdownMenuItem(value: '', child: Text(t('any'))),
             ...values.map((v) => DropdownMenuItem(value: v,
               child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : v)))],
-          onChanged: _busy ? null : (v) => setState(() => onChanged(v ?? '')),
+          onChanged: _busy || _filtersLoading || values.isEmpty ? null : (v) => setState(() => onChanged(v ?? '')),
         ));
     return Column(children: [
+      if (_filtersLoading) Text(t('filtersLoading')),
+      if (_filtersFailed) Row(children: [
+        Expanded(child: Text(t('filtersFailed'))),
+        TextButton(onPressed: _busy ? null : _loadFilters, child: Text(t('retry'))),
+      ]),
+      if (!_filtersLoading && !_filtersFailed && _batches.isEmpty) Text(t('filtersEmpty')),
       select('route', _route, routes, (v) { _route = v; _year = ''; _voyage = ''; }),
       select('year', _year, years, (v) { _year = v; _voyage = ''; }),
       select('voyage', _voyage, voyages, (v) => _voyage = v),

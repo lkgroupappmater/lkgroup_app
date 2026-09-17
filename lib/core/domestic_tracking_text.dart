@@ -4,6 +4,10 @@ String domesticText(AppLanguage language, String key) =>
     (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
 
 const domesticWords = <String, List<String>>{
+  "filtersLoading": ["검색 조건을 불러오는 중…", "Loading search filters…", "ກຳລັງໂຫຼດເງື່ອນໄຂຄົ້ນຫາ…"],
+  "filtersFailed": ["검색 조건을 불러오지 못했습니다. 다시 시도하거나 번호만으로 조회하세요.", "Filters could not be loaded. Retry or search by number only.", "ໂຫຼດເງື່ອນໄຂບໍ່ໄດ້. ລອງໃໝ່ ຫຼື ຄົ້ນຫາດ້ວຍເລກເທົ່ານັ້ນ."],
+  "filtersEmpty": ["선택할 운송 데이터가 없습니다. 번호만으로 조회할 수 있습니다.", "No shipment filters are available. You can search by number only.", "ບໍ່ມີຂໍ້ມູນຂົນສົ່ງໃຫ້ເລືອກ. ຄົ້ນຫາດ້ວຍເລກໄດ້."],
+  "retry": ["다시 시도", "Retry", "ລອງໃໝ່"],
   "status": ["배송 상태", "Delivery status", "ສະຖານະຈັດສົ່ງ"],
   "title": [
     "명세서 통합 배송 조회",
