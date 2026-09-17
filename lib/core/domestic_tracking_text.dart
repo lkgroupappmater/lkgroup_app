@@ -4,6 +4,33 @@ String domesticText(AppLanguage language, String key) =>
     (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
 
 const domesticWords = <String, List<String>>{
+  "linkMethod": ["연결 방식", "Link method", "ວິທີເຊື່ອມ"],
+  "linkStatement": ["LK 명세서 연결", "Link an LK statement", "ເຊື່ອມໃບລາຍການ LK"],
+  "linkReference": ["별도 명세서·관리번호 연결", "Link a separate reference", "ເຊື່ອມເລກອ້າງອີງແຍກ"],
+  "linkCargo": ["개별 화물 연결", "Link individual cargo", "ເຊື່ອມສິນຄ້າແຕ່ລະລາຍການ"],
+  "linkLegacy": ["기존 송장만 등록된 배송", "Existing delivery without a reference", "ການຈັດສົ່ງເກົ່າທີ່ບໍ່ມີເລກອ້າງອີງ"],
+  "stepStatement": ["1. 연결할 LK 명세서 또는 관리번호", "1. LK statement or reference to link", "1. ໃບລາຍການ LK ຫຼື ເລກອ້າງອີງ"],
+  "stepWaybill": ["2. 라오스 배송업체 송장", "2. Lao carrier waybill", "2. ໃບສົ່ງຂອງບໍລິສັດຂົນສົ່ງລາວ"],
+  "statementNumber": ["LK 명세서 번호", "LK statement number", "ເລກໃບລາຍການ LK"],
+  "exampleStatement": ["예: LKS 03", "Example: LKS 03", "ຕົວຢ່າງ: LKS 03"],
+  "confirmStatement": ["명세서 확인", "Confirm statement", "ກວດໃບລາຍການ"],
+  "statementConfirmed": ["연결할 명세서 확인 완료", "Statement confirmed for linking", "ຢືນຢັນໃບລາຍການທີ່ຈະເຊື່ອມແລ້ວ"],
+  "mappingHelp": ["경로·연도·항차를 선택하고 LK 명세서 번호를 확인하세요. 선택한 명세서 전체에 배송 송장을 연결합니다.", "Choose the route, year and voyage, then confirm the LK statement number. The waybill will link to the whole statement.", "ເລືອກເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວ ແລ້ວກວດເລກໃບລາຍການ LK. ໃບສົ່ງຈະເຊື່ອມກັບໃບລາຍການທັງໝົດ."],
+  "referenceType": ["관리번호 구분", "Reference type", "ປະເພດເລກອ້າງອີງ"],
+  "referenceNumber": ["별도 명세서·관리번호", "Separate statement / reference number", "ເລກໃບລາຍການ / ອ້າງອີງແຍກ"],
+  "local": ["별도 국내배송", "Separate domestic delivery", "ການຈັດສົ່ງພາຍໃນແຍກ"],
+  "referenceHelp": ["전자상거래 또는 별도 국내배송에 사용하는 LK 관리번호를 입력하세요. 배송업체 송장번호는 아래에 따로 입력합니다.", "Enter the LK reference used for e-commerce or separate domestic deliveries. Enter the carrier tracking number separately below.", "ປ້ອນເລກອ້າງອີງ LK ສຳລັບອີຄອມເມີຊ ຫຼື ການຈັດສົ່ງພາຍໃນແຍກ. ປ້ອນເລກໃບສົ່ງຂອງຂົນສົ່ງຢູ່ດ້ານລຸ່ມ."],
+  "waybillHelp": ["배송업체 송장에 적힌 업체와 번호를 입력하세요. 한 명세서에 송장이 여러 장이면 각각 등록하세요.", "Enter the carrier and number printed on the waybill. Register each waybill separately when a statement has several deliveries.", "ປ້ອນບໍລິສັດ ແລະ ເລກທີ່ຢູ່ໃນໃບສົ່ງ. ຖ້າໃບລາຍການມີຫຼາຍໃບສົ່ງ ໃຫ້ລົງທະບຽນແຕ່ລະໃບ."],
+  "carrierHint": ["번호 형식에 따른 참고 추천입니다. 송장에 적힌 배송업체를 확인해 선택하세요.", "Suggestions use the number format only. Confirm the carrier printed on the waybill.", "ຄຳແນະນຳອີງຕາມຮູບແບບເລກເທົ່ານັ້ນ. ກວດບໍລິສັດທີ່ຢູ່ໃນໃບສົ່ງ."],
+  "correctionHelp": ["업체나 송장번호를 정정하면 이전 배송사 이력은 초기화됩니다. 직접 등록한 이력과 사진은 유지됩니다.", "Correcting the carrier or number resets carrier events. Manually recorded events and photos are retained.", "ການແກ້ບໍລິສັດ ຫຼື ເລກໃບສົ່ງຈະລ້າງປະຫວັດຈາກຂົນສົ່ງ. ປະຫວັດທີ່ບັນທຶກເອງ ແລະ ຮູບຍັງຢູ່."],
+  "lookupKind": ["조회 기준", "Search by", "ຄົ້ນຫາຕາມ"],
+  "STATEMENT_REQUIRED": ["경로·연도·항차와 명세서 번호를 입력한 뒤 명세서 확인을 눌러 주세요.", "Choose the route, year and voyage, enter the number, then confirm the statement.", "ເລືອກເສັ້ນທາງ, ປີ, ຖ້ຽວ ແລະ ປ້ອນເລກ ແລ້ວກວດໃບລາຍການ."],
+  "STATEMENT_NOT_FOUND": ["선택한 경로·연도·항차에서 명세서를 찾지 못했습니다.", "No statement matches the selected route, year and voyage.", "ບໍ່ພົບໃບລາຍການໃນເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວທີ່ເລືອກ."],
+  "AMBIGUOUS_STATEMENT": ["같은 번호가 여러 명세서에 있습니다. LKS 03처럼 전체 명세서 번호를 입력하세요.", "More than one statement matches. Enter the full statement number, such as LKS 03.", "ພົບຫຼາຍໃບລາຍການ. ປ້ອນເລກຄົບ ເຊັ່ນ LKS 03."],
+  "INVALID_REFERENCE": ["관리번호 구분과 전체 번호를 확인하세요. 영문·숫자·점·하이픈·밑줄·슬래시를 사용할 수 있습니다.", "Check the reference type and full number. Use letters, digits, dots, hyphens, underscores or slashes.", "ກວດປະເພດ ແລະ ເລກອ້າງອີງ. ໃຊ້ອັກສອນອັງກິດ, ຕົວເລກ, ຈຸດ, ຂີດ ຫຼື ເຄື່ອງໝາຍທັບ."],
+  "INVALID_LINK_SCOPE": ["연결 방식을 확인하세요.", "Check the link method.", "ກວດວິທີເຊື່ອມ."],
+  "cargoCount": ["포함 화물", "Cargo items", "ລາຍການສິນຄ້າ"],
+
   "filtersLoading": ["검색 조건을 불러오는 중…", "Loading search filters…", "ກຳລັງໂຫຼດເງື່ອນໄຂຄົ້ນຫາ…"],
   "filtersFailed": ["검색 조건을 불러오지 못했습니다. 다시 시도하거나 번호만으로 조회하세요.", "Filters could not be loaded. Retry or search by number only.", "ໂຫຼດເງື່ອນໄຂບໍ່ໄດ້. ລອງໃໝ່ ຫຼື ຄົ້ນຫາດ້ວຍເລກເທົ່ານັ້ນ."],
   "filtersEmpty": ["선택할 운송 데이터가 없습니다. 번호만으로 조회할 수 있습니다.", "No shipment filters are available. You can search by number only.", "ບໍ່ມີຂໍ້ມູນຂົນສົ່ງໃຫ້ເລືອກ. ຄົ້ນຫາດ້ວຍເລກໄດ້."],
@@ -189,3 +216,4 @@ const domesticWords = <String, List<String>>{
     "ດຳເນີນການບໍ່ໄດ້. ລອງໃໝ່.",
   ],
 };
+

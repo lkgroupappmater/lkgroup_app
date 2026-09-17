@@ -8,6 +8,7 @@ class DomesticTrackingException implements Exception {
 }
 
 class DomesticTrackingService {
+  static String? get currentUserId => SupabaseService.isReady ? SupabaseService.client.auth.currentUser?.id : null;
   // Only validated formats select a carrier; numeric identifiers stay a suggestion.
   static String? detectCarrier(String value) {
     final n = value.toUpperCase().replaceAll(RegExp(r'\s'), '');
@@ -75,3 +76,4 @@ class DomesticTrackingService {
     return '${date.year}-${two(date.month)}-${two(date.day)} ${two(date.hour)}:${two(date.minute)}';
   }
 }
+

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lkgroup_app/core/app_language.dart';
@@ -8,6 +9,71 @@ import 'package:lkgroup_app/models/app_user.dart';
 import 'package:lkgroup_app/services/shipment_filter_options_service.dart';
 
 void main() {
+  Future<void> choose(WidgetTester tester, String value) async {
+    final dropdown = tester.widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>))
+      .firstWhere((w) => w.items!.any((item) => item.value == value));
+    dropdown.onChanged!(value); await tester.pump();
+  }
+  Future<void> editor(WidgetTester tester, Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) call) async {
+    tester.view.physicalSize = const Size(1000, 2600); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: DomesticWaybillEditor(language: AppLanguage.korean,
+      loadFilterBatches: () async => const [ShipmentBatchOption(route: 'sea', year: 2026, voyage: '08'), ShipmentBatchOption(route: 'sea', year: 2026, voyage: '09')], callApi: call)));
+    await tester.pumpAndSettle();
+  }
+  Future<void> enterStatement(WidgetTester tester) async {
+    await choose(tester, 'sea'); await choose(tester, '2026'); await choose(tester, '08');
+    await tester.enterText(find.byKey(const Key('delivery-receipt-number')), 'LKS 03');
+    await tester.enterText(find.byKey(const Key('delivery-tracking-number')), 'VTE12345678901');
+    await choose(tester, 'HAL');
+  }
+  const statement = {'route':'sea','shipment_year':2026,'voyage':'08','receipt_number':'LKS 03'};
+  testWidgets('statement confirmation is required and the canonical LK receipt stays separate from the waybill', (tester) async {
+    final calls = <Map<String, dynamic>>[];
+    await editor(tester, (action, body) async {
+      calls.add({'action':action, ...body});
+      if (action == 'statement_resolve') return {'statement':statement,'cargo_count':2,'cargo':[]};
+      return {'parcel':{}};
+    });
+    await enterStatement(tester);
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(calls, isEmpty);
+    expect(find.text(domesticText(AppLanguage.korean, 'STATEMENT_REQUIRED')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pumpAndSettle();
+    expect(calls.single['receipt_number'], 'LKS 03');
+    await choose(tester, '09');
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(calls.length, 1);
+    await choose(tester, '08');
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(calls.last['action'], 'save'); expect(calls.last['link_scope'], 'statement');
+    expect(calls.last['statement'], statement); expect(calls.last['shipment_id'], isNull);
+    expect(calls.last['tracking_number'], 'VTE12345678901'); expect(tester.takeException(), isNull);
+  });
+  testWidgets('ecommerce references save without an international cargo selection', (tester) async {
+    final calls = <Map<String, dynamic>>[];
+    await editor(tester, (action, body) async { calls.add({'action':action, ...body}); return {'parcel':{}}; });
+    await choose(tester, 'reference');
+    await tester.enterText(find.byKey(const Key('delivery-reference-number')), 'EC-003');
+    await tester.enterText(find.byKey(const Key('delivery-tracking-number')), 'VTE12345678901'); await choose(tester, 'HAL');
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(calls.single['reference'], {'reference_type':'ecommerce','reference_number':'EC-003'});
+    expect(calls.single['service_kind'], 'ecommerce'); expect(calls.single['shipment_id'], isNull);
+    expect(calls.single['statement'], isNull); expect(tester.takeException(), isNull);
+  });
+  testWidgets('late confirmation cannot link the receipt that the operator has already changed', (tester) async {
+    final pending = Completer<Map<String, dynamic>>();
+    await editor(tester, (action, body) => pending.future);
+    await enterStatement(tester);
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pump();
+    await tester.enterText(find.byKey(const Key('delivery-receipt-number')), 'LKS 04');
+    pending.complete({'statement':statement,'cargo_count':2,'cargo':[]}); await tester.pumpAndSettle();
+    expect(find.textContaining(domesticText(AppLanguage.korean, 'statementConfirmed')), findsNothing);
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(find.text(domesticText(AppLanguage.korean, 'STATEMENT_REQUIRED')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('filters contain only DB batches and cascade without submitting a search', (tester) async {
     const batches = [
       ShipmentBatchOption(route: 'sea', year: 2026, voyage: '02'),
@@ -21,7 +87,7 @@ void main() {
     )));
     await tester.pumpAndSettle();
     List<DropdownButton<String>> selects() => tester.widgetList<DropdownButton<String>>(
-      find.byType(DropdownButton<String>)).toList();
+      find.byType(DropdownButton<String>)).where((w) => !w.items!.any((item) => item.value == 'statement')).toList();
     List<String?> values(int i) => selects()[i].items!.map((v) => v.value).toList();
     expect(values(0), ['', 'air', 'sea']);
     selects()[0].onChanged!('sea'); await tester.pump();
@@ -31,7 +97,7 @@ void main() {
     selects()[2].onChanged!('02'); await tester.pump();
     selects()[0].onChanged!('air'); await tester.pump();
     expect(values(1), ['', '2024']); expect(values(2), ['', '03']);
-    final states = tester.stateList<FormFieldState<String>>(find.byType(DropdownButtonFormField<String>)).toList();
+    final states = tester.stateList<FormFieldState<String>>(find.byType(DropdownButtonFormField<String>)).where((s) => s.widget.key != null).toList();
     expect(states[1].value, ''); expect(states[2].value, '');
     expect(find.text('조회 가능한 배송 내역이 없습니다. 입력한 번호와 검색 조건을 확인해 주세요.'), findsNothing);
     expect(tester.takeException(), isNull);
