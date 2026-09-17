@@ -4,6 +4,24 @@ String domesticText(AppLanguage language, String key) =>
     (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index];
 
 const domesticWords = <String, List<String>>{
+  "INVALID_BATCH": ["송장번호는 한 번에 1~20개까지 등록할 수 있습니다.", "Register 1–20 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–20 ເລກຕໍ່ຄັ້ງ."],
+
+  "TOO_MANY_PHOTOS": ["기존 사진을 포함해 송장당 최대 10장까지 등록할 수 있습니다.", "Each waybill can have up to 10 photos, including existing photos.", "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 10 ຮູບ ລວມຮູບເກົ່າ."],
+
+  "recipientMasked": ["다른 고객의 이름과 연락처는 일부만 표시됩니다.", "Another customer's name and phone are partially masked.", "ຊື່ ແລະ ເບີໂທຂອງລູກຄ້າອື່ນຖືກປິດບັງບາງສ່ວນ."],
+
+  "autoRefreshHint": ["등록·조회 시 배송 이력을 자동 확인합니다. 화면을 열어 둔 동안 5분마다 갱신합니다.", "History is checked automatically when saving or viewing, and every 5 minutes while this screen is open.", "ກວດປະຫວັດອັດຕະໂນມັດເມື່ອບັນທຶກ ຫຼື ເບິ່ງ ແລະ ທຸກ 5 ນາທີຂະນະເປີດໜ້ານີ້."],
+
+  "photoHelp": ["선택한 사진은 이번에 등록하는 송장들에 함께 연결되며, 명세서 안에서 확인할 수 있습니다. JPG·PNG·WebP를 선택하세요.", "Selected photos are shared by the waybills saved together and shown inside the statement. Choose JPG, PNG or WebP.", "ຮູບຈະເຊື່ອມກັບໃບສົ່ງທີ່ບັນທຶກພ້ອມກັນ ແລະ ສະແດງໃນໃບລາຍການ. ໃຊ້ JPG, PNG ຫຼື WebP."],
+
+  "waybillCount": ["연결 송장", "Linked waybills", "ໃບສົ່ງທີ່ເຊື່ອມ"],
+
+  "removePhoto": ["선택 사진 제외", "Remove selected photo", "ເອົາຮູບທີ່ເລືອກອອກ"],
+
+  "removeWaybill": ["송장번호 삭제", "Remove tracking number", "ລຶບເລກໃບສົ່ງ"],
+
+  "addWaybill": ["송장번호 추가", "Add tracking number", "ເພີ່ມເລກໃບສົ່ງ"],
+
   "linkMethod": ["연결 방식", "Link method", "ວິທີເຊື່ອມ"],
   "linkStatement": ["LK 명세서 연결", "Link an LK statement", "ເຊື່ອມໃບລາຍການ LK"],
   "linkReference": ["별도 명세서·관리번호 연결", "Link a separate reference", "ເຊື່ອມເລກອ້າງອີງແຍກ"],
@@ -20,7 +38,7 @@ const domesticWords = <String, List<String>>{
   "referenceNumber": ["별도 명세서·관리번호", "Separate statement / reference number", "ເລກໃບລາຍການ / ອ້າງອີງແຍກ"],
   "local": ["별도 국내배송", "Separate domestic delivery", "ການຈັດສົ່ງພາຍໃນແຍກ"],
   "referenceHelp": ["전자상거래 또는 별도 국내배송에 사용하는 LK 관리번호를 입력하세요. 배송업체 송장번호는 아래에 따로 입력합니다.", "Enter the LK reference used for e-commerce or separate domestic deliveries. Enter the carrier tracking number separately below.", "ປ້ອນເລກອ້າງອີງ LK ສຳລັບອີຄອມເມີຊ ຫຼື ການຈັດສົ່ງພາຍໃນແຍກ. ປ້ອນເລກໃບສົ່ງຂອງຂົນສົ່ງຢູ່ດ້ານລຸ່ມ."],
-  "waybillHelp": ["배송업체 송장에 적힌 업체와 번호를 입력하세요. 한 명세서에 송장이 여러 장이면 각각 등록하세요.", "Enter the carrier and number printed on the waybill. Register each waybill separately when a statement has several deliveries.", "ປ້ອນບໍລິສັດ ແລະ ເລກທີ່ຢູ່ໃນໃບສົ່ງ. ຖ້າໃບລາຍການມີຫຼາຍໃບສົ່ງ ໃຫ້ລົງທະບຽນແຕ່ລະໃບ."],
+  "waybillHelp": ["같은 명세서의 송장번호를 + 버튼으로 추가하세요. 번호별 배송업체를 선택하고 함께 저장합니다.", "Use + to add waybills for this statement. Select a carrier for each number and save together.", "ໃຊ້ປຸ່ມ + ເພີ່ມໃບສົ່ງໃນໃບລາຍການດຽວກັນ. ເລືອກຂົນສົ່ງແຕ່ລະເລກ ແລ້ວບັນທຶກພ້ອມກັນ."],
   "carrierHint": ["번호 형식에 따른 참고 추천입니다. 송장에 적힌 배송업체를 확인해 선택하세요.", "Suggestions use the number format only. Confirm the carrier printed on the waybill.", "ຄຳແນະນຳອີງຕາມຮູບແບບເລກເທົ່ານັ້ນ. ກວດບໍລິສັດທີ່ຢູ່ໃນໃບສົ່ງ."],
   "correctionHelp": ["업체나 송장번호를 정정하면 이전 배송사 이력은 초기화됩니다. 직접 등록한 이력과 사진은 유지됩니다.", "Correcting the carrier or number resets carrier events. Manually recorded events and photos are retained.", "ການແກ້ບໍລິສັດ ຫຼື ເລກໃບສົ່ງຈະລ້າງປະຫວັດຈາກຂົນສົ່ງ. ປະຫວັດທີ່ບັນທຶກເອງ ແລະ ຮູບຍັງຢູ່."],
   "lookupKind": ["조회 기준", "Search by", "ຄົ້ນຫາຕາມ"],
@@ -41,7 +59,7 @@ const domesticWords = <String, List<String>>{
     "Statement delivery tracking",
     "ຕິດຕາມການຈັດສົ່ງຕາມໃບລາຍການ",
   ],
-  "manage": ["국내배송 송장 관리", "Domestic waybills", "ຈັດການໃບສົ່ງພາຍໃນ"],
+  "manage": ["라오스 국내 배송 관리", "Laos Domestic Delivery Management", "ຈັດການຂົນສົ່ງພາຍໃນລາວ"],
   "carrier": ["배송업체", "Carrier", "ບໍລິສັດຂົນສົ່ງ"],
   "tracking": [
     "국내배송 송장번호 전체",
@@ -71,11 +89,7 @@ const domesticWords = <String, List<String>>{
     "Enter your statement number to see linked deliveries. Select a route, year or voyage if needed.",
     "ປ້ອນເລກໃບລາຍການເພື່ອເບິ່ງການຈັດສົ່ງ. ເລືອກເສັ້ນທາງ, ປີ ຫຼື ຖ້ຽວຖ້າຕ້ອງການ.",
   ],
-  "manageHint": [
-    "업체를 선택하고 송장번호 전체를 입력하세요.",
-    "Choose a carrier and enter the full tracking number.",
-    "ເລືອກບໍລິສັດ ແລະ ປ້ອນເລກໃບສົ່ງຄົບຖ້ວນ.",
-  ],
+  "manageHint": ["LK 명세서별로 배송업체 송장과 사진, 배송 이력을 관리합니다.", "Manage carrier waybills, photos and delivery history by LK statement.", "ຈັດການໃບສົ່ງ, ຮູບ ແລະ ປະຫວັດຕາມໃບລາຍການ LK."],
   "loading": [
     "배송 이력을 확인하고 있습니다…",
     "Checking delivery history…",
@@ -96,11 +110,7 @@ const domesticWords = <String, List<String>>{
   "kind": ["배송 구분", "Delivery type", "ປະເພດຈັດສົ່ງ"],
   "service": ["운송 구분", "Service", "ປະເພດບໍລິການ"],
   "photo": ["등록된 송장 사진", "Waybill photo", "ຮູບໃບສົ່ງ"],
-  "photoInput": [
-    "송장 사진 · JPG/PNG/WebP, 최대 5MB",
-    "Waybill photo · JPG/PNG/WebP, max 5MB",
-    "ຮູບໃບສົ່ງ · JPG/PNG/WebP, ສູງສຸດ 5MB",
-  ],
+  "photoInput": ["송장 사진 여러 장 선택 · 최대 10장, 장당 5MB, 합계 15MB", "Select waybill photos · up to 10, 5MB each, 15MB total", "ເລືອກຫຼາຍຮູບ · ສູງສຸດ 10 ຮູບ, ຮູບລະ 5MB, ລວມ 15MB"],
   "noPhoto": [
     "등록된 송장 사진이 없습니다.",
     "No waybill photo registered.",
@@ -185,11 +195,7 @@ const domesticWords = <String, List<String>>{
     "This record changed. Reload before saving.",
     "ຂໍ້ມູນປ່ຽນແລ້ວ. ໂຫຼດຄືນກ່ອນບັນທຶກ.",
   ],
-  "FILE_TOO_LARGE": [
-    "사진은 5MB 이하로 선택하세요.",
-    "Choose a photo smaller than 5MB.",
-    "ເລືອກຮູບບໍ່ເກີນ 5MB.",
-  ],
+  "FILE_TOO_LARGE": ["사진은 장당 5MB, 이번 선택 합계 15MB 이하여야 합니다.", "Photos must be at most 5MB each and 15MB total per selection.", "ຮູບຕ້ອງບໍ່ເກີນ 5MB ຕໍ່ຮູບ ແລະ ລວມ 15MB ຕໍ່ຄັ້ງ."],
   "INVALID_IMAGE": [
     "JPG, PNG, WebP 사진만 등록할 수 있습니다.",
     "Use a JPG, PNG or WebP photo.",

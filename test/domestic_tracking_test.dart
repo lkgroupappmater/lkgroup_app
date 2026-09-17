@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lkgroup_app/core/app_language.dart';
@@ -14,11 +15,11 @@ void main() {
       .firstWhere((w) => w.items!.any((item) => item.value == value));
     dropdown.onChanged!(value); await tester.pump();
   }
-  Future<void> editor(WidgetTester tester, Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) call) async {
+  Future<void> editor(WidgetTester tester, Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) call, {Future<List<DomesticPhotoSelection>> Function()? pickPhotos}) async {
     tester.view.physicalSize = const Size(1000, 2600); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MaterialApp(home: DomesticWaybillEditor(language: AppLanguage.korean,
-      loadFilterBatches: () async => const [ShipmentBatchOption(route: 'sea', year: 2026, voyage: '08'), ShipmentBatchOption(route: 'sea', year: 2026, voyage: '09')], callApi: call)));
+      loadFilterBatches: () async => const [ShipmentBatchOption(route: 'sea', year: 2026, voyage: '08'), ShipmentBatchOption(route: 'sea', year: 2026, voyage: '09')], callApi: call, pickPhotos: pickPhotos)));
     await tester.pumpAndSettle();
   }
   Future<void> enterStatement(WidgetTester tester) async {
@@ -33,7 +34,7 @@ void main() {
     await editor(tester, (action, body) async {
       calls.add({'action':action, ...body});
       if (action == 'statement_resolve') return {'statement':statement,'cargo_count':2,'cargo':[]};
-      return {'parcel':{}};
+      return {'parcels':[{}]};
     });
     await enterStatement(tester);
     await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
@@ -47,13 +48,13 @@ void main() {
     await choose(tester, '08');
     await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
-    expect(calls.last['action'], 'save'); expect(calls.last['link_scope'], 'statement');
+    expect(calls.last['action'], 'save_batch'); expect(calls.last['link_scope'], 'statement');
     expect(calls.last['statement'], statement); expect(calls.last['shipment_id'], isNull);
     expect(calls.last['tracking_number'], 'VTE12345678901'); expect(tester.takeException(), isNull);
   });
   testWidgets('ecommerce references save without an international cargo selection', (tester) async {
     final calls = <Map<String, dynamic>>[];
-    await editor(tester, (action, body) async { calls.add({'action':action, ...body}); return {'parcel':{}}; });
+    await editor(tester, (action, body) async { calls.add({'action':action, ...body}); return {'parcels':[{}]}; });
     await choose(tester, 'reference');
     await tester.enterText(find.byKey(const Key('delivery-reference-number')), 'EC-003');
     await tester.enterText(find.byKey(const Key('delivery-tracking-number')), 'VTE12345678901'); await choose(tester, 'HAL');
@@ -72,6 +73,43 @@ void main() {
     expect(find.textContaining(domesticText(AppLanguage.korean, 'statementConfirmed')), findsNothing);
     await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
     expect(find.text(domesticText(AppLanguage.korean, 'STATEMENT_REQUIRED')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('multiple waybills and photos are saved together under one statement', (tester) async {
+    final calls = <Map<String, dynamic>>[];
+    final image = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZkAAAAASUVORK5CYII=');
+    await editor(tester, (action, body) async {
+      calls.add({'action': action, ...body});
+      if (action == 'statement_resolve') return {'statement': statement, 'cargo_count': 1, 'cargo': []};
+      return {'parcels': [{}, {}]};
+    }, pickPhotos: () async => [DomesticPhotoSelection('one.png', image), DomesticPhotoSelection('two.png', image)]);
+    await enterStatement(tester);
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('delivery-add-waybill'))); await tester.pumpAndSettle();
+    final numbers = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText == domesticText(AppLanguage.korean, 'tracking'));
+    await tester.enterText(numbers.last, 'JTLA123456789012'); await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('delivery-pick-photos')));
+    await tester.tap(find.byKey(const Key('delivery-pick-photos'))); await tester.pumpAndSettle();
+    expect(find.text('one.png'), findsOneWidget); expect(find.text('two.png'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('delivery-save')));
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    expect(calls.last['action'], 'save_batch'); expect((calls.last['photos'] as List).length, 2);
+    expect(calls.last['waybills'], [{'carrier':'HAL','tracking_number':'VTE12345678901'},{'carrier':'JT','tracking_number':'JTLA123456789012'}]);
+    expect(calls.last['statement'], statement); expect(tester.takeException(), isNull);
+  });
+  testWidgets('management lists one parent per statement and refresh preserves grouping', (tester) async {
+    final actions = <String>[];
+    final parcels = List.generate(2, (i) => <String,dynamic>{'id':'id$i','group_key':'same-statement','statement':statement,'carrier_name':'HAL','carrier':'HAL','tracking_number':'VTE1234567890$i','delivery_kind':'province','service_kind':'domestic','status':'delivered','integration':'auto','events':[],'photo_urls':[],'receiver_name':'원*연','receiver_phone':'020 5555 ****','recipient_masked':true,'origin':'','destination':'','can_manage':false});
+    await tester.pumpWidget(MaterialApp(home: DomesticTrackingScreen(language: AppLanguage.korean,
+      user: const AppUser(id:'test',role:UserRole.admin), manage:true, loadFilterBatches: () async => [],
+      callApi: (action, body) async { actions.add(action); return {'parcels':parcels,'has_more':false}; })));
+    await tester.pumpAndSettle();
+    expect(actions, ['list_groups']); expect(find.byKey(const ValueKey('statement-group-same-statement')), findsOneWidget);
+    expect(find.text('LK 명세서 번호: LKS 03'), findsOneWidget);
+    expect(find.text('수취인 전화번호: 020 5555 ****'), findsWidgets);
+    await tester.pump(const Duration(minutes:5)); await tester.pumpAndSettle();
+    expect(actions, ['list_groups','list_groups']);
+    await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);
   });
   testWidgets('filters contain only DB batches and cascade without submitting a search', (tester) async {

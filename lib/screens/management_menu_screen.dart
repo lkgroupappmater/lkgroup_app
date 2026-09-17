@@ -57,7 +57,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
       '화물 내용 변경 승인 관리': 'Change Approvals',
       '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)': 'Bulk Excel Management\n(Edit lock, zone & receipt)',
       '할인 적용 관리': 'Discounts',
-      '시내.지방 배송 관리': 'Local Delivery',
+      '시내.지방 배송 list 관리': 'City / Provincial Delivery List',
       '항차별 총액 관리': 'Voyage Totals',
       '견적 요청 관리': 'Quote Requests',
       '기준 환율 입력': 'Exchange Rates',
@@ -76,7 +76,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
       '화물 내용 변경 승인 관리': 'ອະນຸມັດການປ່ຽນແປງ',
       '엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)': 'ຈັດການ Excel ຈຳນວນຫຼາຍ',
       '할인 적용 관리': 'ຈັດການສ່ວນລົດ',
-      '시내.지방 배송 관리': 'ຈັດການຈັດສົ່ງພາຍໃນ',
+      '시내.지방 배송 list 관리': 'ຈັດການລາຍການຈັດສົ່ງໃນເມືອງ·ຕ່າງແຂວງ',
       '항차별 총액 관리': 'ຍອດລວມແຕ່ລະຖ້ຽວ',
       '견적 요청 관리': 'ຄຳຂໍໃບສະເໜີລາຄາ',
       '기준 환율 입력': 'ອັດຕາແລກປ່ຽນ',
@@ -280,7 +280,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
           'page': const DiscountManagementScreen(),
         },
         {
-          'label': _m('시내.지방 배송 관리'),
+          'label': _m('시내.지방 배송 list 관리'),
           'icon': Icons.local_shipping_outlined,
           'menuKey': 'local_delivery_management',
           'page': const LocalDeliveryManagementScreen(),
@@ -372,3 +372,4 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> {
     );
   }
 }
+
