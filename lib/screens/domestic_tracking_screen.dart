@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -19,16 +20,18 @@ class DomesticTrackingScreen extends StatefulWidget {
     this.user,
     this.manage = false,
     this.loadFilterBatches,
+    this.callApi,
   });
   final AppLanguage language;
   final AppUser? user;
   final bool manage;
+  final Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)? callApi;
   final Future<List<ShipmentBatchOption>> Function()? loadFilterBatches;
   @override
   State<DomesticTrackingScreen> createState() => _DomesticTrackingScreenState();
 }
 
-class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
+class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with WidgetsBindingObserver {
   final _number = TextEditingController();
   String _carrier = '', _queryType = 'statement';
   String _route = '', _year = '', _voyage = '';
@@ -40,6 +43,10 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   int _page = 0;
   String? _message;
   List<Map<String, dynamic>> _rows = [];
+  Timer? _refreshTimer;
+  bool _foreground = true;
+  String? _owner;
+  bool get _valid => mounted && widget.user?.id == _owner && (widget.callApi != null || DomesticTrackingService.currentUserId == _owner);
   String t(String k) => domesticText(widget.language, k);
   bool get manager =>
       [UserRole.admin, UserRole.staff].contains(widget.user?.role);
@@ -49,8 +56,24 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _owner = widget.user?.id;
+    WidgetsBinding.instance.addObserver(this);
     if (widget.manage && isOperator) _list();
     if (widget.user != null) _loadFilters();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+  }
+
+  @override
+  void didUpdateWidget(covariant DomesticTrackingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user?.id != widget.user?.id) {
+      _rows = []; _submitted = {}; _more = false; _page = 0;
+      _owner = widget.user?.id;
+    }
   }
 
   Future<void> _loadFilters() async {
@@ -73,46 +96,49 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _number.dispose();
     super.dispose();
   }
 
-  Future<void> _run(String action, Map<String, dynamic> args) async {
-    if (_busy) return;
+  Future<void> _run(String action, Map<String, dynamic> args, {bool quiet = false}) async {
+    if (_busy || !_valid) return;
+    final requestOwner = _owner;
     setState(() {
       _busy = true;
-      _message = t('loading');
-      _rows = [];
-      _more = false;
+      if (!quiet) { _message = t('loading'); _rows = []; _more = false; }
       if (action == 'lookup') _page = 0;
     });
     try {
-      final data = await DomesticTrackingService.call(action, args);
-      if (!mounted) return;
+      final data = await (widget.callApi?.call(action, {...args, 'grouped': true}) ?? DomesticTrackingService.call(action, {...args, 'grouped': true}));
+      if (!_valid || requestOwner != _owner) return;
       setState(() {
         _rows = (data['parcels'] as List)
             .map((x) => Map<String, dynamic>.from(x))
             .toList();
+        if (_rows.isNotEmpty) _refreshTimer ??= Timer.periodic(const Duration(minutes: 5), (_) {
+          if (_valid && _foreground && _rows.isNotEmpty && ModalRoute.of(context)?.isCurrent == true) _loadPage(quiet: true);
+        });
         _more = data['has_more'] == true;
         _message = _rows.isEmpty
             ? t((data['cargo_count'] as num? ?? 0) > 0 ? 'noLinked' : 'empty')
             : null;
       });
     } catch (e) {
-      if (mounted) setState(() => _message = error(e));
+      if (_valid && requestOwner == _owner) setState(() => _message = error(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _list() {
-    _mode = 'list';
-    return _run('list', {'page': _page});
+    _mode = 'list_groups';
+    return _run('list_groups', {'page': _page});
   }
-  Future<void> _loadPage() => _mode == 'list' ? _list() : _run(_mode, {..._submitted, 'page': _page});
+  Future<void> _loadPage({bool quiet = false}) => _run(_mode, {...(_mode == 'list_groups' ? <String, dynamic>{} : _submitted), 'page': _page}, quiet: quiet);
   Future<void> _lookup([Map<String, dynamic>? row]) {
     if (row != null) {
-      if (_mode == 'list' || _mode == 'lookup') return _run('lookup', {'carrier': row['carrier'], 'tracking_number': row['tracking_number']});
       return _loadPage();
     }
     _page = 0;
@@ -122,16 +148,15 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
       : {'reference_type': _queryType, 'reference_number': _number.text.trim()};
     return _loadPage();
   }
-  Future<void> _edit([Map<String, dynamic>? row]) async {
+  Future<void> _edit([Map<String, dynamic>? row, Map<String, dynamic>? linkSource]) async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
         builder: (_) =>
-            DomesticWaybillEditor(language: widget.language, row: row),
+            DomesticWaybillEditor(language: widget.language, row: row, linkSource: linkSource),
       ),
     );
     if (result != null && mounted) {
-      _mode = 'lookup';
-      await _lookup(result);
+      if (_mode == 'statement_lookup' && _submitted.isEmpty) { await _list(); } else { await _loadPage(); }
     }
   }
 
@@ -162,7 +187,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(initialValue: _queryType, isExpanded: true,
                 decoration: InputDecoration(labelText: t('lookupKind')),
-                items: [for (final pair in [['statement','linkStatement'],['ecommerce','ecommerce'],['local','local'],if (widget.manage) ['tracking','tracking']]) DropdownMenuItem(value: pair[0], child: Text(t(pair[1])))],
+                items: [for (final pair in [['statement','linkStatement'],['ecommerce','ecommerce'],['local','local'],['tracking','tracking']]) DropdownMenuItem(value: pair[0], child: Text(t(pair[1])))],
                 onChanged: _busy ? null : (v) => setState(() => _queryType = v!)),
               const SizedBox(height: 12),
               if (_queryType == 'statement') _filters(),
@@ -219,7 +244,8 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(_message!, semanticsLabel: _message),
                 ),
-              ..._rows.map(_card),
+              if (_rows.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(t('autoRefreshHint'))),
+              ..._groups(),
               if (_page > 0 || _more)
                 Wrap(
                   spacing: 12,
@@ -281,8 +307,44 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
       select('voyage', _voyage, voyages, (v) => _voyage = v),
     ]);
   }
+  List<Widget> _groups() {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final row in _rows) {
+      final key = '${row['group_key'] ?? row['id']}';
+      (groups[key] ??= []).add(row);
+    }
+    return groups.entries.map((entry) {
+      final rows = entry.value, first = rows.first;
+      final statement = first['statement'] ?? first['cargo'];
+      final title = statement is Map ? '${t('statementNumber')}: ${statement['receipt_number'] ?? statement['box_number']}'
+          : first['reference_number'] != null ? '${t('${first['reference_type']}')}: ${first['reference_number']}' : t('linkLegacy');
+      final photos = <String>{};
+      for (final row in rows) {
+        photos.addAll((row['photo_urls'] as List? ?? [if (row['photo_url'] != null) row['photo_url']]).cast<String>());
+      }
+      return Card(key: ValueKey('statement-group-${entry.key}'), margin: const EdgeInsets.symmetric(vertical: 12),
+        child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SelectableText(title, style: Theme.of(context).textTheme.titleLarge),
+          if (statement is Map) Text('${RouteCatalog.localizedLabel('${statement['route']}', widget.language)} · ${statement['shipment_year']} / ${statement['voyage']}'),
+          Text('${t('waybillCount')}: ${rows.length}'),
+          if (isOperator) TextButton.icon(onPressed: _busy ? null : () => _edit(null, first), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
+          const SizedBox(height: 12),
+          Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
+          if (photos.isEmpty) Text(t(rows.any((r) => r['photo_restricted'] == true) ? 'restricted' : 'noPhoto')),
+          Wrap(spacing: 12, runSpacing: 12, children: photos.map(_photoView).toList()),
+          ...rows.map(_card),
+        ])));
+    }).toList();
+  }
+
+  Widget _photoView(String url) => InkWell(
+    onTap: () => showDialog<void>(context: context, builder: (dialogContext) => Dialog(child: Stack(children: [
+      InteractiveViewer(child: Image.network(url, errorBuilder: (_, __, ___) => Text(t('REQUEST_FAILED')))),
+      Positioned(right: 0, top: 0, child: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(dialogContext))),
+    ]))),
+    child: Image.network(url, height: 160, width: 180, fit: BoxFit.contain, errorBuilder: (_, __, ___) => SizedBox(width: 180, child: Text(t('REQUEST_FAILED')))));
+
   Widget _card(Map<String, dynamic> r) {
-    final photo = r['photo_url'] as String?;
     final integration = r['integration'];
     final notice = ['planned', 'connection_required'].contains(integration)
         ? t('connection')
@@ -292,7 +354,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
         ? t('failed')
         : null;
     final events = (r['events'] as List? ?? []).cast<Map>();
-    final cargo = r['cargo'], statement = r['statement'];
+    final cargo = r['cargo'];
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 12),
       child: Padding(
@@ -313,53 +375,14 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Chip(label: Text(t(r['status']))),
             ),
-            if (statement is Map) Text('${t('statementNumber')}: ${statement['receipt_number']}\n${RouteCatalog.localizedLabel('${statement['route']}', widget.language)} · ${statement['shipment_year']} / ${statement['voyage']}'),
-            if (r['reference_number'] != null) Text('${t('${r['reference_type']}')}: ${r['reference_number']}'),
             if (cargo is Map)
               Text(
                 '${cargo['receipt_number'] ?? cargo['invoice_number'] ?? cargo['box_number']} · ${cargo['box_number']}\n${RouteCatalog.localizedLabel('${cargo['route'] ?? ''}', widget.language)} · ${cargo['shipment_year']} / ${cargo['voyage']}',
               ),
             const SizedBox(height: 12),
-            Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            if (photo != null)
-              InkWell(
-                onTap: () => showDialog<void>(
-                  context: context,
-                  builder: (_) => Dialog(
-                    child: Stack(
-                      children: [
-                        InteractiveViewer(
-                          child: Image.network(
-                            photo,
-                            errorBuilder: (_, __, ___) => Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Text(t('REQUEST_FAILED')),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                child: Image.network(
-                  photo,
-                  height: 180,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Text(t('REQUEST_FAILED')),
-                ),
-              )
-            else
-              Text(t(r['photo_restricted'] == true ? 'restricted' : 'noPhoto')),
+            if ('${r['receiver_name'] ?? ''}'.isNotEmpty) Text('${t('receiver')}: ${r['receiver_name']}'),
+            if ('${r['receiver_phone'] ?? ''}'.isNotEmpty) Text('${t('phone')}: ${r['receiver_phone']}'),
+            if (r['recipient_masked'] == true) Text(t('recipientMasked'), style: Theme.of(context).textTheme.bodySmall),
             if ('${r['origin']}${r['destination']}'.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -468,11 +491,25 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> {
   }
 }
 
+class DomesticPhotoSelection {
+  const DomesticPhotoSelection(this.name, this.bytes);
+  final String name;
+  final Uint8List bytes;
+}
+
+class _WaybillDraft {
+  final number = TextEditingController();
+  String carrier = '';
+  bool chosen = false;
+}
+
 class DomesticWaybillEditor extends StatefulWidget {
   const DomesticWaybillEditor({super.key, required this.language, this.row,
-    this.loadFilterBatches, this.callApi});
+    this.loadFilterBatches, this.callApi, this.linkSource, this.pickPhotos});
   final AppLanguage language;
   final Map<String, dynamic>? row;
+  final Map<String, dynamic>? linkSource;
+  final Future<List<DomesticPhotoSelection>> Function()? pickPhotos;
   final Future<List<ShipmentBatchOption>> Function()? loadFilterBatches;
   final Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)? callApi;
   @override
@@ -494,8 +531,10 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
   Map<String, dynamic>? _confirmed;
   List<Map<String, dynamic>> _cargoRows = [];
   List<ShipmentBatchOption> _batches = [];
-  Uint8List? _photo;
-  String? _photoName, _message, _owner;
+  final List<_WaybillDraft> _extraWaybills = [];
+  final List<DomesticPhotoSelection> _photos = [];
+  bool _picking = false;
+  String? _message, _owner;
   String t(String key) => domesticText(widget.language, key);
   bool get _valid => mounted && (widget.callApi != null || DomesticTrackingService.currentUserId == _owner);
   Future<Map<String, dynamic>> _call(String action, Map<String, dynamic> body) {
@@ -506,15 +545,15 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
   void initState() {
     super.initState();
     _owner = DomesticTrackingService.currentUserId;
-    final row = widget.row;
+    final row = widget.row ?? widget.linkSource;
     if (row != null) {
-      _carrier = '${row['carrier']}'; _kind = '${row['delivery_kind']}';
-      _service = '${row['service_kind']}'; _number.text = '${row['tracking_number']}';
+      _kind = '${row['delivery_kind']}'; _service = '${row['service_kind']}';
+      if (widget.row != null) { _carrier = '${row['carrier']}'; _number.text = '${row['tracking_number']}'; }
       _name.text = '${row['receiver_name'] ?? ''}'; _phone.text = '${row['receiver_phone'] ?? ''}';
       _cargo = (row['shipment_id'] as num?)?.toInt();
       _scope = '${row['link_scope'] ?? (_cargo == null ? 'standalone' : 'cargo')}';
       _referenceType = '${row['reference_type'] ?? 'ecommerce'}';
-      _reference.text = '${row['reference_number'] ?? ''}'; _carrierChosen = true;
+      _reference.text = '${row['reference_number'] ?? ''}'; _carrierChosen = widget.row != null;
       if (row['cargo'] is Map) _cargoRows = [Map<String, dynamic>.from(row['cargo'])];
       if (_scope == 'statement' && row['statement'] is Map) {
         _confirmed = Map<String, dynamic>.from(row['statement']);
@@ -526,7 +565,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
   }
   @override
   void dispose() {
-    for (final c in [_number, _name, _phone, _cargoQuery, _receipt, _reference]) { c.dispose(); }
+    for (final c in [_number, _name, _phone, _cargoQuery, _receipt, _reference, ..._extraWaybills.map((w) => w.number)]) { c.dispose(); }
     super.dispose();
   }
   Future<void> _loadBatches() async {
@@ -578,21 +617,37 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
     finally { if (mounted) setState(() => _finding = false); }
   }
   Future<void> _pick() async {
+    if (_picking || _busy) return;
+    setState(() => _picking = true);
     try {
-      final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png', 'webp']);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      if (bytes.length > 5242880) throw const DomesticTrackingException('FILE_TOO_LARGE');
-      if (_valid) setState(() { _photo = bytes; _photoName = file.name; });
+      final selected = <DomesticPhotoSelection>[];
+      final existing = (widget.row?['photo_count'] as num?)?.toInt() ?? (widget.row?['photo_url'] == null ? 0 : 1);
+      if (widget.pickPhotos != null) {
+        selected.addAll(await widget.pickPhotos!());
+      } else {
+        final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png', 'webp']);
+        if (existing + _photos.length + files.length > 10) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
+        var total = _photos.fold<int>(0, (n, p) => n + p.bytes.length);
+        for (final file in files) {
+          final size = await file.length();
+          if (size > 5242880 || total + size > 15728640) throw const DomesticTrackingException('FILE_TOO_LARGE');
+          final bytes = await file.readAsBytes(); total += bytes.length;
+          selected.add(DomesticPhotoSelection(file.name, bytes));
+        }
+      }
+      if (existing + _photos.length + selected.length > 10) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
+      if (selected.any((p) => p.bytes.length > 5242880) || [..._photos, ...selected].fold<int>(0, (n, p) => n + p.bytes.length) > 15728640) throw const DomesticTrackingException('FILE_TOO_LARGE');
+      if (_valid) setState(() { _photos.addAll(selected); _message = null; });
     } catch (e) { if (_valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'REQUEST_FAILED')); }
+    finally { if (mounted) setState(() => _picking = false); }
   }
   Future<void> _save() async {
-    if (_busy || _finding || !_form.currentState!.validate()) return;
+    if (_busy || _finding || _picking || !_form.currentState!.validate()) return;
     if (_scope == 'statement' && _confirmed == null) { setState(() => _message = t('STATEMENT_REQUIRED')); return; }
     if (_scope == 'cargo' && _cargo == null) { setState(() => _message = t('CARGO_REQUIRED')); return; }
     setState(() => _busy = true);
     try {
-      final data = await _call('save', {
+      final data = await _call(widget.row == null ? 'save_batch' : 'save', {
         'id': widget.row?['id'], 'updated_at': widget.row?['updated_at'],
         'link_scope': _scope, 'statement': _scope == 'statement' ? _confirmed : null,
         'reference': _scope == 'reference' ? {'reference_type': _referenceType, 'reference_number': _reference.text} : null,
@@ -600,12 +655,28 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
         'carrier': _carrier, 'tracking_number': _number.text,
         'delivery_kind': _kind, 'service_kind': _scope == 'reference' && _referenceType == 'ecommerce' ? 'ecommerce' : _service,
         'receiver_name': _name.text, 'receiver_phone': _phone.text,
-        if (_photo != null) 'photo': {'base64': base64Encode(_photo!)},
+        if (widget.row == null) 'waybills': [{'carrier': _carrier, 'tracking_number': _number.text}, ..._extraWaybills.map((w) => {'carrier': w.carrier, 'tracking_number': w.number.text})],
+        'photos': _photos.map((p) => {'base64': base64Encode(p.bytes)}).toList(),
       });
-      if (_valid) Navigator.pop(context, Map<String, dynamic>.from(data['parcel']));
+      if (_valid) Navigator.pop(context, Map<String, dynamic>.from(widget.row == null ? (data['parcels'] as List).first : data['parcel']));
     } catch (e) { if (_valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'REQUEST_FAILED')); }
     finally { if (mounted) setState(() => _busy = false); }
   }
+  Widget _extraWaybill(_WaybillDraft draft) => Container(key: ObjectKey(draft),
+    margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(border: Border.all(color: const Color(0xffd9e2ef)), borderRadius: BorderRadius.circular(8)),
+    child: Column(children: [
+      TextFormField(controller: draft.number, enabled: !_busy, maxLength: 40, decoration: InputDecoration(labelText: t('tracking')),
+        validator: (v) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9\s-]{5,39}$').hasMatch(v?.trim() ?? '') ? null : t('INVALID_TRACKING'),
+        onChanged: (v) => setState(() { if (!draft.chosen) draft.carrier = DomesticTrackingService.detectCarrier(v) ?? ''; })),
+      DropdownButtonFormField<String>(key: ValueKey('extra-${identityHashCode(draft)}-${draft.carrier}'), initialValue: draft.carrier, isExpanded: true,
+        decoration: InputDecoration(labelText: t('carrier')),
+        items: [DropdownMenuItem(value: '', child: Text(t('selectCarrier'))), ...DomesticTrackingService.carriers.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))],
+        validator: (v) => (v ?? '').isEmpty ? t('selectCarrier') : null,
+        onChanged: _busy ? null : (v) => setState(() { draft.carrier = v!; draft.chosen = v.isNotEmpty; })),
+      TextButton.icon(onPressed: _busy ? null : () { setState(() => _extraWaybills.remove(draft)); WidgetsBinding.instance.addPostFrameCallback((_) => draft.number.dispose()); }, icon: const Icon(Icons.remove_circle_outline), label: Text(t('removeWaybill'))),
+    ]));
+
   Widget _choice(String label, String value, List<String> values, ValueChanged<String?> changed) => Padding(
     padding: const EdgeInsets.only(bottom: 16), child: DropdownButtonFormField<String>(
       key: ValueKey('$label-$value'), initialValue: value, isExpanded: true,
@@ -678,16 +749,19 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> {
         validator: (v) => (v ?? '').isEmpty ? t('selectCarrier') : null,
         onChanged: _busy ? null : (v) => setState(() { _carrier = v!; _carrierChosen = v.isNotEmpty; })),
       Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(t('carrierHint'))),
+      ..._extraWaybills.map(_extraWaybill),
+      if (widget.row == null) OutlinedButton.icon(key: const Key('delivery-add-waybill'), onPressed: _busy || _extraWaybills.length >= 19 ? null : () => setState(() => _extraWaybills.add(_WaybillDraft())), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
       if (widget.row != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t('correctionHelp'))),
       _choice('kind', _kind, ['city','province'], (v) => setState(() => _kind = v!)),
       _choice('service', _service, ['domestic','inbound','outbound','ecommerce','express'], (v) => setState(() => _service = v!)),
       TextField(controller: _name, enabled: !_busy, readOnly: ['statement','cargo'].contains(_scope), maxLength: 160, decoration: InputDecoration(labelText: t('receiver'))),
       TextField(controller: _phone, enabled: !_busy, readOnly: ['statement','cargo'].contains(_scope), maxLength: 40, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: t('phone'))),
-      OutlinedButton.icon(onPressed: _busy ? null : _pick, icon: const Icon(Icons.image_outlined), label: Text(t('photoInput'))),
-      if (_photo != null) ...[Text(_photoName ?? ''), Image.memory(_photo!, height: 150, fit: BoxFit.contain)],
+      Text(t('photoHelp')),
+      OutlinedButton.icon(key: const Key('delivery-pick-photos'), onPressed: _busy || _picking ? null : _pick, icon: const Icon(Icons.image_outlined), label: Text(t('photoInput'))),
+      for (final photo in _photos) ListTile(title: Text(photo.name), leading: Image.memory(photo.bytes, width: 48, height: 48, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined)), trailing: IconButton(tooltip: t('removePhoto'), icon: const Icon(Icons.close), onPressed: _busy ? null : () => setState(() => _photos.remove(photo)))),
       if (_message != null) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(_message!)),
       if (_busy || _finding) const LinearProgressIndicator(),
-      FilledButton(key: const Key('delivery-save'), onPressed: _busy || _finding ? null : _save, child: Text(t('save'))),
+      FilledButton(key: const Key('delivery-save'), onPressed: _busy || _finding || _picking ? null : _save, child: Text(t('save'))),
     ])),
   );
 }

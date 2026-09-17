@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { CARRIERS, STATUSES, trackingNumber, carrierUrl, fetchTracking, mergeEvents, canSeePhoto, laoTimestamp } from './carriers.mjs';
-import { receiptKey, statementInput, referenceInput, rowStatement, canManageParcel, mapLimited } from './statements.mjs';
+import { receiptKey, statementInput, referenceInput, rowStatement, canManageParcel, mapLimited, maskName, maskPhone, photoPaths, deliveryGroup } from './statements.mjs';
+import { decodePhotos, readBody, MAX_PHOTOS } from './photos.mjs';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const json=(status:number,data:unknown)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
 class ApiError extends Error{constructor(public status:number,code:string){super(code)}}
@@ -19,8 +20,7 @@ Deno.serve(async req=>{
   const profile=dbResult(await db.from('profiles').select('id,role,name,phone,approval_status,deletion_status,deleted_at').eq('id',user.id).maybeSingle());
   must(profile&&!profile.deleted_at&&!['pending','deleted'].includes(profile.deletion_status)&&!['pending','rejected'].includes(profile.approval_status),'ACCOUNT_NOT_ACTIVE',403);
   const allowed=dbResult(await db.rpc('consume_domestic_tracking_limit',{p_user_id:user.id}));must(allowed,'TOO_MANY_REQUESTS',429);
-  must(Number(req.headers.get('Content-Length')??0)<=7500000,'FILE_TOO_LARGE',413);
-  const raw=await req.text();must(raw.length<=7500000,'FILE_TOO_LARGE',413);
+  const raw=await readBody(req);
   let b:any;try{b=JSON.parse(raw)}catch{throw new ApiError(400,'INVALID_REQUEST')}
   must(b&&typeof b==='object'&&!Array.isArray(b),'INVALID_REQUEST');
   const manager=['admin','staff'].includes(profile.role),partner=profile.role==='partner',operator=manager||partner;
@@ -61,25 +61,33 @@ Deno.serve(async req=>{
    if(ref){const linked=await resolveStatement(ref);return linked.rows.length>0&&linked.rows.every((r:any)=>canSeePhoto(profile,{},r));}
    return canSeePhoto(profile,row,s);
   }
+  const photoCache=new Map<string,Promise<string|null>>();
   async function serialize(row:any,full=false){
-   const s=await shipment(row.shipment_id),own=await photoAccess(row,s),visible=full||own;
+   const s=await shipment(row.shipment_id),own=await photoAccess(row,s);
    const statement=rowStatement(row)??(s?.receipt_number?{route:s.route,shipment_year:s.shipment_year,voyage:s.voyage,receipt_number:s.receipt_number}:null);
-   let photo_url=null;if(row.photo_path&&own){const result=await db.storage.from('domestic-waybills').createSignedUrl(row.photo_path,600);if(!result.error)photo_url=result.data.signedUrl;}
+   const paths=photoPaths(row);let photo_urls:any[]=[];
+   if(own)photo_urls=await Promise.all(paths.map((path:string)=>{
+    if(!photoCache.has(path))photoCache.set(path,(async()=>{const r=await db.storage.from('domestic-waybills').createSignedUrl(path,600);return r.error?null:r.data.signedUrl;})());
+    return photoCache.get(path);
+   }));
+   photo_urls=photo_urls.filter(Boolean);
+   const events=own?row.events:(row.events??[]).map((e:any,i:number)=>({key:`redacted:${i}`,occurred_at:e.occurred_at,status:e.status,source:e.source,description:'',location:''}));
    return {id:row.id,carrier:row.carrier,carrier_name:CARRIERS[row.carrier].name,tracking_number:row.tracking_number,
-    delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:row.origin,destination:row.destination,
-    status:row.status,events:row.events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
-    official_url:carrierUrl(row.carrier,row.tracking_number),integration:CARRIERS[row.carrier].mode,
-    has_photo:!!row.photo_path,photo_url,photo_restricted:!!row.photo_path&&!own,
-    ...(visible?{shipment_id:row.shipment_id,link_scope:row.link_scope??(s?'cargo':'standalone'),statement,
-     reference_type:row.reference_type??null,reference_number:row.reference_number??null,
-     cargo:s?{id:s.id,box_number:s.box_number,invoice_number:s.invoice_number,receipt_number:s.receipt_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage}:null,
-     receiver_name:row.receiver_name,receiver_phone:row.receiver_phone}:{}),
+    delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:own?row.origin:'',destination:own?row.destination:'',
+    status:row.status,events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
+    official_url:own?carrierUrl(row.carrier,row.tracking_number):null,integration:CARRIERS[row.carrier].mode,
+    has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&!own,
+    group_key:deliveryGroup(row,s),link_scope:row.link_scope??(s?'cargo':'standalone'),statement,
+    reference_type:row.reference_type??null,reference_number:row.reference_number??null,
+    shipment_id:own?row.shipment_id:null,
+    cargo:own&&s?{id:s.id,box_number:s.box_number,invoice_number:s.invoice_number,receipt_number:s.receipt_number,route:s.route,shipment_year:s.shipment_year,voyage:s.voyage}:null,
+    receiver_name:own?row.receiver_name:maskName(row.receiver_name),receiver_phone:own?row.receiver_phone:maskPhone(row.receiver_phone),recipient_masked:!own,
     created_at:row.created_at,updated_at:row.updated_at,can_manage:canManageParcel(profile,row)};
   }
   async function sync(row:any){
    const now=new Date(),cutoff=new Date(now.getTime()-300000).toISOString();
    if(row.checked_at&&row.checked_at>cutoff)return row;
-   const claimed=dbResult(await db.from('domestic_parcels').update({checked_at:now.toISOString()}).eq('id',row.id).or(`checked_at.is.null,checked_at.lt.${cutoff}`).select().maybeSingle());
+   const claimed=dbResult(await db.from('domestic_parcels').update({checked_at:now.toISOString()}).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).or(`checked_at.is.null,checked_at.lt.${cutoff}`).select().maybeSingle());
    if(!claimed)return dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
    let update:any;
    try{
@@ -95,6 +103,45 @@ Deno.serve(async req=>{
     update={sync_state:code==='PLANNED'?'planned':code==='VERIFICATION_REQUIRED'?'verification_required':'error',sync_error:known.includes(code)?code:'CARRIER_UNAVAILABLE'};
    }
    return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).select().maybeSingle())??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
+  }
+  async function refreshRows(rows:any[]){
+   const cutoff=new Date(Date.now()-300000).toISOString();
+   const pending=rows.filter(r=>!r.checked_at||r.checked_at<cutoff).sort((a,b)=>String(a.checked_at??'').localeCompare(String(b.checked_at??''))).slice(0,20);
+   const refreshed=new Map((await mapLimited(pending,async(r:any)=>await sync(r),4)).map((r:any)=>[r.id,r]));
+   return rows.map(r=>refreshed.get(r.id)??r);
+  }
+  async function present(rows:any[]){return await mapLimited(await refreshRows(rows),async(r:any)=>await serialize(r));}
+  async function uploadPhotos(body:any,existing:string[]=[],folder=crypto.randomUUID()){
+   const decoded=decodePhotos(body);must(existing.length+decoded.length<=MAX_PHOTOS,'TOO_MANY_PHOTOS');
+   const created:string[]=[];
+   try{
+    for(const image of decoded){const path=`${folder}/${crypto.randomUUID()}.${image.ext}`;dbResult(await db.storage.from('domestic-waybills').upload(path,image.bytes,{contentType:image.mime,upsert:false}));created.push(path);}
+    return {paths:[...existing,...created],created};
+   }catch(e){if(created.length)await db.storage.from('domestic-waybills').remove(created);throw e;}
+  }
+  async function linkValues(input:any,old:any=null){
+   must(['city','province'].includes(input.delivery_kind),'INVALID_DELIVERY_KIND');must(['domestic','inbound','outbound','ecommerce','express'].includes(input.service_kind),'INVALID_SERVICE_KIND');
+   const scope=input.link_scope??input.link_mode??(['statement','reference'].includes(old?.link_scope)?old.link_scope:Object.prototype.hasOwnProperty.call(input,'shipment_id')?(input.shipment_id?'cargo':'standalone'):old?.link_scope??'standalone');
+   must(['cargo','statement','reference','standalone'].includes(scope),'INVALID_LINK_SCOPE');
+   const resolved=scope==='statement'?await resolveStatement(input.statement??rowStatement(old??{})):null;
+   if(resolved)must(resolved.rows.length,'STATEMENT_NOT_FOUND',404);
+   const reference=scope==='reference'?referenceInput(input.reference??(input.reference_type?input:old??{})):null;
+   const shipment_id=scope==='cargo'?Number(input.shipment_id??old?.shipment_id):null;
+   must(shipment_id===null||Number.isSafeInteger(shipment_id)&&shipment_id>0,'INVALID_CARGO');
+   const cargo=await shipment(shipment_id);if(shipment_id)must(cargo&&!cargo.deleted_at&&!cargo.deletion_requested_at,'INVALID_CARGO');
+   const receiver=cargo??resolved?.rows[0],ref=resolved?.statement;
+   return {shipment_id,link_scope:scope,
+    link_route:ref?.route??null,link_year:ref?.shipment_year??null,link_voyage:ref?.voyage??null,link_receipt_number:ref?.receipt_number??null,
+    statement_route:ref?.route??null,statement_year:ref?.shipment_year??null,statement_voyage:ref?.voyage??null,statement_receipt:ref?.receipt_number??null,
+    reference_type:reference?.reference_type??null,reference_number:reference?.reference_number??null,
+    delivery_kind:input.delivery_kind,service_kind:reference?.reference_type==='ecommerce'?'ecommerce':input.service_kind,
+    receiver_name:text(receiver?.consignee_name??input.receiver_name,160),receiver_phone:text(receiver?.consignee_phone??input.receiver_phone,40),updated_at:new Date().toISOString(),updated_by:user.id};
+  }
+  if(b.action==='list_groups'){
+   must(operator,'FORBIDDEN',403);const page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
+   const groups=dbResult(await db.rpc('domestic_parcel_group_page',{p_page:page,p_size:10}));
+   const rows=groups.slice(0,10).flatMap((g:any)=>g.parcels);must(rows.length<=1000,'NARROW_SEARCH');
+   return json(200,{parcels:await present(rows),has_more:groups.length>10,group_count:Math.min(groups.length,10)});
   }
   if(b.action==='statement_resolve'){
    must(operator,'FORBIDDEN',403);
@@ -118,28 +165,37 @@ Deno.serve(async req=>{
    }
    const rows=[...records.values()].sort((a:any,b:any)=>String(a.created_at??'').localeCompare(String(b.created_at??''))||String(a.id).localeCompare(String(b.id)));
    const page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
-   const parcels=await mapLimited(rows.slice(page*20,page*20+20),async(r:any)=>serialize(await sync(r)));
-   return json(200,{parcels,has_more:rows.length>(page+1)*20,cargo_count:found.length,statement:[...refs.values()][0]??null});
+   must(!b.grouped||rows.length<=1000,'NARROW_SEARCH');
+   const parcels=await present(b.grouped?rows:rows.slice(page*20,page*20+20));
+   return json(200,{parcels,has_more:!b.grouped&&rows.length>(page+1)*20,cargo_count:found.length,statement:[...refs.values()][0]??null});
   }
   if(b.action==='reference_lookup'){
    const ref=referenceInput(b),page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
    const rows=await allRows(()=>db.from('domestic_parcels').select('*').eq('link_scope','reference').eq('reference_type',ref.reference_type).eq('reference_number',ref.reference_number).order('created_at').order('id'));
    const visible=rows.filter((r:any)=>operator||canSeePhoto(profile,r,null));
-   const parcels=await mapLimited(visible.slice(page*20,page*20+20),async(r:any)=>serialize(await sync(r)));
-   return json(200,{parcels,has_more:visible.length>(page+1)*20,cargo_count:0,reference:ref});
+   must(!b.grouped||visible.length<=1000,'NARROW_SEARCH');
+   const parcels=await present(b.grouped?visible:visible.slice(page*20,page*20+20));
+   return json(200,{parcels,has_more:!b.grouped&&visible.length>(page+1)*20,cargo_count:0,reference:ref});
   }
   if(b.action==='lookup'){
    const number=trackingNumber(b.tracking_number);must(!b.carrier||CARRIERS[b.carrier],'INVALID_CARRIER');
    let q=db.from('domestic_parcels').select('*').eq('tracking_number',number);if(b.carrier)q=q.eq('carrier',b.carrier);
-   const rows=dbResult(await q.limit(5));const parcels=[];
-   for(const r of rows)parcels.push(await serialize(await sync(r)));
-   return json(200,{parcels});
+   const rows=dbResult(await q.limit(5)),found=new Map(rows.map((r:any)=>[r.id,r]));
+   if(b.grouped)for(const r of rows){
+    const s=await shipment(r.shipment_id);if(!await photoAccess(r,s))continue;
+    const ref=rowStatement(r)??(s?.receipt_number?{route:s.route,shipment_year:s.shipment_year,voyage:s.voyage,receipt_number:s.receipt_number}:null);
+    let related:any[]=[];
+    if(ref)related=await allRows(()=>db.rpc('domestic_parcels_for_statement',{p_route:ref.route,p_year:ref.shipment_year,p_voyage:ref.voyage,p_receipt:ref.receipt_number}));
+    else if(r.reference_number)related=await allRows(()=>db.from('domestic_parcels').select('*').eq('reference_type',r.reference_type).eq('reference_number',r.reference_number).order('created_at').order('id'));
+    for(const child of related)if(await photoAccess(child,await shipment(child.shipment_id)))found.set(child.id,child);
+   }
+   must(found.size<=1000,'NARROW_SEARCH');return json(200,{parcels:await present([...found.values()]),has_more:false});
   }
   if(b.action==='list'){
    must(manager||partner,'FORBIDDEN',403);const page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
    let q=db.from('domestic_parcels').select('*').order('created_at',{ascending:false}).order('id').range(page*50,page*50+49);
    if(b.carrier){must(CARRIERS[b.carrier],'INVALID_CARRIER');q=q.eq('carrier',b.carrier)}
-   const rows=dbResult(await q);return json(200,{parcels:await Promise.all(rows.map((r:any)=>serialize(r,true))),has_more:rows.length===50});
+   const rows=dbResult(await q);return json(200,{parcels:await present(rows),has_more:rows.length===50});
   }
   if(b.action==='cargo_search'){
    must(operator,'FORBIDDEN',403);const q=text(b.query,50);must(q.length>=2,'SEARCH_TOO_SHORT');
@@ -152,46 +208,31 @@ Deno.serve(async req=>{
    return json(200,{cargo:[...found.values()].sort((a,b)=>b.id-a.id).slice(0,30)});
   }
   must(operator,'FORBIDDEN',403);
+  if(b.action==='save_batch'){
+   must(Array.isArray(b.waybills)&&b.waybills.length>=1&&b.waybills.length<=20,'INVALID_BATCH');
+   const entries=b.waybills.map((w:any)=>{must(w&&CARRIERS[w.carrier],'INVALID_CARRIER');return {carrier:w.carrier,tracking_number:trackingNumber(w.tracking_number)};});
+   must(new Set(entries.map((w:any)=>w.carrier+':'+w.tracking_number)).size===entries.length,'DUPLICATE_TRACKING',409);
+   const base=await linkValues(b),photos=await uploadPhotos(b);
+   const values=entries.map((w:any)=>({...base,...w,id:crypto.randomUUID(),photo_paths:photos.paths,photo_path:photos.paths[0]??null,created_by:user.id}));
+   // One PostgREST array insert is a single database transaction: all rows or none.
+   const result=await db.from('domestic_parcels').insert(values).select('*');
+   if(result.error){if(photos.created.length)await db.storage.from('domestic-waybills').remove(photos.created);dbResult(result);}
+   return json(200,{parcels:await present(result.data),saved_count:result.data.length});
+  }
   if(b.action==='save'){
    const id=b.id||crypto.randomUUID();must(uuid(id),'INVALID_ID');must(CARRIERS[b.carrier],'INVALID_CARRIER');
-   const number=trackingNumber(b.tracking_number);const old=b.id?dbResult(await db.from('domestic_parcels').select('*').eq('id',id).maybeSingle()):null;
-   if(b.id){must(old,'NOT_FOUND',404);must(canManageParcel(profile,old),'FORBIDDEN',403);must(b.updated_at===old.updated_at,'RECORD_CHANGED',409)}
-   must(['city','province'].includes(b.delivery_kind),'INVALID_DELIVERY_KIND');must(['domestic','inbound','outbound','ecommerce','express'].includes(b.service_kind),'INVALID_SERVICE_KIND');
-   // Older installed apps omit link_scope; preserve any existing statement/reference mapping.
-   const scope=b.link_scope??b.link_mode??old?.link_scope??(b.shipment_id?'cargo':'standalone');
-   must(['cargo','statement','reference','standalone'].includes(scope),'INVALID_LINK_SCOPE');
-   const resolved=scope==='statement'?await resolveStatement(b.statement??rowStatement(old??{})):null;
-   if(resolved)must(resolved.rows.length,'STATEMENT_NOT_FOUND',404);
-   const reference=scope==='reference'?referenceInput(b.reference??(b.reference_type?b:old??{})):null;
-   const shipment_id=scope==='cargo'?Number(b.shipment_id??old?.shipment_id):null;
-   must(shipment_id===null||Number.isSafeInteger(shipment_id)&&shipment_id>0,'INVALID_CARGO');
-   const cargo=await shipment(shipment_id);if(shipment_id)must(cargo&&!cargo.deleted_at&&!cargo.deletion_requested_at,'INVALID_CARGO');
-   const receiver=cargo??resolved?.rows[0],ref=resolved?.statement;
-   const value:any={id,carrier:b.carrier,tracking_number:number,shipment_id,link_scope:scope,
-    link_route:ref?.route??null,link_year:ref?.shipment_year??null,link_voyage:ref?.voyage??null,link_receipt_number:ref?.receipt_number??null,
-    statement_route:ref?.route??null,statement_year:ref?.shipment_year??null,statement_voyage:ref?.voyage??null,statement_receipt:ref?.receipt_number??null,
-    reference_type:reference?.reference_type??null,reference_number:reference?.reference_number??null,
-    delivery_kind:b.delivery_kind,service_kind:reference?.reference_type==='ecommerce'?'ecommerce':b.service_kind,
-    receiver_name:text(receiver?.consignee_name??b.receiver_name,160),receiver_phone:text(receiver?.consignee_phone??b.receiver_phone,40),updated_at:new Date().toISOString(),updated_by:user.id};
+   const number=trackingNumber(b.tracking_number),old=b.id?dbResult(await db.from('domestic_parcels').select('*').eq('id',id).maybeSingle()):null;
+   if(b.id){must(old,'NOT_FOUND',404);must(canManageParcel(profile,old),'FORBIDDEN',403);must(b.updated_at===old.updated_at,'RECORD_CHANGED',409);}
+   const value:any={...(await linkValues(b,old)),id,carrier:b.carrier,tracking_number:number};
    if(old&&(old.carrier!==b.carrier||old.tracking_number!==number)){
     const events=(old.events??[]).filter((e:any)=>e.source==='staff');
     Object.assign(value,{events,status:events[0]?.status??'registered',origin:'',destination:'',checked_at:null,synced_at:null,sync_state:'never',sync_error:null});
    }
-   let newPhoto:string|null=null;
-   if(b.photo){
-    must(typeof b.photo.base64==='string'&&b.photo.base64.length<=6990508,'FILE_TOO_LARGE',413);
-    let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(b.photo.base64),c=>c.charCodeAt(0))}catch{throw new ApiError(400,'INVALID_IMAGE')}
-    must(bytes.length>12&&bytes.length<=5242880,'FILE_TOO_LARGE',413);
-    const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71;
-    const jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
-    const webp=String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';
-    must(png||jpg||webp,'INVALID_IMAGE');const ext=png?'png':jpg?'jpg':'webp',mime=png?'image/png':jpg?'image/jpeg':'image/webp';
-    newPhoto=`${id}/${crypto.randomUUID()}.${ext}`;dbResult(await db.storage.from('domestic-waybills').upload(newPhoto,bytes,{contentType:mime,upsert:false}));value.photo_path=newPhoto;
-   }
+   const photos=await uploadPhotos(b,photoPaths(old??{}),id);
+   value.photo_paths=photos.paths;value.photo_path=photos.paths[0]??null;
    const result=old?await db.from('domestic_parcels').update(value).eq('id',id).eq('updated_at',old.updated_at).select().maybeSingle():await db.from('domestic_parcels').insert({...value,created_by:user.id}).select().single();
-   if(result.error||!result.data){if(newPhoto)await db.storage.from('domestic-waybills').remove([newPhoto]);if(!result.error)throw new ApiError(409,'RECORD_CHANGED');dbResult(result)}
-   // Old images expire naturally from signed links; retain them for recovery.
-   return json(200,{parcel:await serialize(result.data,true)});
+   if(result.error||!result.data){if(photos.created.length)await db.storage.from('domestic-waybills').remove(photos.created);if(!result.error)throw new ApiError(409,'RECORD_CHANGED');dbResult(result);}
+   return json(200,{parcel:(await present([result.data]))[0]});
   }
   if(b.action==='add_event'){
    must(uuid(b.id),'INVALID_ID');must(STATUSES.includes(b.status),'INVALID_STATUS');
@@ -203,6 +244,6 @@ Deno.serve(async req=>{
    return json(200,{parcel:await serialize(result,true)});
   }
   return json(400,{error:'INVALID_ACTION'});
- }catch(e){const code=(e as Error).message;if(e instanceof ApiError)return json(e.status,{error:code});if(['INVALID_TRACKING','INVALID_STATEMENT','INVALID_REFERENCE'].includes(code))return json(400,{error:code});console.error('domestic-tracking request failed:',e instanceof Error?e.name:'error');return json(500,{error:'REQUEST_FAILED'})}
+ }catch(e){const code=(e as Error).message;if(e instanceof ApiError)return json(e.status,{error:code});if(code==='FILE_TOO_LARGE')return json(413,{error:code});if(['INVALID_TRACKING','INVALID_STATEMENT','INVALID_REFERENCE','INVALID_IMAGE','TOO_MANY_PHOTOS'].includes(code))return json(400,{error:code});console.error('domestic-tracking request failed:',e instanceof Error?e.name:'error');return json(500,{error:'REQUEST_FAILED'})}
 });
 

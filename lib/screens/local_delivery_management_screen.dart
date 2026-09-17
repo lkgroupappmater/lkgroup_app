@@ -174,7 +174,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('시내.지방 배송 관리')),
+        appBar: AppBar(title: const Text('시내.지방 배송 list 관리')),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(),
           icon: const Icon(Icons.add_location_alt_outlined),
@@ -235,3 +235,4 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
               ),
       );
 }
+

@@ -48,3 +48,15 @@ Apply `20260917063225_domestic_statement_mapping.sql` to the existing database b
 Website homepage access was changed to public on 2026-09-17 at the owner's request. LK business/member pages still require the existing LK Supabase login. This is a Sites audience change, not an auth/database permission change.
 
 Verification: API regression tests cover receipt identity, multiple waybills, voyage isolation, customer privacy, partner ownership, legacy clients, correction races and optimistic edits. Flutter widget tests cover confirm-before-save, changed voyage, stale lookup and ecommerce mapping. Web DOM tests cover the same mapping/search contract. Actual signed-in phone/browser operation and real carrier waybill end-to-end validation require the owner's normal account and shipment; no customer production records are created for tests.
+
+## 2026-09-17: grouped statements and bulk waybills
+
+Management labels: `시내.지방 배송 list 관리` and `라오스 국내 배송 관리` (public tracking title unchanged). The shared endpoint now accepts `save_batch` with 1–20 carrier/number pairs and one statement/reference. The single array insert is atomic; uploaded images are cleaned if it fails. New clients use `list_groups` so a statement is not split across pages. Old single-save/list clients remain compatible.
+
+`photos` accepts up to 10 JPG/PNG/WebP images per parcel, 5 MiB each and 15 MiB per request; shared batch photos are stored once in the existing private bucket. `photo_path` remains compatible with older clients and is backfilled into `photo_paths`. New photos append to existing ones. Photos registered together appear once in the statement gallery.
+
+Save and lookup/list requests automatically refresh stale carrier history, with a five-minute cache, four concurrent requests and at most 20 carrier requests per response. Open foreground screens refresh every five minutes. HAL automatic integration is verified; existing ANS connection, J&T/Lao Post verification and Mixay pending limitations are unchanged. Provider failures show the last saved history and a notice, never fabricated events.
+
+Exact tracking-number searches include the LK statement/reference. Owners see related waybills; other members receive only the number they searched, masked recipient name/phone, no signed photo URLs, and no free-text history/address or provider link. Shared statement photos require ownership of all linked cargo. Operational roles retain their existing permissions; partner edits remain restricted to records they created. The common shipment search RPC now requires assigned customer ownership or both matching name and phone for full records; suffix recovery keeps its original rate limits and exposes only masked recipient fields.
+
+Apply `20260917075918_domestic_group_photos_privacy.sql` before deploying the updated Edge Function (including `photos.mjs`). Run `node --test supabase/functions/domestic-tracking/*.test.mjs` and Flutter domestic tracking widget tests. Real-device multi-file selection and mixed-provider live integrations still need device/provider verification.

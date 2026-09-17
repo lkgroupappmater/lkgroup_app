@@ -43,3 +43,22 @@ export async function mapLimited(rows, fn, limit = 4) {
   }));
   return output;
 }
+
+export function maskName(value) {
+  const chars = Array.from(String(value ?? '').trim());
+  if (chars.length < 2) return chars.length ? '*' : '';
+  return chars[0] + '*'.repeat(Math.max(1, chars.length - 2)) + (chars.length > 2 ? chars.at(-1) : '');
+}
+export function maskPhone(value) {
+  let left = 4;
+  return Array.from(String(value ?? '')).reverse().map(c => /[0-9]/.test(c) && left-- > 0 ? '*' : c).reverse().join('');
+}
+export function photoPaths(row) {
+  return [...new Set([...(Array.isArray(row.photo_paths) ? row.photo_paths : []), row.photo_path].filter(Boolean))];
+}
+export function deliveryGroup(row, shipment = null) {
+  const ref = rowStatement(row) ?? (shipment?.receipt_number ? {route:shipment.route, shipment_year:shipment.shipment_year, voyage:shipment.voyage, receipt_number:shipment.receipt_number} : null);
+  if (ref) return JSON.stringify(['statement',ref.route,ref.shipment_year,receiptKey(ref.voyage),receiptKey(ref.receipt_number)]);
+  if (row.reference_number) return JSON.stringify(['reference',row.reference_type,row.reference_number]);
+  return JSON.stringify(row.shipment_id ? ['cargo',row.shipment_id] : ['parcel',row.id]);
+}
