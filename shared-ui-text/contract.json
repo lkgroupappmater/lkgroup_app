@@ -2,9 +2,10 @@
   "version": 1,
   "aliases": {
     "domestic.title": "domesticTracking",
-    "domesticManage": "domestic.manage",
-    "adminMenu.domesticTracking": "domestic.manage",
-    "adminMenu.localDeliveries": "localDeliveries"
+    "domesticManage": "domesticTracking",
+    "adminMenu.domesticTracking": "domesticTracking",
+    "adminMenu.localDeliveries": "localDeliveries",
+    "domestic.manage": "domesticTracking"
   },
   "appKeys": {
     "add_box": "quote.addBox",
@@ -605,11 +606,6 @@
       "en": "Search by",
       "lo": "ຄົ້ນຫາຕາມ"
     },
-    "domestic.manage": {
-      "ko": "라오스 국내 배송 관리",
-      "en": "Laos Domestic Delivery Management",
-      "lo": "ຈັດການຂົນສົ່ງພາຍໃນລາວ"
-    },
     "domestic.manageHint": {
       "ko": "LK 명세서별로 배송업체 송장과 사진, 배송 이력을 관리합니다.",
       "en": "Manage carrier waybills, photos and delivery history by LK statement.",
@@ -1119,7 +1115,11 @@
       "ko": "년도",
       "en": "Year",
       "lo": "ປີ"
+    },
+    "domestic.publicTitle": {
+      "ko": "라오스 국내 배송 조회 (e-commerce)",
+      "en": "Laos Domestic Delivery Tracking (e-commerce)",
+      "lo": "ການຕິດຕາມການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"
     }
   }
 }
-

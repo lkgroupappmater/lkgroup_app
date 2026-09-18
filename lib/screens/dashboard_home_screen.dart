@@ -1,5 +1,3 @@
-import 'domestic_tracking_screen.dart';
-import '../core/domestic_tracking_text.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -378,12 +376,6 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> with AutoRefreshS
         ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 118),
           children: [
-            OutlinedButton.icon(
-              onPressed: () => _open(context, DomesticTrackingScreen(language: widget.language, user: widget.currentUser)),
-              icon: const Icon(Icons.local_shipping_outlined),
-              label: Text(domesticText(widget.language, 'title')),
-            ),
-            const SizedBox(height: 14),
             RouteOverview(schedules: _mapSchedules, language: widget.language),
             const SizedBox(height: 14),
             _sectionHeader(
@@ -771,3 +763,4 @@ class DashboardHomeScreen extends StatelessWidget {
         ),
       );
 }
+
