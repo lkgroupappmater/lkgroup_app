@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "nose": "right",
   "sea": [
     [
@@ -616,5 +616,12 @@
     "truck": "-26 -14 52 28",
     "ship": "-32 -18 64 36",
     "plane": "-21 -18 42 36"
+  },
+  "interaction": {
+    "minZoom": 1,
+    "maxZoom": 4,
+    "buttonFactor": 1.4,
+    "wheelScaleFactor": 200,
+    "vehicleZoomExponent": 0.65
   }
 }

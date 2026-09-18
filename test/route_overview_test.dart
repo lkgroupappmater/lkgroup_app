@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lkgroup_app/core/app_language.dart';
 import 'package:lkgroup_app/core/cargo_tracking.dart';
@@ -8,6 +9,52 @@ import 'package:lkgroup_app/widgets/cargo_tracking_dialog.dart';
 import 'package:lkgroup_app/widgets/route_overview.dart';
 
 void main() {
+  test('zoom keeps vehicles smaller relative to routes without fixing their screen size', () {
+    final relative = routeVehicleZoomScale(4);
+    expect(relative, lessThan(1));
+    expect(relative * 4, greaterThan(1));
+    expect(relative * 4, lessThan(4));
+    expect(routeVehicleZoomScale(2) * 2, lessThan(relative * 4));
+  });
+  testWidgets('wheel zoom preserves cursor focus, buttons keep bounds and reset fits map', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Center(child: SizedBox(width: 380, child: CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.en))))));
+    final finder = find.byType(InteractiveViewer);
+    final viewer = tester.widget<InteractiveViewer>(finder);
+    final controller = viewer.transformationController!;
+    final origin = tester.getTopLeft(finder);
+    const focal = Offset(150, 100);
+    final before = controller.toScene(focal);
+    tester.binding.handlePointerEvent(PointerScrollEvent(position: origin + focal, scrollDelta: const Offset(0, -100), kind: PointerDeviceKind.mouse));
+    await tester.pump();
+    expect(controller.value.getMaxScaleOnAxis(), greaterThan(1));
+    expect((controller.toScene(focal) - before).distance, lessThan(.01));
+    controller.value = Matrix4.identity()..translate(-380.0 * 3, -250.0 * 3)..scale(4.0);
+    await tester.pump();
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'zoomOut')));
+    await tester.pump();
+    final corner = controller.toScene(const Offset(380, 250));
+    expect(corner.dx, lessThanOrEqualTo(380.01));expect(corner.dy, lessThanOrEqualTo(250.01));
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'reset')));
+    await tester.pump();expect(controller.value, Matrix4.identity());
+    expect(tester.takeException(), isNull);await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('two fingers zoom inside a scrolling page and buttons continue from pinch scale', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: Column(children: [SizedBox(height: 80), CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.en), SizedBox(height: 1200)])))));
+    final finder = find.byType(InteractiveViewer);
+    final center = tester.getCenter(finder);
+    final controller = tester.widget<InteractiveViewer>(finder).transformationController!;
+    final left = await tester.startGesture(center - const Offset(50, 0), pointer: 1);
+    final right = await tester.startGesture(center + const Offset(50, 0), pointer: 2);
+    await tester.pump();
+    await left.moveTo(center - const Offset(100, 0));await right.moveTo(center + const Offset(100, 0));
+    await tester.pump();
+    await left.moveTo(center - const Offset(120, 0));await right.moveTo(center + const Offset(120, 0));
+    await tester.pump();await left.up();await right.up();await tester.pump();
+    final scale = controller.value.getMaxScaleOnAxis();expect(scale, greaterThan(1.05));
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'zoomIn')));
+    await tester.pump();expect(controller.value.getMaxScaleOnAxis(), closeTo(math.min(scale * routeMapButtonFactor, routeMapMaxZoom), .001));
+    expect(tester.takeException(), isNull);await tester.pumpWidget(const SizedBox());
+  });
   test('overview uses visible actual schedules in the same newest-first order as web', () {
     Map<String, dynamic> row(String date, {bool visible = true}) => {'route': '한국->라오스 해상', 'booking_close_date': date, 'is_visible': visible};
     final rows = RouteOverview.visibleRows([row('2026-09-01'), row('2026-10-01'), row('2027-01-01', visible: false), {'route': 'unknown'}, {...row('2026-12-01'), 'deleted_at': '2026-01-01'}]);

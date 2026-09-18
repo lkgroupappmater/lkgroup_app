@@ -40,11 +40,12 @@ class RouteOverview extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${RouteCatalog.localizedLabel('${row['tracking_route'] ?? row['route'] ?? ''}', language)} · ${ShipmentPeriodLabels.year(row['year'] ?? row['shipment_year'], language)} / ${ShipmentPeriodLabels.voyage(row['voyage'], language)}', style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text(CargoTrackingLabels.summary(language, row)),
+              Text('${RouteCatalog.localizedLabel('${row['tracking_route'] ?? row['route'] ?? ''}', language)} · ${ShipmentPeriodLabels.year(row['year'] ?? row['shipment_year'], language)} / ${ShipmentPeriodLabels.voyage(row['voyage'], language)}', style: const TextStyle(fontSize: 14, height: 1.4, fontWeight: FontWeight.w600)),
+              Text(CargoTrackingLabels.summary(language, row), style: const TextStyle(fontSize: 13, height: 1.4)),
             ]),
           ),
       ],
     );
   }
 }
+
