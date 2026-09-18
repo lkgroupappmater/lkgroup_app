@@ -17,7 +17,7 @@ void main() {
     expect(routeVehicleZoomScale(2) * 2, lessThan(relative * 4));
   });
   testWidgets('wheel zoom preserves cursor focus, buttons keep bounds and reset fits map', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Center(child: SizedBox(width: 380, child: CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.en))))));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Center(child: SizedBox(width: 380, child: CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.english))))));
     final finder = find.byType(InteractiveViewer);
     final viewer = tester.widget<InteractiveViewer>(finder);
     final controller = viewer.transformationController!;
@@ -30,16 +30,16 @@ void main() {
     expect((controller.toScene(focal) - before).distance, lessThan(.01));
     controller.value = Matrix4.identity()..translate(-380.0 * 3, -250.0 * 3)..scale(4.0);
     await tester.pump();
-    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'zoomOut')));
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.english, 'zoomOut')));
     await tester.pump();
     final corner = controller.toScene(const Offset(380, 250));
     expect(corner.dx, lessThanOrEqualTo(380.01));expect(corner.dy, lessThanOrEqualTo(250.01));
-    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'reset')));
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.english, 'reset')));
     await tester.pump();expect(controller.value, Matrix4.identity());
     expect(tester.takeException(), isNull);await tester.pumpWidget(const SizedBox());
   });
   testWidgets('two fingers zoom inside a scrolling page and buttons continue from pinch scale', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: Column(children: [SizedBox(height: 80), CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.en), SizedBox(height: 1200)])))));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: Column(children: [SizedBox(height: 80), CargoRouteMap(mode: CargoTrackingMode.sea, progress: .4, language: AppLanguage.english), SizedBox(height: 1200)])))));
     final finder = find.byType(InteractiveViewer);
     final center = tester.getCenter(finder);
     final controller = tester.widget<InteractiveViewer>(finder).transformationController!;
@@ -51,7 +51,7 @@ void main() {
     await left.moveTo(center - const Offset(120, 0));await right.moveTo(center + const Offset(120, 0));
     await tester.pump();await left.up();await right.up();await tester.pump();
     final scale = controller.value.getMaxScaleOnAxis();expect(scale, greaterThan(1.05));
-    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.en, 'zoomIn')));
+    await tester.tap(find.byTooltip(CargoTrackingLabels.text(AppLanguage.english, 'zoomIn')));
     await tester.pump();expect(controller.value.getMaxScaleOnAxis(), closeTo(math.min(scale * routeMapButtonFactor, routeMapMaxZoom), .001));
     expect(tester.takeException(), isNull);await tester.pumpWidget(const SizedBox());
   });
