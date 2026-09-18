@@ -57,9 +57,9 @@ const domesticWords = <String, List<String>>{
   "retry": ["다시 시도", "Retry", "ລອງໃໝ່"],
   "status": ["배송 상태", "Delivery status", "ສະຖານະຈັດສົ່ງ"],
   "title": [
-    "라오스 국내 배송 조회 & 관리",
-    "Laos Domestic Delivery Tracking & Management",
-    "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ",
+    "라오스 국내 배송 조회 & 관리 (e-commerce)",
+    "Laos Domestic Delivery Tracking & Management (e-commerce)",
+    "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)",
   ],
   "manage": ["라오스 국내 배송 관리", "Laos Domestic Delivery Management", "ຈັດການຂົນສົ່ງພາຍໃນລາວ"],
   "carrier": ["배송업체", "Carrier", "ບໍລິສັດຂົນສົ່ງ"],

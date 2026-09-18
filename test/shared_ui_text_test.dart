@@ -20,7 +20,7 @@ void main() {
     }
     expect(domesticText(AppLanguage.korean, 'manage'), '라오스 국내 배송 관리');
     service.applyRows([]);
-    expect(domesticText(AppLanguage.korean, 'title'), '라오스 국내 배송 조회 & 관리');
+    expect(domesticText(AppLanguage.korean, 'title'), '라오스 국내 배송 조회 & 관리 (e-commerce)');
   });
 
   test('legacy keys resolve deterministically without changing unrelated copy', () {
@@ -64,7 +64,7 @@ void main() {
     expect(service.text('domestic.title','ko','fallback'),'saved');
     empty = true;
     expect(await service.refresh(), isTrue);
-    expect(service.text('domestic.title','ko','fallback'),'라오스 국내 배송 조회 & 관리');
+    expect(service.text('domestic.title','ko','fallback'),'라오스 국내 배송 조회 & 관리 (e-commerce)');
     service.dispose();
   });
 
@@ -96,3 +96,4 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 }
+

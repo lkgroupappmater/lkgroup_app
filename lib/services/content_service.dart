@@ -75,7 +75,7 @@ class ContentService {
     });
 
     return _localizedRows(
-      result,
+      result.map((row) => <String, dynamic>{...row, 'tracking_route': row['route'], 'tracking_status': row['status']}).toList(),
       language,
       const <String>['route', 'origin', 'destination', 'status', 'detail'],
     );
@@ -391,4 +391,5 @@ class ContentService {
           if (row.containsKey('${field}_lo')) '${field}_lo': row['${field}_lo'],
       };
 }
+
 

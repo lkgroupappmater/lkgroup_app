@@ -11,6 +11,7 @@ import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../widgets/ai_consultation.dart';
 import '../widgets/content_media.dart';
+import '../widgets/route_overview.dart';
 import 'company_content_screen.dart';
 import '../services/content_service.dart';
 import 'notice_list_screen.dart';
@@ -102,6 +103,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> with AutoRefreshS
   @override
   Future<void> refreshAutomatically() => _loadContent(background: true);
 
+  List<Map<String, dynamic>> _mapSchedules = [];
   List<_ScheduleItem> _visibleSchedules = <_ScheduleItem>[];
   List<_NoticeItem> _visibleNotices = <_NoticeItem>[];
 
@@ -227,6 +229,7 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> with AutoRefreshS
           (background && !canApplyAutoRefresh)) return;
 
       setState(() {
+        _mapSchedules = schedules;
         _visibleSchedules = scheduleItems;
         _visibleNotices = noticeItems;
       });
@@ -380,6 +383,8 @@ class _DashboardHomeBodyState extends State<DashboardHomeBody> with AutoRefreshS
               icon: const Icon(Icons.local_shipping_outlined),
               label: Text(domesticText(widget.language, 'title')),
             ),
+            const SizedBox(height: 14),
+            RouteOverview(schedules: _mapSchedules, language: widget.language),
             const SizedBox(height: 14),
             _sectionHeader(
               _t('schedule'),
