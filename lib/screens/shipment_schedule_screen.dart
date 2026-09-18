@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../services/content_service.dart';
 import '../widgets/content_media.dart';
+import '../widgets/route_overview.dart';
 
 class ShipmentScheduleScreen extends StatefulWidget {
   const ShipmentScheduleScreen({
@@ -85,8 +86,10 @@ class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> with Au
               },
               child: ListView(
                 padding: const EdgeInsets.all(16),
-                children: rows
-                    .map(
+                children: [
+                  RouteOverview(schedules: rows, language: widget.language),
+                  const SizedBox(height: 14),
+                  ...rows.map(
                       (row) => Card(
                         key: ValueKey(row['id']),
                         margin: const EdgeInsets.only(bottom: 10),
@@ -120,6 +123,7 @@ class _ShipmentScheduleScreenState extends State<ShipmentScheduleScreen> with Au
                       ),
                     )
                     .toList(),
+                ],
               ),
             );
           },

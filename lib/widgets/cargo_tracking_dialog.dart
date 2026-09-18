@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/cargo_tracking.dart';
+import '../core/route_map_geometry.dart';
 import '../core/route_catalog.dart';
 import '../core/shipment_period_labels.dart';
 import '../services/schedule_service.dart';
@@ -13,6 +14,10 @@ class CargoTrackingLabels {
   CargoTrackingLabels._();
 
   static const _values = <String, List<String>>{
+    'mapTitle': ['해상·항공 운송 현황', 'Ocean & air route status', 'ສະຖານະເສັ້ນທາງທາງເຮືອ ແລະ ອາກາດ'],
+    'zoomIn': ['확대', 'Zoom in', 'ຂະຫຍາຍ'],
+    'zoomOut': ['축소', 'Zoom out', 'ຫຍໍ້'],
+    'reset': ['지도 초기화', 'Reset map', 'ຣີເຊັດແຜນທີ່'],
     'title': ['물품 이동 현황', 'Cargo movement', 'ສະຖານະການເຄື່ອນຍ້າຍສິນຄ້າ'],
     'current': ['현재 예상 위치', 'Current estimated location', 'ຕຳແໜ່ງຄາດຄະເນປັດຈຸບັນ'],
     'preparing': ['출발 준비', 'Preparing', 'ກຳລັງກຽມອອກ'],
@@ -493,11 +498,13 @@ class CargoRouteMap extends StatefulWidget {
     required this.mode,
     required this.progress,
     required this.language,
+    this.schedules = const [],
   });
 
   final CargoTrackingMode mode;
   final double? progress;
   final AppLanguage language;
+  final List<Map<String, dynamic>> schedules;
 
   @override
   State<CargoRouteMap> createState() => _CargoRouteMapState();
@@ -556,6 +563,7 @@ class _CargoRouteMapState extends State<CargoRouteMap>
             Positioned.fill(
               child: InteractiveViewer(
                 transformationController: _transform,
+                onInteractionEnd: (_) => _zoom = _transform.value.getMaxScaleOnAxis(),
                 minScale: 1,
                 maxScale: 3,
                 boundaryMargin: const EdgeInsets.all(90),
@@ -566,6 +574,7 @@ class _CargoRouteMapState extends State<CargoRouteMap>
                       progress: widget.progress,
                       language: widget.language,
                       motion: _motion,
+                      schedules: widget.schedules,
                     ),
                   ),
                 ),
@@ -583,9 +592,9 @@ class _CargoRouteMapState extends State<CargoRouteMap>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _control(Icons.add, () => _setZoom(_zoom + .4), 'Zoom in'),
-                    _control(Icons.remove, () => _setZoom(_zoom - .4), 'Zoom out'),
-                    _control(Icons.home_outlined, () => _setZoom(1), 'Reset'),
+                    _control(Icons.add, () => _setZoom(_zoom + .4), CargoTrackingLabels.text(widget.language, 'zoomIn')),
+                    _control(Icons.remove, () => _setZoom(_zoom - .4), CargoTrackingLabels.text(widget.language, 'zoomOut')),
+                    _control(Icons.home_outlined, () => _setZoom(1), CargoTrackingLabels.text(widget.language, 'reset')),
                   ],
                 ),
               ),
@@ -603,12 +612,14 @@ class _CargoRoutePainter extends CustomPainter {
     required this.progress,
     required this.language,
     required Animation<double> motion,
+    this.schedules = const [],
   }) : _motion = motion,
        super(repaint: motion);
 
   final CargoTrackingMode mode;
   final double? progress;
   final AppLanguage language;
+  final List<Map<String, dynamic>> schedules;
   final Animation<double> _motion;
 
   Path _polygon(List<Offset> points) {
@@ -630,14 +641,7 @@ class _CargoRoutePainter extends CustomPainter {
     ..moveTo(195, 346)
     ..lineTo(207, 337);
 
-  Path _seaPath() => Path()
-    ..moveTo(563, 106)
-    ..cubicTo(564, 150, 545, 185, 515, 220)
-    ..cubicTo(495, 242, 478, 260, 467, 285)
-    ..cubicTo(445, 330, 402, 368, 346, 404)
-    ..cubicTo(315, 424, 292, 445, 268, 463)
-    ..cubicTo(240, 482, 197, 472, 180, 450)
-    ..cubicTo(167, 434, 163, 420, 169, 409);
+  Path _seaPath() => sharedSeaRoutePath();
 
   Path _airPath() => Path()
     ..moveTo(557, 93)
@@ -654,16 +658,7 @@ class _CargoRoutePainter extends CustomPainter {
       return Path()..moveTo(195, 346)..lineTo(207, 337);
     }
     if (index == 0) return Path()..moveTo(575, 96)..lineTo(563, 106);
-    if (index == 1) {
-      return Path()
-        ..moveTo(563, 106)
-        ..cubicTo(564, 150, 545, 185, 515, 220)
-        ..cubicTo(495, 242, 478, 260, 467, 285)
-        ..cubicTo(445, 330, 402, 368, 346, 404)
-        ..cubicTo(315, 424, 292, 445, 268, 463)
-        ..cubicTo(240, 482, 197, 472, 180, 450)
-        ..cubicTo(167, 434, 163, 420, 169, 409);
-    }
+    if (index == 1) return _seaPath();
     if (index == 2) {
       return Path()
         ..moveTo(169, 409)
@@ -733,76 +728,10 @@ class _CargoRoutePainter extends CustomPainter {
     }
   }
 
-  void _drawTruck(Canvas canvas) {
-    final fill = Paint()..color = const Color(0xFFF1FBFF);
-    final edge = Paint()
-      ..color = const Color(0xFF5ED2EB)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    canvas.drawRect(const Rect.fromLTWH(-26, -11, 31, 19), fill);
-    canvas.drawRect(const Rect.fromLTWH(-26, -11, 31, 19), edge);
-    final cab = Path()
-      ..moveTo(5, -6)
-      ..lineTo(15, -6)
-      ..lineTo(24, 3)
-      ..lineTo(24, 8)
-      ..lineTo(5, 8)
-      ..close();
-    canvas.drawPath(cab, fill);
-    canvas.drawPath(cab, edge);
-    final wheel = Paint()..color = const Color(0xFF082B50);
-    canvas.drawCircle(const Offset(-17, 10), 4, wheel);
-    canvas.drawCircle(const Offset(16, 10), 4, wheel);
-  }
-
-  void _drawShip(Canvas canvas) {
-    final fill = Paint()..color = const Color(0xFFF1FBFF);
-    final edge = Paint()
-      ..color = const Color(0xFF5ED2EB)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    final hull = Path()
-      ..moveTo(-32, 5)
-      ..lineTo(31, 5)
-      ..lineTo(21, 17)
-      ..lineTo(-22, 17)
-      ..close();
-    canvas.drawPath(hull, fill);
-    canvas.drawPath(hull, edge);
-    final box = Paint()..color = const Color(0xFFE4A43B);
-    for (var i = 0; i < 3; i++) {
-      canvas.drawRect(Rect.fromLTWH(-23 + i * 16, -10, 14, 14), box);
-    }
-  }
-
-  void _drawPlane(Canvas canvas) {
-    final path = Path()
-      ..moveTo(-25, 0)
-      ..lineTo(-7, -6)
-      ..lineTo(2, -20)
-      ..lineTo(8, -20)
-      ..lineTo(5, -5)
-      ..lineTo(26, 0)
-      ..lineTo(5, 6)
-      ..lineTo(8, 20)
-      ..lineTo(2, 20)
-      ..lineTo(-7, 7)
-      ..close();
-    canvas.drawPath(path, Paint()..color = Colors.white);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = const Color(0xFFE9A547)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  void _drawVehicle(Canvas canvas) {
-    if (progress == null) return;
-    final trackingMode = mode;
+  void _drawVehicle(Canvas canvas, CargoTrackingMode trackingMode, double? markerProgress, {String? voyage, int index = 0}) {
+    if (markerProgress == null) return;
     final legs = CargoTracking.legs(trackingMode);
-    final leg = CargoTracking.currentLeg(trackingMode, progress!);
+    final leg = CargoTracking.currentLeg(trackingMode, markerProgress);
     final legIndex = legs.indexWhere((item) =>
         item.from == leg.from &&
         item.to == leg.to &&
@@ -811,7 +740,7 @@ class _CargoRoutePainter extends CustomPainter {
     final metric = path.computeMetrics().first;
     final span = math.max(.0001, leg.toProgress - leg.fromProgress);
     final localProgress =
-        ((progress! - leg.fromProgress) / span).clamp(0.0, 1.0).toDouble();
+        ((markerProgress - leg.fromProgress) / span).clamp(0.0, 1.0).toDouble();
     final base = metric.length * localProgress;
     final wave = math.sin(_motion.value * math.pi * 2) * 2.5;
     final tangent = metric.getTangentForOffset(
@@ -830,17 +759,21 @@ class _CargoRoutePainter extends CustomPainter {
       haloRadius,
       Paint()..color = const Color(0xBB082E57),
     );
-    canvas.rotate(tangent.angle);
+    if (voyage != null) {
+      _label(canvas, voyage, Offset(-12, index.isOdd ? 36 : -47), size: 15);
+    }
+    // All shared symbols face up; tangent.angle uses the positive X axis.
+    canvas.rotate(tangent.angle + math.pi / 2);
     switch (leg.vehicle) {
       case CargoTrackingVehicle.truck:
         canvas.scale(.82);
-        _drawTruck(canvas);
+        drawSharedRouteVehicle(canvas, 'truck');
         break;
       case CargoTrackingVehicle.ship:
-        _drawShip(canvas);
+        drawSharedRouteVehicle(canvas, 'ship');
         break;
       case CargoTrackingVehicle.plane:
-        _drawPlane(canvas);
+        drawSharedRouteVehicle(canvas, 'plane');
         break;
     }
     canvas.restore();
@@ -1057,8 +990,8 @@ class _CargoRoutePainter extends CustomPainter {
     _label(canvas, 'VIETNAM', const Offset(263, 365), size: 13);
     final landRoute = _landPath(), sea = _seaPath(), air = _airPath();
     _drawRoute(canvas, landRoute, const Color(0xFF2F80ED), true);
-    _drawRoute(canvas, sea, const Color(0xFFEF3F48), mode == CargoTrackingMode.sea);
-    _drawRoute(canvas, air, const Color(0xFFFFAD32), mode == CargoTrackingMode.air);
+    _drawRoute(canvas, sea, const Color(0xFFEF3F48), (schedules.isNotEmpty || mode == CargoTrackingMode.sea));
+    _drawRoute(canvas, air, const Color(0xFFFFAD32), (schedules.isNotEmpty || mode == CargoTrackingMode.air));
 
     final node = Paint()..color = Colors.white;
     final nodeEdge = Paint()
@@ -1089,7 +1022,15 @@ class _CargoRoutePainter extends CustomPainter {
       const Offset(232, 337),
       size: 15,
     );
-    _drawVehicle(canvas);
+    if (schedules.isEmpty) {
+      _drawVehicle(canvas, mode, progress);
+    } else {
+      for (var i = 0; i < schedules.length; i++) {
+        final row = schedules[i];
+        final rowMode = CargoTracking.modeOf(row);
+        if (rowMode != null) _drawVehicle(canvas, rowMode, CargoTracking.progress(row), voyage: ShipmentPeriodLabels.voyage(row['voyage'], language), index: i);
+      }
+    }
     canvas.restore();
   }
 
@@ -1097,5 +1038,7 @@ class _CargoRoutePainter extends CustomPainter {
   bool shouldRepaint(covariant _CargoRoutePainter oldDelegate) =>
       oldDelegate.mode != mode ||
       oldDelegate.progress != progress ||
-      oldDelegate.language != language;
+      oldDelegate.language != language ||
+      oldDelegate.schedules != schedules;
 }
+

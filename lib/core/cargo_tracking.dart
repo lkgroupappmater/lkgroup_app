@@ -62,7 +62,7 @@ class CargoTracking {
       _normalize(value).replaceFirst(RegExp(r'^0+(?=\d)'), '');
 
   static CargoTrackingMode? modeOf(Map<String, dynamic> row) {
-    final text = '${_text(row['route'])} ${_text(row['route_category'])}'.toLowerCase();
+    final text = '${_text(row['tracking_route'] ?? row['route'])} ${_text(row['route_category'])}'.toLowerCase();
     if (RegExp(r'항공|air|flight|lka').hasMatch(text)) {
       return CargoTrackingMode.air;
     }
@@ -116,7 +116,7 @@ class CargoTracking {
   static DateTime? _date(dynamic value) {
     final text = _text(value);
     if (text.isEmpty) return null;
-    return DateTime.tryParse(text)?.toLocal();
+    return DateTime.tryParse(text.length <= 10 ? '${text}T12:00:00' : text)?.toLocal();
   }
 
   static DateTime? startDate(Map<String, dynamic> schedule) =>
@@ -133,7 +133,7 @@ class CargoTracking {
     Map<String, dynamic> schedule, {
     DateTime? now,
   }) {
-    final status = _text(schedule['status']).toLowerCase().trim();
+    final status = _text(schedule['tracking_status'] ?? schedule['status']).toLowerCase().trim();
     if (RegExp(r'출고|dispatch|out.?for.?delivery').hasMatch(status)) {
       return CargoTrackingPhase.dispatching;
     }
@@ -158,7 +158,7 @@ class CargoTracking {
   }) {
     final current = now ?? DateTime.now();
     if (phase(schedule, now: current) != CargoTrackingPhase.moving) return 1;
-    final status = _text(schedule['status']).toLowerCase();
+    final status = _text(schedule['tracking_status'] ?? schedule['status']).toLowerCase();
     if (RegExp(r'arriv|deliver|complete|도착|완료').hasMatch(status)) return 1;
     final start = startDate(schedule);
     final end = endDate(schedule);
@@ -251,3 +251,4 @@ class CargoTracking {
     ));
   }
 }
+

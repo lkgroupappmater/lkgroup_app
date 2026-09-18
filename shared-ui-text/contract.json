@@ -891,9 +891,9 @@
       "lo": "ປີ"
     },
     "domesticTracking": {
-      "ko": "라오스 국내 배송 조회 & 관리",
-      "en": "Laos Domestic Delivery Tracking & Management",
-      "lo": "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ"
+      "ko": "라오스 국내 배송 조회 & 관리 (e-commerce)",
+      "en": "Laos Domestic Delivery Tracking & Management (e-commerce)",
+      "lo": "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"
     },
     "edit": {
       "ko": "수정",
@@ -1122,3 +1122,4 @@
     }
   }
 }
+
