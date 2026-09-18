@@ -514,7 +514,6 @@ class _CargoRouteMapState extends State<CargoRouteMap>
     with SingleTickerProviderStateMixin {
   final _transform = TransformationController();
   late final AnimationController _motion;
-  double _zoom = 1;
 
   @override
   void initState() {
@@ -532,11 +531,15 @@ class _CargoRouteMapState extends State<CargoRouteMap>
     super.dispose();
   }
 
-  void _setZoom(double value) {
-    setState(() {
-      _zoom = value.clamp(1.0, 3.0).toDouble();
-      _transform.value = Matrix4.diagonal3Values(_zoom, _zoom, 1);
-    });
+  void _setZoom(double value, Size viewport) {
+    final zoom = value.clamp(routeMapMinZoom, routeMapMaxZoom).toDouble();
+    final center = viewport.center(Offset.zero);
+    final scene = _transform.toScene(center);
+    final x = (center.dx - scene.dx * zoom).clamp(viewport.width * (1 - zoom), 0.0);
+    final y = (center.dy - scene.dy * zoom).clamp(viewport.height * (1 - zoom), 0.0);
+    _transform.value = Matrix4.identity()
+      ..translate(x, y)
+      ..scale(zoom);
   }
 
   Widget _control(IconData icon, VoidCallback action, String tooltip) {
@@ -558,15 +561,18 @@ class _CargoRouteMapState extends State<CargoRouteMap>
       aspectRatio: 760 / 500,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(13),
-        child: Stack(
+        child: LayoutBuilder(builder: (context, constraints) => Stack(
           children: [
             Positioned.fill(
               child: InteractiveViewer(
                 transformationController: _transform,
-                onInteractionEnd: (_) => _zoom = _transform.value.getMaxScaleOnAxis(),
-                minScale: 1,
-                maxScale: 3,
-                boundaryMargin: const EdgeInsets.all(90),
+                minScale: routeMapMinZoom,
+                maxScale: routeMapMaxZoom,
+                scaleFactor: routeMapWheelScaleFactor,
+                trackpadScrollCausesScale: true,
+                panEnabled: true,
+                scaleEnabled: true,
+                boundaryMargin: EdgeInsets.zero,
                 child: SizedBox.expand(
                   child: CustomPaint(
                     painter: _CargoRoutePainter(
@@ -574,6 +580,7 @@ class _CargoRouteMapState extends State<CargoRouteMap>
                       progress: widget.progress,
                       language: widget.language,
                       motion: _motion,
+                      transform: _transform,
                       schedules: widget.schedules,
                     ),
                   ),
@@ -592,15 +599,15 @@ class _CargoRouteMapState extends State<CargoRouteMap>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _control(Icons.add, () => _setZoom(_zoom + .4), CargoTrackingLabels.text(widget.language, 'zoomIn')),
-                    _control(Icons.remove, () => _setZoom(_zoom - .4), CargoTrackingLabels.text(widget.language, 'zoomOut')),
-                    _control(Icons.home_outlined, () => _setZoom(1), CargoTrackingLabels.text(widget.language, 'reset')),
+                    _control(Icons.add, () => _setZoom(_transform.value.getMaxScaleOnAxis() * routeMapButtonFactor, constraints.biggest), CargoTrackingLabels.text(widget.language, 'zoomIn')),
+                    _control(Icons.remove, () => _setZoom(_transform.value.getMaxScaleOnAxis() / routeMapButtonFactor, constraints.biggest), CargoTrackingLabels.text(widget.language, 'zoomOut')),
+                    _control(Icons.home_outlined, () => _transform.value = Matrix4.identity(), CargoTrackingLabels.text(widget.language, 'reset')),
                   ],
                 ),
               ),
             ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -612,10 +619,12 @@ class _CargoRoutePainter extends CustomPainter {
     required this.progress,
     required this.language,
     required Animation<double> motion,
+    required this.transform,
     this.schedules = const [],
   }) : _motion = motion,
-       super(repaint: motion);
+       super(repaint: Listenable.merge([motion, transform]));
 
+  final TransformationController transform;
   final CargoTrackingMode mode;
   final double? progress;
   final AppLanguage language;
@@ -749,6 +758,8 @@ class _CargoRoutePainter extends CustomPainter {
     if (tangent == null) return;
     canvas.save();
     canvas.translate(tangent.position.dx, tangent.position.dy);
+    // Relative size decreases as the map opens up; screen size still changes.
+    canvas.scale(routeVehicleZoomScale(transform.value.getMaxScaleOnAxis()));
     final haloRadius = leg.vehicle == CargoTrackingVehicle.ship
         ? 29.0
         : leg.vehicle == CargoTrackingVehicle.truck
@@ -1036,6 +1047,7 @@ class _CargoRoutePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CargoRoutePainter oldDelegate) =>
+      oldDelegate.transform != transform ||
       oldDelegate.mode != mode ||
       oldDelegate.progress != progress ||
       oldDelegate.language != language ||

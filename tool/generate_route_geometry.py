@@ -25,6 +25,14 @@ for key, paths in data['vehicles'].items():
         dart += '      canvas.drawPath(p' + str(i) + ', Paint()..color = const ' + color(p['stroke']) + '..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeJoin = StrokeJoin.round);\n'
     dart += '      break;\n'
 dart += '  }\n}\n'
+interaction = data['interaction']
+web += 'const routeMapInteraction = ' + json.dumps(interaction) + ';\n'
+web += 'function routeVehicleZoomScale(zoom) { return Math.pow(Math.max(routeMapInteraction.minZoom, Math.min(routeMapInteraction.maxZoom, zoom)), -routeMapInteraction.vehicleZoomExponent); }\n'
+dart = dart.replace("import 'dart:ui';", "import 'dart:ui';\nimport 'dart:math' as math;")
+for key, value in interaction.items():
+    dart += 'const double routeMap' + key[0].upper() + key[1:] + ' = ' + str(float(value)) + ';\n'
+dart += 'double routeVehicleZoomScale(double zoom) => math.pow(zoom.clamp(routeMapMinZoom, routeMapMaxZoom), -routeMapVehicleZoomExponent).toDouble();\n'
+
 targets = [('dist/route-geometry.js', web)] if (ROOT / 'dist').exists() else [('lib/core/route_map_geometry.dart', dart)]
 for name, output in targets:
     target = ROOT / name
