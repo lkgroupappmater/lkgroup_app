@@ -762,8 +762,8 @@ class _CargoRoutePainter extends CustomPainter {
     if (voyage != null) {
       _label(canvas, voyage, Offset(-12, index.isOdd ? 36 : -47), size: 15);
     }
-    // All shared symbols face up; tangent.angle uses the positive X axis.
-    canvas.rotate(tangent.angle + math.pi / 2);
+    // Keep side-view vehicles upright; only their left/right heading changes.
+    canvas.scale(tangent.vector.dx < 0 ? -1.0 : 1.0, 1.0);
     switch (leg.vehicle) {
       case CargoTrackingVehicle.truck:
         canvas.scale(.82);
