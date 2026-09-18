@@ -18,7 +18,7 @@ void main() {
     for (final lang in AppLanguage.values) {
       expect(domesticText(lang, 'title'), ['새 제목', 'New title', 'ຫົວຂໍ້ໃໝ່'][lang.index]);
     }
-    expect(domesticText(AppLanguage.korean, 'manage'), '라오스 국내 배송 관리');
+    expect(domesticText(AppLanguage.korean, 'manage'), '새 제목');
     service.applyRows([]);
     expect(domesticText(AppLanguage.korean, 'title'), '라오스 국내 배송 조회 & 관리 (e-commerce)');
   });
@@ -89,11 +89,12 @@ void main() {
     await tester.pumpAndSettle();
     final input = find.byType(TextField).first;
     await tester.enterText(input, 'LKS 03');
-    SharedUiTextService.instance.applyRows([{'key':'domesticTracking','ko':'동기화된 제목'}]);
+    SharedUiTextService.instance.applyRows([{'key':'domestic.publicTitle','ko':'동기화된 제목'}]);
     await tester.pump();
     expect(find.text('동기화된 제목'),findsOneWidget);
     expect(tester.widget<TextField>(input).controller!.text,'LKS 03');
     await tester.pumpWidget(const SizedBox());
   });
 }
+
 

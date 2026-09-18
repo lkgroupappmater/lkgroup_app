@@ -1,5 +1,7 @@
 import '../services/code_update_service.dart';
 import 'code_update_panel.dart';
+import 'tracking_choice_sheet.dart';
+import '../screens/domestic_tracking_screen.dart';
 import '../services/app_update_service.dart';
 import 'app_update_banner.dart';
 import 'auto_refresh_state.dart';
@@ -356,6 +358,18 @@ class _AppShellState extends State<AppShell>
     });
   }
 
+  Future<void> _chooseTracking() async {
+    final owner = _currentUser?.id;
+    final choice = await showTrackingChoiceSheet(context, _language, _currentUser?.role);
+    if (!mounted || owner != _currentUser?.id || choice == null) return;
+    if (choice == TrackingChoice.cargo) {
+      _selectTab(1);
+    } else {
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) =>
+        DomesticTrackingScreen(language: _language, user: _currentUser)));
+    }
+  }
+
   void _selectTab(int index) {
     setState(() => _currentIndex = index);
     if (index == 0) {
@@ -507,7 +521,10 @@ class _AppShellState extends State<AppShell>
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selected < 0 ? 0 : selected,
-        onTap: (index) => _selectTab(navIndexes[index]),
+        onTap: (index) {
+          if (navIndexes[index] == 1) { _chooseTracking(); }
+          else { _selectTab(navIndexes[index]); }
+        },
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.primary,
         selectedItemColor: AppColors.tealAccent,
@@ -531,3 +548,4 @@ class _AppShellState extends State<AppShell>
 class TextSnackBar extends SnackBar {
   TextSnackBar(String message) : super(content: Text(message));
 }
+

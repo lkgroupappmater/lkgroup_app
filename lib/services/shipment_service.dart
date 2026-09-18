@@ -116,7 +116,10 @@ class ShipmentService {
       );
       final existingIds = result.map((row) => '${row['id']}').toSet();
       for (final raw in List<Map<String, dynamic>>.from(maskedRaw as List)) {
-        if (existingIds.add('${raw['id']}')) result.add(raw);
+        final matchesRoute = route == '전체' || '${raw['route']}' == route;
+        final matchesYear = parsedYear == null || year == '전체' || '${raw['shipment_year']}' == '$parsedYear';
+        final matchesVoyage = voyageValue.isEmpty || '${raw['voyage']}'.replaceFirst(RegExp(r'^0+'), '') == voyageValue.replaceFirst(RegExp(r'^0+'), '');
+        if (matchesRoute && matchesYear && matchesVoyage && existingIds.add('${raw['id']}')) result.add(raw);
       }
     }
 
@@ -579,4 +582,5 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
+
 

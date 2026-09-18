@@ -42,7 +42,8 @@ jobs:
       - run: flutter test test/cargo_tracking_test.dart test/route_overview_test.dart
       - run: python3 tool/generate_shared_ui_text.py --check
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/shared_ui_text_service.dart lib/core/shared_ui_text_catalog.dart lib/core/app_language.dart lib/core/ui_localizations.dart lib/core/cargo_ui_strings.dart lib/screens/management_menu_screen.dart test/shared_ui_text_test.dart
-      - run: flutter test test/domestic_tracking_test.dart test/shared_ui_text_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/widgets/tracking_choice_sheet.dart lib/services/shipment_service.dart test/tracking_choice_sheet_test.dart
+      - run: flutter test test/domestic_tracking_test.dart test/shared_ui_text_test.dart test/tracking_choice_sheet_test.dart
       - run: python3 -m unittest discover -s tool -p 'test_*.py'
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/live_data_service.dart lib/services/app_update_service.dart lib/services/code_update_service.dart lib/widgets/code_update_panel.dart lib/main.dart lib/app.dart lib/widgets/auto_refresh_state.dart lib/widgets/app_update_banner.dart lib/widgets/app_shell.dart lib/screens/dashboard_home_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart lib/screens/notice_list_screen.dart lib/screens/shipment_schedule_screen.dart test/auto_refresh_state_test.dart test/app_update_service_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/receipt_delivery_cost.dart lib/services/receipt_extra_cost_service.dart test/receipt_delivery_cost_test.dart lib/core/document_delivery_style.dart lib/core/money_format.dart lib/screens/splash_screen.dart lib/screens/quote_request_screen.dart lib/services/customer_benefit_service.dart lib/core/document_form_style.dart lib/core/document_form_painter.dart lib/core/document_text_catalog.dart lib/screens/quotation_preview_dialog.dart lib/screens/statement_preview_dialog.dart test/document_form_layout_test.dart test/document_form_render_test.dart
@@ -174,5 +175,6 @@ jobs:
             build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 30
+
 
 

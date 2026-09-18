@@ -173,7 +173,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(t(widget.manage ? 'manage' : 'title'))),
+    appBar: AppBar(title: Text(domesticTitle(widget.language, widget.user?.role))),
     body: widget.user == null
         ? Center(
             child: Padding(
@@ -881,5 +881,6 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> with SharedUi
     ),
   );
 }
+
 
 

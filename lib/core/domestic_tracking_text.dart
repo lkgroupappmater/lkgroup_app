@@ -1,11 +1,16 @@
 import 'app_language.dart';
+import '../models/app_user.dart';
 import '../services/shared_ui_text_service.dart';
+
+String domesticTitle(AppLanguage language, UserRole? role) => domesticText(language,
+    [UserRole.admin, UserRole.staff, UserRole.partner].contains(role) ? 'title' : 'publicTitle');
 
 String domesticText(AppLanguage language, String key) =>
     SharedUiTextService.instance.text('domestic.$key', language.code,
       (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index]);
 
 const domesticWords = <String, List<String>>{
+  "publicTitle": ["라오스 국내 배송 조회 (e-commerce)", "Laos Domestic Delivery Tracking (e-commerce)", "ການຕິດຕາມການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"],
   "INVALID_BATCH": ["송장번호는 한 번에 1~20개까지 등록할 수 있습니다.", "Register 1–20 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–20 ເລກຕໍ່ຄັ້ງ."],
 
   "TOO_MANY_PHOTOS": ["기존 사진을 포함해 송장당 최대 10장까지 등록할 수 있습니다.", "Each waybill can have up to 10 photos, including existing photos.", "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 10 ຮູບ ລວມຮູບເກົ່າ."],
@@ -224,5 +229,6 @@ const domesticWords = <String, List<String>>{
     "ດຳເນີນການບໍ່ໄດ້. ລອງໃໝ່.",
   ],
 };
+
 
 
