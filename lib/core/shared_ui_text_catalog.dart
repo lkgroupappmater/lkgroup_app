@@ -168,7 +168,10 @@ const sharedKoreanTextKeys = <String, String>{
   "카톡 명세서 선공유 및 온라인 결제": "statement.shareOnline",
   "온라인 결제": "statement.onlinePayment",
   "(선결제)": "statement.prepaidSuffix",
-  "특별 할인": "statement.groupSpecial"
+  "특별 할인": "statement.groupSpecial",
+  "기업 할인": "statement.corporateDiscount",
+  "대표 고정 할인": "statement.representativeDiscount",
+  "기타 할인": "statement.otherDiscount"
 };
 const sharedTextDefaults = <String, Map<String, String>>{
   "account": {
@@ -1570,5 +1573,20 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "ko": "특별 할인",
   "en": "Special discount",
   "lo": "ສ່ວນຫຼຸດພິເສດ"
+},
+  "statement.corporateDiscount": {
+  "ko": "기업 할인",
+  "en": "Corporate discount",
+  "lo": "ສ່ວນຫຼຸດບໍລິສັດ"
+},
+  "statement.representativeDiscount": {
+  "ko": "대표 고정 할인",
+  "en": "Fixed management discount",
+  "lo": "ສ່ວນຫຼຸດຄົງທີ່ຈາກຜູ້ບໍລິຫານ"
+},
+  "statement.otherDiscount": {
+  "ko": "기타 할인",
+  "en": "Other discount",
+  "lo": "ສ່ວນຫຼຸດອື່ນ"
 }
 };

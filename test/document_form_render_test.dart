@@ -154,6 +154,8 @@ void main() {
 
   test('all document labels and route notes use the selected language offline', () async {
     for (final language in [AppLanguage.english, AppLanguage.lao]) {
+      expect(RegExp(r'[가-힣]').hasMatch(DocumentLocalizations.note(language,
+        '카톡 명세서 선공유 및 온라인 결제 / 기업 할인 5% 적용 / 지방배송(선결제)')), false);
       for (final route in RouteCatalog.routes) {
         final quote = DocumentTextCatalog.quotation(route, date, language: language);
         final receipt = DocumentTextCatalog.statement(route, date, language: language);
