@@ -2,9 +2,10 @@
   "version": 1,
   "aliases": {
     "domestic.title": "domesticTracking",
-    "domesticManage": "domestic.manage",
-    "adminMenu.domesticTracking": "domestic.manage",
-    "adminMenu.localDeliveries": "localDeliveries"
+    "domesticManage": "domesticTracking",
+    "adminMenu.domesticTracking": "domesticTracking",
+    "adminMenu.localDeliveries": "localDeliveries",
+    "domestic.manage": "domesticTracking"
   },
   "appKeys": {
     "add_box": "quote.addBox",
@@ -66,7 +67,7 @@
     "삭제 대기중": "parity.deletedRoutes",
     "선적 일정 관리": "adminMenu.schedules",
     "송장번호": "invoice",
-    "수량": "quantity",
+    "수량": "statement-preview.statementDocumentHtml.quantity",
     "수정": "edit",
     "시내.지방 배송 list 관리": "localDeliveries",
     "암호": "password",
@@ -79,7 +80,7 @@
     "저장": "save",
     "직접 입력 (선택)": "app.contentManualLabel.manualEntryOptional",
     "추가": "add",
-    "추가 할인": "excel-management.fetchSettlement.additionalDiscount",
+    "추가 할인": "statement-preview.statementDocumentHtml.additionalDiscount",
     "추가 할인명": "receipt.discountName",
     "취소": "admin-parity.renderRouteDevelopmentEditor.cancel",
     "하역 자료 관리": "adminMenu.unloading",
@@ -97,7 +98,78 @@
     "회신 완료": "quote.replied",
     "회원 로그인": "loginTitle",
     "회원 종합 관리": "adminMenu.members",
-    "회원 탈퇴": "accountDelete"
+    "회원 탈퇴": "accountDelete",
+    "* 이용해 주셔서 감사합니다.": "statement-preview.statementFooterLines.thankYou",
+    "이며, 청구중량에 따라 차등 운임이 적용 됩니다.": "statement-preview.statementFooterLines.tieredRateNotice",
+    "입니다.": "statement-preview.statementFooterLines.rateNoticeEnd",
+    "* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.": "statement-preview.statementFooterLines.pickupNotice",
+    "* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.": "statement-preview.statementFooterLines.storageNotice",
+    "* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.": "statement-preview.statementFooterLines.storageTerms",
+    " (할인 적용)": "statement-preview.statementTableRows.discountApplied",
+    "할인": "statement-preview.statementDocumentHtml.discount",
+    "최종 가견적 총액": "statement-preview.statementDocumentHtml.quotationFinalTotal",
+    "최종 명세서 총액": "statement-preview.statementDocumentHtml.statementFinalTotal",
+    "견적일": "statement-preview.statementDocumentHtml.quotationDate",
+    "영수번호": "statement-preview.statementDocumentHtml.receiptNumber",
+    "특별할인": "statement-preview.statementDocumentHtml.specialDiscount",
+    "LK Group Trading": "statement-preview.statementDocumentHtml.lkGroupTrading",
+    "구획(Zone)": "statement-preview.statementDocumentHtml.zone",
+    "회사명": "statement-preview.statementDocumentHtml.companyName",
+    "엘케이(LK)무역": "statement-preview.statementDocumentHtml.companyTradingName",
+    "회사주소": "statement-preview.statementDocumentHtml.companyAddress",
+    "비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading": "statement-preview.statementDocumentHtml.officeAddress",
+    "전화번호": "statement-preview.statementDocumentHtml.telephone",
+    "고객명/회사명": "statement-preview.statementDocumentHtml.customerCompany",
+    "연락처": "statement-preview.statementDocumentHtml.contact",
+    "No.": "statement-preview.statementDocumentHtml.no",
+    "박스번호": "statement-preview.statementDocumentHtml.boxNumber",
+    "단가": "statement-preview.statementDocumentHtml.unitPrice",
+    "실제중량": "statement-preview.statementDocumentHtml.actualWeight",
+    "실제중량 합산": "statement-preview.statementDocumentHtml.totalActualWeight",
+    "용적중량": "statement-preview.statementDocumentHtml.volumeWeight",
+    "용적중량 합산": "statement-preview.statementDocumentHtml.totalVolumeWeight",
+    "실제중량 운임": "statement-preview.statementDocumentHtml.actualFreight",
+    "용적중량 운임": "statement-preview.statementDocumentHtml.volumeFreight",
+    "청구중량 운임": "statement-preview.statementDocumentHtml.chargeableFreight",
+    "합계": "statement-preview.statementDocumentHtml.total",
+    "Remark/비고": "statement-preview.statementDocumentHtml.remark",
+    "Inland delivery/시내·지방 배송": "statement-preview.statementDocumentHtml.inlandDelivery",
+    "운임 총합": "statement-preview.statementDocumentHtml.totalFreight",
+    "세금 계산서(VAT)": "statement-preview.statementDocumentHtml.vat",
+    "BCEL (USD):": "statement-preview.statementDocumentHtml.bcelUsd",
+    "(SungHo Park)": "statement-preview.statementDocumentHtml.sunghoPark",
+    "BCEL (KIP):": "statement-preview.statementDocumentHtml.bcelKip",
+    "BCEL (Baht):": "statement-preview.statementDocumentHtml.bcelBaht",
+    "한국 원화 계좌:": "statement-preview.statementDocumentHtml.krwAccount",
+    "경남은행": "statement-preview.statementDocumentHtml.bankName",
+    "박성호": "statement-preview.statementDocumentHtml.accountHolder",
+    "BCEL USD QR": "statement-preview.statementDocumentHtml.bcelUsdQr",
+    "BCEL KIP QR": "statement-preview.statementDocumentHtml.bcelKipQr",
+    "BCEL Baht QR": "statement-preview.statementDocumentHtml.bcelBahtQr",
+    "LK Trading company stamp": "statement-preview.statementDocumentHtml.lkTradingCompanyStamp",
+    "고객사 확인": "statement-preview.statementDocumentHtml.customerConfirmation",
+    "Unsupported statement image": "statement-preview.statementImageDataUrl.unsupportedStatementImage",
+    "Statement image load timed out": "statement-preview.waitForStatementImage.statementImageLoadTimedOut",
+    "Statement image is empty": "statement-preview.waitForStatementImage.statementImageIsEmpty",
+    "Statement image is missing": "statement-preview.inlineStatementImages.statementImageIsMissing",
+    "Canvas is unavailable": "statement-preview.statementRasterAsset.canvasIsUnavailable",
+    "PNG export failed": "statement-preview.statementRasterAsset.pngExportFailed",
+    "적용 환율": "statement.appliedExchange",
+    "절취선": "statement.cutLine",
+    "- 동 가견적 운임의 중량 및 크기는 단순 예상치이므로 최종 책정 방법인 기준인 실측시 금액 차이가 발생 할수 있으니, 참고용으로만 확인 부탁 드립니다.\n- 운임은 USD 기준이며, 이외 화폐는 가견적 안내시의 환율 기준이므로, 최종 운임 책정시의 환율변동으로 인한 운임 차이가 발생할수 있으니, 참고용으로만 확인 부탁 드립니다.": "statement.quotationDisclaimer",
+    "거래 명세서": "statement.statementTitle",
+    "가견적서": "statement.quotationTitle",
+    " (할인)": "statement.documentDiscountSuffix",
+    "시내배송": "statement.cityDelivery",
+    "지방배송": "statement.provinceDelivery",
+    "시내 선결제": "statement.cityPrepaid",
+    "지방 선결제": "statement.provincePrepaid",
+    "라오스 국내 배송 조회 (e-commerce)": "domestic.publicTitle",
+    "카톡 명세서 선공유": "statement.kakaoShare",
+    "카톡 명세서 선공유 및 온라인 결제": "statement.shareOnline",
+    "온라인 결제": "statement.onlinePayment",
+    "(선결제)": "statement.prepaidSuffix",
+    "특별 할인": "statement.groupSpecial"
   },
   "defaults": {
     "account": {
@@ -605,11 +677,6 @@
       "en": "Search by",
       "lo": "ຄົ້ນຫາຕາມ"
     },
-    "domestic.manage": {
-      "ko": "라오스 국내 배송 관리",
-      "en": "Laos Domestic Delivery Management",
-      "lo": "ຈັດການຂົນສົ່ງພາຍໃນລາວ"
-    },
     "domestic.manageHint": {
       "ko": "LK 명세서별로 배송업체 송장과 사진, 배송 이력을 관리합니다.",
       "en": "Manage carrier waybills, photos and delivery history by LK statement.",
@@ -1098,7 +1165,7 @@
     "statement-preview.statementDocumentHtml.discount": {
       "ko": "할인",
       "en": "Discount",
-      "lo": "ອັດຕາສ່ວນຫຼຸດ"
+      "lo": "ສ່ວນຫຼຸດ"
     },
     "textManager.empty": {
       "ko": "검색 결과가 없습니다.",
@@ -1119,7 +1186,391 @@
       "ko": "년도",
       "en": "Year",
       "lo": "ປີ"
+    },
+    "statement-preview.statementFooterLines.thankYou": {
+      "ko": "* 이용해 주셔서 감사합니다.",
+      "en": "* Thank you for using our service.",
+      "lo": "* ຂອບໃຈທີ່ໃຊ້ບໍລິການ."
+    },
+    "statement-preview.statementFooterLines.tieredRateNotice": {
+      "ko": "이며, 청구중량에 따라 차등 운임이 적용 됩니다.",
+      "en": "; tiered rates apply according to chargeable weight.",
+      "lo": "; ອັດຕາແຕກຕ່າງຕາມນ້ຳໜັກທີ່ຄິດຄ່າຂົນສົ່ງ."
+    },
+    "statement-preview.statementFooterLines.rateNoticeEnd": {
+      "ko": "입니다.",
+      "en": ".",
+      "lo": "."
+    },
+    "statement-preview.statementFooterLines.pickupNotice": {
+      "ko": "* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.",
+      "en": "* Check your goods and quantities before leaving the receiving or dispatch location. LK Group is not responsible for damage or loss after dispatch.",
+      "lo": "* ກະລຸນາກວດສິນຄ້າ ແລະ ຈຳນວນກ່ອນອອກຈາກຈຸດຮັບ-ສົ່ງ. LK Group ບໍ່ຮັບຜິດຊອບຄວາມເສຍຫາຍ ຫຼື ສູນຫາຍຫຼັງຈາກສົ່ງອອກ."
+    },
+    "statement-preview.statementFooterLines.storageNotice": {
+      "ko": "* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.",
+      "en": "* Storage and other fees may apply to goods left uncollected for a long period without a special reason.",
+      "lo": "* ສິນຄ້າທີ່ບໍ່ມາຮັບເປັນເວລາດົນໂດຍບໍ່ມີເຫດຜົນພິເສດ ອາດມີຄ່າເກັບຮັກສາ ແລະ ຄ່າໃຊ້ຈ່າຍເພີ່ມ."
+    },
+    "statement-preview.statementFooterLines.storageTerms": {
+      "ko": "* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.",
+      "en": "* Storage charges (minimum USD 3/CBM/day) start one week after dispatch. Goods stored for over two months without a special reason may be disposed of.",
+      "lo": "* ເລີ່ມຄິດຄ່າເກັບຮັກສາ (ຂັ້ນຕ່ຳ USD 3/CBM/day) ຫຼັງສົ່ງອອກ 1 ອາທິດ. ສິນຄ້າທີ່ເກັບເກີນ 2 ເດືອນໂດຍບໍ່ມີເຫດຜົນພິເສດອາດຖືກກຳຈັດ."
+    },
+    "statement-preview.statementTableRows.discountApplied": {
+      "ko": " (할인 적용)",
+      "en": " (discount applied)",
+      "lo": " (ນຳໃຊ້ສ່ວນຫຼຸດ)"
+    },
+    "statement-preview.statementDocumentHtml.quotationFinalTotal": {
+      "ko": "최종 가견적 총액",
+      "en": "Final quotation total",
+      "lo": "ລວມລາຄາປະເມີນສຸດທ້າຍ"
+    },
+    "statement-preview.statementDocumentHtml.statementFinalTotal": {
+      "ko": "최종 명세서 총액",
+      "en": "Final statement total",
+      "lo": "ລວມຍອດໃບລາຍການສຸດທ້າຍ"
+    },
+    "statement-preview.statementDocumentHtml.quotationDate": {
+      "ko": "견적일",
+      "en": "Quotation date",
+      "lo": "ວັນທີປະເມີນ"
+    },
+    "statement-preview.statementDocumentHtml.receiptNumber": {
+      "ko": "영수번호",
+      "en": "Receipt number",
+      "lo": "ເລກໃບຮັບ"
+    },
+    "statement-preview.statementDocumentHtml.specialDiscount": {
+      "ko": "특별할인",
+      "en": "Special discount",
+      "lo": "ສ່ວນຫຼຸດພິເສດ"
+    },
+    "statement-preview.statementDocumentHtml.additionalDiscount": {
+      "ko": "추가 할인",
+      "en": "Additional discount",
+      "lo": "ສ່ວນຫຼຸດເພີ່ມ"
+    },
+    "statement-preview.statementDocumentHtml.lkGroupTrading": {
+      "ko": "LK Group Trading",
+      "en": "LK Group Trading",
+      "lo": "LK Group Trading"
+    },
+    "statement-preview.statementDocumentHtml.zone": {
+      "ko": "구획(Zone)",
+      "en": "Zone",
+      "lo": "ເຂດ"
+    },
+    "statement-preview.statementDocumentHtml.companyName": {
+      "ko": "회사명",
+      "en": "Company",
+      "lo": "ບໍລິສັດ"
+    },
+    "statement-preview.statementDocumentHtml.companyTradingName": {
+      "ko": "엘케이(LK)무역",
+      "en": "LK Trading",
+      "lo": "LK Trading"
+    },
+    "statement-preview.statementDocumentHtml.companyAddress": {
+      "ko": "회사주소",
+      "en": "Company address",
+      "lo": "ທີ່ຢູ່ບໍລິສັດ"
+    },
+    "statement-preview.statementDocumentHtml.officeAddress": {
+      "ko": "비엔티엔시, 씨싿따낙구, 싸판텅 느아 09, 11번 골목, 엘케이(LK) 빌딩, 1층 LK Trading",
+      "en": "LK Trading, ground floor, LK Building, alley 11, Saphanthong Neua 09, Sisattanak District, Vientiane",
+      "lo": "LK Trading, ຊັ້ນ 1 ອາຄານ LK, ຮ່ອມ 11, ສະພານທອງເໜືອ 09, ເມືອງສີສັດຕະນາກ, ນະຄອນຫຼວງວຽງຈັນ"
+    },
+    "statement-preview.statementDocumentHtml.telephone": {
+      "ko": "전화번호",
+      "en": "Telephone",
+      "lo": "ເບີໂທ"
+    },
+    "statement-preview.statementDocumentHtml.customerCompany": {
+      "ko": "고객명/회사명",
+      "en": "Customer / company",
+      "lo": "ລູກຄ້າ / ບໍລິສັດ"
+    },
+    "statement-preview.statementDocumentHtml.contact": {
+      "ko": "연락처",
+      "en": "Contact",
+      "lo": "ຕິດຕໍ່"
+    },
+    "statement-preview.statementDocumentHtml.no": {
+      "ko": "No.",
+      "en": "No.",
+      "lo": "ລຳດັບ"
+    },
+    "statement-preview.statementDocumentHtml.boxNumber": {
+      "ko": "박스번호",
+      "en": "Box number",
+      "lo": "ເລກກ່ອງ"
+    },
+    "statement-preview.statementDocumentHtml.unitPrice": {
+      "ko": "단가",
+      "en": "Unit price",
+      "lo": "ລາຄາຕໍ່ໜ່ວຍ"
+    },
+    "statement-preview.statementDocumentHtml.quantity": {
+      "ko": "수량",
+      "en": "Quantity",
+      "lo": "ຈຳນວນ"
+    },
+    "statement-preview.statementDocumentHtml.actualWeight": {
+      "ko": "실제중량",
+      "en": "Actual weight",
+      "lo": "ນ້ຳໜັກຈິງ"
+    },
+    "statement-preview.statementDocumentHtml.totalActualWeight": {
+      "ko": "실제중량 합산",
+      "en": "Total actual weight",
+      "lo": "ລວມນ້ຳໜັກຈິງ"
+    },
+    "statement-preview.statementDocumentHtml.volumeWeight": {
+      "ko": "용적중량",
+      "en": "Volumetric weight",
+      "lo": "ນ້ຳໜັກຕາມປະລິມານ"
+    },
+    "statement-preview.statementDocumentHtml.totalVolumeWeight": {
+      "ko": "용적중량 합산",
+      "en": "Total volumetric weight",
+      "lo": "ລວມນ້ຳໜັກຕາມປະລິມານ"
+    },
+    "statement-preview.statementDocumentHtml.actualFreight": {
+      "ko": "실제중량 운임",
+      "en": "Actual-weight freight",
+      "lo": "ຄ່າຂົນສົ່ງຕາມນ້ຳໜັກຈິງ"
+    },
+    "statement-preview.statementDocumentHtml.volumeFreight": {
+      "ko": "용적중량 운임",
+      "en": "Volumetric-weight freight",
+      "lo": "ຄ່າຂົນສົ່ງຕາມປະລິມານ"
+    },
+    "statement-preview.statementDocumentHtml.chargeableFreight": {
+      "ko": "청구중량 운임",
+      "en": "Chargeable-weight freight",
+      "lo": "ຄ່າຂົນສົ່ງທີ່ຄິດເກັບ"
+    },
+    "statement-preview.statementDocumentHtml.total": {
+      "ko": "합계",
+      "en": "Total",
+      "lo": "ລວມ"
+    },
+    "statement-preview.statementDocumentHtml.remark": {
+      "ko": "Remark/비고",
+      "en": "Remark",
+      "lo": "ໝາຍເຫດ"
+    },
+    "statement-preview.statementDocumentHtml.inlandDelivery": {
+      "ko": "Inland delivery/시내·지방 배송",
+      "en": "Inland delivery",
+      "lo": "ຂົນສົ່ງພາຍໃນປະເທດ"
+    },
+    "statement-preview.statementDocumentHtml.totalFreight": {
+      "ko": "운임 총합",
+      "en": "Total freight",
+      "lo": "ລວມຄ່າຂົນສົ່ງ"
+    },
+    "statement-preview.statementDocumentHtml.vat": {
+      "ko": "세금 계산서(VAT)",
+      "en": "VAT",
+      "lo": "ອາກອນ VAT"
+    },
+    "statement-preview.statementDocumentHtml.bcelUsd": {
+      "ko": "BCEL (USD):",
+      "en": "BCEL (USD):",
+      "lo": "BCEL (USD):"
+    },
+    "statement-preview.statementDocumentHtml.sunghoPark": {
+      "ko": "(SungHo Park)",
+      "en": "(SungHo Park)",
+      "lo": "(SungHo Park)"
+    },
+    "statement-preview.statementDocumentHtml.bcelKip": {
+      "ko": "BCEL (KIP):",
+      "en": "BCEL (KIP):",
+      "lo": "BCEL (KIP):"
+    },
+    "statement-preview.statementDocumentHtml.bcelBaht": {
+      "ko": "BCEL (Baht):",
+      "en": "BCEL (Baht):",
+      "lo": "BCEL (Baht):"
+    },
+    "statement-preview.statementDocumentHtml.krwAccount": {
+      "ko": "한국 원화 계좌:",
+      "en": "KRW account:",
+      "lo": "ບັນຊີເງິນວອນເກົາຫຼີ:"
+    },
+    "statement-preview.statementDocumentHtml.bankName": {
+      "ko": "경남은행",
+      "en": "Kyongnam Bank",
+      "lo": "ທະນາຄານ Kyongnam"
+    },
+    "statement-preview.statementDocumentHtml.accountHolder": {
+      "ko": "박성호",
+      "en": "SungHo Park",
+      "lo": "SungHo Park"
+    },
+    "statement-preview.statementDocumentHtml.bcelUsdQr": {
+      "ko": "BCEL USD QR",
+      "en": "BCEL USD QR",
+      "lo": "BCEL USD QR"
+    },
+    "statement-preview.statementDocumentHtml.bcelKipQr": {
+      "ko": "BCEL KIP QR",
+      "en": "BCEL KIP QR",
+      "lo": "BCEL KIP QR"
+    },
+    "statement-preview.statementDocumentHtml.bcelBahtQr": {
+      "ko": "BCEL Baht QR",
+      "en": "BCEL Baht QR",
+      "lo": "BCEL Baht QR"
+    },
+    "statement-preview.statementDocumentHtml.lkTradingCompanyStamp": {
+      "ko": "LK Trading company stamp",
+      "en": "LK Trading company stamp",
+      "lo": "ຕາປະທັບບໍລິສັດ LK Trading"
+    },
+    "statement-preview.statementDocumentHtml.customerConfirmation": {
+      "ko": "고객사 확인",
+      "en": "Customer confirmation",
+      "lo": "ລູກຄ້າຢືນຢັນ"
+    },
+    "statement-preview.statementFooterLines.minimumFreightNotice": {
+      "ko": "* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 {standard} {value}",
+      "en": "* Charges follow company policy and actual weight/dimensions. Minimum freight is {standard} {value}",
+      "lo": "* ຄ່າໃຊ້ຈ່າຍອີງຕາມລະບຽບບໍລິສັດ ແລະ ນ້ຳໜັກ/ຂະໜາດທີ່ວັດຈິງ. ຄ່າຂົນສົ່ງຂັ້ນຕ່ຳ {standard} {value}"
+    },
+    "statement-preview.statementBaseRemark.quotationValidity": {
+      "ko": "- valid end of {month}/{value}, after confirm price but incase departrue delayed by customer request or needs, rate should be change.\n- 기한: {value}년 {value2}월 말, 고객의 요청에 의하여 견적후 배송/출발 지연이 발생할 경우 운임 변동이 있을수 있으니 참고 부탁 드립니다.",
+      "en": "- Valid through the end of {month}/{value} (month {value2}). Rates may change if dispatch is delayed at the customer's request after the quotation.",
+      "lo": "- ໃຊ້ໄດ້ຮອດທ້າຍເດືອນ {value2}/{value} ({month}). ອັດຕາອາດປ່ຽນຖ້າລູກຄ້າຂໍເລື່ອນການສົ່ງຫຼັງຢືນຢັນລາຄາ."
+    },
+    "statement-preview.statementBaseRemark.fuelNotice": {
+      "ko": "{generic}\n- 변동 유류값으로 인하여 매월 운임의 변동이 있을 수 있으니, 실제 선적 진행 시 꼭! 운임을 재차 확인 하시기 바랍니다.",
+      "en": "{generic}\n- Rates may change monthly with fuel costs. Please confirm the rate before shipping.",
+      "lo": "{generic}\n- ອັດຕາອາດປ່ຽນທຸກເດືອນຕາມລາຄານ້ຳມັນ. ກະລຸນາຢືນຢັນອັດຕາກ່ອນສົ່ງ."
+    },
+    "statement-preview.statementDocumentHtml.discountGroupLabel": {
+      "ko": "{discountGroup} 할인",
+      "en": "{discountGroup} discount",
+      "lo": "{discountGroup} ສ່ວນຫຼຸດ"
+    },
+    "statement-preview.statementDocumentHtml.appliedLabel": {
+      "ko": "{discountLabel} {value} 적용",
+      "en": "{discountLabel} {value} applied",
+      "lo": "ນຳໃຊ້ {discountLabel} {value}"
+    },
+    "statement-preview.statementImageDataUrl.unsupportedStatementImage": {
+      "ko": "Unsupported statement image",
+      "en": "Unsupported statement image",
+      "lo": "ບໍ່ຮອງຮັບຮູບໃບລາຍການນີ້"
+    },
+    "statement-preview.waitForStatementImage.statementImageLoadTimedOut": {
+      "ko": "Statement image load timed out",
+      "en": "Statement image load timed out",
+      "lo": "ໂຫຼດຮູບໃບລາຍການໝົດເວລາ"
+    },
+    "statement-preview.waitForStatementImage.statementImageIsEmpty": {
+      "ko": "Statement image is empty",
+      "en": "Statement image is empty",
+      "lo": "ຮູບໃບລາຍການວ່າງ"
+    },
+    "statement-preview.inlineStatementImages.statementImageIsMissing": {
+      "ko": "Statement image is missing",
+      "en": "Statement image is missing",
+      "lo": "ບໍ່ພົບຮູບໃບລາຍການ"
+    },
+    "statement-preview.statementRasterAsset.canvasIsUnavailable": {
+      "ko": "Canvas is unavailable",
+      "en": "Canvas is unavailable",
+      "lo": "ບໍ່ສາມາດໃຊ້ Canvas"
+    },
+    "statement-preview.statementRasterAsset.pngExportFailed": {
+      "ko": "PNG export failed",
+      "en": "PNG export failed",
+      "lo": "ສົ່ງອອກ PNG ບໍ່ສຳເລັດ"
+    },
+    "statement.appliedExchange": {
+      "ko": "적용 환율",
+      "en": "Applied exchange rate",
+      "lo": "ອັດຕາແລກປ່ຽນ"
+    },
+    "statement.cutLine": {
+      "ko": "절취선",
+      "en": "Cut here",
+      "lo": "ຕັດຕາມເສັ້ນ"
+    },
+    "statement.quotationDisclaimer": {
+      "ko": "- 동 가견적 운임의 중량 및 크기는 단순 예상치이므로 최종 책정 방법인 기준인 실측시 금액 차이가 발생 할수 있으니, 참고용으로만 확인 부탁 드립니다.\n- 운임은 USD 기준이며, 이외 화폐는 가견적 안내시의 환율 기준이므로, 최종 운임 책정시의 환율변동으로 인한 운임 차이가 발생할수 있으니, 참고용으로만 확인 부탁 드립니다.",
+      "en": "- Weight and dimensions in this quotation are estimates. Final charges may differ after actual measurement.\n- Rates are in USD. Other currencies use the exchange rate at quotation time; the final amount may differ when exchange rates change.",
+      "lo": "- ນ້ຳໜັກ ແລະ ຂະໜາດໃນໃບປະເມີນແມ່ນຄ່າຄາດຄະເນ. ລາຄາສຸດທ້າຍອາດແຕກຕ່າງຫຼັງການວັດຈິງ.\n- ອັດຕາແມ່ນ USD. ສະກຸນເງິນອື່ນໃຊ້ອັດຕາແລກປ່ຽນໃນວັນປະເມີນ; ຍອດສຸດທ້າຍອາດປ່ຽນຕາມອັດຕາແລກປ່ຽນ."
+    },
+    "statement.statementTitle": {
+      "ko": "거래 명세서",
+      "en": "Statement",
+      "lo": "ໃບລາຍການ"
+    },
+    "statement.quotationTitle": {
+      "ko": "가견적서",
+      "en": "Estimate",
+      "lo": "ໃບປະເມີນ"
+    },
+    "statement.documentDiscountSuffix": {
+      "ko": " (할인)",
+      "en": " (discount)",
+      "lo": " (ສ່ວນຫຼຸດ)"
+    },
+    "statement.cityDelivery": {
+      "ko": "시내배송",
+      "en": "City delivery",
+      "lo": "ຈັດສົ່ງໃນເມືອງ"
+    },
+    "statement.provinceDelivery": {
+      "ko": "지방배송",
+      "en": "Provincial delivery",
+      "lo": "ຈັດສົ່ງຕ່າງແຂວງ"
+    },
+    "statement.cityPrepaid": {
+      "ko": "시내 선결제",
+      "en": "Prepaid city delivery",
+      "lo": "ຈ່າຍລ່ວງໜ້າສົ່ງໃນເມືອງ"
+    },
+    "statement.provincePrepaid": {
+      "ko": "지방 선결제",
+      "en": "Prepaid provincial delivery",
+      "lo": "ຈ່າຍລ່ວງໜ້າສົ່ງຕ່າງແຂວງ"
+    },
+    "domestic.publicTitle": {
+      "ko": "라오스 국내 배송 조회 (e-commerce)",
+      "en": "Laos Domestic Delivery Tracking (e-commerce)",
+      "lo": "ການຕິດຕາມການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"
+    },
+    "statement.kakaoShare": {
+      "ko": "카톡 명세서 선공유",
+      "en": "Statement shared in advance via KakaoTalk",
+      "lo": "ສົ່ງໃບລາຍການລ່ວງໜ້າຜ່ານ KakaoTalk"
+    },
+    "statement.shareOnline": {
+      "ko": "카톡 명세서 선공유 및 온라인 결제",
+      "en": "Statement shared in advance via KakaoTalk and paid online",
+      "lo": "ສົ່ງໃບລາຍການລ່ວງໜ້າຜ່ານ KakaoTalk ແລະ ຊຳລະອອນລາຍ"
+    },
+    "statement.onlinePayment": {
+      "ko": "온라인 결제",
+      "en": "Online payment",
+      "lo": "ຊຳລະອອນລາຍ"
+    },
+    "statement.prepaidSuffix": {
+      "ko": "(선결제)",
+      "en": " (prepaid)",
+      "lo": " (ຊຳລະລ່ວງໜ້າ)"
+    },
+    "statement.groupSpecial": {
+      "ko": "특별 할인",
+      "en": "Special discount",
+      "lo": "ສ່ວນຫຼຸດພິເສດ"
     }
   }
 }
-

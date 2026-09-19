@@ -13,6 +13,8 @@ import '../models/app_user.dart';
 import 'cargo_flow_app_bar.dart';
 import '../screens/dashboard_home_screen.dart';
 import '../screens/shipment_search_screen.dart';
+import '../screens/domestic_tracking_screen.dart';
+import '../core/domestic_tracking_text.dart';
 import '../screens/quote_request_screen.dart';
 import '../screens/account_screen.dart';
 import '../screens/cargo_management_screen.dart';
@@ -364,6 +366,30 @@ class _AppShellState extends State<AppShell>
     }
   }
 
+  Future<void> _chooseTracking() async {
+    final domestic = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.local_shipping_outlined),
+            title: Text(AppStrings.get(_language, 'tracking_title')),
+            onTap: () => Navigator.pop(sheetContext, false),
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_shipping_outlined),
+            title: Text(domesticText(_language, _hasManagementMenu ? 'title' : 'publicTitle')),
+            onTap: () => Navigator.pop(sheetContext, true),
+          ),
+        ]),
+      ),
+    );
+    if (!mounted || domestic == null) return;
+    if (!domestic) { _selectTab(1); return; }
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) =>
+      DomesticTrackingScreen(language: _language, user: _currentUser)));
+  }
+
   void _openCargoManagement(List<String> ids) {
     setState(() {
       _cargoSelection = ids;
@@ -507,7 +533,13 @@ class _AppShellState extends State<AppShell>
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selected < 0 ? 0 : selected,
-        onTap: (index) => _selectTab(navIndexes[index]),
+        onTap: (index) {
+          if (navIndexes[index] == 1) {
+            _chooseTracking();
+          } else {
+            _selectTab(navIndexes[index]);
+          }
+        },
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.primary,
         selectedItemColor: AppColors.tealAccent,
@@ -516,10 +548,9 @@ class _AppShellState extends State<AppShell>
       ),
     );
     final laoFont = _language.fontFamily;
-    if (laoFont == null) return scaffold;
     final theme = Theme.of(context);
     return Theme(
-      data: theme.copyWith(
+      data: laoFont == null ? theme : theme.copyWith(
         textTheme: theme.textTheme.apply(fontFamily: laoFont),
         primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: laoFont),
       ),

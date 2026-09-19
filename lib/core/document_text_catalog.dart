@@ -1,12 +1,17 @@
 import 'route_catalog.dart';
+import 'app_language.dart';
+import 'document_localizations.dart';
 
 class DocumentTextContent {
-  const DocumentTextContent({required this.remark, required this.footerLines});
+  const DocumentTextContent({required this.remark, required this.footerLines,
+    this.language = AppLanguage.korean});
+  final AppLanguage language;
 
   final String remark;
   final List<String> footerLines;
 
-  String get footerText => <String>[...footerLines, '* 이용해 주셔서 감사합니다.'].join('\n');
+  String get footerText => <String>[...footerLines,
+    DocumentLocalizations.text(language, '* 이용해 주셔서 감사합니다.')].join('\n');
 
   // Long route notes grow vertically instead of becoming harder to read.
   double get footerFontSize => 17.0;
@@ -108,7 +113,9 @@ class DocumentTextCatalog {
     }
   }
 
-  static DocumentTextContent quotation(String routeLabel, DateTime now) {
+  static DocumentTextContent quotation(String routeLabel, DateTime now,
+      {AppLanguage language = AppLanguage.korean}) {
+    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, true);
     final key = RouteCatalog.formRouteKeyFor(routeLabel);
     String remark;
     switch (key) {
@@ -135,7 +142,9 @@ class DocumentTextCatalog {
     );
   }
 
-  static DocumentTextContent statement(String routeLabel, DateTime now) {
+  static DocumentTextContent statement(String routeLabel, DateTime now,
+      {AppLanguage language = AppLanguage.korean}) {
+    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, false);
     final key = RouteCatalog.formRouteKeyFor(routeLabel);
     final hasDeadline = const <String>{
       'kh_la_land', 'la_ch_land', 'la_kh_land', 'la_vn_land', 'vn_la_land',
@@ -145,6 +154,31 @@ class DocumentTextCatalog {
       footerLines: _footer(key, statement: true),
     );
   }
-}
 
+  static DocumentTextContent _localized(String routeLabel, DateTime now,
+      AppLanguage language, bool quotation) {
+    final route = RouteCatalog.formRouteKeyFor(routeLabel);
+    String t(String key, [Map<String, Object?> values = const {}]) =>
+        DocumentLocalizations.key(language, key, values);
+    final generic = t('statement.quotationDisclaimer');
+    final deadline = t('statement-preview.statementBaseRemark.quotationValidity', {
+      'month': monthsEn[now.month - 1], 'value': now.year,
+      'value2': now.month.toString().padLeft(2, '0'),
+    });
+    final deadlineRoute = ['kh_la_land','la_kh_land','la_ch_land','la_vn_land','vn_la_land'].contains(route);
+    final remark = !quotation ? (deadlineRoute ? deadline : '')
+        : route == 'kr_la_air' ? t('statement-preview.statementBaseRemark.fuelNotice', {'generic': generic})
+        : ['kh_la_land','la_kh_land'].contains(route) ? deadline
+        : deadlineRoute ? '$deadline\n$generic' : generic;
+    final footer = _footer(route, statement: !quotation).map((line) {
+      final match = RegExp(r'최소 운임은 (.+?)/kg').firstMatch(line);
+      if (match != null) return t('statement-preview.statementFooterLines.minimumFreightNotice', {
+        'standard': '${match[1]}/kg',
+        'value': t('statement-preview.statementFooterLines.${line.contains('차등') ? 'tieredRateNotice' : 'rateNoticeEnd'}'),
+      });
+      return DocumentLocalizations.text(language, line);
+    }).toList();
+    return DocumentTextContent(remark: remark, footerLines: footer, language: language);
+  }
+}
 

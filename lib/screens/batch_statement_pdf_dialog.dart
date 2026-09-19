@@ -2,10 +2,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
+import '../core/app_language.dart';
 import 'statement_preview_dialog.dart';
 
 class BatchStatementPdfDialog extends StatefulWidget {
-  const BatchStatementPdfDialog({super.key, required this.selectedRows});
+  const BatchStatementPdfDialog({super.key, required this.selectedRows,
+    this.language = AppLanguage.korean});
+  final AppLanguage language;
 
   final List<Map<String, dynamic>> selectedRows;
 
@@ -34,6 +37,7 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
       found.putIfAbsent(
         key,
         () => StatementRenderRequest(
+          language: widget.language,
           routeLabel: route,
           year: year,
           voyage: voyage,

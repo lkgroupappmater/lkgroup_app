@@ -9,6 +9,8 @@ import '../lib/core/document_form_painter.dart';
 import '../lib/core/document_delivery_style.dart';
 import '../lib/core/document_form_style.dart';
 import '../lib/core/document_text_catalog.dart';
+import '../lib/core/app_language.dart';
+import '../lib/core/document_localizations.dart';
 import '../lib/core/route_catalog.dart';
 import '../lib/screens/quotation_preview_dialog.dart';
 import '../lib/screens/statement_preview_dialog.dart';
@@ -50,8 +52,9 @@ void main() {
   tearDownAll(() { for (final asset in assets) { asset.dispose(); } });
 
   DigitalQuotationPainter quotation(String route, {double discount = 0,
+      AppLanguage language = AppLanguage.korean,
       List<ExtraCostItem> extras = const []}) => DigitalQuotationPainter(
-    routeLabel: route, boxes: const [quoteBox],
+    routeLabel: route, language: language, boxes: const [quoteBox],
     result: QuoteFreightResult(route: route, lines: const [quoteLine],
       totalUsd: 15, sourceFile: 'synthetic-print-fixture'),
     rates: rates, extraCosts: extras, discountPercent: discount, issuedAt: date,
@@ -59,6 +62,7 @@ void main() {
     stamp: assets[4], bankStrip: assets[5]);
 
   DigitalStatementPainter statement(String route, {double discount = .05,
+      AppLanguage language = AppLanguage.korean,
       String delivery = '', int count = 3, List<ExtraCostItem> extras = const []}) {
     const weights = [2.8, 6.4, .2];
     const volumes = [6.89, 19.6, .04];
@@ -82,7 +86,7 @@ void main() {
       'consignee_phone': '-', 'unloading_zone': 'A',
       'special_note_auto': '카톡 명세서 선공유 및 온라인 결제${delivery.isEmpty ? '' : ' / 지방배송(선결제)'}',
     });
-    return DigitalStatementPainter(routeLabel: route, rows: rows,
+    return DigitalStatementPainter(routeLabel: route, language: language, rows: rows,
       freight: FreightCalculation(lines: lines, totalUsd: total,
         totalKip: total*rates.appliedKip, totalThb: total*rates.appliedThb,
         totalKrw: total*rates.appliedKrw, rates: rates,
@@ -147,6 +151,32 @@ void main() {
     expect(pixelsWhere(data, seal, (c) => (c&255)>120 && ((c>>16)&255)<100),
       greaterThan(1000), reason: 'the enlarged blue stamp must be drawn');
   }
+
+  test('all document labels and route notes use the selected language offline', () async {
+    for (final language in [AppLanguage.english, AppLanguage.lao]) {
+      for (final route in RouteCatalog.routes) {
+        final quote = DocumentTextCatalog.quotation(route, date, language: language);
+        final receipt = DocumentTextCatalog.statement(route, date, language: language);
+        expect(RegExp(r'[가-힣]').hasMatch('${quote.remark}${quote.footerText}${receipt.remark}${receipt.footerText}'), false);
+        for (final label in ['박스번호','수량','실제중량','용적중량','합계','할인','세금 계산서(VAT)','고객사 확인']) {
+          expect(RegExp(r'[가-힣]').hasMatch(DocumentLocalizations.text(language,label)), false);
+        }
+      }
+      final q = quotation(RouteCatalog.routes.first, language: language);
+      final s = statement(RouteCatalog.routes.first, language: language);
+      final qr = await render(q, q.documentHeight, 'quotation_${language.code}');
+      final sr = await render(s, s.documentHeight, 'statement_${language.code}');
+      qr.image.dispose(); sr.image.dispose();
+    }
+  });
+
+  test('language changes keep the same shell tree and tracking uses a chooser', () {
+    final shell=File('lib/widgets/app_shell.dart').readAsStringSync();
+    expect(shell.contains('if (laoFont == null) return scaffold'), false);
+    expect(shell.contains('data: laoFont == null ? theme : theme.copyWith('), true);
+    expect(shell.contains('showModalBottomSheet<bool>'), true);
+    expect(File('lib/screens/dashboard_home_screen.dart').readAsStringSync().contains('DomesticTrackingScreen('), false);
+  });
 
   test('delivery tint is drawn for every type and absent on empty estimates', () async {
     final layout = DocumentFormLayout(itemCount: 1, remark: '', remarkFontSize: 22,

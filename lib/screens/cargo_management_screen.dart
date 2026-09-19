@@ -405,6 +405,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     await showDialog<void>(
       context: context,
       builder: (_) => StatementPreviewDialog(
+        language: widget.language,
         routeLabel: route,
         year: year,
         voyage: voyage,
@@ -434,7 +435,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     }
     await showDialog<void>(
       context: context,
-      builder: (_) => BatchStatementPdfDialog(selectedRows: selected),
+      builder: (_) => BatchStatementPdfDialog(selectedRows: selected, language: widget.language),
     );
   }
   Future<void> _save() async {
@@ -1991,6 +1992,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                       await showDialog<void>(
                         context: context,
                         builder: (_) => StatementPreviewDialog(
+                          language: widget.language,
                           routeLabel: '${rows.first['route']}',
                           year: (rows.first['shipment_year'] as num).toInt(),
                           voyage: '${rows.first['voyage']}',

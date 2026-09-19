@@ -350,6 +350,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       context: context,
       barrierDismissible: false,
       builder: (_) => QuotationPreviewDialog(
+        language: widget.language,
         routeLabel: _selectedRoute,
         boxes: previewBoxes,
         result: calculation,

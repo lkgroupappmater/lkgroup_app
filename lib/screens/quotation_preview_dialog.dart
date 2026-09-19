@@ -9,6 +9,8 @@ import '../core/money_format.dart';
 import '../core/document_amounts.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
+import '../core/app_language.dart';
+import '../core/document_localizations.dart';
 import '../core/document_form_style.dart';
 import '../core/document_form_painter.dart';
 import '../services/document_pdf_export.dart';
@@ -52,6 +54,7 @@ class QuotationPreviewDialog extends StatefulWidget {
   const QuotationPreviewDialog({
     super.key,
     required this.routeLabel,
+    this.language = AppLanguage.korean,
     required this.boxes,
     required this.result,
     required this.rates,
@@ -60,6 +63,7 @@ class QuotationPreviewDialog extends StatefulWidget {
   });
 
   final String routeLabel;
+  final AppLanguage language;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
@@ -140,6 +144,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 
   DigitalQuotationPainter get _painter => DigitalQuotationPainter(
         routeLabel: widget.routeLabel,
+        language: widget.language,
         boxes: widget.boxes,
         result: widget.result,
         rates: widget.rates,
@@ -351,6 +356,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
 class DigitalQuotationPainter extends CustomPainter {
   const DigitalQuotationPainter({
     required this.routeLabel,
+    this.language = AppLanguage.korean,
     required this.boxes,
     required this.result,
     required this.rates,
@@ -366,6 +372,7 @@ class DigitalQuotationPainter extends CustomPainter {
   });
 
   final String routeLabel;
+  final AppLanguage language;
   final List<QuotationPreviewBox> boxes;
   final QuoteFreightResult result;
   final ExchangeRateSettings rates;
@@ -387,7 +394,7 @@ class DigitalQuotationPainter extends CustomPainter {
   static const appliedColor = DocumentFormStyle.applied;
   static const totalColor = DocumentFormStyle.total;
 
-  DocumentTextContent get _docText => DocumentTextCatalog.quotation(routeLabel, issuedAt);
+  DocumentTextContent get _docText => DocumentTextCatalog.quotation(routeLabel, issuedAt, language: language);
   String get _remarkText => _docText.remark;
 
   DocumentFormLayout get _layout => DocumentFormLayout(
@@ -405,8 +412,8 @@ class DigitalQuotationPainter extends CustomPainter {
     c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
     c.save();
     c.translate(DocumentFormStyle.pagePadding, DocumentFormStyle.pagePadding);
-    DocumentFormPainter.header(c, logo: logo,
-      title: '${RouteCatalog.documentTitleFor(routeLabel)} 가견적서',
+    DocumentFormPainter.header(c, logo: logo, language: language,
+      title: '${language == AppLanguage.korean ? RouteCatalog.documentTitleFor(routeLabel) : RouteCatalog.localizedLabel(routeLabel, language)} ${DocumentLocalizations.text(language, '가견적서')}',
       zone: '-', customer: '-', phone: '-', lastLabel: '견적일',
       lastValue: '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}');
 
@@ -428,7 +435,7 @@ class DigitalQuotationPainter extends CustomPainter {
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 18, bold: true, center: true);
+      _text(c, DocumentLocalizations.text(language, headers[i].replaceAll('\n(kg)', '')) + (headers[i].contains('\n(kg)') ? '\n(kg)' : ''), r.deflate(3), 18, bold: true, center: true);
     }
 
     for (var i = 0; i < rowCount; i++) {
@@ -458,7 +465,7 @@ class DigitalQuotationPainter extends CustomPainter {
         _box(c, Rect.fromLTRB(cols[1], y, cols[13], y + rowH), const Color(0xFFF8FAFD));
         _text(
           c,
-          '${extra.name}${extra.discountApplies && safeDiscountPercent > 0 ? ' (할인)' : ''}',
+          '${DocumentLocalizations.text(language, extra.name)}${extra.discountApplies && safeDiscountPercent > 0 ? DocumentLocalizations.text(language, ' (할인)') : ''}',
           Rect.fromLTRB(cols[1] + 12, y + 2, cols[13] - 12, y + rowH - 2),
           19,
           bold: true,
@@ -523,7 +530,7 @@ class DigitalQuotationPainter extends CustomPainter {
     final discountAmount = discountBase * safeDiscountPercent / 100;
     final usd = grossUsd - discountAmount;
     final summaryValues = <int, String>{
-      1: '합계',
+      1: DocumentLocalizations.text(language, '합계'),
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
@@ -536,7 +543,7 @@ class DigitalQuotationPainter extends CustomPainter {
     }
 
     final docText = _docText;
-    DocumentFormPainter.notes(c, layout,
+    DocumentFormPainter.notes(c, layout, language: language,
       remark: docText.remark, remarkFontSize: docText.remarkFontSize);
     final accounting = const ['kr_la_sea', 'kr_la_air', 'la_kr_air_exp']
         .contains(RouteCatalog.keyFor(routeLabel));
@@ -548,7 +555,7 @@ class DigitalQuotationPainter extends CustomPainter {
     final discountValue =
         safeDiscountPercent > 0 ? '${accounting ? '' : '-'}${totalUsd(discountAmount)}' : '-';
 
-    DocumentFormPainter.totals(c, layout, accounting: accounting, adjustments: [
+    DocumentFormPainter.totals(c, layout, language: language, accounting: accounting, adjustments: [
       ('운임 총합', '', totalUsd(grossUsd)),
       ('할인', discountLabel, discountValue),
       (accounting ? '특별할인' : '추가 할인', '-', '-'),
@@ -560,7 +567,7 @@ class DigitalQuotationPainter extends CustomPainter {
           : MoneyFormat.thbNumber(usd * rates.appliedThb),
       MoneyFormat.krwNumber(usd * rates.appliedKrw),
     ]);
-    DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
+    DocumentFormPainter.footer(c, layout, language: language, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
       footerFontSize: docText.footerFontSize,
       kipRate: rates.appliedKip, thbRate: rates.appliedThb, krwRate: rates.appliedKrw);
@@ -578,9 +585,6 @@ class DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DigitalQuotationPainter oldDelegate) => true;
 }
-
-
-
 
 
 

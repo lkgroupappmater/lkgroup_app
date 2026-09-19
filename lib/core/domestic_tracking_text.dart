@@ -61,7 +61,8 @@ const domesticWords = <String, List<String>>{
     "Laos Domestic Delivery Tracking & Management (e-commerce)",
     "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)",
   ],
-  "manage": ["라오스 국내 배송 관리", "Laos Domestic Delivery Management", "ຈັດການຂົນສົ່ງພາຍໃນລາວ"],
+  "publicTitle": ["라오스 국내 배송 조회 (e-commerce)", "Laos Domestic Delivery Tracking (e-commerce)", "ການຕິດຕາມການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"],
+  "manage": ["라오스 국내 배송 조회 & 관리 (e-commerce)", "Laos Domestic Delivery Tracking & Management (e-commerce)", "ການຕິດຕາມແລະຈັດການການຂົນສົ່ງໃນປະເທດລາວ (e-commerce)"],
   "carrier": ["배송업체", "Carrier", "ບໍລິສັດຂົນສົ່ງ"],
   "tracking": [
     "국내배송 송장번호 전체",
@@ -224,5 +225,4 @@ const domesticWords = <String, List<String>>{
     "ດຳເນີນການບໍ່ໄດ້. ລອງໃໝ່.",
   ],
 };
-
 

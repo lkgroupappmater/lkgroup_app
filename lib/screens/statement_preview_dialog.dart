@@ -12,6 +12,8 @@ import '../core/document_amounts.dart';
 import '../core/document_delivery_style.dart';
 import '../core/route_catalog.dart';
 import '../core/document_text_catalog.dart';
+import '../core/app_language.dart';
+import '../core/document_localizations.dart';
 import '../core/document_form_style.dart';
 import '../core/document_form_painter.dart';
 import '../services/document_pdf_export.dart';
@@ -57,12 +59,14 @@ class StatementPreviewDialog extends StatefulWidget {
   const StatementPreviewDialog({
     super.key,
     required this.routeLabel,
+    this.language = AppLanguage.korean,
     required this.year,
     required this.voyage,
     required this.receiptNumber,
   });
 
   final String routeLabel;
+  final AppLanguage language;
   final int year;
   final String voyage;
   final String receiptNumber;
@@ -176,6 +180,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 
   DigitalStatementPainter get _painter => DigitalStatementPainter(
         routeLabel: widget.routeLabel,
+        language: widget.language,
         rows: _rows,
         freight: _freight!,
         receiptNumber: widget.receiptNumber,
@@ -418,6 +423,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
 class DigitalStatementPainter extends CustomPainter {
   const DigitalStatementPainter({
     required this.routeLabel,
+    this.language = AppLanguage.korean,
     required this.rows,
     required this.freight,
     required this.receiptNumber,
@@ -434,6 +440,7 @@ class DigitalStatementPainter extends CustomPainter {
   });
 
   final String routeLabel;
+  final AppLanguage language;
   final List<Map<String, dynamic>> rows;
   final FreightCalculation freight;
   final String receiptNumber;
@@ -456,9 +463,9 @@ class DigitalStatementPainter extends CustomPainter {
   static const appliedColor = DocumentFormStyle.applied;
   static const totalColor = DocumentFormStyle.total;
 
-  DocumentTextContent get _docText => DocumentTextCatalog.statement(routeLabel, DateTime.now());
+  DocumentTextContent get _docText => DocumentTextCatalog.statement(routeLabel, DateTime.now(), language: language);
   String get _remarkText => _displayAutoNotes.isEmpty
-      ? _docText.remark : '${_docText.remark}\n\n$_displayAutoNotes';
+      ? _docText.remark : '${_docText.remark}\n\n${DocumentLocalizations.note(language, _displayAutoNotes)}';
 
   DocumentFormLayout get _layout => DocumentFormLayout(
     itemCount: rows.length + extraCosts.length,
@@ -553,7 +560,9 @@ class DigitalStatementPainter extends CustomPainter {
         : '${RouteCatalog.documentTitleFor(routeLabel)} $voyageText 거래 명세서';
 
     final first = rows.isEmpty ? const <String, dynamic>{} : rows.first;
-    DocumentFormPainter.header(c, logo: logo, title: statementTitle,
+    final localizedTitle = language == AppLanguage.korean ? statementTitle
+        : '${RouteCatalog.localizedLabel(routeLabel, language)} ${voyage.trim().replaceAll('항차', '')} ${DocumentLocalizations.text(language, '거래 명세서')}';
+    DocumentFormPainter.header(c, logo: logo, language: language, title: localizedTitle,
       zone: _s(first['unloading_zone']), customer: _s(first['consignee_name']),
       phone: _s(first['consignee_phone']), lastLabel: '영수번호', lastValue: receiptNumber);
 
@@ -574,7 +583,7 @@ class DigitalStatementPainter extends CustomPainter {
     for (var i = 0; i < headers.length; i++) {
       final r = Rect.fromLTRB(cols[i], tableTop, cols[i + 1], tableTop + headerH);
       _box(c, r, fills[i] ?? const Color(0xFFF6F7F9));
-      _text(c, headers[i], r.deflate(3), 18, bold: true, center: true);
+      _text(c, DocumentLocalizations.text(language, headers[i].replaceAll('\n(kg)', '')) + (headers[i].contains('\n(kg)') ? '\n(kg)' : ''), r.deflate(3), 18, bold: true, center: true);
     }
 
     final lines = freight.lines;
@@ -604,7 +613,7 @@ class DigitalStatementPainter extends CustomPainter {
         _box(c, Rect.fromLTRB(cols[1], y, cols[13], y + rowH), const Color(0xFFF8FAFD));
         _text(
           c,
-          extra.discountApplies ? '${extra.name} (할인)' : extra.name,
+          '${DocumentLocalizations.text(language, extra.name)}${extra.discountApplies ? DocumentLocalizations.text(language, ' (할인)') : ''}',
           Rect.fromLTRB(cols[1] + 12, y + 2, cols[13] - 12, y + rowH - 2),
           19,
           bold: true,
@@ -682,7 +691,7 @@ class DigitalStatementPainter extends CustomPainter {
     final grossUsd = freight.grossTotalUsd + extraTotal;
     final untaxedUsd = grossUsd - totalDiscountUsd;
     final summaryValues = <int, String>{
-      1: '합계',
+      1: DocumentLocalizations.text(language, '합계'),
       3: _fmtWeight(totalQty),
       5: _fmtWeight(totalActual),
       10: _fmtWeight(totalVolume),
@@ -701,7 +710,7 @@ class DigitalStatementPainter extends CustomPainter {
         return automatic.isNotEmpty ? automatic : '${row['special_note'] ?? ''}';
       }),
     );
-    DocumentFormPainter.notes(c, layout,
+    DocumentFormPainter.notes(c, layout, language: language,
       remark: _remarkText, remarkFontSize: docText.remarkFontSize,
       delivery: inlandDeliveryText, deliveryColor: deliveryColor);
 
@@ -751,7 +760,7 @@ class DigitalStatementPainter extends CustomPainter {
         : additionalDiscountPctText;
     String totalUsd(num value) => accounting
         ? MoneyFormat.documentUsdNumber(value) : MoneyFormat.usdNumber(value);
-    DocumentFormPainter.totals(c, layout, accounting: accounting, adjustments: [
+    DocumentFormPainter.totals(c, layout, language: language, accounting: accounting, adjustments: [
       ('운임 총합', '', totalUsd(grossUsd)),
       ('할인', regularPct.isEmpty ? '-' : regularPct,
         regularPct.isEmpty ? '-' : '${accounting ? '' : '-'}${totalUsd(regularDiscountUsd)}'),
@@ -767,7 +776,7 @@ class DigitalStatementPainter extends CustomPainter {
           : MoneyFormat.thbNumber(finalUsd * freight.rates.appliedThb),
       MoneyFormat.krwNumber(finalUsd * freight.rates.appliedKrw),
     ]);
-    DocumentFormPainter.footer(c, layout, qrUsd: qrUsd, qrKip: qrKip,
+    DocumentFormPainter.footer(c, layout, language: language, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
       footerFontSize: docText.footerFontSize,
       kipRate: freight.rates.appliedKip, thbRate: freight.rates.appliedThb, krwRate: freight.rates.appliedKrw);
@@ -798,12 +807,14 @@ class DigitalStatementPainter extends CustomPainter {
 class StatementRenderRequest {
   const StatementRenderRequest({
     required this.routeLabel,
+    this.language = AppLanguage.korean,
     required this.year,
     required this.voyage,
     required this.receiptNumber,
   });
 
   final String routeLabel;
+  final AppLanguage language;
   final int year;
   final String voyage;
   final String receiptNumber;
@@ -849,6 +860,7 @@ class StatementDocumentRenderer {
 
     final painter = DigitalStatementPainter(
       routeLabel: request.routeLabel,
+      language: request.language,
       rows: rows,
       freight: freight,
       receiptNumber: request.receiptNumber,
