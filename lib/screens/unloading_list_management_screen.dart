@@ -238,11 +238,20 @@ class _UnloadingListManagementScreenState
                                         color: PdfColors.black,
                                       ),
                                     ),
-                                    child: pw.Text(
-                                      text,
-                                      style: pw.TextStyle(
-                                        font: font,
-                                        fontSize: 7.5,
+                                    padding: const pw.EdgeInsets.symmetric(
+                                      horizontal: 1,
+                                      vertical: .5,
+                                    ),
+                                    child: pw.FittedBox(
+                                      fit: pw.BoxFit.scaleDown,
+                                      child: pw.Text(
+                                        text,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: pw.TextStyle(
+                                          font: bold,
+                                          fontSize: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
