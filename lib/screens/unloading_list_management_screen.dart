@@ -171,9 +171,50 @@ class _UnloadingListManagementScreenState
     final font = pw.Font.helvetica();
     final bold = pw.Font.helveticaBold();
 
-    const rowsPerColumn = 34;
-    const groups = 6;
+    // Same portrait layout as Web: four groups of 50 rows, with a header
+    // repeated above every group on every page.
+    const rowsPerColumn = 50;
+    const groups = 4;
     const perPage = rowsPerColumn * groups;
+
+    pw.Widget cell(
+      String text,
+      int flex, {
+      bool header = false,
+      bool warning = false,
+    }) =>
+        pw.Expanded(
+          flex: flex,
+          child: pw.Container(
+            height: header ? 18 : 15,
+            alignment: pw.Alignment.center,
+            decoration: pw.BoxDecoration(
+              color: header
+                  ? const PdfColor.fromInt(0xff0070c0)
+                  : warning
+                      ? const PdfColor(1, 1, 0)
+                      : PdfColors.white,
+              border: pw.Border.all(width: .5, color: PdfColors.black),
+            ),
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: .75,
+              vertical: .5,
+            ),
+            child: pw.FittedBox(
+              fit: pw.BoxFit.scaleDown,
+              child: pw.Text(
+                text,
+                maxLines: 1,
+                softWrap: false,
+                style: pw.TextStyle(
+                  font: bold,
+                  fontSize: 12,
+                  color: header ? PdfColors.white : PdfColors.black,
+                ),
+              ),
+            ),
+          ),
+        );
 
     final doc = pw.Document();
     final totalPages = (_rows.length / perPage).ceil();
@@ -187,89 +228,58 @@ class _UnloadingListManagementScreenState
 
       doc.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(12),
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(5 * PdfPageFormat.mm),
           build: (_) => pw.Column(
             children: [
-              pw.Text(
-                '$titleRoute ${_year ?? ''} V${_voyage ?? ''} UNLOADING ZONE',
-                style: pw.TextStyle(
-                  font: bold,
-                  fontSize: 13,
+              pw.SizedBox(
+                height: 18.75,
+                child: pw.Center(
+                  child: pw.Text(
+                    '$titleRoute ${_year ?? ''} V${_voyage ?? ''} UNLOADING ZONE',
+                    style: pw.TextStyle(font: bold, fontSize: 10.5),
+                  ),
                 ),
               ),
-              pw.SizedBox(height: 5),
-              pw.Expanded(
-                child: pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: List.generate(groups, (group) {
-                    return pw.Expanded(
-                      child: pw.Padding(
-                        padding: pw.EdgeInsets.only(
-                          right: group == groups - 1 ? 0 : 3,
-                        ),
-                        child: pw.Column(
-                          children: List.generate(rowsPerColumn, (line) {
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  for (var group = 0; group < groups; group++) ...[
+                    if (group > 0) pw.SizedBox(width: 2.25),
+                    pw.Expanded(
+                      child: pw.Column(
+                        children: [
+                          pw.Row(
+                            children: [
+                              cell('No.', 65, header: true),
+                              cell('Zone', 35, header: true),
+                            ],
+                          ),
+                          ...List.generate(rowsPerColumn, (line) {
                             final index = group * rowsPerColumn + line;
                             final row =
                                 index < pageRows.length ? pageRows[index] : null;
-                            final warning =
-                                row != null && _needsAttention(row);
-
+                            final warning = row != null && _needsAttention(row);
                             final box = row == null
                                 ? ''
                                 : '${row['box_number'] ?? ''}'.trim();
                             final zone = row == null
                                 ? ''
                                 : '${row['unloading_zone'] ?? ''}'.trim();
-
-                            pw.Widget cell(String text, int flex) =>
-                                pw.Expanded(
-                                  flex: flex,
-                                  child: pw.Container(
-                                    height: 14.0,
-                                    alignment: pw.Alignment.center,
-                                    decoration: pw.BoxDecoration(
-                                      color: warning
-                                          ? const PdfColor(1, 1, 0)
-                                          : const PdfColor(1, 1, 1),
-                                      border: pw.Border.all(
-                                        width: .5,
-                                        color: PdfColors.black,
-                                      ),
-                                    ),
-                                    padding: const pw.EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                      vertical: .5,
-                                    ),
-                                    child: pw.FittedBox(
-                                      fit: pw.BoxFit.scaleDown,
-                                      child: pw.Text(
-                                        text,
-                                        maxLines: 1,
-                                        softWrap: false,
-                                        style: pw.TextStyle(
-                                          font: bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-
                             return pw.Row(
                               children: [
-                                cell(box, 65),
-                                cell(zone, 35),
+                                cell(box, 65, warning: warning),
+                                cell(zone, 35, warning: warning),
                               ],
                             );
                           }),
-                        ),
+                        ],
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  ],
+                ],
               ),
+              pw.SizedBox(height: 2),
               pw.Text(
                 '${page + 1} / $totalPages',
                 style: pw.TextStyle(font: font, fontSize: 7),
