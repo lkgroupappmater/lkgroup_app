@@ -12,6 +12,21 @@ ApprovalItem change(int id, String name) => ApprovalItem(ApprovalKind.changes, {
 });
 
 void main() {
+  test('Zone review starts with Excel values and permits reverting explicitly', () {
+    final draft = ApprovalDraft(ApprovalItem(ApprovalKind.changes, {
+      'request_id': 1,
+      'unloading_zone': 'F',
+      'weight_kg': 3,
+      'requested_changes': {'unloading_zone': 'C'},
+    }));
+    expect(draft.values['unloading_zone'], 'C');
+    expect(draft.payload(), isEmpty);
+    draft.values['unloading_zone'] = 'F';
+    expect(draft.payload(), {'unloading_zone': 'F'});
+    draft.values['unloading_zone'] = 'ST';
+    expect(draft.payload(), {'unloading_zone': 'ST'});
+  });
+
   test(
     'competing claims are reported together instead of approving the first',
     () {

@@ -256,6 +256,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   final Set<int> _editing = <int>{};
   final Map<int, Map<String, TextEditingController>> _controllers = {};
+  final Map<int, ApprovalDraft> _singleDrafts = {};
   bool _loading = true;
 
   @override
@@ -266,12 +267,18 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   @override
   void dispose() {
+    _clearSingleEditors();
+    super.dispose();
+  }
+
+  void _clearSingleEditors() {
     for (final group in _controllers.values) {
       for (final controller in group.values) {
         controller.dispose();
       }
     }
-    super.dispose();
+    _controllers.clear();
+    _singleDrafts.clear();
   }
 
   Future<void> _load() async {
@@ -346,6 +353,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       }
       if (!mounted) return;
       setState(() {
+        _clearSingleEditors();
         _requests = rows;
         _unknownClaims = unknownClaims;
         _invoiceCorrections = invoiceCorrections;
@@ -366,7 +374,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   ) {
     final id = (r['request_id'] as num).toInt();
     return _controllers.putIfAbsent(id, () {
-      String value(String key) => '${r[key] ?? ''}';
+      final draft = ApprovalDraft(ApprovalItem(ApprovalKind.changes, r));
+      _singleDrafts[id] = draft;
+      String value(String key) => draft.values[key] ?? '';
       return {
         'invoice_number': TextEditingController(text: value('invoice_number')),
         'sender_name': TextEditingController(text: value('sender_name')),
@@ -391,57 +401,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
 
   Map<String, dynamic> _adminChanges(Map<String, dynamic> r) {
     final c = _editControllersFor(r);
-    final changes = <String, dynamic>{};
-
-    void addText(String key) {
-      final text = c[key]!.text.trim();
-      if (text != '${r[key] ?? ''}'.trim()) changes[key] = text;
+    final draft = _singleDrafts[(r['request_id'] as num).toInt()]!;
+    for (final entry in c.entries) {
+      draft.values[entry.key] = entry.value.text;
     }
-
-    void addNum(String key) {
-      final text = c[key]!.text.trim();
-      final old = '${r[key] ?? ''}'.trim();
-      if (text != old) {
-        if (text.isEmpty) {
-          changes[key] = null;
-          return;
-        }
-        final value = num.tryParse(text);
-        if (value == null) throw FormatException('$key 숫자를 확인해 주세요.');
-        changes[key] = value;
-      }
-    }
-
-    void addInt(String key) {
-      final text = c[key]!.text.trim();
-      final old = '${r[key] ?? ''}'.trim();
-      if (text != old) {
-        if (text.isEmpty) {
-          changes[key] = null;
-          return;
-        }
-        final value = int.tryParse(text);
-        if (value == null) throw const FormatException('수량은 정수로 입력해 주세요.');
-        changes[key] = value;
-      }
-    }
-
-    addText('invoice_number');
-    addText('sender_name');
-    addText('consignee_name');
-    addText('consignee_phone');
-    addText('contents');
-    addText('package_type');
-    addInt('quantity');
-    addText('notes');
-    addNum('weight_kg');
-    addNum('length_cm');
-    addNum('width_cm');
-    addNum('height_cm');
-    addText('receipt_number');
-    addText('unloading_zone');
-    addText('received_at');
-    return changes;
+    return draft.payload();
   }
 
   Future<void> _review(Map<String, dynamic> r, String action) async {
