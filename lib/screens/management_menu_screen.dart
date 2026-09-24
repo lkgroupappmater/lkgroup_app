@@ -209,7 +209,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
       items.addAll([
         {
           'label': sharedPurchaseLabel(widget.language, SharedPurchaseView.purchaseAgency),
-          'icon': Icons.shopping_cart_outlined,
+          'icon': Icons.inventory_2_outlined,
           'action': () {
             openSharedPurchaseWorkspace(context, memberId: user.id,
               language: widget.language, view: SharedPurchaseView.purchaseAgency);
