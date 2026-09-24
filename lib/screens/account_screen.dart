@@ -7,6 +7,7 @@ import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../services/shared_purchase_workspace.dart';
+import '../services/shared_ui_text_service.dart';
 import '../utils/form_validators.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -48,7 +49,7 @@ class AccountBody extends StatefulWidget {
   State<AccountBody> createState() => _AccountBodyState();
 }
 
-class _AccountBodyState extends State<AccountBody> {
+class _AccountBodyState extends State<AccountBody> with SharedUiTextState {
   final _account = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;

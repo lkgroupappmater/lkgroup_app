@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_language.dart';
+import 'shared_ui_text_service.dart';
 
 enum SharedPurchaseView { purchaseAgency, siteAccounts }
 
@@ -9,7 +10,11 @@ String sharedPurchaseLabel(AppLanguage language, SharedPurchaseView view) {
   final labels = view == SharedPurchaseView.purchaseAgency
       ? ['구매대행', 'Purchase agency', 'ບໍລິການຮັບຊື້']
       : ['내 외부 사이트 계정', 'My external site accounts', 'ບັນຊີເວັບໄຊຂອງຂ້ອຍ'];
-  return labels[language == AppLanguage.korean ? 0 : language == AppLanguage.lao ? 2 : 1];
+  return SharedUiTextService.instance.text(
+    view == SharedPurchaseView.purchaseAgency ? 'purchase.title' : 'memberSites.title',
+    language.code,
+    labels[language == AppLanguage.korean ? 0 : language == AppLanguage.lao ? 2 : 1],
+  );
 }
 
 Uri sharedPurchaseUri({
