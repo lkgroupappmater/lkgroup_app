@@ -223,7 +223,7 @@ class _AccountBodyState extends State<AccountBody> with SharedUiTextState {
               onPressed: () => openSharedPurchaseWorkspace(context,
                 memberId: _displayUser!.id, language: widget.language,
                 view: SharedPurchaseView.siteAccounts),
-              icon: const Icon(Icons.language_outlined),
+              icon: const Icon(Icons.person_outline),
               label: Text(sharedPurchaseLabel(widget.language, SharedPurchaseView.siteAccounts)),
             ),
             const SizedBox(height: 8),
