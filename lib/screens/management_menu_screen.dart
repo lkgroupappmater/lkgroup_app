@@ -1,4 +1,5 @@
 import '../services/shared_ui_text_service.dart';
+import '../services/shared_purchase_workspace.dart';
 import 'domestic_tracking_screen.dart';
 import '../core/domestic_tracking_text.dart';
 import 'package:flutter/material.dart';
@@ -206,6 +207,14 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
 
     if (_isAdmin || _isStaff) {
       items.addAll([
+        {
+          'label': sharedPurchaseLabel(widget.language, SharedPurchaseView.purchaseAgency),
+          'icon': Icons.shopping_cart_outlined,
+          'action': () {
+            openSharedPurchaseWorkspace(context, memberId: user.id,
+              language: widget.language, view: SharedPurchaseView.purchaseAgency);
+          },
+        },
         {
           'label': _m('선적 일정 관리'),
           'icon': Icons.calendar_month,
