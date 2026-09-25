@@ -33,7 +33,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/customer_discounts.dart lib/services/freight_service.dart lib/services/excel_import_service.dart test/customer_discounts_test.dart
-      - run: flutter test test/customer_discounts_test.dart
+      - run: flutter test test/customer_discounts_test.dart test/remark_automation_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/shared_purchase_workspace.dart lib/screens/management_menu_screen.dart lib/screens/account_screen.dart test/shared_purchase_workspace_test.dart
       - run: flutter test test/shared_purchase_workspace_test.dart
       - uses: actions/setup-node@v4

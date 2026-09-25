@@ -9,6 +9,14 @@ class DocumentAmounts {
   static double vatRate(String routeKey, String remark) =>
       usesExcelRules(routeKey) && remark.contains('세금 계산서') ? .1 : 0;
 
+  static bool requiresTaxInvoice(String remark) =>
+      remark.replaceAll(RegExp(r'\s+'), '').contains('세금계산서발급');
+
+  static ({String number, String holder}) krwAccount(String remark) =>
+      requiresTaxInvoice(remark)
+          ? (number: '2070133424601', holder: '박성호(엘케이무역)')
+          : (number: '571-22-0330221', holder: '박성호');
+
   // Excel N23: ROUNDUP(USD * THB exchange rate, -1).
   static double thb(num value) => (value.abs() / 10).ceil() * 10.0 * value.sign;
 

@@ -63,11 +63,13 @@ class AutomationWorkbookRules {
   }
 
   static List<Map<String, dynamic>>? shares(Map<String, List<List<String>>> workbook) {
-    final sheets = workbook.entries.where((e) => key(e.key) == '명세서선공유').toList();
+    // The renamed BASE sheet is authoritative; older BASE files remain valid.
+    final sheets = workbook.entries.where((e) => ['remark및특이사항', '명세서선공유'].contains(key(e.key))).toList();
+    sheets.sort((a, b) => (key(a.key) == 'remark및특이사항' ? 0 : 1).compareTo(key(b.key) == 'remark및특이사항' ? 0 : 1));
     if (sheets.isEmpty) return null;
     final rows = sheets.first.value;
     final header = rows.indexWhere((r) => ['name', '이름', '고객명'].contains(key(cell(r, 1))) && ['tel', 'phone', '전화번호', '연락처'].contains(key(cell(r, 2))));
-    if (header < 0) throw StateError('명세서 선공유: Name/Tel 제목 행을 확인하세요.');
+    if (header < 0) throw StateError('${sheets.first.key}: Name/Tel 제목 행을 확인하세요.');
     final result = <Map<String, dynamic>>[];
     for (final row in rows.skip(header + 1)) {
       final name = cell(row, 1), phone = cell(row, 2), content = cell(row, 3);

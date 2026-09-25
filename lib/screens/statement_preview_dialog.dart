@@ -776,7 +776,7 @@ class DigitalStatementPainter extends CustomPainter {
           : MoneyFormat.thbNumber(finalUsd * freight.rates.appliedThb),
       MoneyFormat.krwNumber(finalUsd * freight.rates.appliedKrw),
     ]);
-    DocumentFormPainter.footer(c, layout, language: language, qrUsd: qrUsd, qrKip: qrKip,
+    DocumentFormPainter.footer(c, layout, language: language, paymentRemark: _displayAutoNotes, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
       footerFontSize: docText.footerFontSize,
       kipRate: freight.rates.appliedKip, thbRate: freight.rates.appliedThb, krwRate: freight.rates.appliedKrw);

@@ -1,3 +1,4 @@
+import 'document_amounts.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -151,7 +152,8 @@ class DocumentFormPainter {
       {required ui.Image qrUsd, required ui.Image qrKip, required ui.Image qrThb,
       required ui.Image stamp, required String footerText, required double footerFontSize,
       required double kipRate, required double thbRate, required double krwRate,
-      AppLanguage language = AppLanguage.korean}) {
+      AppLanguage language = AppLanguage.korean, String paymentRemark = ''}) {
+    final krwAccount = DocumentAmounts.krwAccount(paymentRemark);
     String tr(String value) => DocumentLocalizations.text(language, value);
     const w = DocumentFormStyle.contentWidth;
     const payW = (w - DocumentFormStyle.sectionGap * 3) / 4;
@@ -169,7 +171,7 @@ class DocumentFormPainter {
           Rect.fromLTWH(r.left + 140, r.top + 8, r.width - 148, r.height - 16),
           20, bold: true, center: true, lineHeight: 1.25);
       } else {
-        DocumentFormStyle.drawText(c, '${tr('한국 원화 계좌:')}\n${tr('경남은행')}\n571-22-0330221\n${tr('박성호')}',
+        DocumentFormStyle.drawText(c, '${tr('한국 원화 계좌:')}\n${tr('경남은행')}\n${krwAccount.number}\n${krwAccount.holder == '박성호' ? tr('박성호') : krwAccount.holder}',
           r.deflate(8), 20, bold: true, center: true, lineHeight: 1.35);
       }
     }
