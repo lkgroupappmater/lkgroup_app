@@ -10,7 +10,7 @@ class DocumentAmounts {
       usesExcelRules(routeKey) && remark.contains('세금 계산서') ? .1 : 0;
 
   static bool requiresTaxInvoice(String remark) =>
-      remark.replaceAll(RegExp(r'\s+'), '').contains('세금계산서발급');
+      remark.replaceAll(RegExp(r'[\s\u00a0\u3000]+'), '').contains('세금계산서');
 
   static ({String number, String holder}) krwAccount(String remark) =>
       requiresTaxInvoice(remark)

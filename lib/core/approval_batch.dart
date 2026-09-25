@@ -22,6 +22,7 @@ class ApprovalItem {
       '${row['box_number'] ?? '-'} · ${row['invoice_number'] ?? '-'}';
   List<String> get fields => switch (kind) {
     ApprovalKind.changes => const [
+      'box_number',
       'invoice_number',
       'sender_name',
       'consignee_name',
@@ -60,6 +61,7 @@ class ApprovalItem {
 }
 
 const approvalFieldLabels = {
+  'box_number': '화물번호',
   'invoice_number': '송장번호',
   'sender_name': '발신인',
   'consignee_name': '수취인 이름/회사명',

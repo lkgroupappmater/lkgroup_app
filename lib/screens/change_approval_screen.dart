@@ -185,6 +185,16 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       );
       if (confirmed != true || !mounted) return;
       final service = ApprovalBatchService();
+      if (kind == ApprovalKind.changes) {
+        await service.applyChanges(items, action, drafts: _batchDrafts);
+        for (final item in items) {
+          _selected.remove(item.key);
+          _batchDrafts.remove(item.key);
+        }
+        await _load();
+        if (mounted) _message('선택한 ${items.length}건을 함께 처리했습니다.');
+        return;
+      }
       final conflicts = conflictingApprovalKeys(items, action);
       final result = await processApprovalBatch(
         items: items,
@@ -378,6 +388,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       _singleDrafts[id] = draft;
       String value(String key) => draft.values[key] ?? '';
       return {
+        'box_number': TextEditingController(text: value('box_number')),
         'invoice_number': TextEditingController(text: value('invoice_number')),
         'sender_name': TextEditingController(text: value('sender_name')),
         'consignee_name': TextEditingController(text: value('consignee_name')),
@@ -1384,6 +1395,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     );
 
     return [
+      field('box_number', '화물번호'),
       field('invoice_number', '송장번호'),
       field('sender_name', '발신인'),
       field('consignee_name', '이름/라오스 수령인'),
@@ -1428,6 +1440,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   ) {
     if (changes.isEmpty) return '변경 내용 없음';
     const labels = {
+      'box_number': '화물번호',
+      '_excel_action': 'Excel 화물 처리',
       'consignee_name': '이름/수령인',
       'consignee_phone': '연락처',
       'sender_name': '발신인',

@@ -12,6 +12,25 @@ ApprovalItem change(int id, String name) => ApprovalItem(ApprovalKind.changes, {
 });
 
 void main() {
+  test('selected Excel changes use one atomic request and preserve per-row edits', () async {
+    final calls = <Map<String, dynamic>>[];
+    final service = ApprovalBatchService(rpc: (name, params) async {
+      calls.add({'name': name, ...params});
+      return null;
+    });
+    await service.applyChanges([change(1, 'A'), change(2, 'B')], 'modified_approve', drafts: {
+      'changes:1': {'box_number': 'S2', 'receipt_number': 'LKS 02'},
+      'changes:2': {'box_number': 'S1', 'receipt_number': 'LKS 01'},
+    });
+    expect(calls, [
+      {'name': 'review_shipment_change_requests', 'p_requests': [
+        {'request_id': 1, 'action': 'modified_approve', 'admin_changes': {'box_number': 'S2', 'receipt_number': 'LKS 02'}},
+        {'request_id': 2, 'action': 'modified_approve', 'admin_changes': {'box_number': 'S1', 'receipt_number': 'LKS 01'}},
+      ]},
+    ]);
+    final failing = ApprovalBatchService(rpc: (_, _) async => throw StateError('rollback'));
+    await expectLater(failing.applyChanges([change(1, 'A'), change(2, 'B')], 'approve'), throwsStateError);
+  });
   test('Zone review starts with Excel values and permits reverting explicitly', () {
     final draft = ApprovalDraft(ApprovalItem(ApprovalKind.changes, {
       'request_id': 1,

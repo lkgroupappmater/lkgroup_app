@@ -4,10 +4,10 @@ import 'package:lkgroup_app/services/automation_workbook_rules.dart';
 
 void main() {
   test('tax invoice Remark selects the specified Korean account', () {
-    for (final remark in ['세금 계산서 발급', '카톡 명세서 / 세금계산서 발급 / 지방배송', '세금\n계산서\t발급']) {
+    for (final remark in ['세금 계산서', '세금계산서', '세금\n계산서', '세금\u00a0계산서', '세금 계산서 문의', '세금 계산서 발급', '카톡 명세서 / 세금계산서 발급 / 지방배송', '세금\n계산서\t발급']) {
       expect(DocumentAmounts.krwAccount(remark), (number: '2070133424601', holder: '박성호(엘케이무역)'));
     }
-    for (final remark in ['', '일반 고객', '세금 계산서 문의']) {
+    for (final remark in ['', '일반 고객', '일반 배송']) {
       expect(DocumentAmounts.krwAccount(remark), (number: '571-22-0330221', holder: '박성호'));
     }
   });

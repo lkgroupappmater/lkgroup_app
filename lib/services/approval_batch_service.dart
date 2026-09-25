@@ -20,6 +20,25 @@ class ApprovalBatchService {
   final ApprovalRpc _rpc;
   final Future<void> Function(String) _clearManualUncertain;
 
+  /// Review the selection in one transaction, including exchanged cargo numbers.
+  Future<void> applyChanges(
+    List<ApprovalItem> items,
+    String action, {
+    Map<String, Map<String, dynamic>> drafts = const {},
+  }) async {
+    if (items.isEmpty || items.any((item) => item.kind != ApprovalKind.changes) ||
+        !const {'approve', 'reject', 'modified_approve'}.contains(action)) {
+      throw StateError('처리할 요청을 다시 확인해 주세요.');
+    }
+    await _rpc('review_shipment_change_requests', {
+      'p_requests': items.map((item) => {
+        'request_id': int.parse(item.id),
+        'action': action,
+        'admin_changes': action == 'modified_approve' ? drafts[item.key] ?? const <String, dynamic>{} : const <String, dynamic>{},
+      }).toList(),
+    });
+  }
+
   Future<void> apply(
     ApprovalItem item,
     String action, {

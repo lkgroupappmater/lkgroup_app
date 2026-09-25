@@ -135,7 +135,7 @@ class ExcelImportQueueService extends ChangeNotifier {
               ? ExcelImportJobStatus.warning
               : ExcelImportJobStatus.completed;
           next.message =
-              '작업 완료 · 신규 ${result.inserted}건 · 수정 ${result.updatedRows}건 · 삭제 ${result.removedRows}건 · 복구 ${result.restoredRows}건'
+              '작업 완료 · 신규 ${result.inserted}건 · 수정 요청 ${result.updatedRows}건 · 삭제 요청 ${result.removedRows}건 · 복원 요청 ${result.restoredRows}건'
               '${result.changeRequests > 0 ? ' · 변경 승인 요청 ${result.changeRequests}건' : ''}'
               ' · 동일 ${result.unchanged}건 저장 생략'
               '${result.alreadyPending > 0 ? ' · 기존 요청 ${result.alreadyPending}건 유지' : ''}'

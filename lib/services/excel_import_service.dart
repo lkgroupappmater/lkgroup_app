@@ -247,20 +247,20 @@ class ExcelImportService {
     // Patch167: current BASE Excel delivery table is the source of truth.
     // Import it before shipment upsert so normalize/finalize can see city/province
     // delivery + prepaid + company/address for this very upload.
-    onProgress?.call(0.45, '항차 화물 수정·삭제 비교 및 DB 반영 중');
+    onProgress?.call(0.45, '항차 화물 비교 및 변경 승인 요청 등록 중');
     final importSummary = synchronize
         ? await ShipmentService.instance.synchronizeExcelRows(uniqueRows)
         : await ShipmentService.instance.importDifferencesFromRows(uniqueRows);
     await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
-    onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
+    onProgress?.call(0.72, '화물 비교 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
     await _importStatementShareRules(workbook, routeKey: routeKey);
 
     if (SupabaseConfig.isConfigured && uniqueRows.isNotEmpty) {
-      onProgress?.call(0.82, '공통 규칙으로 배송·구획·이름순 명세서 번호 적용 중');
+      onProgress?.call(0.82, '승인된 명세서 번호 유지 · 고객 규칙 확인 중');
       await SupabaseService.client.rpc('admin_finalize_excel_batch_rules_fast', params: {
-        'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_resequence': true,
+        'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_resequence': false,
       });
     }
 
@@ -296,7 +296,7 @@ class ExcelImportService {
       customerRulesWaitingForPhone: customerRuleResult.waitingForPhone,
       message: noCargoSheet
           ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
-          : synchronize ? '해당 항차 Excel의 수정·삭제를 공통 DB에 반영했습니다. 누락 화물은 삭제함에서 30일 동안 복구할 수 있습니다.' : '신규 화물 추가 및 기존 화물 변경 승인 요청을 반영했습니다.',
+          : synchronize ? '신규 화물을 추가하고 수정·삭제·복원은 변경·정정 승인에 등록했습니다. 명세서 번호를 포함한 기존 화물은 승인 후 반영됩니다.' : '신규 화물 추가 및 기존 화물 변경 승인 요청을 반영했습니다.',
     );
   }
 

@@ -1,7 +1,10 @@
 import { receiptOrderFormulas, fixedDiscountFormulas, RECEIPT_RULE_VERSION } from './receipt-order.mjs';
 import { formatStatementAmounts } from './statement-amount-format.mjs';
+import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
+import { formatDeliveryNumbers } from './delivery-number-format.mjs';
+import { zipWorkbook } from './workbook-zip.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { unzipSync, zipSync, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
+import { unzipSync, Zip, ZipPassThrough, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,7 +95,7 @@ function cellText(cellXml: string, strings: string[]): string {
   const type = cellXml.match(/\bt="([^"]+)"/)?.[1] ?? '';
   if (type === 'inlineStr') {
     return [...cellXml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)]
-      .map((m) => m[1])
+      .map((m) => decodeXmlText(m[1]))
       .join('');
   }
   const raw = cellXml.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? '';
@@ -100,7 +103,18 @@ function cellText(cellXml: string, strings: string[]): string {
     const index = Number(raw);
     return Number.isFinite(index) ? strings[index] ?? '' : '';
   }
-  return raw;
+  return decodeXmlText(raw);
+}
+
+function decodeXmlText(value: string): string {
+  return value.replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, (entity) => {
+    const named: Record<string, string> = {'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'"};
+    if (named[entity]) return named[entity];
+    const code = entity.startsWith('&#x') || entity.startsWith('&#X')
+      ? parseInt(entity.slice(3, -1), 16) : Number(entity.slice(2, -1));
+    return Number.isInteger(code) && code > 0 && code <= 0x10ffff
+      ? String.fromCodePoint(code) : entity;
+  });
 }
 
 function findHeaderRow(sheetXml: string, strings: string[]): number {
@@ -144,18 +158,40 @@ function blankCell(ref: string, style: string): string {
   return `<c r="${ref}"${style}></c>`;
 }
 
-function upgradeReceiptOrder(sheetXml: string, routeKey: string): string {
+function upgradeReceiptOrder(sheetXml: string, routeKey: string, knownLastRow?: number): string {
   if (!['kr_la_sea','kr_la_air'].includes(routeKey)) return sheetXml;
-  const rows = [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6);
-  if (!rows.length || !/<c\b[^>]*r="AK6"/.test(sheetXml)) return sheetXml;
-  const last = Math.max(...rows);
+  let last = knownLastRow;
+  if (last == null) {
+    const rows = [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6);
+    if (!rows.length || !/<c\b[^>]*r="AK6"/.test(sheetXml)) return sheetXml;
+    last = Math.max(...rows);
+  }
+  let formulaRow = -1;
+  let formulas: Record<string, string> = {};
+  const separatedDiscounts = /<c\b[^>]*r="AO\d+"/.test(sheetXml);
   return sheetXml.replace(/<c\b[^>]*r="(N|Y|Z|AB|AC|AK|AL|AM|T|AD)(\d+)"[^>]*>[\s\S]*?<\/c>/g, (cell, column, rowText) => {
     const row = Number(rowText);
     if (row < 6 || row > last || !/<f\b/.test(cell)) return cell;
-    const formulas = {...receiptOrderFormulas(row, last, routeKey === 'kr_la_air' ? 'LKA' : 'LKS'), ...fixedDiscountFormulas(row)};
-    const formula = formulas[column as keyof typeof formulas];
-    return cell.replace(/<f\b[^>]*(?:\/>|>[\s\S]*?<\/f>)/, `<f>${escXml(formula)}</f>`);
+    // All edited columns in a row share this calculation. Build it once per
+    // row to leave enough Edge CPU for validating and compressing the workbook.
+    if (row !== formulaRow) {
+      formulas = {...receiptOrderFormulas(row, last, routeKey === 'kr_la_air' ? 'LKA' : 'LKS'), ...fixedDiscountFormulas(row)};
+      if (separatedDiscounts) {
+        const remark = formulas.T;
+        formulas.T = `(${remark})&IF(AO${row}=0,"",IF((${remark})="",""," / ")&INDEX('Row data'!$AL:$AL,AO${row}))`;
+      }
+      formulaRow = row;
+    }
+    const formula = formulas[column];
+    return cell.replace(/<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/, `<f>${escXml(formula)}</f>`);
   });
+}
+
+// A formula cell has at most one cached value, after <f> and before extensions.
+// Excel commonly stores an empty cache as <v/>; appending after it corrupts cells.
+function replaceFormulaCache(body: string, value: string): string {
+  const withoutCache = body.replace(/<v\b[^>]*?\/>|<v\b[^>]*>[\s\S]*?<\/v>/g, '');
+  return withoutCache.replace(/<\/f>|<f\b[^>]*\/>/, (formulaEnd) => `${formulaEnd}<v>${value}</v>`);
 }
 
 function updateCellPreservingFormula(
@@ -164,6 +200,7 @@ function updateCellPreservingFormula(
   column: string,
   value: unknown,
   kind: 'text' | 'number' | 'date',
+  cacheFormula = ['N','O','P'].includes(column),
 ): string {
   const ref = `${column}${rowNumber}`;
   const cellRe = new RegExp(
@@ -175,12 +212,10 @@ function updateCellPreservingFormula(
   if (existing) {
     const body = existing[3] ?? '';
     if (/<f\b/.test(body)) {
-      if (!['N','O','P'].includes(column)) return rowXml;
+      if (!cacheFormula) return rowXml;
       const attrs = `${existing[1]}r="${ref}"${existing[2]}`.replace(/\s+t="[^"]*"/g, '');
-      const cached = `<v>${escXml(value ?? '')}</v>`;
-      const nextBody = /<v>[\s\S]*?<\/v>/.test(body)
-        ? body.replace(/<v>[\s\S]*?<\/v>/,cached) : body + cached;
-      return rowXml.replace(existing[0],`<c${attrs} t="str">${nextBody}</c>`);
+      const nextBody = replaceFormulaCache(body, escXml(value ?? ''));
+      return rowXml.replace(existing[0], () => `<c${attrs} t="str">${nextBody}</c>`);
     }
   }
 
@@ -212,7 +247,7 @@ function setNumericCellInSheet(
 
   const rowXml = rowMatch[0];
   const updated = updateCell(rowXml, rowNumber, column, value, 'number');
-  return sheetXml.replace(rowXml, updated);
+  return sheetXml.replace(rowXml, () => updated);
 }
 
 function updateExchangeRates(
@@ -329,7 +364,7 @@ function updateCell(
     replacement = inlineCell(ref, style, value);
   }
 
-  if (existing) return rowXml.replace(cellRe, replacement);
+  if (existing) return rowXml.replace(cellRe, () => replacement);
 
   // OOXML에서는 row 안의 <c> 셀이 열 순서대로 있어야 합니다.
   // 기존 템플릿 행이 A/B/O처럼 일부 셀만 가진 경우,
@@ -337,7 +372,7 @@ function updateCell(
   // Excel이 "읽을 수 없는 내용"으로 판단하고 셀 정보를 복구/삭제합니다.
   const targetIndex = columnIndex(column);
   const cellMatches = [...rowXml.matchAll(
-    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
   )];
 
   for (const match of cellMatches) {
@@ -358,6 +393,7 @@ function updateCargoSheet(
   sheetXml: string,
   strings: string[],
   shipments: Record<string, unknown>[],
+  routeKey = '',
 ): string {
   const headerRow = findHeaderRow(sheetXml, strings);
   if (headerRow < 0) {
@@ -365,18 +401,52 @@ function updateCargoSheet(
   }
 
   const firstDataRow = headerRow + 1;
-  const rowPattern = /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g;
-  let candidateRowCount = 0;
-  for (const match of sheetXml.matchAll(rowPattern)) {
-    if (Number(match[1]) >= firstDataRow) candidateRowCount += 1;
-  }
-
-  if (shipments.length > candidateRowCount) {
-    throw new Error(
-      `현재 템플릿 화물 행 ${candidateRowCount}개보다 DB 화물 ${shipments.length}개가 많습니다. ` +
-      '행 자동 확장은 다음 단계에서 해당 노선 명세서 구조와 함께 적용해야 합니다.',
-    );
-  }
+  const formulaRows = ['kr_la_sea','kr_la_air'].includes(routeKey) && /<c\b[^>]*r="AK6"/.test(sheetXml)
+    ? [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6)
+    : [];
+  const lastFormulaRow = formulaRows.length ? Math.max(...formulaRows) : 0;
+  let nextSharedId = 1 + Math.max(-1,...[...sheetXml.matchAll(/<f\b[^>]*\bsi="(\d+)"/g)].map(m => Number(m[1])));
+  const sharedColumns = new Map<string, number>();
+  const shareGeneratedFormulas = (rowXml: string) => rowXml.replace(
+    /<c\b[^>]*\br="(N|Y|Z|AB|AC|AK|AL|AM)(\d+)"[^>]*>[\s\S]*?<\/c>/g,
+    (cell, column, rowText) => {
+      const row = Number(rowText);
+      if (row < 6 || row > lastFormulaRow) return cell;
+      const f = cell.match(/<f\b[^>]*?(?:\/>|>([\s\S]*?)<\/f>)/);
+      if (!f) return cell;
+      let id = sharedColumns.get(column);
+      let replacement: string;
+      if (id == null) {
+        id = nextSharedId++;
+        sharedColumns.set(column,id);
+        replacement = `<f t="shared" si="${id}" ref="${column}${row}:${column}${lastFormulaRow}">${f[1]}</f>`;
+      } else replacement = `<f t="shared" si="${id}"/>`;
+      return cell.replace(f[0],() => replacement);
+    },
+  );
+  // Expand formulas only in the finished row, so the entire expanded cargo
+  // worksheet is never retained alongside all of its edited intermediates.
+  const finishRow = (rowXml: string) => {
+    if (!lastFormulaRow) return rowXml;
+    const rowNumber = Number(rowXml.match(/<row\b[^>]*\br="(\d+)"/)?.[1]);
+    // These eight formulas are generated solely from relative row references.
+    // Excel's native shared formulas retain identical calculations without
+    // duplicating tens of MB of formula text in every exported worksheet.
+    // Once all shared masters exist, follower rows only need their compact
+    // references. Rebuilding the long formulas here wastes Edge CPU.
+    if (sharedColumns.size < 8) rowXml = upgradeReceiptOrder(rowXml,routeKey,lastFormulaRow);
+    rowXml = separateCargoRowDiscounts(rowXml,rowNumber);
+    if (rowNumber >= 6 && rowNumber <= lastFormulaRow) {
+      // Excel cannot share formulas containing cross-sheet references. Keep
+      // T/AD as ordinary formulas; only the eight local-reference columns share.
+      const fixed = fixedDiscountFormulas(rowNumber);
+      const remark = fixed.T;
+      fixed.T = `(${remark})&IF(AO${rowNumber}=0,"",IF((${remark})="",""," / ")&INDEX('Row data'!$AL:$AL,AO${rowNumber}))`;
+      rowXml = rowXml.replace(/<c\b[^>]*\br="(T|AD)\d+"[^>]*>[\s\S]*?<\/c>/g,
+        (cell, column) => cell.replace(/<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/, () => `<f>${escXml(fixed[column])}</f>`));
+    }
+    return shareGeneratedFormulas(rowXml);
+  };
 
   const mapping: Array<[string, string, 'text' | 'number' | 'date']> = [
     ['B', 'box_number', 'text'],
@@ -397,46 +467,89 @@ function updateCargoSheet(
     ['Q', 'received_at', 'date'],
   ];
 
-  // 박스번호는 현장 입고 순서 기준으로 템플릿에 고정된 슬롯입니다.
-  // DB 데이터가 없는 번호도 "아직 사용하지 않은 번호"로 남겨야 하므로
-  // shipments를 위에서부터 압축해 쓰지 않고 B열의 고정 박스번호와 정확히 매칭합니다.
+  // Split identifiers are distinct cargo but belong at their parent's numeric
+  // position: S125, S126(01), S126(02), S127. Keep worksheet rows and formulas
+  // in place; assign ordered labels AND their data to the existing cargo rows.
+  const boxKey = (value: unknown) => String(value ?? '').trim().toUpperCase();
   const shipmentByBox = new Map<string, Record<string, unknown>>();
   for (const shipment of shipments) {
-    const box = String(shipment.box_number ?? '').trim().toUpperCase();
-    if (box) shipmentByBox.set(box, shipment);
+    const box = boxKey(shipment.box_number);
+    if (!box) throw new Error('화물번호가 없는 자료가 있습니다. 화물번호를 확인해 주세요.');
+    if (shipmentByBox.has(box)) throw new Error(`중복 화물번호가 있습니다: ${box}`);
+    shipmentByBox.set(box, shipment);
   }
 
+  const slots: Array<{row: number; box: string}> = [];
+  const labels = new Map<string, string>();
+  for (const match of sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g)) {
+    const row = Number(match[1]);
+    if (row < firstDataRow) continue;
+    const boxCell = match[0].match(new RegExp(`<c\\b[^>]*r="B${row}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`));
+    if (!boxCell) continue;
+    const label = cellText(boxCell[0], strings).trim();
+    const box = boxKey(label);
+    // Totals/notes are not capacity. Fixed cargo IDs have a numeric component;
+    // an exact DB match also supports route-specific literal identifiers.
+    if (!box || (!shipmentByBox.has(box) && !/^[A-Z]*\d+(?:[^\p{L}\p{N}].*)?$/u.test(box))) continue;
+    slots.push({row, box});
+    labels.set(box, label);
+  }
+  if (shipments.length > slots.length) {
+    throw new Error(`현재 템플릿의 화물 입력 행이 부족합니다. DB 화물 ${shipments.length}건 / 사용 가능한 행 ${slots.length}개. 화물 행이 충분한 원본 양식을 등록해 주세요.`);
+  }
+  for (const [box, shipment] of shipmentByBox) labels.set(box, String(shipment.box_number).trim());
+  // If only split boxes exist, replace the empty parent placeholder with them.
+  // When a real parent cargo also exists, retain it before its split boxes.
+  for (const box of shipmentByBox.keys()) {
+    const parent = box.match(/^([A-Z]*\d+)\s*\(\s*\d+\s*\)$/u)?.[1];
+    if (parent && !shipmentByBox.has(parent)) labels.delete(parent);
+  }
+  const ordered = [...labels.keys()]
+    .sort((a, b) => a.localeCompare(b, 'en', {numeric:true}) || (a < b ? -1 : a > b ? 1 : 0));
+  // Retain ordinary unused-number gaps where possible. Make room for split
+  // rows by dropping only unused placeholders, starting at the numeric tail.
+  let placeholdersToDrop = Math.max(0, ordered.length - slots.length);
+  const selected: string[] = [];
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const box = ordered[i];
+    if (placeholdersToDrop > 0 && !shipmentByBox.has(box)) { placeholdersToDrop--; continue; }
+    selected.push(box);
+  }
+  selected.reverse();
+  const assignments = new Map(slots.map((slot, i) => [slot.row, selected[i]]));
+  const slotByRow = new Map(slots.map(slot => [slot.row, slot]));
+  const clearEditableInputs = (rowXml: string) => rowXml.replace(
+    /<c\b[^>]*\br="((?:C|D|E|F|G|H|I|J|K|L|M|N|P|Q)\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
+    (cell, ref) => {
+      if (/<f\b/.test(cell)) return cell;
+      const style = cell.match(/\bs="([^"]+)"/)?.[1];
+      return blankCell(ref, style ? ` s="${style}"` : '');
+    },
+  );
   const matchedBoxes = new Set<string>();
+  const mappedColumns = new Map(mapping.filter(([column]) => column !== 'B')
+    .map(([column, key, kind]) => [column, {key, kind}]));
   // 한 행을 바꿀 때마다 수 MB짜리 worksheet 전체를 다시 복사하면
   // 418행 기준으로 수 GB 규모의 임시 문자열 작업이 발생해 Edge CPU 한도를 넘습니다.
   // worksheet 전체는 한 번만 순회하고, callback 안에서 해당 행만 갱신합니다.
-  const output = sheetXml.replace(
-    /<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g,
-    (candidateXml, rowText) => {
+  const updateRow = (candidateXml: string, rowText: string) => {
       const rowNumber = Number(rowText);
-      if (rowNumber < firstDataRow) return candidateXml;
-      const bRe = new RegExp(
-        `<c\\b[^>]*r="B${rowNumber}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
-      );
-      const bMatch = String(candidateXml).match(bRe);
-      if (!bMatch) return candidateXml;
-
-      const fixedBox = cellText(bMatch[0], strings).trim();
-      if (!fixedBox) return candidateXml;
-
-      const normalizedBox = fixedBox.toUpperCase();
-      const sourceShipment = shipmentByBox.get(normalizedBox);
+      const slot = slotByRow.get(rowNumber);
+      if (!slot) return finishRow(candidateXml);
+      const normalizedBox = assignments.get(rowNumber);
+      const sourceShipment = normalizedBox ? shipmentByBox.get(normalizedBox) : undefined;
+      let rowXml = String(candidateXml);
+      if (normalizedBox !== slot.box) {
+        rowXml = updateCell(rowXml, rowNumber, 'B', normalizedBox ? labels.get(normalizedBox) : '', 'text');
+        // A shifted cargo must not inherit a previous row's name, invoice,
+        // dimensions or date when the corresponding DB field is empty.
+        rowXml = clearEditableInputs(rowXml);
+      }
       if (!sourceShipment) {
-        // A voyage template may contain deleted/old cargo. Keep fixed box slots
-        // and formulas, but clear the editable inputs for absent database rows.
-        let emptyRow = String(candidateXml);
-        for (const column of ['C','D','E','F','G','H','I','J','K','L','M','Q']) {
-          emptyRow = updateCell(emptyRow, rowNumber, column, '', 'text');
-        }
-        for (const column of ['N','O','P']) {
-          emptyRow = updateCellPreservingFormula(emptyRow,rowNumber,column,'','text');
-        }
-        return emptyRow;
+        return finishRow(clearEditableInputs(rowXml).replace(
+          /<c\b[^>]*\br="([NOP])\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
+          (cell, column) => updateCellPreservingFormula(cell,rowNumber,column,'','text'),
+        ));
       }
       const manualNote = String(sourceShipment.notes ?? '').trim();
       const autoNote = String(sourceShipment.special_note_auto ?? '').trim();
@@ -447,24 +560,37 @@ function updateCargoSheet(
           .join(' / '),
       };
 
-      matchedBoxes.add(normalizedBox);
-      let rowXml = String(candidateXml);
+      matchedBoxes.add(normalizedBox!);
 
-      // B열은 템플릿 고정 번호이므로 절대 덮어쓰지 않습니다.
-      for (const [column, key, kind] of mapping) {
-        if (column === 'B') continue;
-        rowXml = updateCellPreservingFormula(
-          rowXml,
-          rowNumber,
-          column,
-          shipment[key],
-          kind,
-        );
+      // Update each cell once. Replacing the full formula-heavy row for every
+      // input column retains large intermediate strings in the Edge worker.
+      const seen = new Set<string>();
+      rowXml = rowXml.replace(
+        /<c\b[^>]*\br="([A-Z]+)\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
+        (cell, column) => {
+          const entry = mappedColumns.get(column);
+          if (!entry) return cell;
+          seen.add(column);
+          return updateCellPreservingFormula(cell,rowNumber,column,shipment[entry.key],entry.kind);
+        },
+      );
+      // Sparse originals still need missing inputs inserted in column order.
+      for (const [column, {key, kind}] of mappedColumns) {
+        if (!seen.has(column)) rowXml = updateCellPreservingFormula(rowXml,rowNumber,column,shipment[key],kind);
       }
 
-      return rowXml;
-    },
-  );
+      return finishRow(rowXml);
+    };
+  // Iterate lazily instead of letting replace retain all callback arguments
+  // and intermediate replacement strings for a large worksheet.
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const match of sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g)) {
+    pieces.push(sheetXml.slice(cursor,match.index),updateRow(match[0],match[1]));
+    cursor = match.index! + match[0].length;
+  }
+  pieces.push(sheetXml.slice(cursor));
+  const output = lastFormulaRow ? formatCargoDiscountColumns(pieces.join('')) : pieces.join('');
 
   const missing = [...shipmentByBox.keys()].filter((box) => !matchedBoxes.has(box));
   if (missing.length > 0) {
@@ -678,7 +804,7 @@ function setStringCellInSheet(sheetXml: string, ref: string, value: string): str
   if (!rowMatch) return sheetXml;
   const rowXml = rowMatch[0];
   const updated = updateCell(rowXml, rowNumber, column, value, 'text');
-  return sheetXml.replace(rowXml, updated);
+  return sheetXml.replace(rowXml, () => updated);
 }
 
 function upgradeZoneQuantityFormulas(
@@ -699,7 +825,7 @@ function upgradeZoneQuantityFormulas(
       const formula =
         `SUMIF('물품 입고 내역'!$N$6:$N$1005,$A${row},'물품 입고 내역'!$I$6:$I$1005)`;
       const nextBody = String(body).replace(
-        /<f\b[^>]*(?:\/>|>[\s\S]*?<\/f>)/,
+        /<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/,
         `<f>${formula}</f>`,
       );
       return `<c${before}r="F${row}"${after}>${nextBody}</c>`;
@@ -729,7 +855,7 @@ function setFormulaCellInRowFast(
 
   const targetIndex = columnIndex(column);
   const cells = [...rowXml.matchAll(
-    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+    /<c\b[^>]*r="([A-Z]+)\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
   )];
   for (const match of cells) {
     if (columnIndex(match[1]) > targetIndex && match.index != null) {
@@ -762,7 +888,7 @@ function setFormulaCellPreservingStyle(
     nextRow = rowXml.replace(cellRe, () => replacement);
   } else {
     const targetIndex = columnIndex(column);
-    const cells = [...rowXml.matchAll(/<c\b[^>]*r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g)];
+    const cells = [...rowXml.matchAll(/<c\b[^>]*r="([A-Z]+)\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)];
     let inserted = false;
     for (const m of cells) {
       if (columnIndex(m[1]) > targetIndex && m.index != null) {
@@ -824,7 +950,7 @@ function seedCustomerListFromShipments(
     if (rowNumber < 4 || rowNumber > 150) return rowXml;
 
     const aRe = new RegExp(
-      `<c\\b[^>]*r="A${rowNumber}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`,
+      `<c\\b[^>]*r="A${rowNumber}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
     );
     const aMatch = String(rowXml).match(aRe);
     if (!aMatch) return rowXml;
@@ -896,7 +1022,9 @@ function seedCustomerListFromShipments(
       signature = '시내배송';
     }
     if (signature) {
-      nextRow = updateCell(nextRow, rowNumber, 'E', signature, 'text');
+      // E may be the master of a shared formula group. Keep its formula and
+      // group metadata so subsequent customer rows never become orphaned.
+      nextRow = updateCellPreservingFormula(nextRow, rowNumber, 'E', signature, 'text', true);
     }
 
     return nextRow;
@@ -919,10 +1047,9 @@ function setCachedFormulaValue(
   const body = match[3] ?? '';
   if (!/<f\b/.test(body)) return sheetXml;
 
-  const newBody = /<v>[\s\S]*?<\/v>/.test(body)
-    ? body.replace(/<v>[\s\S]*?<\/v>/, `<v>${numeric ? Number(value) : escXml(value)}</v>`)
-    : `${body}<v>${numeric ? Number(value) : escXml(value)}</v>`;
-  return sheetXml.replace(match[0], `<c${match[1]}r="${ref}"${match[2]}>${newBody}</c>`);
+  const newBody = replaceFormulaCache(body, numeric ? String(Number(value)) : escXml(value));
+  const attrs = `${match[1]}r="${ref}"${match[2]}`.replace(/\s+t="[^"]*"/g, '');
+  return sheetXml.replace(match[0], () => `<c${attrs}${numeric ? '' : ' t="str"'}>${newBody}</c>`);
 }
 
 function refreshReceiptSheetCaches(
@@ -1238,7 +1365,7 @@ function applySettlementToExistingRowData(
     )) {
       const rowNumber = Number(rowMatch[1]);
       for (const cellMatch of rowMatch[2].matchAll(
-        /<c\b[^>]*r="([A-Z]+\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+        /<c\b[^>]*r="([A-Z]+\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
       )) {
         const ref = cellMatch[1];
         if (colOf(ref) !== 'B') continue;
@@ -1535,7 +1662,7 @@ function populateDeliveryCostInputSheet(
   const receiptRows = new Map<string, number>();
   const overflowRows: number[] = [];
   for (const match of xml.matchAll(
-    /<c\b[^>]*r="A(\d+)"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,
+    /<c\b[^>]*r="A(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,
   )) {
     const row = Number(match[1]);
     if (row < 5 || row > 405) continue;
@@ -1597,7 +1724,7 @@ function setFormulaCellInSheet(sheetXml: string, ref: string, formula: string): 
 
   const seeded = updateCell(rowXml, rowNumber, column, '', 'text');
   const targetRe = new RegExp(
-    `<c\\b[^>]*r="${ref}"[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)`,
+    `<c\\b[^>]*r="${ref}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`,
   );
   const updatedRow = seeded.replace(targetRe, () => replacement);
   return sheetXml.replace(rowXml, updatedRow);
@@ -1663,7 +1790,7 @@ function applyStatementWrapText(
   if (!cellXfsMatch) return;
 
   const xfList = [...cellXfsMatch[4].matchAll(
-    /<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g,
+    /<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g,
   )].map(m => m[0]);
   if (xfList.length === 0) return;
 
@@ -1814,6 +1941,51 @@ function wireStatementAutomationFormulas(
   // N5 helper is also intentionally omitted to keep the original template untouched.
   void deliveryTypeFormula;
   files[path] = strToU8(xml);
+}
+
+// Link the existing account text box to the statement's own Remark. Using a
+// cell link keeps the printed account current when N2 or BASE rules change.
+function wireStatementPaymentAccounts(files: Record<string, Uint8Array>): void {
+  const workbook = strFromU8(files['xl/workbook.xml']);
+  const names = [...workbook.matchAll(/<sheet\b[^>]*name="([^"]+)"/g)].map(m => decodeXmlText(m[1]));
+  const strings = sharedStrings(files);
+  const compact = (s: string) => s.replace(/\s/g, '');
+  const normal = '571-22-0330221', business = '2070133424601';
+  const formula = '"한국 원화 계좌:"&CHAR(10)&"경남은행"&CHAR(10)&IF(ISNUMBER(SEARCH("세금계산서",SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(A18," ",""),CHAR(9),""),CHAR(10),""),CHAR(13),""),CHAR(160),""))),"2070133424601"&CHAR(10)&"박성호(엘케이무역)","571-22-0330221"&CHAR(10)&"박성호")';
+  for (const name of names) {
+    if (!/^(LKS|LKA)\s/.test(name) && name !== '명세서 빠르게 확인') continue;
+    const path = workbookSheetPath(files, name);
+    if (!path || !files[path]) continue;
+    let xml = strFromU8(files[path]);
+    const drawingId = xml.match(/<drawing\b[^>]*r:id="([^"]+)"/)?.[1];
+    const relPath = path.replace(/([^/]+)$/, '_rels/$1.rels');
+    if (!drawingId || !files[relPath]) continue;
+    const rel = [...strFromU8(files[relPath]).matchAll(/<Relationship\b[^>]*\/>/g)]
+      .map(m => m[0]).find(tag => tag.match(/\bId="([^"]+)"/)?.[1] === drawingId);
+    const target = rel?.match(/\bTarget="([^"]+)"/)?.[1];
+    if (!target) continue;
+    const drawingPath = target.startsWith('/') ? target.slice(1) : 'xl/' + target.replace(/^\.\.\//, '');
+    if (!files[drawingPath]) continue;
+    const remarkCell = xml.match(/<c\b[^>]*\br="A18"[^>]*>[\s\S]*?<\/c>/)?.[0] || '';
+    const tax = compact(cellText(remarkCell, strings)).includes('세금계산서');
+    const account = tax ? business : normal, holder = tax ? '박성호(엘케이무역)' : '박성호';
+    const textlink = escXml(`'${name.replaceAll("'", "''")}'!$W$14`);
+    let linked = false;
+    const drawing = strFromU8(files[drawingPath]).replace(/<xdr:sp\b[^>]*>[\s\S]*?<\/xdr:sp>/g, shape => {
+      if (!shape.includes(normal) && !shape.includes(business)) return shape;
+      linked = true;
+      shape = shape.replace(/<xdr:sp\b[^>]*>/, tag => /\btextlink="/.test(tag)
+        ? tag.replace(/\btextlink="[^"]*"/, () => `textlink="${textlink}"`)
+        : tag.replace(/>$/, () => ` textlink="${textlink}">`));
+      return shape.replace(/(<a:t>)(571-22-0330221|2070133424601)(<\/a:t>)/g, (_, a, _v, b) => a + account + b)
+        .replace(/(<a:t>)박성호(?:\(엘케이무역\))?(<\/a:t>)/g, (_, a, b) => a + holder + b);
+    });
+    if (!linked) continue;
+    xml = setFormulaCellInSheet(xml, 'W14', formula);
+    xml = setCachedFormulaValue(xml, 'W14', `한국 원화 계좌:\n경남은행\n${account}\n${holder}`, false);
+    files[path] = strToU8(xml);
+    files[drawingPath] = strToU8(drawing);
+  }
 }
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -2075,12 +2247,12 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const strings = sharedStrings(files);
 
     if (targetPath && files[targetPath]) {
-      const sheetXml = upgradeReceiptOrder(strFromU8(files[targetPath]), routeKey);
       files[targetPath] = strToU8(
         updateCargoSheet(
-          sheetXml,
+          strFromU8(files[targetPath]),
           strings,
           enrichedShipments,
+          routeKey,
         ),
       );
     } else if (routeKey !== 'th_la_land') {
@@ -2089,6 +2261,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
           '현재 1차 Export는 \"물품 입고 내역\" 시트가 있는 실제 Excel부터 지원합니다. 원본 템플릿은 안전하게 저장되어 있습니다.',
       });
     }
+    // Release row-local temporary strings before processing linked sheets.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    console.log('[EXCEL] cargo updated', Deno.memoryUsage().heapUsed);
     // 실사용 Excel 연결: 고객 리스트와 기존 영수증 sheet의 cached value를 함께 갱신합니다.
     seedCustomerListFromShipments(files, enrichedShipments, routeKey, voyage);
     upgradeZoneQuantityFormulas(files);
@@ -2101,6 +2276,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyage,
     );
     wireStatementAutomationFormulas(files, routeKey);
+    wireStatementPaymentAccounts(files);
     applyStatementWrapText(files, routeKey);
     applyDeliveryColorConditionalFormatting(files, routeKey);
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
@@ -2150,7 +2326,11 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // approved BASE contains the input sheet, mirror those values into it so
     // downloaded Excel statements use the same delivery-cost source.
     populateDeliveryCostInputSheet(files, voyageExtraCosts);
+    console.log('[EXCEL] linked sheets updated', Deno.memoryUsage().heapUsed);
     formatStatementAmounts(files, routeKey);
+    separateStatementDiscounts(files, routeKey, false, true);
+    console.log('[EXCEL] discounts separated', Deno.memoryUsage().heapUsed);
+    formatDeliveryNumbers(files, routeKey);
     appendDocumentAutomationBlock(
       files,
       enrichedShipments,
@@ -2198,15 +2378,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     }
     files['xl/workbook.xml'] = strToU8(workbookXml);
 
-    // PATCH200B: XLSX is already a ZIP archive.  Level 6 compression can push the
-    // Supabase Edge worker over its compute limit on the large multi-sheet BASE files.
-    // Level 1 keeps the workbook fully compatible while drastically reducing CPU time.
-    // PATCH200C: Supabase Edge has a very small per-request CPU budget.
-    // The workbook is already only a few MB compressed; recompressing every OOXML part
-    // is the single most expensive synchronous step. Store-only ZIP is valid XLSX and
-    // dramatically lowers CPU usage.
+    // Native DEFLATE retains normal XLSM size without spending Edge CPU on a
+    // JavaScript compressor. VBA and all other parts remain byte-identical.
     console.log('[EXCEL200C] zip start');
-    const encoded = zipSync(files, { level: 0 });
+    const encoded = await zipWorkbook(files, { Zip, ZipPassThrough });
     console.log('[EXCEL200C] zip done', encoded.byteLength);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const exportPath =
