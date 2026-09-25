@@ -120,6 +120,26 @@ class ShipmentService {
       }
     }
 
+    // Registered company aliases enable discovery, never full-record access.
+    if (currentUser.role == UserRole.member) {
+      final companyRaw = await SupabaseService.client.rpc(
+        'search_shipments_by_registered_company',
+        params: {
+          'p_route': route == '전체' ? '' : route,
+          'p_year': year == '전체' ? null : parsedYear,
+          'p_voyage': voyageValue,
+          'p_box_number': boxNumber.trim(),
+          'p_invoice': invoice.trim(),
+          'p_recipient': recipient.trim(),
+          'p_phone': phone.trim(),
+        },
+      );
+      final existingIds = result.map((row) => '${row['id']}').toSet();
+      for (final row in List<Map<String, dynamic>>.from(companyRaw as List)) {
+        if (existingIds.add('${row['id']}')) result.add(row);
+      }
+    }
+
     // 관리자·직원·협력/파트너 검색에서는 수취인 불명 화물도 일반 화물 검색 결과
     // 아래에 보여야 합니다. 과거 RPC 버전에 recipient_unknown 제외 조건이 남아 있어도
     // 앱에서 해당 항차의 불명 화물을 보강해 누락되지 않게 합니다.

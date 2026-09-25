@@ -635,8 +635,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
     }
   }
 
-  bool _isInvoiceSuffixResult(Map<String, dynamic> row) =>
-      row['invoice_suffix_match'] == true;
+  bool _isMaskedSearchResult(Map<String, dynamic> row) =>
+      row['invoice_suffix_match'] == true || row['company_match'] == true;
 
   Future<void> _requestInvoiceCorrection(Map<String, dynamic> row) async {
     final user = widget.currentUser;
@@ -770,7 +770,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
   void _toggleAll() {
     setState(() {
       final ids = _results
-          .where((row) => !_isInvoiceSuffixResult(row))
+          .where((row) => !_isMaskedSearchResult(row))
           .map((r) => '${r['id']}')
           .toSet();
       if (ids.isNotEmpty && _selectedIds.containsAll(ids)) {
@@ -830,7 +830,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
 
   Widget _searchFixedBottomBar() {
     final selectableIds = _results
-        .where((row) => !_isInvoiceSuffixResult(row))
+        .where((row) => !_isMaskedSearchResult(row))
         .map((r) => '${r['id']}')
         .toSet();
     final allSelected = selectableIds.isNotEmpty &&
@@ -1014,7 +1014,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
           const SizedBox(height: 10),
           _input(_invoiceCtrl, _t('invoice_number'), Icons.tag_rounded),
           const SizedBox(height: 10),
-          _input(_recipientCtrl, _t('recipient_name'), Icons.person_outline),
+          _input(_recipientCtrl, _l('이름 / 회사명'), Icons.person_outline),
           const SizedBox(height: 10),
           _input(_phoneCtrl, _l('연락처'), Icons.phone_outlined,
               type: TextInputType.phone),
@@ -1041,10 +1041,10 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 widget.language == AppLanguage.english
-                    ? 'Members can search with at least the last 4 invoice digits, an exact name, or the last 8 phone digits.'
+                    ? 'Search by your name, phone, or registered company. Unverified recipient details remain masked. Invoice recovery needs at least the last 4 characters.'
                     : widget.language == AppLanguage.lao
-                        ? 'ສະມາຊິກສາມາດຄົ້ນຫາດ້ວຍເລກໃບຂົນສົ່ງ 4 ຕົວທ້າຍ, ຊື່ທີ່ກົງກັນ ຫຼື ເບີໂທ 8 ຕົວທ້າຍ.'
-                        : '일반 회원은 송장번호 뒤 4자리 이상, 정확한 이름 또는 연락처 뒤 8자리 기준으로 조회됩니다.',
+                        ? 'ຄົ້ນຫາດ້ວຍຊື່, ເບີໂທ ຫຼື ບໍລິສັດທີ່ລົງທະບຽນ. ຂໍ້ມູນຜູ້ຮັບທີ່ຍັງບໍ່ຢືນຢັນຈະຖືກປິດບັງ. ຄົ້ນຫາເລກໃບຂົນສົ່ງດ້ວຍ 4 ຕົວທ້າຍຂຶ້ນໄປ.'
+                        : '이름·전화번호와 등록된 회사명으로 조회합니다. 본인 확인 전 수취인 정보는 가려 표시하며, 송장번호 복구 검색은 뒤 4자리 이상을 입력하세요.',
                 style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
@@ -1076,7 +1076,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
 
   void _toggleGroup(List<Map<String, dynamic>> rows) {
     final ids = rows
-        .where((row) => !_isInvoiceSuffixResult(row))
+        .where((row) => !_isMaskedSearchResult(row))
         .map((r) => '${r['id']}')
         .toSet();
     setState(() {
@@ -1168,7 +1168,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
   ) {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final row in rows) {
-      final receipt = _isInvoiceSuffixResult(row)
+      final receipt = _isMaskedSearchResult(row)
           ? '__invoice_suffix_${row['id']}'
           : '${row['receipt_number'] ?? ''}'.trim();
       map.putIfAbsent(receipt, () => <Map<String, dynamic>>[]).add(row);
@@ -1189,7 +1189,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
 
   void _toggleReceiptGroup(List<Map<String, dynamic>> rows) {
     final ids = rows
-        .where((row) => !_isInvoiceSuffixResult(row))
+        .where((row) => !_isMaskedSearchResult(row))
         .map((r) => '${r['id']}')
         .toSet();
     setState(() {
@@ -1206,7 +1206,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
       final rows = entry.value;
       final first = rows.first;
       final normalRows = rows
-          .where((row) => !_isInvoiceSuffixResult(row))
+          .where((row) => !_isMaskedSearchResult(row))
           .toList(growable: false);
       final ids = normalRows.map((r) => '${r['id']}').toSet();
       final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
@@ -1254,7 +1254,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
   Widget _receiptResultCard(List<Map<String, dynamic>> rows) {
     final first = rows.first;
     final normalRows = rows
-        .where((row) => !_isInvoiceSuffixResult(row))
+        .where((row) => !_isMaskedSearchResult(row))
         .toList(growable: false);
     final ids = normalRows.map((r) => '${r['id']}').toSet();
     final all = ids.isNotEmpty && _selectedIds.containsAll(ids);
@@ -1376,7 +1376,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
 
   Widget _shipmentCard(Map<String, dynamic> r) {
     final id = '${r['id']}';
-    final suffixResult = _isInvoiceSuffixResult(r);
+    final suffixResult = _isMaskedSearchResult(r);
+    final companyResult = r['company_match'] == true;
     if (suffixResult) {
       final pending = r['correction_pending'] == true;
       return Card(
@@ -1394,7 +1395,13 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      widget.language == AppLanguage.english
+                      companyResult
+                          ? (widget.language == AppLanguage.english
+                              ? 'Registered company match · recipient details masked'
+                              : widget.language == AppLanguage.lao
+                                  ? 'ກົງກັບບໍລິສັດທີ່ລົງທະບຽນ · ປິດບັງຂໍ້ມູນຜູ້ຮັບ'
+                                  : '등록 회사명 일치 · 수취인 정보 가림')
+                          : widget.language == AppLanguage.english
                           ? 'Invoice suffix match · recipient verification required'
                           : widget.language == AppLanguage.lao
                               ? 'ເລກໃບຂົນສົ່ງກົງກັນ · ຕ້ອງກວດຜູ້ຮັບ'
@@ -1411,27 +1418,33 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
               _row(_l('화물번호'), '${r['box_number'] ?? '-'}'),
               _row(_l('송장번호'), '${r['invoice_number'] ?? '-'}'),
               _row(_l('입고날짜'), _dateOnly(r['received_at'])),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: pending ? null : () => _requestInvoiceCorrection(r),
-                  icon: Icon(pending ? Icons.hourglass_top : Icons.fact_check_outlined),
-                  label: Text(
-                    pending
-                        ? (widget.language == AppLanguage.english
-                            ? 'Administrator review pending'
-                            : widget.language == AppLanguage.lao
-                                ? 'ລໍຖ້າຜູ້ບໍລິຫານກວດ'
-                                : '관리자 확인 대기 중')
-                        : (widget.language == AppLanguage.english
-                            ? 'Request my cargo verification'
-                            : widget.language == AppLanguage.lao
-                                ? 'ຂໍກວດສິນຄ້າຂອງຂ້ອຍ'
-                                : '본인 화물 확인·정정 요청'),
+              if (companyResult) ...[
+                _row(_l('이름'), '${r['consignee_name'] ?? '-'}'),
+                _row(_l('연락처'), '${r['consignee_phone'] ?? '-'}'),
+              ],
+              if (!companyResult) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: pending ? null : () => _requestInvoiceCorrection(r),
+                    icon: Icon(pending ? Icons.hourglass_top : Icons.fact_check_outlined),
+                    label: Text(
+                      pending
+                          ? (widget.language == AppLanguage.english
+                              ? 'Administrator review pending'
+                              : widget.language == AppLanguage.lao
+                                  ? 'ລໍຖ້າຜູ້ບໍລິຫານກວດ'
+                                  : '관리자 확인 대기 중')
+                          : (widget.language == AppLanguage.english
+                              ? 'Request my cargo verification'
+                              : widget.language == AppLanguage.lao
+                                  ? 'ຂໍກວດສິນຄ້າຂອງຂ້ອຍ'
+                                  : '본인 화물 확인·정정 요청'),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
