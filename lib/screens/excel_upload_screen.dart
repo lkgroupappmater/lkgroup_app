@@ -248,7 +248,9 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 '예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n'
                 '또는: 2026년 LKS 08항차 최종본.xlsm\n'
                 '경로·년도·항차만 포함하면 앞뒤 파일명은 자유롭게 사용할 수 있습니다.\n\n'
-                '접수 후 Excel 분석, 중복 정리, 화물 DB 반영은 순차 처리됩니다.',
+                '총괄 관리자 업로드는 해당 항차의 전체 Excel을 기준으로 수정·삭제를 자동 반영합니다. '
+                'Excel에서 빠진 화물은 삭제함으로 이동하며 30일 동안 복구할 수 있습니다.\n'
+                '직원·협력사 업로드는 기존 변경 승인 절차를 따릅니다.',
               ),
               const SizedBox(height: 20),
               FilledButton.icon(

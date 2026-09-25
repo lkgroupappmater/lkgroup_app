@@ -11,6 +11,9 @@ class ShipmentImportSummary {
     this.changeRequests = 0,
     this.alreadyPending = 0,
     this.protectedRows = 0,
+    this.updatedRows = 0,
+    this.removedRows = 0,
+    this.restoredRows = 0,
   });
 
   final int newRows;
@@ -18,10 +21,13 @@ class ShipmentImportSummary {
   final int changeRequests;
   final int alreadyPending;
   final int protectedRows;
+  final int updatedRows;
+  final int removedRows;
+  final int restoredRows;
 
   int get existingRows =>
       unchanged + changeRequests + alreadyPending + protectedRows;
-  int get actions => newRows + changeRequests;
+  int get actions => newRows + changeRequests + updatedRows + removedRows + restoredRows;
 
   ShipmentImportSummary operator +(ShipmentImportSummary other) =>
       ShipmentImportSummary(
@@ -30,6 +36,9 @@ class ShipmentImportSummary {
         changeRequests: changeRequests + other.changeRequests,
         alreadyPending: alreadyPending + other.alreadyPending,
         protectedRows: protectedRows + other.protectedRows,
+        updatedRows: updatedRows + other.updatedRows,
+        removedRows: removedRows + other.removedRows,
+        restoredRows: restoredRows + other.restoredRows,
       );
 
   factory ShipmentImportSummary.fromRpc(dynamic value) {
@@ -43,6 +52,9 @@ class ShipmentImportSummary {
       changeRequests: count('change_requests'),
       alreadyPending: count('already_pending'),
       protectedRows: count('protected_rows'),
+      updatedRows: count('updated_rows'),
+      removedRows: count('removed_rows'),
+      restoredRows: count('restored_rows'),
     );
   }
 }
@@ -214,6 +226,23 @@ class ShipmentService {
   Future<int> upsertFromRows(List<Map<String, dynamic>> rows) async {
     final summary = await importDifferencesFromRows(rows);
     return summary.actions;
+  }
+
+  /// An administrator's complete voyage snapshot commits atomically, including
+  /// missing rows. Never send a chunk or retry it through the legacy insert API.
+  Future<ShipmentImportSummary> synchronizeExcelRows(
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (!SupabaseConfig.isConfigured) return const ShipmentImportSummary();
+    if (rows.isEmpty) throw StateError('화물 행이 없는 파일은 동기화할 수 없습니다.');
+    final payload = rows.map(_shipmentPayload).toList();
+    final preview = await SupabaseService.client.rpc(
+      'admin_preview_shipment_excel_sync', params: {'p_rows': payload});
+    final token = preview is Map ? preview['preview_token'] : null;
+    if (token is! String || token.isEmpty) throw StateError('항차 비교 결과를 확인할 수 없습니다.');
+    final result = await SupabaseService.client.rpc('admin_apply_shipment_excel_sync',
+      params: {'p_rows': payload, 'p_preview_token': token});
+    return ShipmentImportSummary.fromRpc(result);
   }
 
   Future<ShipmentImportSummary> importDifferencesFromRows(
@@ -599,4 +628,3 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
-

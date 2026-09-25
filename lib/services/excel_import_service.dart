@@ -1,4 +1,6 @@
 import '../core/customer_discounts.dart';
+import '../models/app_user.dart';
+import 'auth_service.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
@@ -20,6 +22,9 @@ class ExcelImportResult {
     this.unchanged = 0,
     this.alreadyPending = 0,
     this.protectedRows = 0,
+    this.updatedRows = 0,
+    this.removedRows = 0,
+    this.restoredRows = 0,
     this.customerRulesWaitingForPhone = 0,
     this.message = '',
   });
@@ -34,6 +39,9 @@ class ExcelImportResult {
   final int unchanged;
   final int alreadyPending;
   final int protectedRows;
+  final int updatedRows;
+  final int removedRows;
+  final int restoredRows;
   // 이름/할인율은 있으나 전화번호가 없어 안전상 적용 대기 중인 규칙.
   final int customerRulesWaitingForPhone;
   final String message;
@@ -146,11 +154,17 @@ class ExcelImportService {
     var skipped = 0;
 
     final cargoRows = workbook['물품 입고 내역'];
+    if (cargoRows == null || _findHeaderRow(cargoRows) < 0) {
+      throw const FormatException('물품 입고 내역 시트와 화물번호 헤더를 확인해 주세요. 반영하지 않았습니다.');
+    }
     if (cargoRows != null) {
       final headerIndex = _findHeaderRow(cargoRows);
       if (headerIndex >= 0) {
         final headers =
             cargoRows[headerIndex].map(_normalise).toList(growable: false);
+        if (!['box_number', 'invoice_number', 'consignee_name', 'consignee_phone', 'quantity'].every(headers.contains)) {
+          throw const FormatException('화물번호·송장번호·이름·전화번호·수량 열이 필요합니다.');
+        }
 
         for (final row in cargoRows.skip(headerIndex + 1)) {
           final map = <String, dynamic>{};
@@ -160,6 +174,10 @@ class ExcelImportService {
 
           final box = '${map['box_number'] ?? ''}'.trim();
           if (box.isEmpty) {
+            if (['invoice_number','consignee_name','consignee_phone'].any((key) => '${map[key] ?? ''}'.trim().isNotEmpty) &&
+                !RegExp(r'합계|총계|total', caseSensitive: false).hasMatch(row.join(' '))) {
+              throw const FormatException('화물번호가 비어 있는 화물 행을 수정해 주세요.');
+            }
             if (row.any((cell) => cell.trim().isNotEmpty)) skipped++;
             continue;
           }
@@ -175,6 +193,20 @@ class ExcelImportService {
             map['weight_kg'],
           ].any((v) => '${v ?? ''}'.trim().isNotEmpty);
           if (!hasBusinessData) continue;
+          for (final field in ['box_number','invoice_number','sender_name','consignee_name','consignee_phone','contents','package_type','quantity','weight_kg','length_cm','width_cm','height_cm','received_at']) {
+            if (RegExp(r'^#(?:REF!|VALUE!|DIV/0!|N/A|NAME\?|NUM!|NULL!|LK_UNCALCULATED!)$').hasMatch('${map[field] ?? ''}')) {
+              throw FormatException('$box: 수식 오류 또는 미계산 셀을 Excel에서 확인해 주세요.');
+            }
+          }
+          for (final field in ['quantity','weight_kg','length_cm','width_cm','height_cm']) {
+            final raw = '${map[field] ?? ''}'.trim().replaceAll(',', '');
+            final number = num.tryParse(raw);
+            if (raw.isNotEmpty && (number == null || !number.isFinite || number < 0 ||
+                (field == 'quantity' && (number < 1 || number > 999999 || number != number.truncate())))) {
+              throw FormatException('$box: $field 값을 확인해 주세요.');
+            }
+            map[field] = raw;
+          }
 
           // Excel 날짜 셀은 OOXML에서 2026-07-14 같은 문자열이 아니라
           // 46217 같은 serial number로 저장될 수 있습니다.
@@ -199,27 +231,27 @@ class ExcelImportService {
     }
 
 
-    // 같은 Excel 안에 동일 import_key가 중복되어 있으면 PostgreSQL
-    // ON CONFLICT DO UPDATE가 같은 row를 한 statement에서 두 번 갱신하려다
-    // SQLSTATE 21000으로 실패할 수 있습니다.
-    // 실제 DB 반영 전 import_key 기준으로 마지막 행 하나만 남깁니다.
+    // Never silently drop duplicates from an authoritative voyage snapshot.
     final uniqueRowsByImportKey = <String, Map<String, dynamic>>{};
     for (final row in rows) {
       final key = '${row['import_key'] ?? ''}'.trim();
-      if (key.isEmpty) continue;
-      uniqueRowsByImportKey[key] = row;
+      if (key.isEmpty || uniqueRowsByImportKey.containsKey(key.toLowerCase())) {
+        throw FormatException('중복 화물번호를 수정해 주세요: ${row['box_number']}');
+      }
+      uniqueRowsByImportKey[key.toLowerCase()] = row;
     }
     final uniqueRows = uniqueRowsByImportKey.values.toList(growable: false);
+    if (uniqueRows.isEmpty) throw const FormatException('화물 행이 없는 파일은 동기화할 수 없습니다.');
+    final synchronize = AuthService.instance.currentUser?.role == UserRole.admin;
 
     // Patch167: current BASE Excel delivery table is the source of truth.
     // Import it before shipment upsert so normalize/finalize can see city/province
     // delivery + prepaid + company/address for this very upload.
-    onProgress?.call(0.38, '시내·지방 배송표 DB 반영 중');
+    onProgress?.call(0.45, '항차 화물 수정·삭제 비교 및 DB 반영 중');
+    final importSummary = synchronize
+        ? await ShipmentService.instance.synchronizeExcelRows(uniqueRows)
+        : await ShipmentService.instance.importDifferencesFromRows(uniqueRows);
     await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
-
-    onProgress?.call(0.45, '배송표 반영 완료 · 화물 DB 반영 중');
-    final importSummary =
-        await ShipmentService.instance.importDifferencesFromRows(uniqueRows);
     onProgress?.call(0.72, '화물 DB 반영 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
         await _importCustomerDiscountRules(workbook, routeKey: routeKey);
@@ -258,10 +290,13 @@ class ExcelImportService {
       unchanged: importSummary.unchanged,
       alreadyPending: importSummary.alreadyPending,
       protectedRows: importSummary.protectedRows,
+      updatedRows: importSummary.updatedRows,
+      removedRows: importSummary.removedRows,
+      restoredRows: importSummary.restoredRows,
       customerRulesWaitingForPhone: customerRuleResult.waitingForPhone,
       message: noCargoSheet
           ? '원본 Excel 템플릿은 안전하게 저장했습니다. 현재 1차 자동 화물 동기화는 "물품 입고 내역" 시트가 있는 파일부터 지원합니다.'
-          : '신규 화물만 추가하고 기존 화물의 차이는 변경 승인 요청으로 분리했습니다. 동일값은 저장하지 않았으며 원본 Excel 템플릿을 안전하게 저장했습니다.',
+          : synchronize ? '해당 항차 Excel의 수정·삭제를 공통 DB에 반영했습니다. 누락 화물은 삭제함에서 30일 동안 복구할 수 있습니다.' : '신규 화물 추가 및 기존 화물 변경 승인 요청을 반영했습니다.',
     );
   }
 
@@ -317,6 +352,7 @@ class ExcelImportService {
       result[name] = _readWorksheetRows(
         utf8.decode(sheetBytes, allowMalformed: true),
         sharedStrings,
+        strictCargo: name == '물품 입고 내역',
       );
     }
 
@@ -350,8 +386,9 @@ class ExcelImportService {
 
   List<List<String>> _readWorksheetRows(
     String xml,
-    List<String> sharedStrings,
-  ) {
+    List<String> sharedStrings, {
+    bool strictCargo = false,
+  }) {
     final rows = <List<String>>[];
     final rowPattern = RegExp(
       r'<row\b[^>]*>([\s\S]*?)</row>',
@@ -403,7 +440,9 @@ class ExcelImportService {
                 caseSensitive: false,
               ).firstMatch(body)?.group(1) ??
               '';
-          if (type == 's') {
+          if (strictCargo && RegExp(r'<f(?:\s|>|/)').hasMatch(body) && raw.isEmpty && type != 'str') {
+            value = '#LK_UNCALCULATED!';
+          } else if (type == 's') {
             final index = int.tryParse(raw.trim());
             value = index != null &&
                     index >= 0 &&
@@ -1704,6 +1743,7 @@ class ExcelImportService {
       'box_no.': 'box_number',
       'box_no': 'box_number',
       '박스번호': 'box_number',
+      '화물번호': 'box_number',
       '박스_번호': 'box_number',
       '송장_번호': 'invoice_number',
       '송장번호': 'invoice_number',
