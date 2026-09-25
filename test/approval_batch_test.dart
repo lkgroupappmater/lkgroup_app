@@ -28,7 +28,7 @@ void main() {
         {'request_id': 2, 'action': 'modified_approve', 'admin_changes': {'box_number': 'S1', 'receipt_number': 'LKS 01'}},
       ]},
     ]);
-    final failing = ApprovalBatchService(rpc: (_, _) async => throw StateError('rollback'));
+    final failing = ApprovalBatchService(rpc: (name, params) async => throw StateError('rollback'));
     await expectLater(failing.applyChanges([change(1, 'A'), change(2, 'B')], 'approve'), throwsStateError);
   });
   test('Zone review starts with Excel values and permits reverting explicitly', () {
