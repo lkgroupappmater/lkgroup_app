@@ -5,11 +5,12 @@ class CustomerDiscounts {
   static bool isSpecial(dynamic name) => '$name'.replaceAll(RegExp(r'\s'), '') == '특별할인';
 
   static ({double regular, double special}) split(Map<String, dynamic>? rule) {
-    final special = _number(rule?['special_discount_percent'] ??
-        (isSpecial(rule?['group_name']) ? rule?['discount_percent'] : 0))
+    final values = rule ?? const <String, dynamic>{};
+    final special = _number(values['special_discount_percent'] ??
+        (isSpecial(values['group_name']) ? values['discount_percent'] : 0))
         .clamp(0, 1).toDouble();
-    final regular = _number(rule?['regular_discount_percent'] ??
-        (_number(rule?['discount_percent']) - special)).clamp(0, 1).toDouble();
+    final regular = _number(values['regular_discount_percent'] ??
+        (_number(values['discount_percent']) - special)).clamp(0, 1).toDouble();
     return (regular: regular, special: special);
   }
 
