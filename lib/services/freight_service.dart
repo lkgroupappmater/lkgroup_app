@@ -1,5 +1,6 @@
 import '../config/supabase_config.dart';
 import '../core/route_catalog.dart';
+import '../core/customer_discounts.dart';
 import 'exchange_rate_service.dart';
 import 'freight_policy_service.dart';
 import 'supabase_service.dart';
@@ -151,9 +152,10 @@ class FreightService {
         }
       }
 
-      final autoDiscount =
-          _d(override?['discount_percent']).clamp(0, 1).toDouble();
-      final additionalDiscount =
+      final parts = CustomerDiscounts.split(override);
+      final sourceSpecial = parts.special;
+      final autoDiscount = parts.regular;
+      final additionalDiscount = sourceSpecial +
           _d(manualAdditional?['discount_percent']).clamp(0, 1).toDouble();
       // Additive against the same original eligible amount: 20% + 10% = 30%.
       final discount =
@@ -164,7 +166,7 @@ class FreightService {
       final amount = grossAmount - discountAmount;
       final group = '${override?['group_name'] ?? ''}'.trim();
       final additionalDiscountName =
-          '${manualAdditional?['discount_name'] ?? ''}'.trim();
+          sourceSpecial > 0 ? '특별할인' : '${manualAdditional?['discount_name'] ?? ''}'.trim();
       final matchedCustomer =
           '${override?['customer_name'] ?? ''}'.trim();
       final combinedQuantity =
@@ -352,4 +354,3 @@ class FreightService {
   static double? _nullableD(dynamic value) =>
       value == null ? null : double.tryParse('$value');
 }
-

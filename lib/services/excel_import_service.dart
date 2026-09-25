@@ -1,3 +1,4 @@
+import '../core/customer_discounts.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
@@ -1355,21 +1356,13 @@ class ExcelImportService {
       return (applied: 0, waitingForPhone: 0);
     }
 
-    // Row data 안에서 같은 고객이 여러 할인 목록에 반복 등장할 수 있습니다.
-    // 같은 customer_name + phone + route_key를 한 upsert statement에
-    // 두 번 넣지 않도록 마지막 항목 하나만 남깁니다.
-    final uniqueRules = <String, Map<String, dynamic>>{};
-    for (final rule in rules) {
-      final key =
-          '${rule['customer_name'] ?? ''}|${rule['phone'] ?? ''}|${rule['route_key'] ?? ''}';
-      uniqueRules[key] = rule;
-    }
+    final uniqueRules = CustomerDiscounts.mergeImportRules(rules);
 
     // One-row-at-a-time is intentional.
     // DB unique/index normalization may collapse names that look different in
     // Excel (spacing/punctuation/etc.). A multi-row INSERT ... ON CONFLICT can
     // then hit the same target row twice and fail with SQLSTATE 21000.
-    for (final rule in uniqueRules.values) {
+    for (final rule in uniqueRules) {
       await SupabaseService.client
           .from('customer_rate_overrides')
           .upsert(
@@ -1741,4 +1734,3 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
-
