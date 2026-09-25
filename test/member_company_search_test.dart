@@ -23,7 +23,7 @@ void main() {
       httpClient: MockClient((request) async {
         calls.add(request);
         return http.Response(jsonEncode(responses[request.url.pathSegments.last] ?? []),
-            200, headers: {'content-type': 'application/json'});
+            200, request: request, headers: {'content-type': 'application/json'});
       }),
     );
   });
