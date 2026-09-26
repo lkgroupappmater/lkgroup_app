@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/app_colors.dart';
+import '../widgets/customer_identity_card.dart';
 import '../core/app_language.dart';
 import '../core/ui_localizations.dart';
 import '../models/app_user.dart';
@@ -349,6 +350,7 @@ class _AccountBodyState extends State<AccountBody> with SharedUiTextState {
         Card(
           child: Column(
             children: [
+              CustomerIdentityCard(key: ValueKey('customer-id-${user.id}-${user.name}-${user.phone}'), userId: user.id, language: widget.language),
               _info(_t('phone'), user.phone),
               _info(_t('role'), user.role.localizedLabel(widget.language)),
               _info(_t('company'), user.company),

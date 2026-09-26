@@ -7,7 +7,7 @@ const json = (status:number,body:unknown) => new Response(JSON.stringify(body), 
 class RequestError extends Error { constructor(public status:number, code:string) { super(code); } }
 const require = (ok:unknown,code:string,status=400) => { if (!ok) throw new RequestError(status,code); };
 const result = (r:any) => {
- if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID','BULK_SELECTION_INVALID'].find(c=>String(r.error.message).includes(c));
+ if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID','BULK_SELECTION_INVALID','UNKNOWN_CUSTOMER_NAME'].find(c=>String(r.error.message).includes(c));
   throw new RequestError(code==='FORBIDDEN'?403:code||r.error.code==='23505'?409:500,code??(r.error.code==='23505'?'DUPLICATE_RECORD':'DATABASE_ERROR'));}
  return r.data;
 };
@@ -73,6 +73,7 @@ Deno.serve(async(req:Request)=>{
    const urls=new Map();for(const p of photos)urls.set(p.id,await signed(p.path));
    return json(200,{cargo:visible.map(r=>({...r,photos:photos.filter((p:any)=>p.shipment_id===r.id).map((p:any)=>({id:p.id,kind:p.kind,url:urls.get(p.id)}))}))});
   }
+  if(b.action==='my_customer_id')return json(200,result(await db.rpc('customer_registry_member_id',{p_owner:owner})));
   require(operator,'FORBIDDEN',403);
   if(['customers_list','customers_summary','customers_detail'].includes(b.action)){
    require(admin,'FORBIDDEN',403);const state=await registryState();

@@ -203,6 +203,7 @@ class _RegistryDetailState extends State<_RegistryDetail> {
         for (final s in sources.take(_shown)) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (s['mismatch'] == true) Text(t('mismatches'), style: TextStyle(color: Colors.deepOrange.shade800, fontWeight: FontWeight.bold)),
           Text('${s['label']}'), Text('${s['name']} · ${s['phone']}'),
+          if (s['is_unknown_name'] == true && s['statement_customer_code'] != null) Text('${t('futureStatementId')}: ${s['statement_customer_code']}'),
           if (s['mismatch'] == true) TextButton(onPressed: _busy ? null : () => _resolve(s), child: Text(t('resolveSource'))),
         ]))),
         if (sources.length > _shown) TextButton(onPressed: () => setState(() => _shown += 100), child: Text(t('more'))),

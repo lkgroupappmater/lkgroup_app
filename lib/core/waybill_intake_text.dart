@@ -356,6 +356,41 @@ const intakeWords = <String, List<String>> {
     "최대 100개를 선택하고 각 그룹에 남길 ID를 지정하세요. 남길 ID는 다른 ID로 통합할 수 없습니다.",
     "Select up to 100 customers and one surviving ID per group. A surviving ID cannot also be merged away.",
     "ເລືອກສູງສຸດ 100 ລູກຄ້າ ແລະ ID ທີ່ຈະເກັບໃນແຕ່ລະກຸ່ມ. ID ທີ່ເກັບບໍ່ສາມາດລວມເຂົ້າ ID ອື່ນ."
+  ],
+  "uniqueCustomerId": [
+    "고객 고유 ID",
+    "Unique customer ID",
+    "ID ປະຈຳຕົວລູກຄ້າ"
+  ],
+  "identityUnmatched": [
+    "연결된 고객 ID 없음",
+    "No linked customer ID",
+    "ຍັງບໍ່ມີ ID ລູກຄ້າທີ່ເຊື່ອມ"
+  ],
+  "identityLoading": [
+    "고객 ID 확인 중…",
+    "Checking customer ID…",
+    "ກຳລັງກວດ ID ລູກຄ້າ…"
+  ],
+  "identityError": [
+    "고객 ID를 불러오지 못했습니다. 새로고침해 주세요.",
+    "Could not load your customer ID. Please refresh.",
+    "ໂຫຼດ ID ລູກຄ້າບໍ່ໄດ້. ກະລຸນາໂຫຼດໃໝ່."
+  ],
+  "identityReview": [
+    "회원 정보 연결 확인 필요",
+    "Profile link needs review",
+    "ຕ້ອງກວດການເຊື່ອມຂໍ້ມູນສະມາຊິກ"
+  ],
+  "futureStatementId": [
+    "명세서용 구분 ID",
+    "Statement identity code",
+    "ລະຫັດ ID ສຳລັບໃບລາຍການ"
+  ],
+  "UNKNOWN_CUSTOMER_NAME": [
+    "수취인 불명 문구는 고객 이름에 넣지 않습니다. 실제 고객 이름과 ID를 사용해 주세요.",
+    "Use the actual customer name and ID without the unknown-recipient prefix.",
+    "ໃຊ້ຊື່ ແລະ ID ລູກຄ້າຕົວຈິງ ໂດຍບໍ່ໃສ່ຄຳວ່າບໍ່ຮູ້ຜູ້ຮັບ."
   ]
 
 };

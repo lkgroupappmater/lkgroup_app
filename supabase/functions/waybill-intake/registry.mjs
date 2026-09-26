@@ -17,7 +17,7 @@ export function oneEditApart(a, b, minimum = 2) {
   return edits+(i<a.length||j<b.length?1:0)===1;
 }
 export function registrySummary(customers, sources) {
-  const active=customers.filter(c=>!c.merged_into), byId=new Map(active.map(c=>[c.id,{...c,customer_code:String(c.customer_no).padStart(3,'0'),source_count:0,mismatch_count:0,duplicates:[]} ]));
+  const active=customers.filter(c=>!c.merged_into&&!/수취인\s*불명/.test(c.name||'')), byId=new Map(active.map(c=>[c.id,{...c,customer_code:String(c.customer_no).padStart(3,'0'),source_count:0,mismatch_count:0,duplicates:[]} ]));
   for(const s of sources){const c=byId.get(s.customer_registry_id);if(c){c.source_count++;if(s.mismatch)c.mismatch_count++;}}
   for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
     const a=active[i],b=active[j],reasons=[];

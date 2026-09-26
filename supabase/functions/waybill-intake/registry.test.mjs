@@ -21,3 +21,8 @@ test('bulk validation keeps independent groups and strips untrusted fields',asyn
  const out=validateBulkRows(rows);assert.deepEqual(out.map(r=>r.target_id),['b','b','d','d']);assert.equal(out[0].name,'Name a');assert.equal(out[0].phone,'02011110000');assert.equal(out[0].merged_into,undefined);
  for(const bad of [[],Array(101).fill(rows[0]),[rows[0],rows[0]],[{...rows[0],target_id:'absent'}],[{...rows[0],updated_at:null},rows[1]],[{...rows[0],target_id:'b'},{...rows[1],target_id:'a'}]])assert.throws(()=>validateBulkRows(bad),/BULK_SELECTION_INVALID/);
 });
+
+test('legacy unknown-prefixed IDs are preserved in storage but not offered as separate customers',()=>{
+ const rows=[{id:'real',name:'Customer',name_key:'customer',customer_no:23,phone_key:'02011110000'},{id:'old',name:'수취인 불명 / Customer',name_key:'수취인불명/customer',customer_no:52,phone_key:'02011110000'},{id:'masked',name:'히 수취인불명 / ???',customer_no:359}];
+ const out=registrySummary(rows,[{customer_registry_id:'real',mismatch:false}]);assert.equal(out.rows.length,1);assert.equal(out.rows[0].customer_code,'023');assert.equal(out.summary.customers,1);assert.equal(out.rows[0].source_count,1);
+});

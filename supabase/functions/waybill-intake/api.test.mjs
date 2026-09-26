@@ -31,6 +31,7 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
     return {data:data.shipments.filter(s=>s.consignee_name.replace(/\s/g,'').toLowerCase()===nk||s.consignee_phone===pk).map(s=>({exact:s.consignee_phone===pk&&s.consignee_name.replace(/\s/g,'').toLowerCase()===nk,statement:{receipt_number:s.receipt_number}})).sort((a,b)=>Number(b.exact)-Number(a.exact))};
    }
    if(name==='customer_registry_change'||name==='customer_registry_merge')return {data:{id:args.p_id??args.p_target}};
+   if(name==='customer_registry_member_id')return {data:{customer_code:'023',status:'linked'}};
    if(name==='customer_registry_bulk_apply')return {data:{updated_count:2,merged_count:0,moved_sources:0}};
    if(name==='customer_registry_resolve_source')return {data:true};
    assert.fail(name);
@@ -126,4 +127,11 @@ test('bulk customer endpoint requires active admin and review and performs one a
  const api=setup();assert.equal((await api.call({action:'customers_bulk',rows})).status,400);assert.equal(api.rpcCalls.length,0);
  assert.equal((await api.call({action:'customers_bulk',rows:[rows[0],rows[0]],confirmed:true})).status,400);assert.equal(api.rpcCalls.length,0);
  const result=await api.call({action:'customers_bulk',rows,confirmed:true});assert.equal(result.status,200);assert.equal(result.body.updated_count,2);assert.equal(api.rpcCalls.length,1);assert.equal(api.rpcCalls[0].name,'customer_registry_bulk_apply');assert.equal(api.rpcCalls[0].args.p_reason,'');assert.equal(api.rpcCalls[0].args.p_rows.length,2);
+});
+
+test('member identity is owner-only; it does not expose registry or operational actions',async()=>{
+ const api=setup({role:'member'});const r=await api.call({action:'my_customer_id',owner:'other',p_owner:'other',id:'other'});
+ assert.equal(r.status,200);assert.equal(r.body.customer_code,'023');assert.deepEqual(api.rpcCalls.map(x=>x.name),['customer_registry_member_id']);assert.equal(api.rpcCalls[0].args.p_owner,'owner');
+ assert.equal((await api.call({action:'customers_list'})).status,403);
+ for(const blocked of [setup({authenticated:false}),setup({active:false})]){const r=await blocked.call({action:'my_customer_id'});assert.ok([401,403].includes(r.status));assert.equal(blocked.rpcCalls.length,0);}
 });
