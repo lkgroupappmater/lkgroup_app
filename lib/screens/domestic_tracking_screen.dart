@@ -2,7 +2,6 @@ import 'waybill_intake_screen.dart';
 import '../services/waybill_intake_service.dart';
 import '../core/waybill_intake_text.dart';
 import '../services/shared_ui_text_service.dart';
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -34,7 +33,7 @@ class DomesticTrackingScreen extends StatefulWidget {
   State<DomesticTrackingScreen> createState() => _DomesticTrackingScreenState();
 }
 
-class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with WidgetsBindingObserver, SharedUiTextState {
+class _DomesticTrackingScreenState extends State<DomesticTrackingScreen>, SharedUiTextState {
   final _number = TextEditingController();
   String _carrier = '', _queryType = 'statement';
   String _route = '', _year = '', _voyage = '';
@@ -46,8 +45,6 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
   int _page = 0;
   String? _message;
   List<Map<String, dynamic>> _rows = [];
-  Timer? _refreshTimer;
-  bool _foreground = true;
   String? _owner;
   bool get _valid => mounted && widget.user?.id == _owner && (widget.callApi != null || DomesticTrackingService.currentUserId == _owner);
   String t(String k) => domesticText(widget.language, k);
@@ -60,14 +57,8 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
   void initState() {
     super.initState();
     _owner = widget.user?.id;
-    WidgetsBinding.instance.addObserver(this);
     if (widget.manage && isOperator) _list();
     if (widget.user != null) _loadFilters();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
   }
 
   @override
@@ -99,8 +90,6 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
     _number.dispose();
     super.dispose();
   }
@@ -120,9 +109,6 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
         _rows = (data['parcels'] as List)
             .map((x) => Map<String, dynamic>.from(x))
             .toList();
-        if (_rows.isNotEmpty) _refreshTimer ??= Timer.periodic(const Duration(minutes: 5), (_) {
-          if (_valid && _foreground && _rows.isNotEmpty && ModalRoute.of(context)?.isCurrent == true) _loadPage(quiet: true);
-        });
         _more = data['has_more'] == true;
         _message = _rows.isEmpty
             ? t((data['cargo_count'] as num? ?? 0) > 0 ? 'noLinked' : 'empty')

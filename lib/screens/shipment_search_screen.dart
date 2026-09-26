@@ -45,8 +45,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
   @override
   Set<String> get autoRefreshTopics => const {'shipments', 'content'};
   @override
-  bool get autoRefreshAllowed => widget.isLoggedIn && widget.currentUser != null &&
-      _selectedIds.isEmpty && !_loadingUnknownRecipients && !_searching;
+  // Search results only reload after Search or a completed edit.
+  bool get autoRefreshAllowed => false;
 
   String get _queryKey => [widget.currentUser?.id, _selectedRouteLabel, _year, _voyage,
       _invoiceCtrl.text, _recipientCtrl.text, _phoneCtrl.text].join('\u0000');

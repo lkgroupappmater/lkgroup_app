@@ -41,9 +41,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
   Future<void> _loadBatches() async {
     try {
-      final raw=await SupabaseService.client.from('shipments')
-          .select('route,shipment_year,voyage').isFilter('deletion_requested_at',null)
-          .order('shipment_year',ascending:false);
+      final raw=await SupabaseService.client.rpc('list_shipment_filter_batches');
       final all=(raw as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList(growable:false);
       if(!mounted)return;
       setState(() {
@@ -51,7 +49,6 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         _year=_years.isNotEmpty?_years.first:null; _voyage=_voyages.isNotEmpty?_voyages.first:null;
         _loading=false;
       });
-      await _loadRows();
     } catch(e){_fail('고객 리스트 조회 실패: $e');}
   }
 
@@ -216,7 +213,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       decoration:InputDecoration(labelText:label,border:const OutlineInputBorder(),
         isDense:true,contentPadding:const EdgeInsets.symmetric(horizontal:8,vertical:10)),
       items:items.map((e)=>DropdownMenuItem(value:e,child:Text(text(e),overflow:TextOverflow.ellipsis))).toList(),
-      onChanged:onChanged,
+      onChanged:_loading||_saving?null:onChanged,
     );
   }
 
@@ -385,18 +382,18 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
         Row(children:[
           Expanded(flex:4,child:_selector<String>(label:'운송 경로',value:_route,items:_routes,text:(v)=>v,onChanged:(v){
-            setState((){_route=v;_year=_years.isNotEmpty?_years.first:null;_voyage=_voyages.isNotEmpty?_voyages.first:null;});_loadRows();})),
+            setState((){_route=v;_year=_years.isNotEmpty?_years.first:null;_voyage=_voyages.isNotEmpty?_voyages.first:null;_rows=const [];});})),
           const SizedBox(width:6),
           Expanded(flex:3,child:_selector<int>(label:'년도',value:_year,items:_years,text:(v)=>'$v년',onChanged:(v){
-            setState((){_year=v;_voyage=_voyages.isNotEmpty?_voyages.first:null;});_loadRows();})),
+            setState((){_year=v;_voyage=_voyages.isNotEmpty?_voyages.first:null;_rows=const [];});})),
           const SizedBox(width:6),
-          Expanded(flex:3,child:_selector<String>(label:'항차',value:_voyage,items:_voyages,text:(v)=>v.endsWith('항차')?v:'$v항차',onChanged:(v){setState(()=>_voyage=v);_loadRows();})),
+          Expanded(flex:3,child:_selector<String>(label:'항차',value:_voyage,items:_voyages,text:(v)=>v.endsWith('항차')?v:'$v항차',onChanged:(v){setState((){_voyage=v;_rows=const [];});})),
         ]),
         const SizedBox(height:6),
         Row(children:[
           Text('고객 ${_rows.length}명',style:const TextStyle(fontWeight:FontWeight.w800)),
           const Spacer(),
-          IconButton(visualDensity:VisualDensity.compact,tooltip:'새로고침',onPressed:_loading?null:_loadRows,icon:const Icon(Icons.refresh)),
+          FilledButton.icon(onPressed:_loading||_route==null||_year==null||_voyage==null?null:_loadRows,icon:const Icon(Icons.search),label:const Text('검색')),
         ]),
         const Divider(height:1),
         Expanded(child:_loading?const Center(child:CircularProgressIndicator()):ListView.separated(
@@ -427,3 +424,4 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     );
   }
 }
+

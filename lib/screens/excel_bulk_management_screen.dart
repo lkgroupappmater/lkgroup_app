@@ -145,7 +145,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       _rows = const [];
       _checked.clear();
     });
-    if (value != null) _loadRows();
+
   }
 
   void _toggle(String id) {
@@ -457,7 +457,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                   items: _routes
                       .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
-                  onChanged: _routeChanged,
+                  onChanged: _busy ? null : _routeChanged,
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -475,7 +475,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                                   child: Text('$e년'),
                                 ))
                             .toList(),
-                        onChanged: _route == null ? null : _yearChanged,
+                        onChanged: _busy || _route == null ? null : _yearChanged,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -492,13 +492,18 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
                                   child: Text('${e}항차'),
                                 ))
                             .toList(),
-                        onChanged: _route == null || _year == null
+                        onChanged: _busy || _route == null || _year == null
                             ? null
                             : _voyageChanged,
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: FilledButton.icon(
+                  onPressed: _busy || _route == null || _year == null || _voyage == null ? null : _loadRows,
+                  icon: const Icon(Icons.search), label: const Text('검색'),
+                )),
                 if (_rows.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Align(
@@ -809,4 +814,5 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
         ),
       );
 }
+
 
