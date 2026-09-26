@@ -321,7 +321,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
         child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SelectableText(title, style: Theme.of(context).textTheme.titleLarge),
           if (statement is Map) Text('${RouteCatalog.localizedLabel('${statement['route']}', widget.language)} · ${statement['shipment_year']} / ${statement['voyage']}'),
-          Text('${t('waybillCount')}: ${rows.length}'),
+          Text('${t('waybillCount')}: ${rows.where((r)=>r['is_reference_photo']!=true).length}'),
           if (isOperator) TextButton.icon(onPressed: _busy ? null : () => _edit(null, first), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
           const SizedBox(height: 12),
           Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
@@ -340,6 +340,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
     child: Image.network(url, height: 160, width: 180, fit: BoxFit.contain, errorBuilder: (_, __, ___) => SizedBox(width: 180, child: Text(t('REQUEST_FAILED')))));
 
   Widget _card(Map<String, dynamic> r) {
+    if(r['is_reference_photo']==true)return Padding(padding:const EdgeInsets.symmetric(vertical:8),child:Text(intakeText(widget.language,'referencePhotos')));
     final integration = r['integration'];
     final notice = ['planned', 'connection_required'].contains(integration)
         ? t('connection')
@@ -519,6 +520,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
   String _carrier = '', _kind = 'province', _service = 'domestic';
   String _scope = 'statement', _referenceType = 'ecommerce';
   String _route = '', _year = '', _voyage = '';
+  bool _referencePhotos=false;
   bool _carrierChosen = false, _busy = false, _finding = false;
   bool _filtersLoading = false, _filtersFailed = false;
   int _lookupVersion = 0;
@@ -615,7 +617,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
     if (_picking || _busy) return;
     setState(() => _picking = true);
     try {
-      if(widget.row==null){
+      if(widget.row==null||_referencePhotos){
         final files=widget.pickPhotos!=null?(await widget.pickPhotos!()).map((p)=>IntakeFile(p.name,p.bytes.length,()async=>p.bytes)).toList():await WaybillIntakeService.pick();
         if(files.isEmpty||!_valid)return;
         WaybillIntakeService.validate(files);
@@ -624,7 +626,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
         if(_scope=='cargo'&&_cargo!=null)fixed={'link_scope':'cargo','shipment_id':_cargo};
         if(_scope=='reference'&&_reference.text.trim().isNotEmpty)fixed={'link_scope':'reference','reference':{'reference_type':_referenceType,'reference_number':_reference.text.trim()}};
         fixed?.addAll({'receiver_name':_name.text,'receiver_phone':_phone.text,'delivery_kind':_kind,'service_kind':_service});
-        final saved=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language,files:files,fixedLink:fixed)));
+        if(_referencePhotos&&fixed==null)throw const DomesticTrackingException('STATEMENT_REQUIRED');
+        final saved=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language,files:files,fixedLink:fixed,referenceOnly:_referencePhotos)));
         if(saved!=null&&_valid)Navigator.pop(context,saved);
         return;
       }
@@ -650,6 +653,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
     finally { if (mounted) setState(() => _picking = false); }
   }
   Future<void> _save() async {
+    if(_referencePhotos){await _pick();return;}
     if (_busy || _finding || _picking || !_form.currentState!.validate()) return;
     if (_scope == 'statement' && _confirmed == null) { setState(() => _message = t('STATEMENT_REQUIRED')); return; }
     if (_scope == 'cargo' && _cargo == null) { setState(() => _message = t('CARGO_REQUIRED')); return; }
@@ -750,6 +754,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
           validator: (v) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9 ./_-]{0,79}$').hasMatch(v?.trim() ?? '') ? null : t('INVALID_REFERENCE')),
       ],
       if (_scope == 'cargo') _cargoSelector(),
+      DropdownButtonFormField<bool>(initialValue:_referencePhotos,decoration:InputDecoration(labelText:intakeText(widget.language,'photoMode')),items:[DropdownMenuItem(value:false,child:Text(intakeText(widget.language,'recognizeWaybill'))),DropdownMenuItem(value:true,child:Text(intakeText(widget.language,'referencePhotos')))],onChanged:_busy||_picking?null:(v)=>setState(()=>_referencePhotos=v??false)),
+      if(!_referencePhotos)...[
       const SizedBox(height: 20), Text(t('stepWaybill'), style: Theme.of(context).textTheme.titleMedium), Text(t('waybillHelp')), const SizedBox(height: 12),
       TextFormField(key: const Key('delivery-tracking-number'), controller: _number, enabled: !_busy, maxLength: 40, decoration: InputDecoration(labelText: t('tracking')),
         onChanged: (v) => setState(() { if (!_carrierChosen) _carrier = DomesticTrackingService.detectCarrier(v) ?? ''; }),
@@ -762,6 +768,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
       ..._extraWaybills.map(_extraWaybill),
       if (widget.row == null) OutlinedButton.icon(key: const Key('delivery-add-waybill'), onPressed: _busy || _extraWaybills.length >= 49 ? null : () => setState(() => _extraWaybills.add(_WaybillDraft())), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
       if (widget.row != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t('correctionHelp'))),
+      ],
+      if(_referencePhotos)Text(intakeText(widget.language,'referenceHelp')),
       _choice('kind', _kind, ['city','province'], (v) => setState(() => _kind = v!)),
       _choice('service', _service, ['domestic','inbound','outbound','ecommerce','express'], (v) => setState(() => _service = v!)),
       TextField(controller: _name, enabled: !_busy, readOnly: ['statement','cargo'].contains(_scope), maxLength: 160, decoration: InputDecoration(labelText: t('receiver'))),
@@ -771,7 +779,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
       for (final photo in _photos) ListTile(title: Text(photo.name), leading: Image.memory(photo.bytes, width: 48, height: 48, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined)), trailing: IconButton(tooltip: t('removePhoto'), icon: const Icon(Icons.close), onPressed: _busy ? null : () => setState(() => _photos.remove(photo)))),
       if (_message != null) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(_message!)),
       if (_busy || _finding) const LinearProgressIndicator(),
-      FilledButton(key: const Key('delivery-save'), onPressed: _busy || _finding || _picking ? null : _save, child: Text(t('save'))),
+      FilledButton(key: const Key('delivery-save'), onPressed: _busy || _finding || _picking ? null : _save, child: Text(_referencePhotos?intakeText(widget.language,'uploadPhotos'):t('save'))),
     ])),
   );
 }

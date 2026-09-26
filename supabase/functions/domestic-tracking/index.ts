@@ -78,10 +78,10 @@ Deno.serve(async req=>{
    }));
    photo_urls=photo_urls.filter(Boolean);
    const events=own?row.events:(row.events??[]).map((e:any,i:number)=>({key:`redacted:${i}`,occurred_at:e.occurred_at,status:e.status,source:e.source,description:'',location:''}));
-   return {id:row.id,carrier:row.carrier,carrier_name:CARRIERS[row.carrier].name,tracking_number:row.tracking_number,
+   return {id:row.id,carrier:row.carrier,is_reference_photo:row.is_reference_photo===true,carrier_name:CARRIERS[row.carrier]?.name??'',tracking_number:row.tracking_number,
     delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:own?row.origin:'',destination:own?row.destination:'',
     status:row.status,events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
-    official_url:own?carrierUrl(row.carrier,row.tracking_number):null,integration:CARRIERS[row.carrier].mode,
+    official_url:own&&!row.is_reference_photo?carrierUrl(row.carrier,row.tracking_number):null,integration:CARRIERS[row.carrier]?.mode??'reference_photo',
     has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&(!own||photo_urls.length<paths.length),
     group_key:deliveryGroup(row,s),link_scope:row.link_scope??(s?'cargo':'standalone'),statement,
     reference_type:row.reference_type??null,reference_number:row.reference_number??null,
@@ -91,6 +91,7 @@ Deno.serve(async req=>{
     created_at:row.created_at,updated_at:row.updated_at,can_manage:canManageParcel(profile,row)};
   }
   async function sync(row:any){
+   if(row.is_reference_photo)return row;
    const now=new Date(),cutoff=new Date(now.getTime()-300000).toISOString();
    if(row.checked_at&&row.checked_at>cutoff)return row;
    const claimed=dbResult(await db.from('domestic_parcels').update({checked_at:now.toISOString()}).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).or(`checked_at.is.null,checked_at.lt.${cutoff}`).select().maybeSingle());
@@ -112,7 +113,7 @@ Deno.serve(async req=>{
   }
   async function refreshRows(rows:any[]){
    const cutoff=new Date(Date.now()-300000).toISOString();
-   const pending=rows.filter(r=>!r.checked_at||r.checked_at<cutoff).sort((a,b)=>String(a.checked_at??'').localeCompare(String(b.checked_at??''))).slice(0,20);
+   const pending=rows.filter(r=>!r.is_reference_photo&&(!r.checked_at||r.checked_at<cutoff)).sort((a,b)=>String(a.checked_at??'').localeCompare(String(b.checked_at??''))).slice(0,20);
    const refreshed=new Map((await mapLimited(pending,async(r:any)=>await sync(r),4)).map((r:any)=>[r.id,r]));
    return rows.map(r=>refreshed.get(r.id)??r);
   }

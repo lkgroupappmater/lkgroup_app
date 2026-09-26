@@ -1,4 +1,5 @@
 import 'customer_registry_screen.dart';
+import '../services/waybill_intake_service.dart';
 import '../core/app_language.dart';
 import '../core/waybill_intake_text.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,15 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
   bool _loading = false;
+  Map<String,dynamic>? _registrySummary;
+  Future<void> _loadRegistrySummary() async {
+    if(!SupabaseConfig.isConfigured)return;
+    try{final owner=Supabase.instance.client.auth.currentUser?.id;final r=await WaybillIntakeService.call('customers_summary');if(mounted&&owner==Supabase.instance.client.auth.currentUser?.id)setState(()=>_registrySummary=Map<String,dynamic>.from(r['summary'] as Map));}catch(_){}
+  }
+  Future<void> _openRegistry({bool mismatchesOnly=false}) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>CustomerRegistryScreen(language:widget.language,mismatchesOnly:mismatchesOnly)));
+    if(mounted)_loadRegistrySummary();
+  }
 
   @override
   void initState() {
@@ -40,6 +50,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   Future<void> _loadMembers() async {
     if (!mounted) return;
     setState(() => _loading = true);
+    _loadRegistrySummary();
     try {
       if (!SupabaseConfig.isConfigured) {
         _members = [];
@@ -494,7 +505,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('회원 종합 관리'),
-        actions:[TextButton(onPressed:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>CustomerRegistryScreen(language:widget.language))),child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
+        actions:[TextButton(onPressed:_openRegistry,child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -510,6 +521,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                 children: [
+                  if(_registrySummary!=null) Card(color:Colors.orange.shade50,child:ListTile(title:Text('${intakeText(widget.language,'mismatches')} ${_registrySummary!['mismatch_customers']}'),subtitle:Text('${intakeText(widget.language,'duplicates')} ${_registrySummary!['duplicate_customers']} · ${intakeText(widget.language,'sourceRows')} ${_registrySummary!['mismatch_sources']}'),trailing:const Icon(Icons.chevron_right),onTap:()=>_openRegistry(mismatchesOnly:true))),
                   const Text(
                     '가입 권한 승인 요청',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
@@ -724,4 +736,3 @@ class _AdminMemberData {
   final String name, email, password, phone, company;
   final UserRole role;
 }
-

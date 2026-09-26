@@ -35,9 +35,9 @@ class WaybillIntakeService {
       throw DomesticTrackingException(e.details is Map ? '${e.details['error'] ?? 'REQUEST_FAILED'}' : 'REQUEST_FAILED');
     }
   }
-  static Future<Map<String,dynamic>> begin(List<IntakeFile> files, String purpose, {int? shipmentId}) {
+  static Future<Map<String,dynamic>> begin(List<IntakeFile> files, String purpose, {int? shipmentId, Map<String,dynamic>? fixedLink}) {
     validate(files);
-    return call('begin', {'purpose': purpose, 'shipment_id': shipmentId, 'files': files.map((f) => {'name': f.name, 'size': f.size}).toList()});
+    return call('begin', {'purpose': purpose, 'shipment_id': shipmentId, 'fixed_link': fixedLink, 'files': files.map((f) => {'name': f.name, 'size': f.size}).toList()});
   }
   static Future<void> upload(IntakeFile file, Map<String,dynamic> target) async {
     final bytes = await file.readBytes();

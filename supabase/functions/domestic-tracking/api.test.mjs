@@ -195,3 +195,10 @@ test('photo decoding rejects bad formats, enforces per-image and total bytes, ac
  assert.throws(()=>photos.decodePhotos({photos:[max,max,max,png]}),/FILE_TOO_LARGE/);
  assert.throws(()=>photos.decodePhotos({photos:[{base64:max.base64+'AAAA'}]}),/FILE_TOO_LARGE/);
 });
+test('reference photos appear under the statement without carrier requests and retain customer photo permissions',async()=>{
+ let carrierRequests=0;
+ const photo=direct(50,{is_reference_photo:true,carrier:null,tracking_number:null,checked_at:null,photo_paths:['intake/owner/reference.jpg'],photo_path:null});
+ const api=setup({shipments:[cargo(1)],parcels:[photo],fetchTracking:async()=>{carrierRequests++;throw Error('must not run');}});
+ const r=await api.call({action:'statement_lookup',...ref});assert.equal(r.status,200);assert.equal(r.body.parcels.length,1);assert.equal(r.body.parcels[0].is_reference_photo,true);assert.equal(r.body.parcels[0].photo_urls.length,1);assert.equal(r.body.parcels[0].official_url,null);assert.equal(carrierRequests,0);
+ const other=setup({shipments:[cargo(1,{customer_id:'other'})],parcels:[photo]});const hidden=await other.call({action:'statement_lookup',...ref});assert.equal(hidden.body.parcels.length,0);assert.equal(other.signed,0);
+});

@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import * as validation from './validation.mjs';
+import * as registry from './registry.mjs';
 const source=stripTypeScriptTypes(fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8').replace(/^import .+;\n/gm,''),{mode:'transform'});
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0,0]);
 function setup({role='admin',active=true,authenticated=true,data:initial={},ocr={waybills:[]},ocrFailure=false}={}){
- const data={profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_sources:[],shipments:[],...structuredClone(initial)};
- let handler,ocrCalls=0;const writes=[],rpcCalls=[],signed=[];
+ const data={profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_sources:[],customer_registry_source_status:[],shipments:[],...structuredClone(initial)};
+ let handler,ocrCalls=0,ocrBody=null;const writes=[],rpcCalls=[],signed=[];
  function query(table){let filters=[],write=null,insert=null,count=false,window=null;
   function run(){let rows=data[table].filter(r=>filters.every(f=>f(r)));
    if(insert){rows=(Array.isArray(insert)?insert:[insert]).map(r=>({created_at:new Date().toISOString(),status:'draft',scan_attempts:0,...r}));data[table].push(...rows);writes.push(table);}
@@ -23,12 +24,19 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
    if(name==='list_unknown_recipient_cargo')return {data:data.shipments.filter(s=>s.recipient_unknown)};
    if(name==='domestic_find_delivery_cargo')return {data:data.shipments.filter(s=>s.receipt_number===args.p_number)};
    if(name==='commit_waybill_intake'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=['saved'];return {data:b.result_ids};}
+   if(name==='commit_reference_photos'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=['reference'];return {data:b.result_ids};}
    if(name==='commit_unknown_cargo_photos')return {data:true};
+   if(name==='waybill_recipient_candidates'){
+    const nk=String(args.p_name).replace(/\s/g,'').toLowerCase(),pk=String(args.p_phone).replace(/\D/g,'').replace(/^856/,'0');
+    return {data:data.shipments.filter(s=>s.consignee_name.replace(/\s/g,'').toLowerCase()===nk||s.consignee_phone===pk).map(s=>({exact:s.consignee_phone===pk&&s.consignee_name.replace(/\s/g,'').toLowerCase()===nk,statement:{receipt_number:s.receipt_number}})).sort((a,b)=>Number(b.exact)-Number(a.exact))};
+   }
+   if(name==='customer_registry_change'||name==='customer_registry_merge')return {data:{id:args.p_id??args.p_target}};
+   if(name==='customer_registry_resolve_source')return {data:true};
    assert.fail(name);
   }};
- vm.runInNewContext(source,{...validation,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
-  fetch:async()=>{ocrCalls++;return new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify(ocr)}]}]}),{status:ocrFailure?503:200});}});
- return {data,writes,rpcCalls,signed,get ocrCalls(){return ocrCalls},async call(body,token='valid'){
+ vm.runInNewContext(source,{...validation,...registry,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
+  fetch:async(_url,options)=>{ocrCalls++;ocrBody=JSON.parse(options.body);return new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify(ocr)}]}]}),{status:ocrFailure?503:200});}});
+ return {data,writes,rpcCalls,signed,get ocrCalls(){return ocrCalls},get ocrBody(){return ocrBody},async call(body,token='valid'){
   const r=await handler(new Request('https://test.invalid',{method:'POST',headers:token?{Authorization:`Bearer ${token}`}:{},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};
  }};
 }
@@ -78,4 +86,35 @@ test('unknown cargo signs only currently visible cargo photos and rejects repeat
  const api=setup({role:'member',data}),r=await api.call({action:'unknown_list'});assert.equal(r.body.cargo[0].photos.length,1);assert.deepEqual(api.signed,['visible']);
  const operator=setup({role:'staff',data:{...ready,waybill_intake_batches:[{...batch,purpose:'unknown'}],waybill_intake_files:[file,{...file,id:'file2'}]}});
  const bad=await operator.call({action:'unknown_save',batch_id:'batch',confirmed:true,photos:[{file_id:'file',kind:'box'},{file_id:'file',kind:'box'}]});assert.equal(bad.status,400);assert.equal(operator.rpcCalls.length,0);
+});
+test('fixed statement is resolved once at intake; number-only OCR and commit preserve authoritative recipient',async()=>{
+ const cargo={id:5,route:'KR-LA',shipment_year:2026,voyage:'09',receipt_number:'LKS05',consignee_name:'Statement customer',consignee_phone:'02012345678'};
+ const link={link_scope:'statement',statement:{route:cargo.route,shipment_year:2026,voyage:'09',receipt_number:'LKS05'},receiver_name:'Client typo',carrier:'BAD'};
+ const api=setup({data:{shipments:[cargo]},ocr:{waybills:[{tracking_number:'VTE12345678901',carrier:'HAL',receiver_name:'OCR wrong',receiver_phone:'000',note:''}]}});
+ const started=await api.call({action:'begin',purpose:'waybill',fixed_link:link,files:[{name:'a.png',size:13}]});assert.equal(started.status,200);
+ assert.equal(started.body.fixed_link.receiver_name,'Statement customer');assert.equal(started.body.fixed_link.carrier,undefined);
+ const f=started.body.files[0],b=started.body.batch_id;
+ const scanned=await api.call({action:'scan',batch_id:b,file_id:f.id});assert.equal(scanned.status,200);assert.equal(scanned.body.waybills[0].receiver_name,'Statement customer');
+ assert.equal(api.ocrBody.text.format.schema.properties.waybills.items.properties.receiver_name,undefined);
+ const r=await api.call({action:'commit',batch_id:b,entries:[{...entry,file_ids:[f.id],receiver_name:'Tampered'},{...entry,file_ids:[f.id],tracking_number:'VTE12345678902'}]});assert.equal(r.status,200);
+ const commit=api.rpcCalls.find(r=>r.name==='commit_waybill_intake');assert.equal(commit.args.p_values[0].receiver_name,'Statement customer');
+ assert.equal(api.rpcCalls.filter(r=>r.name==='domestic_find_delivery_cargo').length,2);
+});
+test('customer summary identifies spelling candidates and true mismatches separately; admin operations stay protected',async()=>{
+ const data={customer_registry:[{id:'a',customer_no:3,name:'Alpha',phone:'02012345678',name_key:'alpha',phone_key:'02012345678'},{id:'b',customer_no:4,name:'Alphb',phone:'02012345679',name_key:'alphb',phone_key:'02012345679'}],customer_registry_source_status:[{source_kind:'shipment',source_id:'7',customer_registry_id:'a',mismatch:true}]};
+ const api=setup({data}),r=await api.call({action:'customers_list',mismatches_only:true});assert.equal(r.body.customers.length,1);assert.equal(r.body.summary.mismatch_customers,1);assert.equal(r.body.summary.duplicate_customers,2);
+ const detail=await api.call({action:'customers_detail',id:'a'});assert.equal(detail.body.candidates[0].id,'b');assert.equal(detail.body.sources.length,1);
+ const edit=await api.call({action:'customers_update',id:'a',customer_no:3,name:'Alpha',phone:'02012345678',updated_at:'stamp'});assert.equal(edit.status,200);assert.equal(api.rpcCalls.at(-1).args.p_reason,'');
+ for(const action of ['customers_summary','customers_detail','customers_update','customers_merge','customers_resolve_source'])assert.equal((await setup({role:'staff'}).call({action})).status,403);
+ assert.equal((await api.call({action:'customers_merge',source_id:'a',target_id:'b',confirmed:false})).status,400);
+ assert.equal((await api.call({action:'customers_merge',source_id:'a',target_id:'b',source_updated_at:'x',target_updated_at:'y',confirmed:true})).status,200);
+ assert.equal(api.rpcCalls.at(-1).args.p_source_expected,'x');
+});
+test('reference photo commit needs no tracking details or OCR and retries without duplicate records',async()=>{
+ const fixed={link_scope:'cargo',shipment_id:1,receiver_name:'A',receiver_phone:'02012345678'};
+ const api=setup({data:{...ready,waybill_intake_batches:[{...batch,purpose:'photos',fixed_link:fixed}],shipments:[{id:1,consignee_name:'A',consignee_phone:'02012345678'}]}});
+ const body={action:'reference_commit',batch_id:'batch',delivery_kind:'province',service_kind:'domestic'};
+ const first=await api.call(body),second=await api.call(body);assert.equal(first.status,200);assert.deepEqual(first.body.ids,second.body.ids);
+ assert.equal(api.ocrCalls,0);const calls=api.rpcCalls.filter(r=>r.name==='commit_reference_photos');assert.equal(calls.length,1);assert.equal(calls[0].args.p_value.tracking_number,undefined);assert.equal(calls[0].args.p_value.photo_paths.length,1);
+ for(const data of [{...ready,waybill_intake_batches:[{...batch,purpose:'photos'}]},{...ready,waybill_intake_batches:[{...batch,purpose:'photos',fixed_link:fixed}],waybill_intake_files:[{...file,verified_at:null}],shipments:[{id:1,consignee_name:'A'}]}])assert.equal((await setup({data}).call(body)).status,400);
 });

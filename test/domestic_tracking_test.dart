@@ -98,6 +98,25 @@ void main() {
     expect(calls.any((c)=>c['action']=='save_batch'), isFalse);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('reference photos attach to a confirmed statement without requiring a waybill number', (tester) async {
+    final calls = <Map<String, dynamic>>[];
+    final image = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZkAAAAASUVORK5CYII=');
+    await editor(tester, (action, body) async {
+      calls.add({'action':action,...body});
+      return {'statement':statement,'cargo_count':1,'cargo':[]};
+    }, pickPhotos: () async => [DomesticPhotoSelection('box.png', image)]);
+    await choose(tester,'sea'); await choose(tester,'2026'); await choose(tester,'08');
+    await tester.enterText(find.byKey(const Key('delivery-receipt-number')),'LKS 03');
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement'))); await tester.pumpAndSettle();
+    tester.widget<DropdownButton<bool>>(find.byType(DropdownButton<bool>)).onChanged!(true); await tester.pump();
+    expect(find.byKey(const Key('delivery-tracking-number')),findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('delivery-save')));
+    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
+    final screen=tester.widget<WaybillIntakeScreen>(find.byType(WaybillIntakeScreen));
+    expect(screen.referenceOnly,isTrue);expect(screen.fixedLink?['statement'],statement);
+    expect(screen.files.single.name,'box.png');expect(calls.any((c)=>c['action']=='save_batch'),isFalse);
+    expect(tester.takeException(),isNull);
+  });
   test('intake validates 50 images at 5MB each and rejects excess before reading bytes',(){
     final file=IntakeFile('photo.jpg',5242880,()async=>throw StateError('must not read'));
     expect(()=>WaybillIntakeService.validate(List.filled(50,file)),returnsNormally);
