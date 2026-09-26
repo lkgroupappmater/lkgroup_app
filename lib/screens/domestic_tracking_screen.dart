@@ -33,7 +33,7 @@ class DomesticTrackingScreen extends StatefulWidget {
   State<DomesticTrackingScreen> createState() => _DomesticTrackingScreenState();
 }
 
-class _DomesticTrackingScreenState extends State<DomesticTrackingScreen>, SharedUiTextState {
+class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with SharedUiTextState {
   final _number = TextEditingController();
   String _carrier = '', _queryType = 'statement';
   String _route = '', _year = '', _voyage = '';
