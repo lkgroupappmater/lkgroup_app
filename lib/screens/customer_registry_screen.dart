@@ -94,12 +94,12 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(t('customers')), actions: [
-      Tooltip(message: '${t('fixed')}\n${t('bulkHelp')}', child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.info_outline))),
+      Tooltip(message: '${t('fixed')}\n${t('bulkHelp')}', child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.help_outline))),
       IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh), tooltip: t('refresh')),
     ]),
     body: LayoutBuilder(builder: (context, constraints) => Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(10, 8, 6, 4), child: Row(children: [
-        Expanded(child: TextField(key: const ValueKey('registry-search'), controller: _search, enabled: !_busy, style: const TextStyle(fontSize: 14), decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), labelText: 'ID / ${t('receiver')} / ${t('phone')}', suffixIcon: IconButton(onPressed: _busy ? null : () { _search.clear(); _filter(false, false); }, tooltip: t('reset'), icon: const Icon(Icons.clear, size: 18))), onSubmitted: (_) { _page = 0; _load(); })),
+        Expanded(child: TextField(key: const ValueKey('registry-search'), controller: _search, enabled: !_busy, style: const TextStyle(fontSize: 14), decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), labelText: 'ID / ${t('receiver')} / ${t('phone')}', suffixIcon: IconButton(onPressed: _busy ? null : () { _search.clear(); _filter(false, false); }, tooltip: t('reset'), icon: const Icon(Icons.close, size: 18))), onSubmitted: (_) { _page = 0; _load(); })),
         IconButton(onPressed: _busy ? null : () { _page = 0; _load(); }, icon: const Icon(Icons.search), tooltip: t('search')),
       ])),
       if (constraints.maxHeight > 260) SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
