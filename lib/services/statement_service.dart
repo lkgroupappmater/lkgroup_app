@@ -1,5 +1,7 @@
 import '../config/supabase_config.dart';
 import 'supabase_service.dart';
+import '../core/route_catalog.dart';
+import 'document_tax_service.dart';
 
 class StatementService {
   StatementService._();
@@ -39,8 +41,17 @@ class StatementService {
         'p_receipt_number': receiptNumber,
       },
     ) as List;
-    return raw
+    final rows = raw
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList(growable: false);
+    if (rows.isNotEmpty) {
+      final tax = await DocumentTaxService.forRemark(RouteCatalog.keyFor(route),
+          '${rows.first['special_note_auto'] ?? ''}');
+      for (final row in rows) {
+        row['document_vat_rate'] = tax.rate;
+        row['document_vat_applicable'] = tax.applicable;
+      }
+    }
+    return rows;
   }
 }
