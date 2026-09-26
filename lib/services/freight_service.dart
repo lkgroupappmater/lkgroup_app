@@ -155,8 +155,11 @@ class FreightService {
       final parts = CustomerDiscounts.split(override);
       final sourceSpecial = parts.special;
       final autoDiscount = parts.regular;
-      final additionalDiscount = sourceSpecial +
-          _d(manualAdditional?['discount_percent']).clamp(0, 1).toDouble();
+      final additionalDiscount = CustomerDiscounts.additionalRate(
+        regular: autoDiscount,
+        special: sourceSpecial,
+        manual: _d(manualAdditional?['discount_percent']),
+      );
       // Additive against the same original eligible amount: 20% + 10% = 30%.
       final discount =
           (autoDiscount + additionalDiscount).clamp(0, 1).toDouble();

@@ -1,6 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/core/customer_discounts.dart';
 void main() {
+  test('voyage totals cap overlapping automatic and manual discounts like Excel', () {
+    expect(CustomerDiscounts.additionalRate(regular: 1, special: 0, manual: 1), 0);
+    expect(CustomerDiscounts.additionalRate(regular: .8, special: .1, manual: .3), closeTo(.2, 1e-12));
+    expect(CustomerDiscounts.additionalRate(regular: .2, special: .05, manual: .1), closeTo(.15, 1e-12));
+    for (final regular in [0.0, .2, .8, 1.0]) {
+      final extra=CustomerDiscounts.additionalRate(regular: regular, special: .1, manual: 1);
+      expect(regular+extra, lessThanOrEqualTo(1));
+      expect(100-100*regular-100*extra, closeTo(0, 1e-12));
+    }
+  });
   test('legacy special rates and the common split contract use separate lines', () {
     expect(CustomerDiscounts.split({'discount_percent': .05, 'group_name': '특별할인'}), (regular: 0.0, special: .05));
     expect(CustomerDiscounts.split({'discount_percent': .2, 'group_name': '기업 할인'}), (regular: .2, special: 0.0));
