@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../services/document_tax_service.dart';
 import 'package:flutter/services.dart';
 
 import '../core/money_format.dart';
@@ -60,6 +61,7 @@ class QuotationPreviewDialog extends StatefulWidget {
     required this.rates,
     this.extraCosts = const <ExtraCostItem>[],
     this.discountPercent = 0,
+    this.taxContext = const DocumentTaxContext(),
   });
 
   final String routeLabel;
@@ -70,6 +72,7 @@ class QuotationPreviewDialog extends StatefulWidget {
 
   final List<ExtraCostItem> extraCosts;
   final double discountPercent;
+  final DocumentTaxContext taxContext;
   @override
   State<QuotationPreviewDialog> createState() => _QuotationPreviewDialogState();
 }
@@ -150,6 +153,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         rates: widget.rates,
         extraCosts: widget.extraCosts,
         discountPercent: widget.discountPercent,
+        taxContext: widget.taxContext,
         issuedAt: _issuedAt,
         logo: _logo!,
         qrUsd: _qrUsd!,
@@ -362,6 +366,7 @@ class DigitalQuotationPainter extends CustomPainter {
     required this.rates,
     required this.extraCosts,
     required this.discountPercent,
+    this.taxContext = const DocumentTaxContext(),
     required this.issuedAt,
     required this.logo,
     required this.qrUsd,
@@ -378,6 +383,7 @@ class DigitalQuotationPainter extends CustomPainter {
   final ExchangeRateSettings rates;
   final List<ExtraCostItem> extraCosts;
   final double discountPercent;
+  final DocumentTaxContext taxContext;
   final DateTime issuedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
@@ -395,7 +401,8 @@ class DigitalQuotationPainter extends CustomPainter {
   static const totalColor = DocumentFormStyle.total;
 
   DocumentTextContent get _docText => DocumentTextCatalog.quotation(routeLabel, issuedAt, language: language);
-  String get _remarkText => _docText.remark;
+  String get _remarkText => [_docText.remark, taxContext.remark]
+      .where((value) => value.trim().isNotEmpty).join('\n\n');
 
   DocumentFormLayout get _layout => DocumentFormLayout(
     itemCount: boxes.length + extraCosts.length,
@@ -528,7 +535,8 @@ class DigitalQuotationPainter extends CustomPainter {
     final grossUsd = result.totalUsd + extraTotal;
     final discountBase = result.totalUsd + discountableExtra;
     final discountAmount = discountBase * safeDiscountPercent / 100;
-    final usd = grossUsd - discountAmount;
+    final vatUsd = (grossUsd - discountAmount) * taxContext.rate;
+    final usd = grossUsd - discountAmount + vatUsd;
     final summaryValues = <int, String>{
       1: DocumentLocalizations.text(language, '합계'),
       3: _fmtWeight(totalQty),
@@ -544,7 +552,7 @@ class DigitalQuotationPainter extends CustomPainter {
 
     final docText = _docText;
     DocumentFormPainter.notes(c, layout, language: language,
-      remark: docText.remark, remarkFontSize: docText.remarkFontSize);
+      remark: _remarkText, remarkFontSize: docText.remarkFontSize);
     final accounting = const ['kr_la_sea', 'kr_la_air', 'la_kr_air_exp']
         .contains(RouteCatalog.keyFor(routeLabel));
     String totalUsd(num value) => accounting
@@ -559,7 +567,8 @@ class DigitalQuotationPainter extends CustomPainter {
       ('운임 총합', '', totalUsd(grossUsd)),
       ('할인', discountLabel, discountValue),
       (accounting ? '특별할인' : '추가 할인', '-', '-'),
-      ('세금 계산서(VAT)', '-', '-'),
+      ('세금 계산서(VAT)', taxContext.applicable ? '${(taxContext.rate * 100).round()}%' : '-',
+        taxContext.applicable ? totalUsd(vatUsd) : '-'),
     ], label: '최종 가견적 총액', amounts: [
       totalUsd(usd), MoneyFormat.kipNumber(usd * rates.appliedKip),
       DocumentAmounts.usesExcelRules(RouteCatalog.keyFor(routeLabel))
@@ -567,7 +576,7 @@ class DigitalQuotationPainter extends CustomPainter {
           : MoneyFormat.thbNumber(usd * rates.appliedThb),
       MoneyFormat.krwNumber(usd * rates.appliedKrw),
     ]);
-    DocumentFormPainter.footer(c, layout, language: language, qrUsd: qrUsd, qrKip: qrKip,
+    DocumentFormPainter.footer(c, layout, language: language, paymentRemark: taxContext.remark, qrUsd: qrUsd, qrKip: qrKip,
       qrThb: qrThb, stamp: stamp, footerText: docText.footerText,
       footerFontSize: docText.footerFontSize,
       kipRate: rates.appliedKip, thbRate: rates.appliedThb, krwRate: rates.appliedKrw);
@@ -585,7 +594,6 @@ class DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DigitalQuotationPainter oldDelegate) => true;
 }
-
 
 
 

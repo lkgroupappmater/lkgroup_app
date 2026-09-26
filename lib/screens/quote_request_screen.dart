@@ -12,6 +12,7 @@ import '../core/ui_localizations.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/quote_freight_calculator.dart';
 import '../services/quote_service.dart';
+import '../services/document_tax_service.dart';
 import '../services/receipt_extra_cost_service.dart';
 import 'quotation_preview_dialog.dart';
 
@@ -50,6 +51,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   double _manualDiscountPercent = 0;
   QuoteFreightResult? _calculation;
   ExchangeRateSettings? _calculationRates;
+  DocumentTaxContext _quoteTax = const DocumentTaxContext();
   List<Map<String, dynamic>> _specialQuotes = const [];
   bool _loadingQuotes = false;
   bool _movingCargo = false;
@@ -308,10 +310,12 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         movingCargo: _movingCargo,
       );
       final rates = await ExchangeRateService.instance.fetch();
+      final tax = await DocumentTaxService.forMyQuote(RouteCatalog.keyFor(result.route));
       if (!mounted) return;
       setState(() {
         _calculation = result;
         _calculationRates = rates;
+        _quoteTax = tax;
       });
     } catch (error) {
       _message('${_ue('견적 요청 처리 실패', error)}\n'
@@ -357,6 +361,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         rates: rates,
         extraCosts: List<ExtraCostItem>.unmodifiable(_extraCosts),
         discountPercent: _manualDiscountPercent,
+        taxContext: _quoteTax,
       ),
     );
   }
@@ -912,7 +917,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final discountBase = result.totalUsd + discountableExtra;
     final discountAmount =
         discountBase * (_manualDiscountPercent.clamp(0, 100) / 100);
-    final finalUsd = grossUsd - discountAmount;
+    final vatUsd = (grossUsd - discountAmount) * _quoteTax.rate;
+    final finalUsd = grossUsd - discountAmount + vatUsd;
     final kip = rates == null ? null : finalUsd * rates.appliedKip;
     final thb = rates == null ? null : finalUsd * rates.appliedThb;
     final krw = rates == null ? null : finalUsd * rates.appliedKrw;
@@ -1015,6 +1021,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               amountRow(_uf('할인 전  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(grossUsd)),
               amountRow('${_t('discount')} ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 2)}%', r'$',
                   MoneyFormat.documentUsdNumber(discountAmount == 0 ? 0 : -discountAmount)),
+              if (_quoteTax.applicable)
+                amountRow('VAT ${(_quoteTax.rate * 100).round()}%', r'$', MoneyFormat.documentUsdNumber(vatUsd)),
               amountRow(_uf('총 운임  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(finalUsd)),
               if (kip != null && rates!.appliedKip > 0) amountRow('KIP', '₭', MoneyFormat.kipNumber(kip)),
               if (thb != null && rates!.appliedThb > 0) amountRow('THB', '฿', DocumentAmounts.usesExcelRules(routeKey)

@@ -742,8 +742,11 @@ class DigitalStatementPainter extends CustomPainter {
         .contains(RouteCatalog.keyFor(routeLabel));
     final routeKey = RouteCatalog.keyFor(routeLabel);
     final excelRules = DocumentAmounts.usesExcelRules(routeKey);
-    final vatRate = DocumentAmounts.vatRate(routeKey,
-        rows.isEmpty ? '' : _s(rows.first['special_note_auto']));
+    final taxRemark = rows.isEmpty ? '' : _s(rows.first['special_note_auto']);
+    final vatRate = rows.isNotEmpty && rows.first['document_vat_rate'] is num
+        ? (rows.first['document_vat_rate'] as num).toDouble()
+        : DocumentAmounts.vatRate(routeKey, taxRemark);
+    final vatApplicable = excelRules && DocumentAmounts.requiresTaxInvoice(taxRemark);
     final totals = DocumentAmounts.totals(gross: grossUsd,
         exempt: extraTotal - discountableExtraTotal,
         regular: rawRegularDiscountUsd, special: rawSpecialDiscountUsd,
@@ -767,8 +770,8 @@ class DigitalStatementPainter extends CustomPainter {
       (additionalDiscountName.isEmpty ? (accounting ? '특별할인' : '추가 할인') : additionalDiscountName,
         specialPct.isEmpty ? '-' : specialPct,
         specialPct.isEmpty ? '-' : '${accounting ? '' : '-'}${totalUsd(specialDiscountUsd)}'),
-      ('세금 계산서(VAT)', vatRate > 0 ? patch199Pct(vatRate) : '-',
-        vatRate > 0 ? totalUsd(totals.vat) : '-'),
+      ('세금 계산서(VAT)', vatApplicable ? '${(vatRate * 100).round()}%' : '-',
+        vatApplicable ? totalUsd(totals.vat) : '-'),
     ], label: '최종 명세서 총액', amounts: [
       totalUsd(finalUsd), MoneyFormat.kipNumber(finalUsd * freight.rates.appliedKip),
       excelRules

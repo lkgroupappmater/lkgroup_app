@@ -3,6 +3,7 @@ import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
 import { formatDeliveryNumbers } from './delivery-number-format.mjs';
 import { zipWorkbook } from './workbook-zip.mjs';
+import { documentVatContext, documentVatFormula } from './document-vat.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { unzipSync, Zip, ZipPassThrough, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
@@ -1635,7 +1636,7 @@ function populateDeliveryCostInputSheet(
   files: Record<string, Uint8Array>,
   extraCosts: Record<string, unknown>[],
 ): void {
-  const path = workbookSheetPath(files, '배송비 입력');
+  const path = workbookSheetPath(files, '기타 비용 추가 입력') || workbookSheetPath(files, '배송비 입력');
   if (!path || !files[path] || extraCosts.length === 0) return;
 
   const costs: Array<{
@@ -1683,7 +1684,7 @@ function populateDeliveryCostInputSheet(
       row = overflowRows[overflowIndex++];
       if (!row) {
         throw new Error(
-          '배송비 입력 시트의 추가 비용 행이 부족합니다. BASE의 입력 범위를 확인해 주세요.',
+          '기타 비용 추가 입력 시트의 추가 비용 행이 부족합니다. BASE의 입력 범위를 확인해 주세요.',
         );
       }
       xml = setStringCellInSheet(xml, `A${row}`, cost.receipt);
@@ -1945,6 +1946,32 @@ function wireStatementAutomationFormulas(
 
 // Link the existing account text box to the statement's own Remark. Using a
 // cell link keeps the printed account current when N2 or BASE rules change.
+function wireStatementVatFormulas(files: Record<string, Uint8Array>, routeKey: string): void {
+  if (!['kr_la_sea','kr_la_air'].includes(routeKey)) return;
+  const strings = sharedStrings(files);
+  const workbook = strFromU8(files['xl/workbook.xml']);
+  for (const match of workbook.matchAll(/<sheet\b[^>]*name="([^"]+)"/g)) {
+    const name = decodeXmlText(match[1]);
+    if (!/^(LKS|LKA)\s/.test(name) && name !== '명세서 빠르게 확인') continue;
+    const path = workbookSheetPath(files,name);
+    if (!path || !files[path]) continue;
+    let xml = strFromU8(files[path]);
+    for (const cell of xml.matchAll(/<c\b[^>]*\br="L(\d+)"[^>]*>[\s\S]*?<\/c>/g)) {
+      if (!cellText(cell[0],strings).includes('VAT')) continue;
+      const ref = `M${cell[1]}`;
+      const old = xml.match(new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*>[\\s\\S]*?<\\/c>`))?.[0] || '';
+      const formula = decodeXmlText(old.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1] || '');
+      const remarkRef = formula.match(/\$?A\$?\d+/)?.[0];
+      if (!remarkRef) throw new Error(`VAT Remark reference missing: ${name}!${ref}`);
+      const remarkCell = xml.match(new RegExp(`<c\\b[^>]*\\br="${remarkRef.replaceAll('$','')}"[^>]*>[\\s\\S]*?<\\/c>`))?.[0] || '';
+      const context = documentVatContext(routeKey,cellText(remarkCell,strings));
+      xml = setFormulaCellInSheet(xml,ref,documentVatFormula(remarkRef));
+      xml = setCachedFormulaValue(xml,ref,context.taxInvoice?context.rate:' ',context.taxInvoice);
+    }
+    files[path] = strToU8(xml);
+  }
+}
+
 function wireStatementPaymentAccounts(files: Record<string, Uint8Array>): void {
   const workbook = strFromU8(files['xl/workbook.xml']);
   const names = [...workbook.matchAll(/<sheet\b[^>]*name="([^"]+)"/g)].map(m => decodeXmlText(m[1]));
@@ -2276,6 +2303,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyage,
     );
     wireStatementAutomationFormulas(files, routeKey);
+    wireStatementVatFormulas(files, routeKey);
     wireStatementPaymentAccounts(files);
     applyStatementWrapText(files, routeKey);
     applyDeliveryColorConditionalFormatting(files, routeKey);

@@ -3,6 +3,26 @@ import '../lib/core/document_amounts.dart';
 import '../lib/core/money_format.dart';
 
 void main() {
+  test('zero-rated invoices win over the tax-invoice keyword in every spacing form', () {
+    for (final route in ['kr_la_sea', 'kr_la_air']) {
+      for (final remark in ['영세율 세금 계산서', '영세율세금계산서',
+          '영 세 율\n세금\t계산서', '영세율\u00a0세금\u3000계산서',
+          '세금 계산서 발급 / 영세율 적용']) {
+        expect(DocumentAmounts.vatRate(route, remark), 0);
+        expect(DocumentAmounts.krwAccount(remark).number, '2070133424601');
+        final totals = DocumentAmounts.totals(gross: 1050.54, exempt: 50,
+            regular: 200.108, special: 100.054,
+            vatRate: DocumentAmounts.vatRate(route, remark));
+        expect(totals.vat, 0);
+        expect(totals.total, closeTo(750.378, .000001));
+      }
+      for (final remark in ['세금 계산서', '세금계산서 발급', '세금\n계산서']) {
+        expect(DocumentAmounts.vatRate(route, remark), .1);
+      }
+    }
+    expect(DocumentAmounts.vatRate('th_la_land', '세금 계산서'), 0);
+    expect(DocumentAmounts.vatRate('kr_la_sea', '일반 고객'), 0);
+  });
   test('same inputs match LKS/LKA Excel discounts, VAT and currency rounding', () {
     for (final route in ['kr_la_sea', 'kr_la_air']) {
       final rate = DocumentAmounts.vatRate(route, '카톡 명세서 / 세금 계산서');
