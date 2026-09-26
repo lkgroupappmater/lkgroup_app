@@ -104,7 +104,7 @@ void main() {
     expect(()=>WaybillIntakeService.validate(List.filled(51,file)),throwsA(isA<DomesticTrackingException>()));
     expect(()=>WaybillIntakeService.validate([IntakeFile('too-large.jpg',5242881,file.readBytes)]),throwsA(isA<DomesticTrackingException>()));
   });
-  testWidgets('management lists one parent per statement and refresh preserves grouping', (tester) async {
+  testWidgets('management keeps grouped results until an explicit refresh', (tester) async {
     tester.view.physicalSize = const Size(1000, 3200); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
     final actions = <String>[];
@@ -117,6 +117,9 @@ void main() {
     expect(find.text('LK 명세서 번호: LKS 03'), findsOneWidget);
     expect(find.text('수취인 전화번호: 020 5555 ****'), findsWidgets);
     await tester.pump(const Duration(minutes:5)); await tester.pumpAndSettle();
+    expect(actions, ['list_groups']);
+    await tester.tap(find.text(domesticText(AppLanguage.korean, 'list')));
+    await tester.pumpAndSettle();
     expect(actions, ['list_groups','list_groups']);
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);

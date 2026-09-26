@@ -12,7 +12,7 @@ const domesticWords = <String, List<String>>{
 
   "recipientMasked": ["다른 고객의 이름과 연락처는 일부만 표시됩니다.", "Another customer's name and phone are partially masked.", "ຊື່ ແລະ ເບີໂທຂອງລູກຄ້າອື່ນຖືກປິດບັງບາງສ່ວນ."],
 
-  "autoRefreshHint": ["등록·조회 시 배송 이력을 자동 확인합니다. 화면을 열어 둔 동안 5분마다 갱신합니다.", "History is checked automatically when saving or viewing, and every 5 minutes while this screen is open.", "ກວດປະຫວັດອັດຕະໂນມັດເມື່ອບັນທຶກ ຫຼື ເບິ່ງ ແລະ ທຸກ 5 ນາທີຂະນະເປີດໜ້ານີ້."],
+  "autoRefreshHint": ["조건을 선택한 뒤 검색을 누르면 배송 이력을 확인합니다. 최신 이력은 배송 이력 조회를 눌러 확인하세요.", "Choose the filters, then press Search. Use Check delivery history to request the latest events.", "ເລືອກເງື່ອນໄຂ ແລ້ວກົດຄົ້ນຫາ. ກົດກວດປະຫວັດຈັດສົ່ງເພື່ອເບິ່ງຂໍ້ມູນລ່າສຸດ."],
 
   "photoHelp": ["선택한 사진은 이번에 등록하는 송장들에 함께 연결되며, 명세서 안에서 확인할 수 있습니다. JPG·PNG·WebP를 선택하세요.", "Selected photos are shared by the waybills saved together and shown inside the statement. Choose JPG, PNG or WebP.", "ຮູບຈະເຊື່ອມກັບໃບສົ່ງທີ່ບັນທຶກພ້ອມກັນ ແລະ ສະແດງໃນໃບລາຍການ. ໃຊ້ JPG, PNG ຫຼື WebP."],
 

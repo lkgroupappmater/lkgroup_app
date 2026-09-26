@@ -397,13 +397,17 @@ class _UnloadingListManagementScreenState
                               _voyage = v;
                               _rows = const [];
                             });
-                            if (v != null) _loadRows();
+
                           },
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
+            Align(alignment: Alignment.centerRight, child: FilledButton.icon(
+              onPressed: _busy || _route == null || _year == null || _voyage == null ? null : _loadRows,
+              icon: const Icon(Icons.search), label: const Text('검색'),
+            )),
             if (_busy) const LinearProgressIndicator(),
             if (!_busy && _voyage != null) ...[
               SwitchListTile(
@@ -446,3 +450,4 @@ class _UnloadingListManagementScreenState
         ),
       );
 }
+

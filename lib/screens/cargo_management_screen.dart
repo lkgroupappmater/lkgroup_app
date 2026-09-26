@@ -48,7 +48,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
   @override
   Set<String> get autoRefreshTopics => const {'shipments'};
   @override
-  bool get autoRefreshAllowed => !_busy && _selectedIds.isEmpty;
+  // Search results only reload after Search or a completed edit.
+  bool get autoRefreshAllowed => false;
   String get _queryKey => [_route, _year, _voyage, _boxNumberController.text,
       _invoiceController.text, _nameController.text, _phoneController.text,
       _showBoxSearch, _showInvoiceSearch, _showNameSearch, _showPhoneSearch].join('\u0000');
@@ -69,6 +70,15 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     );
     if (!canApplyAutoRefresh || key != _queryKey) return;
     setState(() => _results = rows);
+  }
+
+  final _receiptDiscountReads = <String, Future<ReceiptDiscountOverride?>>{};
+  final _receiptExtraReads = <String, Future<List<ExtraCostItem>>>{};
+  String _receiptReadKey(Map<String, dynamic> row, String receipt) =>
+      [row['route'], row['shipment_year'], row['voyage'], receipt].join('\u0000');
+  void _clearReceiptReads() {
+    _receiptDiscountReads.clear();
+    _receiptExtraReads.clear();
   }
 
   final _boxNumberController = TextEditingController();
@@ -211,6 +221,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       );
       if (!mounted || key != _queryKey) return;
       setState(() {
+        _clearReceiptReads();
         _results = rows;
         _searched = true;
         _lastSearchKey = key;
@@ -2191,7 +2202,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     await Future<void>.delayed(const Duration(milliseconds: 350));
     discountName.dispose();
     percent.dispose();
-    if (mounted) setState(() {});
+    if (mounted) setState(_clearReceiptReads);
   }
 
   Future<void> _showReceiptExtraCostDialog(
@@ -2664,14 +2675,14 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                   ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
                   FutureBuilder<ReceiptDiscountOverride?>(
-                    future: ReceiptDiscountService.instance.get(
+                    future: _receiptDiscountReads.putIfAbsent(_receiptReadKey(first, receipt), () => ReceiptDiscountService.instance.get(
                       routeKey: RouteCatalog.formRouteKeyFor(
                         '${first['route'] ?? ''}',
                       ),
                       year: (first['shipment_year'] as num?)?.toInt() ?? 0,
                       voyage: '${first['voyage'] ?? ''}'.trim(),
                       receiptNumber: receipt,
-                    ),
+                    )),
                     builder: (context, snapshot) {
                       final rule = snapshot.data;
                       final pct = rule == null
@@ -2703,12 +2714,12 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                   ),
                 if ((_isAdmin || _isStaff) && receipt.isNotEmpty)
                   FutureBuilder<List<ExtraCostItem>>(
-                    future: ReceiptExtraCostService.instance.list(
+                    future: _receiptExtraReads.putIfAbsent(_receiptReadKey(first, receipt), () => ReceiptExtraCostService.instance.list(
                       route: '${first['route'] ?? ''}'.trim(),
                       year: (first['shipment_year'] as num?)?.toInt() ?? 0,
                       voyage: '${first['voyage'] ?? ''}'.trim(),
                       receiptNumber: receipt,
-                    ),
+                    )),
                     builder: (context, snapshot) {
                       final count = snapshot.data?.length ?? 0;
                       return Row(
@@ -2733,7 +2744,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                                 ? null
                                 : () async {
                                     await _showReceiptExtraCostDialog(rows);
-                                    if (mounted) setState(() {});
+                                    if (mounted) setState(_clearReceiptReads);
                                   },
                             icon: const Icon(
                               Icons.add_card_outlined,
@@ -3035,3 +3046,4 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         ),
       );
 }
+
