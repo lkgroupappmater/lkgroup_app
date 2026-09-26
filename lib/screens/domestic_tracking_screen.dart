@@ -1,6 +1,8 @@
+import 'waybill_intake_screen.dart';
+import '../services/waybill_intake_service.dart';
+import '../core/waybill_intake_text.dart';
 import '../services/shared_ui_text_service.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -161,6 +163,11 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
     }
   }
 
+  Future<void> _automatic() async {
+    final result=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language)));
+    if(result!=null&&mounted)await _list();
+  }
+
   Future<void> _addEvent(Map<String, dynamic> row) async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
@@ -228,6 +235,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Wi
                         icon: const Icon(Icons.add),
                         label: Text(t('add')),
                       ),
+                    OutlinedButton(onPressed:_busy?null:_automatic,child:Text(intakeText(widget.language,'auto'))),
                     TextButton(
                       onPressed: _busy
                           ? null
@@ -621,23 +629,36 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
     if (_picking || _busy) return;
     setState(() => _picking = true);
     try {
+      if(widget.row==null){
+        final files=widget.pickPhotos!=null?(await widget.pickPhotos!()).map((p)=>IntakeFile(p.name,p.bytes.length,()async=>p.bytes)).toList():await WaybillIntakeService.pick();
+        if(files.isEmpty||!_valid)return;
+        WaybillIntakeService.validate(files);
+        Map<String,dynamic>? fixed;
+        if(_scope=='statement'&&_confirmed!=null)fixed={'link_scope':'statement','statement':_confirmed};
+        if(_scope=='cargo'&&_cargo!=null)fixed={'link_scope':'cargo','shipment_id':_cargo};
+        if(_scope=='reference'&&_reference.text.trim().isNotEmpty)fixed={'link_scope':'reference','reference':{'reference_type':_referenceType,'reference_number':_reference.text.trim()}};
+        fixed?.addAll({'receiver_name':_name.text,'receiver_phone':_phone.text,'delivery_kind':_kind,'service_kind':_service});
+        final saved=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language,files:files,fixedLink:fixed)));
+        if(saved!=null&&_valid)Navigator.pop(context,saved);
+        return;
+      }
       final selected = <DomesticPhotoSelection>[];
       final existing = (widget.row?['photo_count'] as num?)?.toInt() ?? (widget.row?['photo_url'] == null ? 0 : 1);
       if (widget.pickPhotos != null) {
         selected.addAll(await widget.pickPhotos!());
       } else {
         final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png', 'webp']);
-        if (existing + _photos.length + files.length > 10) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
+        if (existing + _photos.length + files.length > 50) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
         var total = _photos.fold<int>(0, (n, p) => n + p.bytes.length);
         for (final file in files) {
           final size = await file.length();
-          if (size > 5242880 || total + size > 15728640) throw const DomesticTrackingException('FILE_TOO_LARGE');
+          if (size > 5242880 || total + size > 262144000) throw const DomesticTrackingException('FILE_TOO_LARGE');
           final bytes = await file.readAsBytes(); total += bytes.length;
           selected.add(DomesticPhotoSelection(file.name, bytes));
         }
       }
-      if (existing + _photos.length + selected.length > 10) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
-      if (selected.any((p) => p.bytes.length > 5242880) || [..._photos, ...selected].fold<int>(0, (n, p) => n + p.bytes.length) > 15728640) throw const DomesticTrackingException('FILE_TOO_LARGE');
+      if (existing + _photos.length + selected.length > 50) throw const DomesticTrackingException('TOO_MANY_PHOTOS');
+      if (selected.any((p) => p.bytes.length > 5242880) || [..._photos, ...selected].fold<int>(0, (n, p) => n + p.bytes.length) > 262144000) throw const DomesticTrackingException('FILE_TOO_LARGE');
       if (_valid) setState(() { _photos.addAll(selected); _message = null; });
     } catch (e) { if (_valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'REQUEST_FAILED')); }
     finally { if (mounted) setState(() => _picking = false); }
@@ -648,6 +669,8 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
     if (_scope == 'cargo' && _cargo == null) { setState(() => _message = t('CARGO_REQUIRED')); return; }
     setState(() => _busy = true);
     try {
+      final stagedBatch=await WaybillIntakeService.stage(_photos.map((p)=>IntakeFile(p.name,p.bytes.length,()async=>p.bytes)).toList());
+      if(!_valid)return;
       final data = await _call(widget.row == null ? 'save_batch' : 'save', {
         'id': widget.row?['id'], 'updated_at': widget.row?['updated_at'],
         'link_scope': _scope, 'statement': _scope == 'statement' ? _confirmed : null,
@@ -657,7 +680,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
         'delivery_kind': _kind, 'service_kind': _scope == 'reference' && _referenceType == 'ecommerce' ? 'ecommerce' : _service,
         'receiver_name': _name.text, 'receiver_phone': _phone.text,
         if (widget.row == null) 'waybills': [{'carrier': _carrier, 'tracking_number': _number.text}, ..._extraWaybills.map((w) => {'carrier': w.carrier, 'tracking_number': w.number.text})],
-        'photos': _photos.map((p) => {'base64': base64Encode(p.bytes)}).toList(),
+        'staged_batch_id': stagedBatch,
       });
       if (_valid) Navigator.pop(context, Map<String, dynamic>.from(widget.row == null ? (data['parcels'] as List).first : data['parcel']));
     } catch (e) { if (_valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'REQUEST_FAILED')); }
@@ -751,7 +774,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
         onChanged: _busy ? null : (v) => setState(() { _carrier = v!; _carrierChosen = v.isNotEmpty; })),
       Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(t('carrierHint'))),
       ..._extraWaybills.map(_extraWaybill),
-      if (widget.row == null) OutlinedButton.icon(key: const Key('delivery-add-waybill'), onPressed: _busy || _extraWaybills.length >= 19 ? null : () => setState(() => _extraWaybills.add(_WaybillDraft())), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
+      if (widget.row == null) OutlinedButton.icon(key: const Key('delivery-add-waybill'), onPressed: _busy || _extraWaybills.length >= 49 ? null : () => setState(() => _extraWaybills.add(_WaybillDraft())), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
       if (widget.row != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t('correctionHelp'))),
       _choice('kind', _kind, ['city','province'], (v) => setState(() => _kind = v!)),
       _choice('service', _service, ['domestic','inbound','outbound','ecommerce','express'], (v) => setState(() => _service = v!)),
@@ -881,4 +904,5 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> with SharedUi
     ),
   );
 }
+
 

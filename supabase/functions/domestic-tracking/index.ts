@@ -67,7 +67,13 @@ Deno.serve(async req=>{
    const statement=rowStatement(row)??(s?.receipt_number?{route:s.route,shipment_year:s.shipment_year,voyage:s.voyage,receipt_number:s.receipt_number}:null);
    const paths=photoPaths(row);let photo_urls:any[]=[];
    if(own)photo_urls=await Promise.all(paths.map((path:string)=>{
-    if(!photoCache.has(path))photoCache.set(path,(async()=>{const r=await db.storage.from('domestic-waybills').createSignedUrl(path,600);return r.error?null:r.data.signedUrl;})());
+    if(!photoCache.has(path))photoCache.set(path,(async()=>{
+     if(!operator&&path.startsWith('intake/')){
+      const linked=await allRows(()=>db.from('domestic_parcels').select('*').contains('photo_paths',[path]).order('id'));
+      for(const other of linked)if(!await photoAccess(other,await shipment(other.shipment_id)))return null;
+     }
+     const r=await db.storage.from('domestic-waybills').createSignedUrl(path,600);return r.error?null:r.data.signedUrl;
+    })());
     return photoCache.get(path);
    }));
    photo_urls=photo_urls.filter(Boolean);
@@ -76,7 +82,7 @@ Deno.serve(async req=>{
     delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:own?row.origin:'',destination:own?row.destination:'',
     status:row.status,events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
     official_url:own?carrierUrl(row.carrier,row.tracking_number):null,integration:CARRIERS[row.carrier].mode,
-    has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&!own,
+    has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&(!own||photo_urls.length<paths.length),
     group_key:deliveryGroup(row,s),link_scope:row.link_scope??(s?'cargo':'standalone'),statement,
     reference_type:row.reference_type??null,reference_number:row.reference_number??null,
     shipment_id:own?row.shipment_id:null,
@@ -112,11 +118,21 @@ Deno.serve(async req=>{
   }
   async function present(rows:any[]){return await mapLimited(await refreshRows(rows),async(r:any)=>await serialize(r));}
   async function uploadPhotos(body:any,existing:string[]=[],folder=crypto.randomUUID()){
-   const decoded=decodePhotos(body);must(existing.length+decoded.length<=MAX_PHOTOS,'TOO_MANY_PHOTOS');
+   const decoded=decodePhotos(body);
+   let staged:string[]=[];
+   if(body.staged_batch_id){
+    must(uuid(body.staged_batch_id),'INVALID_ID');
+    const batch=dbResult(await db.from('waybill_intake_batches').select('*').eq('id',body.staged_batch_id).eq('owner_id',user.id).maybeSingle());
+    must(batch&&batch.purpose==='photos'&&new Date(batch.created_at).getTime()>Date.now()-86400000,'INVALID_IMAGE');
+    const files=dbResult(await db.from('waybill_intake_files').select('path,verified_at,size_bytes').eq('batch_id',batch.id));
+    must(files.length>0&&files.length<=50&&files.every((f:any)=>f.verified_at&&f.size_bytes<=5242880)&&files.reduce((n:number,f:any)=>n+f.size_bytes,0)<=262144000,'INVALID_IMAGE');
+    staged=files.map((f:any)=>f.path);
+   }
+   must(new Set([...existing,...staged]).size+decoded.length<=MAX_PHOTOS,'TOO_MANY_PHOTOS');
    const created:string[]=[];
    try{
     for(const image of decoded){const path=`${folder}/${crypto.randomUUID()}.${image.ext}`;dbResult(await db.storage.from('domestic-waybills').upload(path,image.bytes,{contentType:image.mime,upsert:false}));created.push(path);}
-    return {paths:[...existing,...created],created};
+    return {paths:[...new Set([...existing,...staged,...created])],created};
    }catch(e){if(created.length)await db.storage.from('domestic-waybills').remove(created);throw e;}
   }
   async function linkValues(input:any,old:any=null){
@@ -209,7 +225,7 @@ Deno.serve(async req=>{
   }
   must(operator,'FORBIDDEN',403);
   if(b.action==='save_batch'){
-   must(Array.isArray(b.waybills)&&b.waybills.length>=1&&b.waybills.length<=20,'INVALID_BATCH');
+   must(Array.isArray(b.waybills)&&b.waybills.length>=1&&b.waybills.length<=50,'INVALID_BATCH');
    const entries=b.waybills.map((w:any)=>{must(w&&CARRIERS[w.carrier],'INVALID_CARRIER');return {carrier:w.carrier,tracking_number:trackingNumber(w.tracking_number)};});
    must(new Set(entries.map((w:any)=>w.carrier+':'+w.tracking_number)).size===entries.length,'DUPLICATE_TRACKING',409);
    const base=await linkValues(b),photos=await uploadPhotos(b);

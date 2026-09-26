@@ -1,3 +1,4 @@
+import 'waybill_intake_service.dart';
 import '../config/supabase_config.dart';
 import 'supabase_service.dart';
 
@@ -7,8 +8,8 @@ class UnknownRecipientService {
 
   Future<List<Map<String, dynamic>>> listVisibleUnknownCargo() async {
     if (!SupabaseConfig.isConfigured) return const [];
-    final raw =
-        await SupabaseService.client.rpc('list_unknown_recipient_cargo') as List;
+    final response=await WaybillIntakeService.call('unknown_list');
+    final raw=response['cargo'] as List;
     return raw
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList(growable: false);
@@ -195,4 +196,5 @@ class UnknownRecipientService {
     );
   }
 }
+
 

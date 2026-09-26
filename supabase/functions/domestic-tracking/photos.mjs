@@ -1,4 +1,4 @@
-export const MAX_PHOTOS = 10;
+export const MAX_PHOTOS = 50;
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export const MAX_PHOTOS_BYTES = 15 * 1024 * 1024;
 export const MAX_REQUEST_BYTES = 22 * 1024 * 1024;

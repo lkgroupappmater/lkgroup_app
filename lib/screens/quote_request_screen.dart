@@ -50,6 +50,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   double _manualDiscountPercent = 0;
   QuoteFreightResult? _calculation;
   ExchangeRateSettings? _calculationRates;
+  String _taxRemark = '';
   List<Map<String, dynamic>> _specialQuotes = const [];
   bool _loadingQuotes = false;
   bool _movingCargo = false;
@@ -273,6 +274,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   Future<void> _calculateFreight() async {
+    final calculatedRoute = _selectedRoute;
+    final owner = SupabaseConfig.isConfigured ? Supabase.instance.client.auth.currentUser?.id : null;
     final selected = <QuoteBoxInput>[];
     for (var i = 0; i < _boxes.length; i++) {
       final box = _boxes[i];
@@ -303,15 +306,19 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
 
     try {
       final result = await QuoteFreightCalculator.calculate(
-        routeLabel: _selectedRoute,
+        routeLabel: calculatedRoute,
         boxes: selected,
         movingCargo: _movingCargo,
       );
       final rates = await ExchangeRateService.instance.fetch();
-      if (!mounted) return;
+      final routeKey = RouteCatalog.keyFor(calculatedRoute);
+      final tax = SupabaseConfig.isConfigured && DocumentAmounts.usesExcelRules(routeKey)
+          ? await Supabase.instance.client.rpc('my_freight_tax_context', params: {'p_route_key': routeKey}) : <String,dynamic>{};
+      if (!mounted || _selectedRoute != calculatedRoute || (SupabaseConfig.isConfigured && Supabase.instance.client.auth.currentUser?.id != owner)) return;
       setState(() {
         _calculation = result;
         _calculationRates = rates;
+        _taxRemark = '${tax['tax_remark'] ?? ''}';
       });
     } catch (error) {
       _message('${_ue('견적 요청 처리 실패', error)}\n'
@@ -357,6 +364,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
         rates: rates,
         extraCosts: List<ExtraCostItem>.unmodifiable(_extraCosts),
         discountPercent: _manualDiscountPercent,
+        taxRemark: _taxRemark,
       ),
     );
   }
@@ -912,7 +920,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     final discountBase = result.totalUsd + discountableExtra;
     final discountAmount =
         discountBase * (_manualDiscountPercent.clamp(0, 100) / 100);
-    final finalUsd = grossUsd - discountAmount;
+    final vatRate = DocumentAmounts.vatRate(RouteCatalog.keyFor(result.route), _taxRemark);
+    final vatApplicable = DocumentAmounts.vatApplicable(RouteCatalog.keyFor(result.route), _taxRemark);
+    final vat = (grossUsd - discountAmount) * vatRate;
+    final finalUsd = grossUsd - discountAmount + vat;
     final kip = rates == null ? null : finalUsd * rates.appliedKip;
     final thb = rates == null ? null : finalUsd * rates.appliedThb;
     final krw = rates == null ? null : finalUsd * rates.appliedKrw;
@@ -1015,6 +1026,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
               amountRow(_uf('할인 전  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(grossUsd)),
               amountRow('${_t('discount')} ${_manualDiscountPercent.toStringAsFixed(_manualDiscountPercent == _manualDiscountPercent.roundToDouble() ? 0 : 2)}%', r'$',
                   MoneyFormat.documentUsdNumber(discountAmount == 0 ? 0 : -discountAmount)),
+              if (vatApplicable) amountRow('VAT ${(vatRate * 100).round()}%', r'$', MoneyFormat.documentUsdNumber(vat)),
               amountRow(_uf('총 운임  USD {amount}', {'amount': ''}).trim(), r'$', MoneyFormat.documentUsdNumber(finalUsd)),
               if (kip != null && rates!.appliedKip > 0) amountRow('KIP', '₭', MoneyFormat.kipNumber(kip)),
               if (thb != null && rates!.appliedThb > 0) amountRow('THB', '฿', DocumentAmounts.usesExcelRules(routeKey)

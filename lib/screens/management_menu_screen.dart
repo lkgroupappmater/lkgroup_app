@@ -270,7 +270,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
           'label': _m('회원 종합 관리'),
           'icon': Icons.people_alt_outlined,
           'menuKey': 'member_management',
-          'page': const MemberManagementScreen(),
+          'page': MemberManagementScreen(language:widget.language),
         },
         {
           'label': _m('화물 내용 변경 승인 관리'),
@@ -383,5 +383,6 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
     );
   }
 }
+
 
 

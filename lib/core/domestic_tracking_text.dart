@@ -6,9 +6,9 @@ String domesticText(AppLanguage language, String key) =>
       (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index]);
 
 const domesticWords = <String, List<String>>{
-  "INVALID_BATCH": ["송장번호는 한 번에 1~20개까지 등록할 수 있습니다.", "Register 1–20 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–20 ເລກຕໍ່ຄັ້ງ."],
+  "INVALID_BATCH": ["송장번호는 한 번에 1~50개까지 등록할 수 있습니다.", "Register 1–50 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–50 ເລກຕໍ່ຄັ້ງ."],
 
-  "TOO_MANY_PHOTOS": ["기존 사진을 포함해 송장당 최대 10장까지 등록할 수 있습니다.", "Each waybill can have up to 10 photos, including existing photos.", "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 10 ຮູບ ລວມຮູບເກົ່າ."],
+  "TOO_MANY_PHOTOS": ["기존 사진을 포함해 송장당 최대 50장까지 등록할 수 있습니다.", "Each waybill can have up to 50 photos, including existing photos.", "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 50 ຮູບ ລວມຮູບເກົ່າ."],
 
   "recipientMasked": ["다른 고객의 이름과 연락처는 일부만 표시됩니다.", "Another customer's name and phone are partially masked.", "ຊື່ ແລະ ເບີໂທຂອງລູກຄ້າອື່ນຖືກປິດບັງບາງສ່ວນ."],
 
@@ -113,7 +113,7 @@ const domesticWords = <String, List<String>>{
   "kind": ["배송 구분", "Delivery type", "ປະເພດຈັດສົ່ງ"],
   "service": ["운송 구분", "Service", "ປະເພດບໍລິການ"],
   "photo": ["등록된 송장 사진", "Waybill photo", "ຮູບໃບສົ່ງ"],
-  "photoInput": ["송장 사진 여러 장 선택 · 최대 10장, 장당 5MB, 합계 15MB", "Select waybill photos · up to 10, 5MB each, 15MB total", "ເລືອກຫຼາຍຮູບ · ສູງສຸດ 10 ຮູບ, ຮູບລະ 5MB, ລວມ 15MB"],
+  "photoInput": ["송장 사진 여러 장 선택 · 최대 50장, 장당 5MB, 합계 250MB", "Select waybill photos · up to 50, 5MB each, 250MB total", "ເລືອກຫຼາຍຮູບ · ສູງສຸດ 50 ຮູບ, ຮູບລະ 5MB, ລວມ 250MB"],
   "noPhoto": [
     "등록된 송장 사진이 없습니다.",
     "No waybill photo registered.",
@@ -225,4 +225,5 @@ const domesticWords = <String, List<String>>{
     "ດຳເນີນການບໍ່ໄດ້. ລອງໃໝ່.",
   ],
 };
+
 

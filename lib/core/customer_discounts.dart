@@ -4,6 +4,12 @@ class CustomerDiscounts {
   static double _number(dynamic value) => double.tryParse('$value') ?? 0;
   static bool isSpecial(dynamic name) => '$name'.replaceAll(RegExp(r'\s'), '') == '특별할인';
 
+  // Excel N19 caps the additional discount at the remaining eligible amount.
+  static double additionalRate({required double regular, required double special,
+      required double manual}) =>
+      (special.clamp(0, 1) + manual.clamp(0, 1))
+          .clamp(0, 1 - regular.clamp(0, 1)).toDouble();
+
   static ({double regular, double special}) split(Map<String, dynamic>? rule) {
     final values = rule ?? const <String, dynamic>{};
     final special = _number(values['special_discount_percent'] ??
