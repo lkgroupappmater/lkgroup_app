@@ -31,10 +31,16 @@ begin
  value:=public.customer_registry_member_id(member);
  if value->>'customer_code'<>public.lk_customer_statement_code(nums[1],false) or value->>'status'<>'linked' then raise exception 'Member join did not match ID'; end if;
  if (select customer_registry_id from public.customer_registry_sources where source_kind='profile' and source_id=member::text) is distinct from a then raise exception 'Member trigger missing'; end if;
+ -- Simulate a historical unknown-only ID, then the operator resolving its name.
+ update public.customer_registry set name='수취인 불명 / '||n where id=b;
+ update public.customer_registry_sources set customer_registry_id=b where source_kind='shipment' and source_id=shipment::text;
+ update public.shipments set consignee_name=n,recipient_unknown=false where id=shipment;
+ if (select customer_registry_id from public.customer_registry_sources where source_kind='shipment' and source_id=shipment::text) is distinct from a
+ or (select customer_registry_id from public.customer_registry_statement_mapping where shipment_id=shipment) is distinct from a then raise exception 'Resolved name retained legacy unknown ID'; end if;
  begin perform public.customer_registry_member_id(gen_random_uuid()); exception when others then if sqlerrm='FORBIDDEN' then blocked:=true; else raise; end if; end;
  if not blocked or has_function_privilege('authenticated','public.customer_registry_member_id(uuid)','EXECUTE') or has_table_privilege('anon','public.customer_registry_statement_mapping','SELECT') then raise exception 'Identity RPC boundary failed'; end if;
  perform set_config('lk.identity_member',member::text,true);
- perform set_config('lk.identity_test','passed: suffix parsing, full phone priority, ambiguity, 9-prefixed display, no unknown ID allocation, member matching, private access',true);
+ perform set_config('lk.identity_test','passed: suffix parsing, full phone priority, ambiguity, 9-prefixed display, no unknown ID allocation, resolved-name relinking, member matching, private access',true);
 end $$;
 set local role service_role;
 select current_setting('lk.identity_test') as result,public.customer_registry_member_id(current_setting('lk.identity_member')::uuid) as service_role_identity;

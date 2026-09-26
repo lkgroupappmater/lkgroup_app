@@ -25,3 +25,5 @@
 - 서버 18개 및 관련 웹 19개 테스트 통과: 자기 ID 조회, 위조한 타인 ID 무시, 일반 회원의 운영 API 차단, 로그아웃 이후 지연 응답 폐기, 미매칭 표시.
 - DB 트랜잭션을 rollback하여 접두어·마스킹·동명이인 구분, 9 접두값, 불명 입력 시 신규 ID 미발급, 일반 회원의 기존 ID 연결, service_role의 자기 ID 조회를 검증했다.
 - 앱 고유 ID 표시·미매칭·회원 전환 시 지연 응답 차단 위젯 검사를 배포 CI에 추가했다.
+
+- When an operator resolves an unknown-prefixed shipment to a normal name, a legacy unknown-only source link is rebound to the actual customer. Existing normal links remain stable; no historical backfill runs. Covered by the rollback-only SQL regression.
