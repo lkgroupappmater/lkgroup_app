@@ -5,9 +5,15 @@ class DocumentAmounts {
   static bool usesExcelRules(String routeKey) =>
       routeKey == 'kr_la_sea' || routeKey == 'kr_la_air';
 
-  // Excel M20: FIND("세금 계산서", A18), then 10%.
+  // Zero-rated invoices take precedence over the general invoice phrase.
   static double vatRate(String routeKey, String remark) =>
-      usesExcelRules(routeKey) && remark.contains('세금 계산서') ? .1 : 0;
+      vatApplicable(routeKey, remark) && !isZeroRated(remark) ? .1 : 0;
+
+  static bool vatApplicable(String routeKey, String remark) =>
+      usesExcelRules(routeKey) && requiresTaxInvoice(remark);
+
+  static bool isZeroRated(String remark) =>
+      remark.replaceAll(RegExp(r'[\s\u00a0\u3000]+'), '').contains('영세율');
 
   static bool requiresTaxInvoice(String remark) =>
       remark.replaceAll(RegExp(r'[\s\u00a0\u3000]+'), '').contains('세금계산서');
