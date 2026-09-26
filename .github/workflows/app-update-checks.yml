@@ -42,7 +42,7 @@ jobs:
           node-version: 24
       - run: node --test supabase/functions/domestic-tracking/*.test.mjs
       - run: node --test supabase/functions/waybill-intake/*.test.mjs
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/waybill_intake_service.dart lib/core/waybill_intake_text.dart lib/screens/waybill_intake_screen.dart lib/screens/unknown_cargo_media_screen.dart lib/screens/customer_registry_screen.dart lib/screens/customer_registry_bulk_editor.dart lib/widgets/customer_identity_card.dart test/customer_identity_card_test.dart test/customer_registry_test.dart
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/waybill_intake_service.dart lib/core/waybill_intake_text.dart lib/screens/waybill_intake_screen.dart lib/screens/unknown_cargo_media_screen.dart lib/screens/customer_registry_screen.dart lib/screens/customer_registry_bulk_editor.dart lib/widgets/customer_identity_card.dart lib/widgets/cargo_flow_app_bar.dart lib/widgets/app_shell.dart lib/services/customer_identity_service.dart lib/services/shipment_service.dart lib/screens/member_management_screen.dart lib/screens/shipment_search_screen.dart lib/screens/cargo_management_screen.dart test/customer_identity_card_test.dart test/customer_registry_test.dart
       - run: flutter test test/customer_registry_test.dart test/customer_identity_card_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/screens/domestic_tracking_screen.dart lib/services/domestic_tracking_service.dart lib/core/domestic_tracking_text.dart test/domestic_tracking_test.dart
       - run: python3 tool/generate_route_geometry.py --check

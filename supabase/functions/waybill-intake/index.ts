@@ -74,6 +74,37 @@ Deno.serve(async(req:Request)=>{
    return json(200,{cargo:visible.map(r=>({...r,photos:photos.filter((p:any)=>p.shipment_id===r.id).map((p:any)=>({id:p.id,kind:p.kind,url:urls.get(p.id)}))}))});
   }
   if(b.action==='my_customer_id')return json(200,result(await db.rpc('customer_registry_member_id',{p_owner:owner})));
+  if(b.action==='customer_identity_index'){
+   const profileIds=b.profile_ids??[],shipmentIds=b.shipment_ids??[];
+   require(Array.isArray(profileIds)&&profileIds.length<=200&&profileIds.every((v:any)=>typeof v==='string'&&v.length<=80),'INVALID_REQUEST');
+   require(Array.isArray(shipmentIds)&&shipmentIds.length<=500&&shipmentIds.every((v:any)=>Number.isSafeInteger(v)&&v>0),'INVALID_REQUEST');
+   require(!profileIds.length||admin,'FORBIDDEN',403);require(!shipmentIds.length||operator,'FORBIDDEN',403);
+   const profiles:any[]=[];const shipments:any[]=[];
+   if(profileIds.length){
+    const visible=result(await userDb.from('profiles').select('id,approval_status,deletion_status,deleted_at').in('id',profileIds));
+    profiles.push(...await mapLimit(visible,6,async(p:any)=>({id:p.id,...(!p.deleted_at&&(p.deletion_status??'active')==='active'&&(p.approval_status??'approved')==='approved'?result(await db.rpc('customer_registry_member_id',{p_owner:p.id})):{customer_code:null,status:'unmatched'})})));
+   }
+   if(shipmentIds.length){
+    const visible=result(await userDb.from('shipments').select('id').in('id',shipmentIds).is('deleted_at',null).is('deletion_requested_at',null));
+    if(visible.length)shipments.push(...result(await db.from('customer_registry_statement_mapping').select('shipment_id,customer_code').in('shipment_id',visible.map((r:any)=>r.id))));
+   }
+   return json(200,{profiles,shipments});
+  }
+  if(b.action==='customer_id_search'){
+   const code=field(b.customer_code,20).match(/^(?:ID\s*[:#-]?\s*)?(\d{1,9})$/i);
+   require(code&&Number(code[1])>0,'INVALID_CUSTOMER_ID');
+   const customerCode=String(Number(code![1])).padStart(3,'0');
+   const visible=result(await userDb.rpc('search_shipments_for_current_user',{
+    p_route:field(b.route),p_year:b.year==null?null:Number(b.year),p_voyage:field(b.voyage,40),
+    p_box_number:field(b.box_number,80),p_invoice:field(b.invoice,80),p_recipient:'',p_phone:field(b.phone,80)
+   }));
+   const matched=new Set<string>();
+   for(let start=0;start<visible.length;start+=500){
+    const mapped=result(await db.from('customer_registry_statement_mapping').select('shipment_id').eq('customer_code',customerCode).in('shipment_id',visible.slice(start,start+500).map((r:any)=>r.id)));
+    mapped.forEach((r:any)=>matched.add(String(r.shipment_id)));
+   }
+   return json(200,{shipments:visible.filter((r:any)=>matched.has(String(r.id))).map((r:any)=>({...r,customer_code:customerCode}))});
+  }
   require(operator,'FORBIDDEN',403);
   if(['customers_list','customers_summary','customers_detail'].includes(b.action)){
    require(admin,'FORBIDDEN',403);const state=await registryState();

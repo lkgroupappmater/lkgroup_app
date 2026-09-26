@@ -5,8 +5,10 @@ import '../services/domestic_tracking_service.dart';
 import '../services/waybill_intake_service.dart';
 
 class CustomerIdentityCard extends StatefulWidget {
-  const CustomerIdentityCard({super.key, required this.userId, required this.language, this.loadIdentity});
+  const CustomerIdentityCard({super.key, required this.userId, required this.language, this.loadIdentity, this.compact = false, this.foregroundColor});
   final String userId;
+  final bool compact;
+  final Color? foregroundColor;
   final AppLanguage language;
   final Future<Map<String, dynamic>> Function()? loadIdentity;
   @override
@@ -34,10 +36,14 @@ class _CustomerIdentityCardState extends State<CustomerIdentityCard> {
     } catch (_) { if (mounted && request == _request) setState(() => _failed = true); }
     finally { if (mounted && request == _request) setState(() => _busy = false); }
   }
+  String get _value => _busy ? t('identityLoading') : _failed ? t('identityError') : _identity?['customer_code'] == null ? t('identityUnmatched') : '${_identity!['customer_code']}${_identity!['status'] == 'review_required' ? ' · ${t('identityReview')}' : ''}';
   @override
-  Widget build(BuildContext context) => ListTile(
-    title: Text(t('uniqueCustomerId')),
-    subtitle: Text(_busy ? t('identityLoading') : _failed ? t('identityError') : _identity?['customer_code'] == null ? t('identityUnmatched') : '${_identity!['customer_code']}${_identity!['status'] == 'review_required' ? ' · ${t('identityReview')}' : ''}', key: const ValueKey('my-customer-id')),
-    trailing: IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh), tooltip: t('refresh')),
-  );
+  Widget build(BuildContext context) {
+    if (widget.compact) return TextButton(
+      onPressed: _busy ? null : _load,
+      style: TextButton.styleFrom(foregroundColor: widget.foregroundColor, disabledForegroundColor: widget.foregroundColor, padding: const EdgeInsets.symmetric(horizontal: 4), minimumSize: const Size(0, 24), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+      child: Text('${t('uniqueCustomerId')}: $_value', key: const ValueKey('my-customer-id'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+    );
+    return ListTile(title: Text(t('uniqueCustomerId')), subtitle: Text(_value, key: const ValueKey('my-customer-id')), trailing: IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh), tooltip: t('refresh')));
+  }
 }

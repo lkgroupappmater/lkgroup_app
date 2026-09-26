@@ -2,6 +2,7 @@ import 'unknown_cargo_media_screen.dart';
 import '../core/waybill_intake_text.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
+import '../core/waybill_intake_text.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/cargo_ui_strings.dart';
@@ -1025,7 +1026,7 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
           const SizedBox(height: 10),
           _input(_invoiceCtrl, _t('invoice_number'), Icons.tag_rounded),
           const SizedBox(height: 10),
-          _input(_recipientCtrl, _l('이름 / 회사명'), Icons.person_outline),
+          _input(_recipientCtrl, '${_l('이름 / 회사명')} / ${intakeText(widget.language, 'uniqueCustomerId')}', Icons.person_outline),
           const SizedBox(height: 10),
           _input(_phoneCtrl, _l('연락처'), Icons.phone_outlined,
               type: TextInputType.phone),

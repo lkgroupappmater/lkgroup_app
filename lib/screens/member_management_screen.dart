@@ -1,4 +1,5 @@
 import 'customer_registry_screen.dart';
+import '../services/customer_identity_service.dart';
 import '../services/waybill_intake_service.dart';
 import '../core/app_language.dart';
 import '../core/waybill_intake_text.dart';
@@ -32,7 +33,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   }
   Future<void> _openRegistry({bool mismatchesOnly=false}) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>CustomerRegistryScreen(language:widget.language,mismatchesOnly:mismatchesOnly)));
-    if(mounted)_loadRegistrySummary();
+    if(mounted)_loadMembers();
   }
 
   @override
@@ -55,11 +56,15 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
       if (!SupabaseConfig.isConfigured) {
         _members = [];
       } else {
+        final owner = Supabase.instance.client.auth.currentUser?.id;
         final rows = await Supabase.instance.client
             .from('profiles')
             .select('id,email,name,phone,company,role,requested_role,approval_status,avatar_url,created_at,deletion_status,deletion_type,deleted_at,purge_after')
             .order('created_at', ascending: false);
-        _members = List<Map<String, dynamic>>.from(rows);
+        final loaded = List<Map<String, dynamic>>.from(rows);
+        try { await CustomerIdentityService.enrichMembers(loaded); } catch (_) { for (final m in loaded) { m['identity_status'] = 'error'; } }
+        if (!mounted || owner != Supabase.instance.client.auth.currentUser?.id) return;
+        _members = loaded;
       }
     } catch (e) {
       _message('회원 목록 조회 실패: $e', error: true);
@@ -102,12 +107,12 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     if (query.isEmpty) return const [];
     final myId = Supabase.instance.client.auth.currentUser?.id;
     return _members.where((m) {
-      if ('${m['id']}' == myId) return false;
+      if ('${m['id']}' == myId && CustomerIdentityService.normalizeCode(query) == null) return false;
       if ('${m['deletion_status'] ?? 'active'}' != 'active') return false;
       if ('${m['approval_status'] ?? 'approved'}' == 'rejected') return false;
       // 관리자/파트너는 위 고정 목록에 항상 표시하므로 검색 영역에서는 일반회원만 표시합니다.
-      if ('${m['role'] ?? 'member'}' != 'member') return false;
-      return '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
+      if ('${m['role'] ?? 'member'}' != 'member' && CustomerIdentityService.normalizeCode(query) == null) return false;
+      return (CustomerIdentityService.normalizeCode(query) != null && CustomerIdentityService.normalizeCode(query) == m['customer_code']) || '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
           .toLowerCase()
           .contains(query);
     }).toList();
@@ -264,6 +269,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Text(_identityLabel(member)),
                 TextField(controller: name, decoration: const InputDecoration(labelText: '이름')),
                 TextFormField(
                   initialValue: '${member['email'] ?? ''}',
@@ -461,11 +467,13 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     );
   }
 
+  String _identityLabel(Map<String, dynamic> member) => '${intakeText(widget.language, 'uniqueCustomerId')}: ${member['customer_code'] ?? intakeText(widget.language, member['identity_status'] == 'error' ? 'identityError' : 'identityUnmatched')}';
+
   Widget _memberCard(Map<String, dynamic> member) => Card(
         child: ListTile(
           title: Text('${member['name'] ?? ''} · ${_roleLabel(member['role'])}'),
           subtitle: Text(
-            '${member['email'] ?? ''}\n${member['phone'] ?? ''} ${member['company'] ?? ''}',
+            '${_identityLabel(member)}\n${member['email'] ?? ''}\n${member['phone'] ?? ''} ${member['company'] ?? ''}',
           ),
           isThreeLine: true,
           trailing: Column(
@@ -579,7 +587,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                     onSearch: (value) => setState(() => _submittedSearch = value),
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),
-                      hintText: '이름·이메일·전화번호 검색',
+                      hintText: '고객 ID·이름·이메일·전화번호 검색',
                     ),
                   ),
                   const SizedBox(height: 8),

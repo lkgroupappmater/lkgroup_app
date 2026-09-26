@@ -7,6 +7,7 @@ import 'company_logo.dart';
 /// Shared header. Use once from AppShell; body screens must not add another AppBar.
 class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final Widget? customerIdentity;
   final AppLanguage selectedLanguage;
   final ValueChanged<AppLanguage> onLanguageChanged;
   final VoidCallback? onNotificationTap;
@@ -17,6 +18,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CargoFlowAppBar({
     super.key,
     required this.title,
+    this.customerIdentity,
     required this.selectedLanguage,
     required this.onLanguageChanged,
     this.onNotificationTap,
@@ -41,6 +43,7 @@ class CargoFlowAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
+          if (customerIdentity != null) Positioned(bottom: 0, left: 124, right: 6, child: Align(alignment: Alignment.centerRight, child: customerIdentity!)),
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(

@@ -5,6 +5,7 @@ import 'app_update_banner.dart';
 import 'auto_refresh_state.dart';
 
 import 'package:flutter/material.dart';
+import 'customer_identity_card.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -499,6 +500,7 @@ class _AppShellState extends State<AppShell>
     final selected = navIndexes.indexOf(_currentIndex);
     final scaffold = Scaffold(
       appBar: CargoFlowAppBar(
+        customerIdentity: _isLoggedIn ? CustomerIdentityCard(key: ValueKey('header-id-${_currentUser!.id}-${_currentUser!.name}-${_currentUser!.phone}'), userId: _currentUser!.id, language: _language, compact: true, foregroundColor: Colors.white) : null,
         title: _title,
         selectedLanguage: _language,
         onLanguageChanged: _onLanguageChanged,

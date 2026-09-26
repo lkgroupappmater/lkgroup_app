@@ -3,6 +3,8 @@ import '../models/app_user.dart';
 import '../models/shipment.dart';
 import '../data/mock_data.dart';
 import 'supabase_service.dart';
+import 'customer_identity_service.dart';
+import 'waybill_intake_service.dart';
 
 class ShipmentImportSummary {
   const ShipmentImportSummary({
@@ -94,6 +96,11 @@ class ShipmentService {
         ? ''
         : voyage.replaceAll('항차', '').trim();
 
+    final customerCode = CustomerIdentityService.normalizeCode(recipient);
+    if (customerCode != null) {
+      final response = await WaybillIntakeService.call('customer_id_search', {'customer_code': customerCode, 'route': route == '전체' ? '' : route, 'year': year == '전체' ? null : parsedYear, 'voyage': voyageValue, 'box_number': boxNumber.trim(), 'invoice': invoice.trim(), 'phone': phone.trim()});
+      return List<Map<String, dynamic>>.from(response['shipments'] as List);
+    }
     final rows = await SupabaseService.client.rpc(
       'search_shipments_for_current_user',
       params: {

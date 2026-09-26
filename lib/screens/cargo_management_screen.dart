@@ -2,6 +2,7 @@ import '../core/receipt_delivery_cost.dart';
 import '../services/customer_benefit_service.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
+import '../core/waybill_intake_text.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -1154,7 +1155,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 controller: _nameController,
                 textInputAction: TextInputAction.search,
                 onSubmitted: (_) => _submitSearch(),
-                decoration: _decoration(_l('이름/라오스 수령인'), Icons.person_outline),
+                decoration: _decoration('${_l('이름/라오스 수령인')} / ${intakeText(widget.language, 'uniqueCustomerId')}', Icons.person_outline),
               ),
             ],
             if (!_isManager || _showPhoneSearch) ...[

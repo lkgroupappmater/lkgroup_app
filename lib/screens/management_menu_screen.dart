@@ -3,6 +3,7 @@ import '../services/shared_purchase_workspace.dart';
 import 'domestic_tracking_screen.dart';
 import '../core/domestic_tracking_text.dart';
 import 'package:flutter/material.dart';
+import '../widgets/customer_identity_card.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -346,10 +347,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                subtitle: Text(
-                  user.role.localizedLabel(widget.language),
-                  style: const TextStyle(color: Colors.white70),
-                ),
+                subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(user.role.localizedLabel(widget.language), style: const TextStyle(color: Colors.white70)), CustomerIdentityCard(key: ValueKey('menu-id-${user.id}-${user.name}-${user.phone}'), userId: user.id, language: widget.language, compact: true, foregroundColor: Colors.white)]),
               ),
             ),
             const SizedBox(height: 16),
