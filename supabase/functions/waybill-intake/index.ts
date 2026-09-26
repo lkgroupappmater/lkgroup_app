@@ -1,13 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validateFiles, imageMime, normalizeDrafts, validateReviewed } from './validation.mjs';
-import { registrySummary, mapLimit } from './registry.mjs';
+import { registrySummary, mapLimit, validateBulkRows } from './registry.mjs';
 
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const json = (status:number,body:unknown) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
 class RequestError extends Error { constructor(public status:number, code:string) { super(code); } }
 const require = (ok:unknown,code:string,status=400) => { if (!ok) throw new RequestError(status,code); };
 const result = (r:any) => {
- if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID'].find(c=>String(r.error.message).includes(c));
+ if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID','BULK_SELECTION_INVALID'].find(c=>String(r.error.message).includes(c));
   throw new RequestError(code==='FORBIDDEN'?403:code||r.error.code==='23505'?409:500,code??(r.error.code==='23505'?'DUPLICATE_RECORD':'DATABASE_ERROR'));}
  return r.data;
 };
@@ -88,6 +88,11 @@ Deno.serve(async(req:Request)=>{
   if(b.action==='customers_update'){
    require(admin,'FORBIDDEN',403);require(Number.isSafeInteger(b.customer_no)&&b.customer_no>0&&b.customer_no<1000000000,'INVALID_CUSTOMER_ID');require(field(b.name),'RECEIVER_REQUIRED');
    const updated=result(await db.rpc('customer_registry_change',{p_id:b.id,p_owner:owner,p_number:b.customer_no,p_name:field(b.name),p_phone:field(b.phone,40),p_reason:field(b.reason,500),p_expected:b.updated_at}));return json(200,{customer:updated});
+  }
+  if(b.action==='customers_bulk'){
+   require(admin,'FORBIDDEN',403);require(b.confirmed===true,'REVIEW_REQUIRED');
+   let items;try{items=validateBulkRows(b.rows);}catch(e){throw new RequestError(400,(e as Error).message);}
+   const saved=result(await db.rpc('customer_registry_bulk_apply',{p_owner:owner,p_rows:items,p_reason:field(b.reason,500)}));return json(200,saved);
   }
   if(b.action==='customers_merge'){
    require(admin,'FORBIDDEN',403);require(b.confirmed===true&&b.source_id!==b.target_id,'REVIEW_REQUIRED');

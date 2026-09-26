@@ -31,6 +31,7 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
     return {data:data.shipments.filter(s=>s.consignee_name.replace(/\s/g,'').toLowerCase()===nk||s.consignee_phone===pk).map(s=>({exact:s.consignee_phone===pk&&s.consignee_name.replace(/\s/g,'').toLowerCase()===nk,statement:{receipt_number:s.receipt_number}})).sort((a,b)=>Number(b.exact)-Number(a.exact))};
    }
    if(name==='customer_registry_change'||name==='customer_registry_merge')return {data:{id:args.p_id??args.p_target}};
+   if(name==='customer_registry_bulk_apply')return {data:{updated_count:2,merged_count:0,moved_sources:0}};
    if(name==='customer_registry_resolve_source')return {data:true};
    assert.fail(name);
   }};
@@ -117,4 +118,12 @@ test('reference photo commit needs no tracking details or OCR and retries withou
  const first=await api.call(body),second=await api.call(body);assert.equal(first.status,200);assert.deepEqual(first.body.ids,second.body.ids);
  assert.equal(api.ocrCalls,0);const calls=api.rpcCalls.filter(r=>r.name==='commit_reference_photos');assert.equal(calls.length,1);assert.equal(calls[0].args.p_value.tracking_number,undefined);assert.equal(calls[0].args.p_value.photo_paths.length,1);
  for(const data of [{...ready,waybill_intake_batches:[{...batch,purpose:'photos'}]},{...ready,waybill_intake_batches:[{...batch,purpose:'photos',fixed_link:fixed}],waybill_intake_files:[{...file,verified_at:null}],shipments:[{id:1,consignee_name:'A'}]}])assert.equal((await setup({data}).call(body)).status,400);
+});
+
+test('bulk customer endpoint requires active admin and review and performs one atomic RPC',async()=>{
+ const rows=['a','b'].map((id,i)=>({id,target_id:id,customer_no:i+3,name:'Customer '+id,phone:'02011110000',updated_at:'2026-09-26T00:00:00Z'}));
+ for(const api of [setup({role:'staff'}),setup({active:false}),setup({role:'partner'})]){assert.equal((await api.call({action:'customers_bulk',rows,confirmed:true})).status,403);assert.equal(api.rpcCalls.length,0);}
+ const api=setup();assert.equal((await api.call({action:'customers_bulk',rows})).status,400);assert.equal(api.rpcCalls.length,0);
+ assert.equal((await api.call({action:'customers_bulk',rows:[rows[0],rows[0]],confirmed:true})).status,400);assert.equal(api.rpcCalls.length,0);
+ const result=await api.call({action:'customers_bulk',rows,confirmed:true});assert.equal(result.status,200);assert.equal(result.body.updated_count,2);assert.equal(api.rpcCalls.length,1);assert.equal(api.rpcCalls[0].name,'customer_registry_bulk_apply');assert.equal(api.rpcCalls[0].args.p_reason,'');assert.equal(api.rpcCalls[0].args.p_rows.length,2);
 });

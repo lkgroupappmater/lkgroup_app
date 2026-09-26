@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'customer_registry_bulk_editor.dart';
 import '../core/app_language.dart';
 import '../core/waybill_intake_text.dart';
 import '../services/domestic_tracking_service.dart';
@@ -8,9 +9,10 @@ typedef CustomerRow = Map<String, dynamic>;
 List<CustomerRow> _maps(dynamic value) => (value as List? ?? []).map((v) => CustomerRow.from(v as Map)).toList();
 
 class CustomerRegistryScreen extends StatefulWidget {
-  const CustomerRegistryScreen({super.key, this.language = AppLanguage.korean, this.mismatchesOnly = false});
+  const CustomerRegistryScreen({super.key, this.language = AppLanguage.korean, this.mismatchesOnly = false, this.callApi});
   final AppLanguage language;
   final bool mismatchesOnly;
+  final Future<CustomerRow> Function(String, CustomerRow)? callApi;
   @override
   State<CustomerRegistryScreen> createState() => _CustomerRegistryScreenState();
 }
@@ -18,6 +20,8 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
   final _search = TextEditingController();
   List<CustomerRow> _rows = [];
   CustomerRow _summary = {};
+  final Map<String, CustomerRow> _selected = {};
+  Future<CustomerRow> _call(String action, CustomerRow body) => widget.callApi?.call(action, body) ?? WaybillIntakeService.call(action, body);
   bool _busy = false, _conflicts = false, _mismatches = false, _more = false;
   int _page = 0, _total = 0;
   String? _message, _owner;
@@ -31,7 +35,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final r = await WaybillIntakeService.call('customers_list', {'page': _page, 'query': _search.text, 'conflicts_only': _conflicts, 'mismatches_only': _mismatches});
+      final r = await _call('customers_list', {'page': _page, 'query': _search.text, 'conflicts_only': _conflicts, 'mismatches_only': _mismatches});
       if (valid) setState(() { _rows = _maps(r['customers']); _more = r['has_more'] == true; _total = (r['total'] as num).toInt(); _summary = CustomerRow.from(r['summary'] as Map? ?? {}); _message = null; });
     } catch (e) { if (valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'error')); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -51,7 +55,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
         if (n == null || n <= 0 || n >= 1000000000 || name.text.trim().isEmpty) { update(() => message = t('error')); return; }
         update(() => saving = true);
         try {
-          await WaybillIntakeService.call('customers_update', {'id': c['id'], 'updated_at': c['updated_at'], 'customer_no': n, 'name': name.text, 'phone': phone.text, 'reason': reason.text});
+          await _call('customers_update', {'id': c['id'], 'updated_at': c['updated_at'], 'customer_no': n, 'name': name.text, 'phone': phone.text, 'reason': reason.text});
           if (dialogContext.mounted) Navigator.pop(dialogContext);
           if (valid) await _load();
         } catch (e) { if (dialogContext.mounted) update(() => message = t(e is DomesticTrackingException ? e.code : 'error')); }
@@ -59,6 +63,21 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
       }, child: Text(t('save')))],
     )));
     number.dispose(); name.dispose(); phone.dispose(); reason.dispose();
+  }
+  void _select(CustomerRow c, bool value) {
+    setState(() {
+      if (!value) { _selected.remove(c['id']); }
+      else if (_selected.length < 100) { _selected['${c['id']}'] = Map.of(c); }
+      else { _message = t('bulkHelp'); }
+    });
+  }
+  Future<void> _bulk(bool merge) async {
+    final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CustomerRegistryBulkEditor(rows: _selected.values.toList(), language: widget.language, merge: merge, callApi: _call)));
+    if (valid && saved == true) {
+      setState(() => _selected.clear());
+      await _load();
+      if (valid) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('bulkSaved'))));
+    }
   }
   void _filter(bool duplicates, bool mismatches) { if (_busy) return; setState(() { _conflicts = duplicates; _mismatches = mismatches; _page = 0; }); _load(); }
   Future<void> _detail(CustomerRow c) async {
@@ -79,8 +98,19 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
     CheckboxListTile(contentPadding: EdgeInsets.zero, value: _mismatches, title: Text(t('mismatches')), onChanged: _busy ? null : (v) => _filter(_conflicts, v ?? false)),
     Wrap(spacing: 8, children: [OutlinedButton(onPressed: _busy ? null : () { _page = 0; _load(); }, child: Text(t('search'))), TextButton(onPressed: _busy ? null : () { _search.clear(); _filter(false, false); }, child: Text(t('reset')))]),
     if (_busy) const LinearProgressIndicator(), if (_message != null) Text(_message!), Text('${t('total')} $_total'),
+    Text(t('bulkHelp')),
+    CheckboxListTile(contentPadding: EdgeInsets.zero, tristate: true, value: _rows.isEmpty || _rows.every((c) => !_selected.containsKey(c['id'])) ? false : _rows.every((c) => _selected.containsKey(c['id'])) ? true : null, title: Text(t('pageSelect')), onChanged: _busy || _rows.isEmpty ? null : (v) {
+      final select = !_rows.every((c) => _selected.containsKey(c['id']));
+      for (final c in _rows) { _select(c, select); }
+    }),
+    Text('${t('selectedCustomers')}: ${_selected.length}/100'),
+    Wrap(spacing: 8, children: [
+      FilledButton(onPressed: _busy || _selected.isEmpty ? null : () => _bulk(false), child: Text(t('bulkEdit'))),
+      OutlinedButton(onPressed: _busy || _selected.length < 2 ? null : () => _bulk(true), child: Text(t('bulkMerge'))),
+      TextButton(onPressed: _busy || _selected.isEmpty ? null : () => setState(() => _selected.clear()), child: Text(t('clearSelection'))),
+    ]),
     for (final c in _rows) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('${c['customer_code']} · ${c['name']}', style: Theme.of(context).textTheme.titleMedium), Text('${c['phone']}'),
+      CheckboxListTile(key: ValueKey('select-${c['id']}'), contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, value: _selected.containsKey(c['id']), onChanged: _busy ? null : (v) => _select(c, v ?? false), title: Text('${c['customer_code']} · ${c['name']}'), subtitle: Text('${c['phone']}')),
       Text('${t('sourceRows')} ${c['source_count']} · ${t('duplicates')} ${(c['duplicates'] as List? ?? []).length} · ${t('mismatches')} ${c['mismatch_count'] ?? 0}'),
       Wrap(spacing: 8, children: [TextButton(onPressed: _busy ? null : () => _edit(c), child: Text(t('edit'))), TextButton(onPressed: _busy ? null : () => _detail(c), child: Text(t('reviewStatus')))]),
     ]))),

@@ -1,4 +1,15 @@
 // Candidate flags are review hints, never automatic identity merges.
+export function validateBulkRows(rows) {
+  if (!Array.isArray(rows)||rows.length<1||rows.length>100) throw Error('BULK_SELECTION_INVALID');
+  const ids=new Map();
+  for(const r of rows){
+    if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.target_id!=='string'||!r.updated_at)throw Error('BULK_SELECTION_INVALID');
+    if(!Number.isSafeInteger(r.customer_no)||r.customer_no<1||r.customer_no>999999999||typeof r.name!=='string'||!r.name.trim()||r.name.length>160||typeof r.phone!=='string'||r.phone.length>40)throw Error('INVALID_CUSTOMER_ID');
+    ids.set(r.id,r);
+  }
+  for(const r of rows)if(!ids.has(r.target_id)||ids.get(r.target_id).target_id!==r.target_id)throw Error('BULK_SELECTION_INVALID');
+  return rows.map(r=>({id:r.id,updated_at:r.updated_at,customer_no:r.customer_no,name:r.name.trim(),phone:r.phone.trim(),target_id:r.target_id}));
+}
 export function oneEditApart(a, b, minimum = 2) {
   if (!a || !b || Math.min(a.length,b.length)<minimum || Math.abs(a.length-b.length)>1 || a===b) return false;
   let i=0,j=0,edits=0;

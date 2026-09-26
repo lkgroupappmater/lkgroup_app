@@ -281,6 +281,81 @@ const intakeWords = <String, List<String>> {
     "사진 바로 올리기",
     "Upload photos now",
     "ອັບໂຫຼດຮູບທັນທີ"
+  ],
+  "pageSelect": [
+    "현재 페이지 전체 선택",
+    "Select current page",
+    "ເລືອກທັງໜ້ານີ້"
+  ],
+  "selectedCustomers": [
+    "선택한 고객 ID",
+    "Selected customer IDs",
+    "ID ລູກຄ້າທີ່ເລືອກ"
+  ],
+  "clearSelection": [
+    "선택 해제",
+    "Clear selection",
+    "ລ້າງການເລືອກ"
+  ],
+  "bulkEdit": [
+    "선택 항목 일괄 수정",
+    "Edit selected customers",
+    "ແກ້ໄຂລູກຄ້າທີ່ເລືອກ"
+  ],
+  "bulkMerge": [
+    "선택 ID 비교·통합",
+    "Compare / merge selected IDs",
+    "ປຽບທຽບ / ລວມ ID ທີ່ເລືອກ"
+  ],
+  "bulkHelp": [
+    "최대 100개를 선택할 수 있습니다. 페이지·검색을 바꿔도 선택은 유지됩니다.",
+    "Select up to 100 customers. Selection stays across pages and searches.",
+    "ເລືອກໄດ້ສູງສຸດ 100 ລູກຄ້າ. ການເລືອກຍັງຄົງຢູ່ເມື່ອປ່ຽນໜ້າ ຫຼື ຄົ້ນຫາ."
+  ],
+  "bulkMergeHelp": [
+    "같은 고객끼리 남길 ID를 지정하세요. 여러 그룹을 한 번에 통합하고, 남길 ID의 이름·연락처도 함께 수정할 수 있습니다.",
+    "Choose the surviving ID for each customer group. Merge multiple groups and edit the surviving names / phones together.",
+    "ເລືອກ ID ທີ່ຈະເກັບສຳລັບແຕ່ລະກຸ່ມ. ລວມຫຼາຍກຸ່ມ ແລະ ແກ້ຊື່ / ເບີໂທໄດ້ພ້ອມກັນ."
+  ],
+  "keepSelf": [
+    "이 ID 유지",
+    "Keep this ID",
+    "ເກັບ ID ນີ້"
+  ],
+  "commonTarget": [
+    "선택 ID를 하나로 통합할 경우 남길 ID",
+    "ID to keep when merging the selection into one",
+    "ID ທີ່ຈະເກັບເມື່ອລວມທັງໝົດ"
+  ],
+  "chooseTarget": [
+    "남길 ID 선택",
+    "Choose ID to keep",
+    "ເລືອກ ID ທີ່ຈະເກັບ"
+  ],
+  "bulkReviewed": [
+    "각 그룹이 같은 고객이며, 남길 ID와 변경 내용을 확인했습니다",
+    "I checked each group belongs to the same customer, the surviving IDs and the changes",
+    "ຢືນຢັນວ່າແຕ່ລະກຸ່ມເປັນລູກຄ້າດຽວກັນ ແລະ ໄດ້ກວດ ID ແລະ ການປ່ຽນແລ້ວ"
+  ],
+  "bulkSave": [
+    "선택 항목 한 번에 저장",
+    "Save all selected changes",
+    "ບັນທຶກທັງໝົດພ້ອມກັນ"
+  ],
+  "bulkSaved": [
+    "선택 항목 저장 완료",
+    "Selected changes saved",
+    "ບັນທຶກລາຍການທີ່ເລືອກແລ້ວ"
+  ],
+  "mergeCount": [
+    "통합할 ID 수",
+    "IDs to merge",
+    "ຈຳນວນ ID ທີ່ຈະລວມ"
+  ],
+  "BULK_SELECTION_INVALID": [
+    "최대 100개를 선택하고 각 그룹에 남길 ID를 지정하세요. 남길 ID는 다른 ID로 통합할 수 없습니다.",
+    "Select up to 100 customers and one surviving ID per group. A surviving ID cannot also be merged away.",
+    "ເລືອກສູງສຸດ 100 ລູກຄ້າ ແລະ ID ທີ່ຈະເກັບໃນແຕ່ລະກຸ່ມ. ID ທີ່ເກັບບໍ່ສາມາດລວມເຂົ້າ ID ອື່ນ."
   ]
 
 };
