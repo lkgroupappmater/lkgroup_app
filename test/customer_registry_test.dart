@@ -11,6 +11,22 @@ void largeView(WidgetTester tester) {
   addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
 }
 void main() {
+  testWidgets('search remains visible while customer rows scroll, and name/phone taps run searches', (tester) async {
+    tester.view.physicalSize = const Size(400, 750); tester.view.devicePixelRatio = 1;
+    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
+    final queries = <Map<String, dynamic>>[];
+    final many = List.generate(30, (i) => {...rows[1], 'id': 'row$i', 'name': 'Name $i', 'phone': '0201111${i.toString().padLeft(4, '0')}'});
+    await tester.pumpWidget(MaterialApp(home: CustomerRegistryScreen(callApi: (action, body) async { queries.add(body); return {'customers': many, 'total': 30, 'summary': {'customers': 30}, 'has_more': false}; })));
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.byKey(const ValueKey('registry-search')));
+    await tester.drag(find.byKey(const ValueKey('registry-list')), const Offset(0, -700)); await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byKey(const ValueKey('registry-search'))), before);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('quick-name-row10')), 250, scrollable: find.descendant(of: find.byKey(const ValueKey('registry-list')), matching: find.byType(Scrollable)));
+    await tester.tap(find.byKey(const ValueKey('quick-name-row10'))); await tester.pumpAndSettle();
+    expect(queries.last['query'], 'Name 10'); expect(queries.last['conflicts_only'], false);
+    await tester.tap(find.byKey(const ValueKey('quick-phone-row1'))); await tester.pumpAndSettle();
+    expect(queries.last['query'], '0001'); expect(tester.takeException(), isNull);
+  });
   testWidgets('selected contacts save together with no required reason', (tester) async {
     largeView(tester); final writes = <Map<String, dynamic>>[];
     await tester.pumpWidget(MaterialApp(home: CustomerRegistryScreen(callApi: (action, body) async {

@@ -94,16 +94,9 @@ Deno.serve(async(req:Request)=>{
    const code=field(b.customer_code,20).match(/^(?:ID\s*[:#-]?\s*)?(\d{1,9})$/i);
    require(code&&Number(code[1])>0,'INVALID_CUSTOMER_ID');
    const customerCode=String(Number(code![1])).padStart(3,'0');
-   const visible=result(await userDb.rpc('search_shipments_for_current_user',{
-    p_route:field(b.route),p_year:b.year==null?null:Number(b.year),p_voyage:field(b.voyage,40),
-    p_box_number:field(b.box_number,80),p_invoice:field(b.invoice,80),p_recipient:'',p_phone:field(b.phone,80)
-   }));
-   const matched=new Set<string>();
-   for(let start=0;start<visible.length;start+=500){
-    const mapped=result(await db.from('customer_registry_statement_mapping').select('shipment_id').eq('customer_code',customerCode).in('shipment_id',visible.slice(start,start+500).map((r:any)=>r.id)));
-    mapped.forEach((r:any)=>matched.add(String(r.shipment_id)));
-   }
-   return json(200,{shipments:visible.filter((r:any)=>matched.has(String(r.id))).map((r:any)=>({...r,customer_code:customerCode}))});
+   require(b.year==null||(Number.isInteger(Number(b.year))&&Number(b.year)>=1900&&Number(b.year)<=9999),'INVALID_REQUEST');
+   const found=result(await db.rpc('customer_registry_search_shipments',{p_owner:owner,p_code:customerCode,p_filters:{route:field(b.route),year:b.year==null?null:Number(b.year),voyage:field(b.voyage,40),box_number:field(b.box_number,80),invoice:field(b.invoice,80),phone:field(b.phone,80)}}));
+   return json(200,{shipments:found.map((r:any)=>({...r,customer_code:customerCode}))});
   }
   require(operator,'FORBIDDEN',403);
   if(['customers_list','customers_summary','customers_detail'].includes(b.action)){

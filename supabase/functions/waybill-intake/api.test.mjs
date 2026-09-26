@@ -21,7 +21,7 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
  const db={auth:{getUser:async()=>({data:{user:authenticated?{id:'owner'}:null},error:!authenticated})},from:query,
   storage:{from:()=>({async createSignedUrl(path){signed.push(path);return {data:{signedUrl:'https://private.test/'+path}}},async createSignedUploadUrl(path){return {data:{signedUrl:'https://upload.test/'+path,token:'upload-token'}}},async download(){return {data:new Blob([png])}}})},
   async rpc(name,args){rpcCalls.push({name,args});
-   if(name==='search_shipments_for_current_user')return {data:data.shipments.filter(s=>s.visible!==false)};
+   if(name==='customer_registry_search_shipments')return {data:data.shipments.filter(s=>s.visible!==false&&data.customer_registry_statement_mapping.some(m=>m.shipment_id===s.id&&m.customer_code===args.p_code))};
    if(name==='list_unknown_recipient_cargo')return {data:data.shipments.filter(s=>s.recipient_unknown)};
    if(name==='domestic_find_delivery_cargo')return {data:data.shipments.filter(s=>s.receipt_number===args.p_number)};
    if(name==='commit_waybill_intake'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=['saved'];return {data:b.result_ids};}
@@ -139,10 +139,10 @@ test('member identity is owner-only; it does not expose registry or operational 
 
 test('customer ID search normalizes leading zeros and only filters existing authorized cargo',async()=>{
  const api=setup({role:'member',data:{shipments:[{id:1},{id:2,visible:false},{id:3}],customer_registry_statement_mapping:[{shipment_id:1,customer_code:'023'},{shipment_id:2,customer_code:'023'},{shipment_id:3,customer_code:'123'}]}});
- for(const code of ['23','023','ID 023']){const r=await api.call({action:'customer_id_search',customer_code:code});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'023'}]);}
+ for(const code of ['23','023','ID 023']){const r=await api.call({action:'customer_id_search',customer_code:code,p_owner:'forged'});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'023'}]);}
  assert.equal((await api.call({action:'customer_id_search',customer_code:'9023'})).body.shipments.length,0);
  assert.equal((await api.call({action:'customer_id_search',customer_code:'0'})).status,400);
- assert.equal(api.rpcCalls.some(c=>c.name==='search_shipments_by_invoice_suffix'),false);assert.equal(api.writes.length,0);
+ assert.equal(api.rpcCalls.every(c=>c.name==='customer_registry_search_shipments'&&c.args.p_owner==='owner'),true);assert.equal(api.writes.length,0);
 });
 test('bulk identity lookup is read-only and role-scoped',async()=>{
  const data={shipments:[{id:1}],customer_registry_statement_mapping:[{shipment_id:1,customer_code:'023'},{shipment_id:2,customer_code:'044'}]};

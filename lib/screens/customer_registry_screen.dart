@@ -18,6 +18,7 @@ class CustomerRegistryScreen extends StatefulWidget {
 }
 class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
   final _search = TextEditingController();
+  final _listScroll = ScrollController();
   List<CustomerRow> _rows = [];
   CustomerRow _summary = {};
   final Map<String, CustomerRow> _selected = {};
@@ -30,7 +31,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
   @override
   void initState() { super.initState(); _owner = DomesticTrackingService.currentUserId; _mismatches = widget.mismatchesOnly; _load(); }
   @override
-  void dispose() { _search.dispose(); super.dispose(); }
+  void dispose() { _search.dispose(); _listScroll.dispose(); super.dispose(); }
   Future<void> _load() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -39,6 +40,12 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
       if (valid) setState(() { _rows = _maps(r['customers']); _more = r['has_more'] == true; _total = (r['total'] as num).toInt(); _summary = CustomerRow.from(r['summary'] as Map? ?? {}); _message = null; });
     } catch (e) { if (valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'error')); }
     finally { if (mounted) setState(() => _busy = false); }
+  }
+  void _quickSearch(String value) {
+    if (_busy || value.trim().isEmpty) return;
+    _search.text = value.trim(); _page = 0; _conflicts = false; _mismatches = false;
+    if (_listScroll.hasClients) _listScroll.jumpTo(0);
+    _load();
   }
   Future<void> _edit(CustomerRow c) async {
     final number = TextEditingController(text: '${c['customer_no']}'), name = TextEditingController(text: '${c['name']}'), phone = TextEditingController(text: '${c['phone']}'), reason = TextEditingController();
@@ -85,37 +92,52 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
     if (valid) await _load();
   }
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(t('customers')), actions: [IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh), tooltip: t('refresh'))]), body: ListView(padding: const EdgeInsets.all(16), children: [
-    Text(t('fixed')),
-    Wrap(spacing: 8, runSpacing: 4, children: [
-      ActionChip(label: Text('${t('total')} ${_summary['customers'] ?? 0}'), onPressed: () => _filter(false, false)),
-      ActionChip(label: Text('${t('duplicates')} ${_summary['duplicate_customers'] ?? 0}'), onPressed: () => _filter(true, false)),
-      ActionChip(backgroundColor: Colors.orange.shade100, label: Text('${t('mismatches')} ${_summary['mismatch_customers'] ?? 0}'), onPressed: () => _filter(false, true)),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(t('customers')), actions: [
+      Tooltip(message: '${t('fixed')}\n${t('bulkHelp')}', child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.info_outline))),
+      IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh), tooltip: t('refresh')),
     ]),
-    Text('${t('mismatches')} · ${t('sourceRows')} ${_summary['mismatch_sources'] ?? 0}'),
-    TextField(controller: _search, enabled: !_busy, decoration: InputDecoration(labelText: 'ID / ${t('receiver')} / ${t('phone')}'), onSubmitted: (_) { _page = 0; _load(); }),
-    CheckboxListTile(contentPadding: EdgeInsets.zero, value: _conflicts, title: Text(t('duplicates')), onChanged: _busy ? null : (v) => _filter(v ?? false, _mismatches)),
-    CheckboxListTile(contentPadding: EdgeInsets.zero, value: _mismatches, title: Text(t('mismatches')), onChanged: _busy ? null : (v) => _filter(_conflicts, v ?? false)),
-    Wrap(spacing: 8, children: [OutlinedButton(onPressed: _busy ? null : () { _page = 0; _load(); }, child: Text(t('search'))), TextButton(onPressed: _busy ? null : () { _search.clear(); _filter(false, false); }, child: Text(t('reset')))]),
-    if (_busy) const LinearProgressIndicator(), if (_message != null) Text(_message!), Text('${t('total')} $_total'),
-    Text(t('bulkHelp')),
-    CheckboxListTile(contentPadding: EdgeInsets.zero, tristate: true, value: _rows.isEmpty || _rows.every((c) => !_selected.containsKey(c['id'])) ? false : _rows.every((c) => _selected.containsKey(c['id'])) ? true : null, title: Text(t('pageSelect')), onChanged: _busy || _rows.isEmpty ? null : (v) {
-      final select = !_rows.every((c) => _selected.containsKey(c['id']));
-      for (final c in _rows) { _select(c, select); }
-    }),
-    Text('${t('selectedCustomers')}: ${_selected.length}/100'),
-    Wrap(spacing: 8, children: [
-      FilledButton(onPressed: _busy || _selected.isEmpty ? null : () => _bulk(false), child: Text(t('bulkEdit'))),
-      OutlinedButton(onPressed: _busy || _selected.length < 2 ? null : () => _bulk(true), child: Text(t('bulkMerge'))),
-      TextButton(onPressed: _busy || _selected.isEmpty ? null : () => setState(() => _selected.clear()), child: Text(t('clearSelection'))),
-    ]),
-    for (final c in _rows) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      CheckboxListTile(key: ValueKey('select-${c['id']}'), contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, value: _selected.containsKey(c['id']), onChanged: _busy ? null : (v) => _select(c, v ?? false), title: Text('${c['customer_code']} · ${c['name']}'), subtitle: Text('${c['phone']}')),
-      Text('${t('sourceRows')} ${c['source_count']} · ${t('duplicates')} ${(c['duplicates'] as List? ?? []).length} · ${t('mismatches')} ${c['mismatch_count'] ?? 0}'),
-      Wrap(spacing: 8, children: [TextButton(onPressed: _busy ? null : () => _edit(c), child: Text(t('edit'))), TextButton(onPressed: _busy ? null : () => _detail(c), child: Text(t('reviewStatus')))]),
-    ]))),
-    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [TextButton(onPressed: _busy || _page == 0 ? null : () { _page--; _load(); }, child: Text(t('prev'))), TextButton(onPressed: _busy || !_more ? null : () { _page++; _load(); }, child: Text(t('more')))]),
-  ]));
+    body: LayoutBuilder(builder: (context, constraints) => Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(10, 8, 6, 4), child: Row(children: [
+        Expanded(child: TextField(key: const ValueKey('registry-search'), controller: _search, enabled: !_busy, style: const TextStyle(fontSize: 14), decoration: InputDecoration(isDense: true, border: const OutlineInputBorder(), labelText: 'ID / ${t('receiver')} / ${t('phone')}', suffixIcon: IconButton(onPressed: _busy ? null : () { _search.clear(); _filter(false, false); }, tooltip: t('reset'), icon: const Icon(Icons.clear, size: 18))), onSubmitted: (_) { _page = 0; _load(); })),
+        IconButton(onPressed: _busy ? null : () { _page = 0; _load(); }, icon: const Icon(Icons.search), tooltip: t('search')),
+      ])),
+      if (constraints.maxHeight > 260) SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+        ActionChip(visualDensity: VisualDensity.compact, label: Text('${t('total')} ${_summary['customers'] ?? 0}', style: const TextStyle(fontSize: 12)), onPressed: () => _filter(false, false)),
+        const SizedBox(width: 6),
+        FilterChip(visualDensity: VisualDensity.compact, selected: _conflicts, label: Text('${t('duplicates')} ${_summary['duplicate_customers'] ?? 0}', style: const TextStyle(fontSize: 12)), onSelected: (v) => _filter(v, _mismatches)),
+        const SizedBox(width: 6),
+        FilterChip(visualDensity: VisualDensity.compact, selected: _mismatches, label: Text('${t('mismatches')} ${_summary['mismatch_customers'] ?? 0}', style: const TextStyle(fontSize: 12)), onSelected: (v) => _filter(_conflicts, v)),
+      ])),
+      if (constraints.maxHeight > 220) Row(children: [
+        Checkbox(tristate: true, value: _rows.isEmpty || _rows.every((c) => !_selected.containsKey(c['id'])) ? false : _rows.every((c) => _selected.containsKey(c['id'])) ? true : null, onChanged: _busy || _rows.isEmpty ? null : (v) { final select = !_rows.every((c) => _selected.containsKey(c['id'])); for (final c in _rows) { _select(c, select); } }),
+        Expanded(child: Text('${t('pageSelect')} · ${t('selectedCustomers')} ${_selected.length}/100', style: const TextStyle(fontSize: 12))),
+        Text('${t('total')} $_total', style: const TextStyle(fontSize: 12)), const SizedBox(width: 10),
+      ]),
+      if (constraints.maxHeight > 220) SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+        FilledButton(onPressed: _busy || _selected.isEmpty ? null : () => _bulk(false), child: Text(t('bulkEdit'), style: const TextStyle(fontSize: 12))),
+        const SizedBox(width: 6), OutlinedButton(onPressed: _busy || _selected.length < 2 ? null : () => _bulk(true), child: Text(t('bulkMerge'), style: const TextStyle(fontSize: 12))),
+        TextButton(onPressed: _busy || _selected.isEmpty ? null : () => setState(() => _selected.clear()), child: Text(t('clearSelection'), style: const TextStyle(fontSize: 12))),
+      ])),
+      if (_busy) const LinearProgressIndicator(), if (_message != null) Text(_message!),
+      Expanded(child: ListView(key: const ValueKey('registry-list'), controller: _listScroll, padding: const EdgeInsets.all(8), children: [
+        for (final c in _rows) Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Checkbox(key: ValueKey('select-${c['id']}'), value: _selected.containsKey(c['id']), onChanged: _busy ? null : (v) => _select(c, v ?? false)),
+            Text('${c['customer_code']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(child: Align(alignment: Alignment.centerLeft, child: TextButton(key: ValueKey('quick-name-${c['id']}'), onPressed: _busy ? null : () => _quickSearch('${c['name']}'), child: Text('${c['name']}', style: const TextStyle(fontSize: 14))))),
+            IconButton(onPressed: _busy ? null : () => _edit(c), icon: const Icon(Icons.edit_outlined, size: 20), tooltip: t('edit')),
+          ]),
+          Row(children: [
+            Expanded(child: TextButton(key: ValueKey('quick-phone-${c['id']}'), onPressed: _busy || '${c['phone'] ?? ''}'.replaceAll(RegExp(r'\D'), '').length < 4 ? null : () { final phone = '${c['phone']}'.replaceAll(RegExp(r'\D'), ''); _quickSearch(phone.substring(phone.length - 4)); }, child: Align(alignment: Alignment.centerLeft, child: Text('${c['phone'] ?? ''}', style: const TextStyle(fontSize: 13))))),
+            TextButton(onPressed: _busy ? null : () => _detail(c), child: Text(t('reviewStatus'), style: const TextStyle(fontSize: 12))),
+          ]),
+          Text('${t('sourceRows')} ${c['source_count']} · ${t('duplicates')} ${(c['duplicates'] as List? ?? []).length} · ${t('mismatches')} ${c['mismatch_count'] ?? 0}', style: const TextStyle(fontSize: 11)),
+        ]))),
+      ])),
+      if (constraints.maxHeight > 160) Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [TextButton(onPressed: _busy || _page == 0 ? null : () { _page--; if (_listScroll.hasClients) _listScroll.jumpTo(0); _load(); }, child: Text(t('prev'))), TextButton(onPressed: _busy || !_more ? null : () { _page++; if (_listScroll.hasClients) _listScroll.jumpTo(0); _load(); }, child: Text(t('more')))]),
+    ])),
+  );
 }
 
 class _RegistryDetail extends StatefulWidget {
