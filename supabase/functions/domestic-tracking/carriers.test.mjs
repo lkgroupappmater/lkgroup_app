@@ -11,7 +11,7 @@ test('full tracking identifiers normalize safely without allowing path or query 
  assert.equal(trackingNumber(' vte 12345678901 '),number);
  for(const value of ['123','../../private','123456?x=1','<script>','A'.repeat(41)])assert.throws(()=>trackingNumber(value));
  assert.equal(new URL(carrierUrl('HAL',number)).searchParams.get('search'),number);
- assert.equal(carrierUrl('MIXAY',number),null);
+ assert.equal(new URL(carrierUrl('MIXAY',number)).searchParams.get('id'),'com.mixay.express.app');
  assert.equal(new URL(carrierUrl('ANS',number)).searchParams.get('_bill_detail'),number);
  assert.equal(new URL(carrierUrl('JT',number)).searchParams.get('waybillNo'),number);
  assert.equal(new URL(carrierUrl('LAOPOST',number)).searchParams.get('tracking-number'),number);
@@ -45,7 +45,7 @@ test('only verified HAL adapter calls network; redirect/error responses never be
  let calls=0;
  const fetcher=async(url,options)=>{calls++;assert.equal(new URL(url).hostname,'hal.hal-logistics.la');assert.equal(options.redirect,'error');return Response.json(fixture)};
  assert.equal((await fetchTracking('HAL',number,fetcher)).status,'delivered');assert.equal(calls,1);
- for(const [code,error] of [['ANS','CONNECTION_REQUIRED'],['JT','VERIFICATION_REQUIRED'],['LAOPOST','VERIFICATION_REQUIRED'],['MIXAY','PLANNED']])await assert.rejects(fetchTracking(code,number,fetcher),new RegExp(error));
+ for(const [code,error] of [['ANS','CONNECTION_REQUIRED'],['JT','VERIFICATION_REQUIRED'],['LAOPOST','VERIFICATION_REQUIRED'],['MIXAY','CONNECTION_REQUIRED']])await assert.rejects(fetchTracking(code,number,fetcher),new RegExp(error));
  assert.equal(calls,1);
  await assert.rejects(fetchTracking('HAL',number,async()=>new Response('redirect',{status:302})),/CARRIER_UNAVAILABLE/);
  await assert.rejects(fetchTracking('HAL',number,async()=>new Response('captcha',{status:403})),/AUTH_REQUIRED/);

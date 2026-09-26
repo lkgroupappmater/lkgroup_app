@@ -1,9 +1,9 @@
-// Public tracking contracts verified against the carrier websites, 2026-09-16.
+// Public links rechecked 2026-09-26; only HAL has a verified automatic data contract.
 // Do not emulate CAPTCHA, use customer sessions, or infer undocumented private APIs.
 export const CARRIERS = {
   HAL: {name:'HAL · Houng Aloun', mode:'automatic', url:'https://halexpress.la/parcel'},
-  ANS: {name:'ANS · Anousith', mode:'connection_required', url:'https://app.anousith.express/login'},
-  MIXAY: {name:'Mixay', mode:'planned', url:null},
+  ANS: {name:'ANS · Anousith', mode:'connection_required', url:'https://app.anousith.express/landing/search_tracking/search_item'},
+  MIXAY: {name:'Mixay', mode:'connection_required', url:'https://play.google.com/store/apps/details?id=com.mixay.express.app'},
   JT: {name:'J&T Express', mode:'verification_required', url:'https://www.jtexpress.la/'},
   LAOPOST: {name:'Lao Post', mode:'verification_required', url:'https://www.laopost.com.la/online-service/tracking'},
 };
@@ -57,8 +57,8 @@ async function jsonFetch(fetcher,url,body) {
 export async function fetchTracking(code,number,fetcher=fetch) {
   const n=trackingNumber(number);
   if(code==='HAL')return normalizeHal(await jsonFetch(fetcher,`https://hal.hal-logistics.la/api/v1/orders/tracking/${encodeURIComponent(n)}`),n);
-  // ANS server requests redirect to an unrelated domain; do not follow them.
-  if(code==='ANS')throw new Error('CONNECTION_REQUIRED');
+  // Public interactive pages/apps do not establish a supported server data API.
+  if(CARRIERS[code]?.mode==='connection_required')throw new Error('CONNECTION_REQUIRED');
   throw new Error(CARRIERS[code]?.mode==='planned'?'PLANNED':'VERIFICATION_REQUIRED');
 }
 export function canSeePhoto(profile,parcel,shipment) {
@@ -69,4 +69,3 @@ export function canSeePhoto(profile,parcel,shipment) {
   const n=name(profile.name),p=phone(profile.phone);
   return !!n&&p.length===8&&n===name(shipment?.consignee_name??parcel.receiver_name)&&p===phone(shipment?.consignee_phone??parcel.receiver_phone);
 }
-

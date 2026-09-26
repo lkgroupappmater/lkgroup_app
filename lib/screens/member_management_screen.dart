@@ -1,3 +1,6 @@
+import 'customer_registry_screen.dart';
+import '../core/app_language.dart';
+import '../core/waybill_intake_text.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
@@ -8,7 +11,8 @@ import '../utils/form_validators.dart';
 import '../widgets/submit_search_field.dart';
 
 class MemberManagementScreen extends StatefulWidget {
-  const MemberManagementScreen({super.key});
+  const MemberManagementScreen({super.key,this.language=AppLanguage.korean});
+  final AppLanguage language;
 
   @override
   State<MemberManagementScreen> createState() =>
@@ -490,6 +494,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('회원 종합 관리'),
+        actions:[TextButton(onPressed:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>CustomerRegistryScreen(language:widget.language))),child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -719,3 +724,4 @@ class _AdminMemberData {
   final String name, email, password, phone, company;
   final UserRole role;
 }
+

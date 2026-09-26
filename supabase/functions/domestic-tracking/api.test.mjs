@@ -27,6 +27,7 @@ function setup({role='member',active=true,authenticated=true,rate=true,shipments
    return {data:structuredClone(rows)};
   }
   return {select(){return this},eq(k,v){predicates.push(r=>r[k]===v);return this},is(k,v){predicates.push(r=>(r[k]??null)===v);return this},in(k,v){predicates.push(r=>v.includes(r[k]));return this},
+   contains(k,v){predicates.push(r=>v.every(x=>(r[k]??[]).includes(x)));return this},
    ilike(k,v){const term=v.replace(/\\_/g,'_').replace(/%/g,'').toLowerCase();predicates.push(r=>String(r[k]??'').toLowerCase().includes(term));return this},
    or(){return this},order(k,options={}){orders.push([k,options.ascending!==false]);return this},limit(n){limit=n;return this},range(a,b){range=[a,b];return this},update(v){write=structuredClone(v);return this},insert(v){insert=structuredClone(v);return this},
    async maybeSingle(){const r=result();return {...r,data:r.data?.[0]??null}},async single(){return this.maybeSingle()},then(resolve,reject){return Promise.resolve(result()).then(resolve,reject)}};
@@ -92,6 +93,12 @@ test('customers cannot expose another recipient photo or mixed-owner statement l
  const hidden=await setup({shipments:[cargo(1,{customer_id:'other'})],parcels:[direct(1)]}).call({action:'statement_lookup',statement_number:'LKS03'});
  assert.deepEqual(hidden.body.parcels,[]);
 });
+test('one uploaded image containing different recipients is restricted even for one linked customer',async()=>{
+ const path='intake/owner/batch/multiple-labels.png';
+ const api=setup({shipments:[cargo(1),cargo(2,{customer_id:'other',consignee_name:'Other',consignee_phone:'2098765432'})],parcels:[parcel(1,{photo_path:path,photo_paths:[path]}),parcel(2,{shipment_id:2,photo_path:path,photo_paths:[path]})]});
+ const r=await api.call({action:'lookup',carrier:'ANS',tracking_number:'TEST00001'});
+ assert.equal(r.status,200);assert.deepEqual(r.body.parcels[0].photo_urls,[]);assert.equal(r.body.parcels[0].photo_restricted,true);assert.equal(api.signed,0);
+});
 test('statement save writes both compatible representations and partner ownership is enforced',async()=>{
  for(const role of ['admin','staff','partner']){
   const api=setup({role,shipments:[cargo(1),cargo(2)]});const r=await api.call(saveBody);
@@ -152,9 +159,9 @@ test('batch saves two numbers and two shared private photos atomically; initial 
 });
 test('invalid batches and photo limits have no partial registration; failed writes clean new images only',async()=>{
  const api=setup({role:'admin',shipments:[cargo(1)],parcels:[parcel(1,{carrier:'ANS',tracking_number:'1234567890123'})]});
- assert.equal((await api.call({...batchBody,waybills:Array(21).fill(batchBody.waybills[0])})).status,400);
+ assert.equal((await api.call({...batchBody,waybills:Array(51).fill(batchBody.waybills[0])})).status,400);
  assert.equal((await api.call({...batchBody,waybills:[batchBody.waybills[0],batchBody.waybills[0]]})).status,409);
- assert.equal((await api.call({...batchBody,photos:Array(11).fill(png)})).body.error,'TOO_MANY_PHOTOS');
+ assert.equal((await api.call({...batchBody,photos:Array(51).fill(png)})).body.error,'TOO_MANY_PHOTOS');
  assert.equal(api.mutations,0);
  const duplicate=await api.call({...batchBody,photos:[png,png]});assert.equal(duplicate.status,409);assert.equal(api.data.domestic_parcels.length,1);assert.deepEqual(api.removed,api.uploaded);
  const failed=setup({role:'admin',shipments:[cargo(1)],uploadFailure:2});

@@ -1,3 +1,5 @@
+import 'package:lkgroup_app/screens/waybill_intake_screen.dart';
+import 'package:lkgroup_app/services/waybill_intake_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -75,7 +77,7 @@ void main() {
     expect(find.text(domesticText(AppLanguage.korean, 'STATEMENT_REQUIRED')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('multiple waybills and photos are saved together under one statement', (tester) async {
+  testWidgets('selected photos open shared review with the confirmed statement and never save automatically', (tester) async {
     final calls = <Map<String, dynamic>>[];
     final image = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZkAAAAASUVORK5CYII=');
     await editor(tester, (action, body) async {
@@ -90,12 +92,17 @@ void main() {
     await tester.enterText(numbers.last, 'JTLA123456789012'); await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('delivery-pick-photos')));
     await tester.tap(find.byKey(const Key('delivery-pick-photos'))); await tester.pumpAndSettle();
-    expect(find.text('one.png'), findsOneWidget); expect(find.text('two.png'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('delivery-save')));
-    await tester.tap(find.byKey(const Key('delivery-save'))); await tester.pumpAndSettle();
-    expect(calls.last['action'], 'save_batch'); expect((calls.last['photos'] as List).length, 2);
-    expect(calls.last['waybills'], [{'carrier':'HAL','tracking_number':'VTE12345678901'},{'carrier':'JT','tracking_number':'JTLA123456789012'}]);
-    expect(calls.last['statement'], statement); expect(tester.takeException(), isNull);
+    final screen=tester.widget<WaybillIntakeScreen>(find.byType(WaybillIntakeScreen));
+    expect(screen.files.map((f)=>f.name), ['one.png','two.png']);
+    expect(screen.fixedLink?['statement'], statement);
+    expect(calls.any((c)=>c['action']=='save_batch'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+  test('intake validates 50 images at 5MB each and rejects excess before reading bytes',(){
+    final file=IntakeFile('photo.jpg',5242880,()async=>throw StateError('must not read'));
+    expect(()=>WaybillIntakeService.validate(List.filled(50,file)),returnsNormally);
+    expect(()=>WaybillIntakeService.validate(List.filled(51,file)),throwsA(isA<DomesticTrackingException>()));
+    expect(()=>WaybillIntakeService.validate([IntakeFile('too-large.jpg',5242881,file.readBytes)]),throwsA(isA<DomesticTrackingException>()));
   });
   testWidgets('management lists one parent per statement and refresh preserves grouping', (tester) async {
     tester.view.physicalSize = const Size(1000, 3200); tester.view.devicePixelRatio = 1;
@@ -198,3 +205,4 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+

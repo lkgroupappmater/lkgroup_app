@@ -1,3 +1,5 @@
+import 'unknown_cargo_media_screen.dart';
+import '../core/waybill_intake_text.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
@@ -540,6 +542,15 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
                               '${phone.isEmpty ? '-' : phone}',
                               style: const TextStyle(fontSize: 13),
                             ),
+                            if((row['photos'] as List? ?? []).isNotEmpty)
+                              Wrap(spacing:8,runSpacing:8,children:(row['photos'] as List).map((p)=>InkWell(
+                                onTap:()=>showDialog<void>(context:context,builder:(_)=>Dialog(child:InteractiveViewer(child:Image.network('${p['url']}')))),
+                                child:Image.network('${p['url']}',width:100,height:80,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox(width:100,height:80)),
+                              )).toList()),
+                            if([UserRole.admin,UserRole.staff].contains(widget.currentUser?.role))TextButton(onPressed:()async{
+                              final saved=await Navigator.of(context).push<bool>(MaterialPageRoute(builder:(_)=>UnknownCargoMediaScreen(language:widget.language,row:row)));
+                              if(saved==true&&mounted)await _loadUnknownRecipientCargo();
+                            },child:Text(intakeText(widget.language,'media'))),
                             if (pending && !isAdmin) ...[
                               const SizedBox(height: 6),
                               Text(
@@ -1661,3 +1672,4 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
