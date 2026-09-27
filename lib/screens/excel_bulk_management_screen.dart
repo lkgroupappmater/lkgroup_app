@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -12,7 +14,16 @@ class ExcelBulkManagementScreen extends StatefulWidget {
       _ExcelBulkManagementScreenState();
 }
 
-class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
+class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
+  @override
+  bool get autoRefreshAllowed => !_busy && _checked.isEmpty;
+
   List<ExcelBulkBatch> _batches = const [];
   List<Map<String, dynamic>> _rows = const [];
   final Set<String> _checked = <String>{};
@@ -23,9 +34,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
   bool _busy = true;
   bool _lockedOnly = false;
 
-  List<Map<String, dynamic>> get _visibleRows => _lockedOnly
-      ? _rows.where((e) => e['data_locked'] == true).toList(growable: false)
-      : _rows;
+  List<Map<String, dynamic>> get _visibleRows => _rows.where((r) => (!_lockedOnly || r['data_locked'] == true) && _fieldFilter.matches(r)).toList(growable: false);
 
   int get _lockedCount =>
       _rows.where((e) => e['data_locked'] == true).length;
@@ -68,7 +77,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
     setState(() => _busy = true);
     try {
       final batches = await ExcelBulkManagementService.instance.listBatches();
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _batches = batches;
         if (_route != null && !_routes.contains(_route)) _route = null;
@@ -91,14 +100,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       return;
     }
 
-    setState(() => _busy = true);
+    if (!_automaticLoad) setState(() => _busy = true);
     try {
       final rows = await ExcelBulkManagementService.instance.listRows(
         route: _route!,
         year: _year!,
         voyage: _voyage!,
       );
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _rows = rows;
         _checked.clear();
@@ -195,7 +204,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
     setState(() => _busy = true);
     try {
       await ExcelBulkManagementService.instance.setLocked([id], false);
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         row['data_locked'] = false;
         _checked.remove(id);
@@ -405,7 +414,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
       );
 
   void _message(String value) {
-    if (!mounted) return;
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
@@ -436,6 +445,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','sender_name':'발송인','unloading_zone':'구획','special_note_auto':'배송 구분'}, onChanged: () => setState(() => _checked.clear())),
         title: const Text('엑셀 데이타 일괄 관리'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

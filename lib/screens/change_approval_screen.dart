@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -16,7 +18,16 @@ class ChangeApprovalScreen extends StatefulWidget {
   State<ChangeApprovalScreen> createState() => _ChangeApprovalScreenState();
 }
 
-class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
+class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
+  @override
+  bool get autoRefreshAllowed => !_processing && !_batchDialogOpen;
+
   List<Map<String, dynamic>> _requests = const [];
   List<Map<String, dynamic>> _unknownClaims = const [];
   List<Map<String, dynamic>> _invoiceCorrections = const [];
@@ -37,7 +48,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   };
 
   List<ApprovalItem> _itemsFor(ApprovalKind kind) =>
-      _rowsFor(kind).map((row) => ApprovalItem(kind, row)).toList();
+      _rowsFor(kind).where(_fieldFilter.matches).map((row) => ApprovalItem(kind, row)).toList();
 
   void _pruneSelection() {
     final keys = {
@@ -222,9 +233,9 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         _selected.remove(key);
         _batchDrafts.remove(key);
       }
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       await _load();
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       final summary =
           '일괄 처리 완료 · 성공 ${result.succeeded.length}건 · 실패 ${result.failures.length}건';
       if (result.failures.isEmpty) {
@@ -292,7 +303,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (!_automaticLoad) setState(() => _loading = true);
     try {
       final rows = await ShipmentService.instance.getPendingChangeRequests();
 
@@ -361,7 +372,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
           incompleteById[id] = copy;
         }
       }
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _clearSingleEditors();
         _requests = rows;
@@ -430,7 +441,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         action: action,
         adminChanges: adminChanges,
       );
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       _message(
         action == 'reject'
             ? '거절되었습니다.'
@@ -541,7 +552,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
       await UnknownRecipientService.instance.keepAutoUnmatched(
         (row['queue_id'] as num).toInt(),
       );
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       _message('수취인 불명 상태로 확인 완료했습니다. 화물은 XX / 구획 F로 유지됩니다.');
       await _load();
     } catch (error) {
@@ -913,7 +924,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         claimId: id,
         action: action,
       );
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       _message(
         approve ? '수취인 불명 화물을 본인 화물로 확인 승인했습니다.' : '수취인 불명 화물 확인 요청을 거절했습니다.',
       );
@@ -962,7 +973,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
         requestId: (request['request_id'] as num).toInt(),
         action: action,
       );
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       _message(approve ? '화물 수취인 정보를 정정했습니다.' : '정정 요청을 거절했습니다.');
       await _load();
     } catch (error) {
@@ -971,7 +982,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
   }
 
   void _message(String message) {
-    if (!mounted) return;
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
@@ -981,6 +992,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
     canPop: !_processing,
     child: Scaffold(
       appBar: AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'수령인','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','status':'상태','request_source':'요청 경로','created_at':'요청일'}, onChanged: () => setState(() { _selected.clear(); _batchDrafts.clear(); })),
         title: Text(_processing ? '일괄 처리 중 $_progress' : '화물 내용 변경 승인 관리'),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
@@ -1015,7 +1027,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       ),
                       const SizedBox(height: 8),
                       _selectionToolbar(ApprovalKind.incomplete),
-                      ..._incomplete.map(_incompleteCard),
+                      ..._incomplete.where(_fieldFilter.matches).map(_incompleteCard),
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1036,7 +1048,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       ),
                       const SizedBox(height: 8),
                       _selectionToolbar(ApprovalKind.autoUnmatched),
-                      ..._autoUnmatched.map(_autoUnmatchedCard),
+                      ..._autoUnmatched.where(_fieldFilter.matches).map(_autoUnmatchedCard),
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1052,7 +1064,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       ),
                       const SizedBox(height: 8),
                       _selectionToolbar(ApprovalKind.unknownClaims),
-                      ..._unknownClaims.map(_unknownClaimCard),
+                      ..._unknownClaims.where(_fieldFilter.matches).map(_unknownClaimCard),
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1073,7 +1085,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       ),
                       const SizedBox(height: 8),
                       _selectionToolbar(ApprovalKind.invoiceClaims),
-                      ..._invoiceCorrections.map(_invoiceCorrectionCard),
+                      ..._invoiceCorrections.where(_fieldFilter.matches).map(_invoiceCorrectionCard),
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1091,7 +1103,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> {
                       ),
                     if (_requests.isNotEmpty) ...[
                       _selectionToolbar(ApprovalKind.changes),
-                      ..._requests.map(_requestCard),
+                      ..._requests.where(_fieldFilter.matches).map(_requestCard),
                     ],
                   ],
                 ),

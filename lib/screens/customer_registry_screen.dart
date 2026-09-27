@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'customer_registry_bulk_editor.dart';
+import 'customer_registry_auto_merge.dart';
 import '../core/app_language.dart';
 import '../core/waybill_intake_text.dart';
 import '../services/domestic_tracking_service.dart';
@@ -54,7 +55,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
       title: Text(t('customers')), content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: number, enabled: !saving, readOnly: [1,2].contains(c['customer_no']), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ID')),
         TextField(controller: name, enabled: !saving, maxLength: 160, decoration: InputDecoration(labelText: t('receiver'))),
-        TextField(controller: phone, enabled: !saving, maxLength: 40, decoration: InputDecoration(labelText: t('phone'))),
+        TextField(controller: phone, enabled: !saving, maxLength: 160, decoration: InputDecoration(labelText: t('phone'))),
         TextField(controller: reason, enabled: !saving, maxLength: 500, decoration: InputDecoration(labelText: t('reason'))),
         if (message != null) Text(message!),
       ])), actions: [TextButton(onPressed: saving ? null : () => Navigator.pop(context), child: Text(t('close'))), FilledButton(onPressed: saving ? null : () async {
@@ -117,6 +118,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
       if (constraints.maxHeight > 220) SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
         FilledButton(onPressed: _busy || _selected.isEmpty ? null : () => _bulk(false), child: Text(t('bulkEdit'), style: const TextStyle(fontSize: 12))),
         const SizedBox(width: 6), OutlinedButton(onPressed: _busy || _selected.length < 2 ? null : () => _bulk(true), child: Text(t('bulkMerge'), style: const TextStyle(fontSize: 12))),
+        OutlinedButton(key: const ValueKey('auto-merge-open'), onPressed: _busy ? null : () async { final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CustomerRegistryAutoMerge(language: widget.language, callApi: _call))); if (valid && saved == true) { _selected.clear(); await _load(); } }, child: Text(t('autoMerge'), style: const TextStyle(fontSize: 12))),
         TextButton(onPressed: _busy || _selected.isEmpty ? null : () => setState(() => _selected.clear()), child: Text(t('clearSelection'), style: const TextStyle(fontSize: 12))),
       ])),
       if (_busy) const LinearProgressIndicator(), if (_message != null) Text(_message!),

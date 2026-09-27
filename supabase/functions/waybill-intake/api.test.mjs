@@ -5,10 +5,11 @@ import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import * as validation from './validation.mjs';
 import * as registry from './registry.mjs';
+import * as autoMerge from './auto-merge.mjs';
 const source=stripTypeScriptTypes(fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8').replace(/^import .+;\n/gm,''),{mode:'transform'});
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0,0]);
 function setup({role='admin',active=true,authenticated=true,data:initial={},ocr={waybills:[]},ocrFailure=false}={}){
- const data={profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_sources:[],customer_registry_source_status:[],shipments:[],customer_registry_statement_mapping:[],...structuredClone(initial)};
+ const data={profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_aliases:[],customer_registry_separation_names:[],local_delivery_profiles:[],customer_registry_sources:[],customer_registry_source_status:[],shipments:[],customer_registry_statement_mapping:[],...structuredClone(initial)};
  let handler,ocrCalls=0,ocrBody=null;const writes=[],rpcCalls=[],signed=[];
  function query(table){let filters=[],write=null,insert=null,count=false,window=null;
   function run(){let rows=data[table].filter(r=>filters.every(f=>f(r)));
@@ -33,11 +34,12 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
    }
    if(name==='customer_registry_change'||name==='customer_registry_merge')return {data:{id:args.p_id??args.p_target}};
    if(name==='customer_registry_member_id')return {data:{customer_code:'023',status:'linked'}};
+   if(name==='customer_registry_auto_apply')return {data:{merged_count:1,group_count:1}};
    if(name==='customer_registry_bulk_apply')return {data:{updated_count:2,merged_count:0,moved_sources:0}};
    if(name==='customer_registry_resolve_source')return {data:true};
    assert.fail(name);
   }};
- vm.runInNewContext(source,{...validation,...registry,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
+ vm.runInNewContext(source,{...validation,...registry,...autoMerge,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
   fetch:async(_url,options)=>{ocrCalls++;ocrBody=JSON.parse(options.body);return new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify(ocr)}]}]}),{status:ocrFailure?503:200});}});
  return {data,writes,rpcCalls,signed,get ocrCalls(){return ocrCalls},get ocrBody(){return ocrBody},async call(body,token='valid'){
   const r=await handler(new Request('https://test.invalid',{method:'POST',headers:token?{Authorization:`Bearer ${token}`}:{},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};
@@ -151,4 +153,17 @@ test('bulk identity lookup is read-only and role-scoped',async()=>{
  const api=setup({data});const r=await api.call({action:'customer_identity_index',profile_ids:['owner','missing'],shipment_ids:[1,2]});
  assert.equal(r.status,200);assert.equal(r.body.profiles.length,1);assert.equal(r.body.profiles[0].customer_code,'023');assert.equal(r.body.shipments.length,1);assert.equal(api.writes.length,0);
  assert.equal((await api.call({action:'customer_identity_index',shipment_ids:Array(501).fill(1)})).status,400);
+});
+
+test('auto merge candidates and preview are read only; commit requires review and current versions',async()=>{
+ const rows=[3,4].map((n,i)=>({id:String(n),customer_no:n,name:i?'A / B':'A',phone:'02012345678',updated_at:'stamp'}));
+ const api=setup({data:{customer_registry:rows}}),selection=rows.map(({id,updated_at})=>({id,updated_at}));
+ for(const action of ['customers_auto_candidates','customers_auto_preview']){const r=await api.call({action,selection});assert.equal(r.status,200);assert.equal(r.body.groups.length,1);}
+ assert.equal(api.rpcCalls.length,0);assert.equal(api.writes.length,0);
+ assert.equal((await api.call({action:'customers_auto_commit',selection})).status,400);
+ assert.equal((await api.call({action:'customers_auto_commit',selection:[{...selection[0],updated_at:'old'},selection[1]],confirmed:true})).status,409);
+ assert.equal(api.rpcCalls.length,0);
+ assert.equal((await api.call({action:'customers_auto_commit',selection,confirmed:true})).status,200);
+ assert.equal(api.rpcCalls[0].name,'customer_registry_auto_apply');assert.equal(api.rpcCalls[0].args.p_owner,'owner');
+ for(const role of ['member','staff','partner'])for(const action of ['customers_auto_candidates','customers_auto_preview','customers_auto_commit'])assert.equal((await setup({role}).call({action,selection,confirmed:true})).status,403);
 });

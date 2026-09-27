@@ -1,3 +1,4 @@
+import '../widgets/management_field_search.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +23,7 @@ class _UnloadingListManagementScreenState
     extends State<UnloadingListManagementScreen> {
   List<ExcelBulkBatch> _batches = const [];
   List<Map<String, dynamic>> _rows = const [];
+  final _fieldFilter = ManagementFieldFilter();
 
   String? _route;
   int? _year;
@@ -330,6 +332,7 @@ class _UnloadingListManagementScreenState
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
+          bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','unloading_zone':'구획'}, onChanged: () => setState(() {})),
           title: const Text('하역 자료 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -427,6 +430,10 @@ class _UnloadingListManagementScreenState
               Text(
                 '화물 ${_rows.length}건 · 노란색 확인 필요 ${_rows.where(_needsAttention).length}건',
               ),
+            ],
+            if (_fieldFilter.query.trim().isNotEmpty) ...[
+              Text('검색 결과 ${_rows.where(_fieldFilter.matches).length}건'),
+              SizedBox(height: 240, child: ListView(children: [for (final row in _rows.where(_fieldFilter.matches)) ListTile(title: Text('${row['receipt_number'] ?? ''} · ${row['consignee_name'] ?? ''}'), subtitle: Text('${row['consignee_phone'] ?? ''} · ${row['box_number'] ?? ''} · ${row['unloading_zone'] ?? ''}'))])),
             ],
             const SizedBox(height: 10),
             FilledButton.icon(

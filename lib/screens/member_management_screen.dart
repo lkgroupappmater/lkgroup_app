@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'customer_registry_screen.dart';
 import '../services/customer_identity_service.dart';
 import '../services/waybill_intake_service.dart';
@@ -21,7 +23,14 @@ class MemberManagementScreen extends StatefulWidget {
       _MemberManagementScreenState();
 }
 
-class _MemberManagementScreenState extends State<MemberManagementScreen> {
+class _MemberManagementScreenState extends State<MemberManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadMembers(); } finally { _automaticLoad = false; } }
+
   final _search = TextEditingController();
   String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
@@ -49,8 +58,8 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   }
 
   Future<void> _loadMembers() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+    if (!_automaticLoad) setState(() => _loading = true);
     _loadRegistrySummary();
     try {
       if (!SupabaseConfig.isConfigured) {
@@ -458,7 +467,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
       );
 
   void _message(String text, {bool error = false}) {
-    if (!mounted) return;
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
@@ -505,13 +514,14 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pending = _pendingRequests;
-    final fixed = _fixedManagementMembers;
-    final list = _filteredMembers;
-    final deleted = _deletedMembers;
+    final pending = _pendingRequests.where(_fieldFilter.matches).toList();
+    final fixed = _fixedManagementMembers.where(_fieldFilter.matches).toList();
+    final list = _filteredMembers.where(_fieldFilter.matches).toList();
+    final deleted = _deletedMembers.where(_fieldFilter.matches).toList();
 
     return Scaffold(
       appBar: AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () => setState(() { _submittedSearch = _fieldFilter.query; _search.text = _fieldFilter.query; })),
         title: const Text('회원 종합 관리'),
         actions:[TextButton(onPressed:_openRegistry,child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
 import '../services/customer_benefit_service.dart';
-import '../widgets/submit_search_field.dart';
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
+import '../services/customer_identity_service.dart';
 
 class LocalDeliveryManagementScreen extends StatefulWidget {
   const LocalDeliveryManagementScreen({super.key, this.language = AppLanguage.korean});
@@ -14,20 +16,22 @@ class LocalDeliveryManagementScreen extends StatefulWidget {
   State<LocalDeliveryManagementScreen> createState() => _LocalDeliveryManagementScreenState();
 }
 
-class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementScreen> with SharedUiTextState {
+class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementScreen> with SharedUiTextState, AutoRefreshState {
+  @override
+  Set<String> get autoRefreshTopics => {'customers', 'local_delivery_profiles'};
+  @override
+  Future<void> refreshAutomatically() => _load(silent: true);
+  final _fieldFilter = ManagementFieldFilter();
+  Map<int, String> _customerCodes = {};
+  String _typeFilter = '', _companyFilter = '';
+  List<String> get _companies => _rules.map((r) => r.localCompany).where((v) => v.isNotEmpty).toSet().toList()..sort();
   List<LocalDeliveryRule> _rules = const [];
   String _route = 'kr_la_sea';
-  String _query = '';
-  final _searchController = TextEditingController();
   bool _loading = true;
 
-  List<LocalDeliveryRule> get _visible => _rules.where((r) {
-        if (r.routeKey != _route) return false;
-        if (_query.trim().isEmpty) return true;
-        final q = _query.toLowerCase().trim();
-        return [r.customerName, r.alternateName, r.companyName, r.phone, r.localCompany, r.destinationAddress]
-            .any((e) => e.toLowerCase().contains(q));
-      }).toList(growable: false);
+  List<LocalDeliveryRule> get _visible => _rules.where((r) =>
+    (_route.isEmpty || r.routeKey == _route) && (_typeFilter.isEmpty || r.deliveryType == _typeFilter) && (_companyFilter.isEmpty || r.localCompany == _companyFilter) &&
+    _fieldFilter.matches({'customer_name': '${r.customerName} / ${r.alternateName}', 'customer_code': _customerCodes[r.id], 'phone': r.phoneDisplay.isEmpty ? r.phone : r.phoneDisplay, 'route': RouteCatalog.labelForKey(r.routeKey), 'local_company': r.localCompany, 'delivery_type': '${r.deliveryType} ${r.typeLabel}', 'address': r.destinationAddress, 'paid_by': r.paidBy, 'notes': r.notes})).toList(growable: false);
 
   @override
   void initState() {
@@ -37,15 +41,15 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     try {
       final rows = await CustomerBenefitService.instance.listLocalDeliveryRules();
-      if (mounted) setState(() => _rules = rows);
+      final codes = await CustomerIdentityService.deliveryCodes(rows.where((r) => r.id != null).map((r) => r.id!).toList());
+      if (mounted && (!silent || canApplyAutoRefresh)) setState(() { _rules = rows; _customerCodes = codes; if (!_rules.any((r) => r.localCompany == _companyFilter)) _companyFilter = ''; });
     } catch (e) {
       if (mounted) _msg('시내·지방 배송 목록 조회 실패: $e');
     } finally {
@@ -177,7 +181,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(SharedUiTextService.instance.text('localDeliveries', widget.language.code, '시내.지방 배송 list 관리'))),
+        appBar: AppBar(actions: [IconButton(onPressed: _loading ? null : () => _load(), icon: const Icon(Icons.refresh))], title: Text(SharedUiTextService.instance.text('localDeliveries', widget.language.code, '시내.지방 배송 list 관리'))),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(),
           icon: const Icon(Icons.add_location_alt_outlined),
@@ -194,17 +198,18 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
                         DropdownButtonFormField<String>(
                           initialValue: _route,
                           decoration: const InputDecoration(labelText: '운송 경로', border: OutlineInputBorder()),
-                          items: CustomerBenefitService.localDeliveryRouteKeys
-                              .map((e) => DropdownMenuItem(value: e, child: Text(RouteCatalog.labelForKey(e))))
+                          items: ['', ...CustomerBenefitService.localDeliveryRouteKeys]
+                              .map((e) => DropdownMenuItem(value: e, child: Text(e.isEmpty ? '전체 경로' : RouteCatalog.labelForKey(e))))
                               .toList(),
                           onChanged: (v) => setState(() => _route = v ?? _route),
                         ),
                         const SizedBox(height: 8),
-                        SubmitSearchField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: '이름 / 전화번호 / 업체 / 주소 검색', border: OutlineInputBorder()),
-                          onSearch: (v) => setState(() => _query = v),
-                        ),
+                        Row(children: [
+                          Expanded(child: DropdownButtonFormField<String>(initialValue: _typeFilter, decoration: const InputDecoration(labelText: 'Type'), items: const [DropdownMenuItem(value: '', child: Text('전체 유형')), DropdownMenuItem(value: 'city', child: Text('시내 배송')), DropdownMenuItem(value: 'province', child: Text('지방배송'))], onChanged: (v) => setState(() => _typeFilter = v ?? ''))),
+                          const SizedBox(width: 8),
+                          Expanded(child: DropdownButtonFormField<String>(key: ValueKey(_companyFilter), initialValue: _companyFilter, isExpanded: true, decoration: const InputDecoration(labelText: '현지 업체'), items: ['', ..._companies].map((v) => DropdownMenuItem(value: v, child: Text(v.isEmpty ? '전체 업체' : v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) => setState(() => _companyFilter = v ?? ''))),
+                        ]),
+                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_name':'고객명', 'customer_code':'고객 ID', 'phone':'연락처', 'route':'운송 경로', 'local_company':'현지 업체', 'delivery_type':'Type', 'address':'배송 주소', 'paid_by':'결제 구분', 'notes':'비고'}, onChanged: () => setState(() {})),
                       ],
                     ),
                   ),
@@ -222,7 +227,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
                                     backgroundColor: r.isCity ? Colors.green.shade100 : Colors.grey.shade200,
                                     child: Icon(r.isCity ? Icons.location_city : Icons.local_shipping_outlined, color: r.isCity ? Colors.green.shade800 : Colors.grey.shade800),
                                   ),
-                                  title: Text('${r.sourceNo == null ? '' : '(${r.originalSourceNo ?? r.sourceNo}) '}${r.customerName}${r.alternateName.isEmpty ? '' : ' / ${r.alternateName}'}'),
+                                  title: Text('${_customerCodes[r.id] == null ? '' : 'ID ${_customerCodes[r.id]} · '}${r.sourceNo == null ? '' : '(${r.originalSourceNo ?? r.sourceNo}) '}${r.customerName}${r.alternateName.isEmpty ? '' : ' / ${r.alternateName}'}'),
                                   subtitle: Text('${r.typeLabel} · ${r.phoneDisplay.isEmpty ? r.phone : r.phoneDisplay}\n${r.localCompany}${r.destinationAddress.isEmpty ? '' : ' · ${r.destinationAddress}'}'),
                                   isThreeLine: true,
                                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [

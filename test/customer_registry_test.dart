@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/core/app_language.dart';
 import '../lib/screens/customer_registry_screen.dart';
+import '../lib/screens/customer_registry_auto_merge.dart';
 import '../lib/screens/customer_registry_bulk_editor.dart';
 import '../lib/services/domestic_tracking_service.dart';
 
@@ -61,4 +62,28 @@ void main() {
     expect(writes, hasLength(1)); expect((writes.single['rows'] as List).map((r) => r['target_id']), ['customer1', 'customer1']);
     expect(find.text('02077770000'), findsOneWidget); expect(find.textContaining('다른 곳에서 자료가 변경'), findsOneWidget); expect(tester.takeException(), isNull);
   });
+
+testWidgets('reviewed auto merge excludes unchecked IDs and requires delivery confirmation', (tester) async {
+  final calls = <Map<String, dynamic>>[];
+  final members = [for (var i = 0; i < 3; i++) <String, dynamic>{'id': 'a$i', 'customer_code': '00${i + 3}', 'name': 'Name $i', 'phone': '02012345678', 'updated_at': 'stamp', 'delivery_contexts': <String>[]}];
+  Future<Map<String, dynamic>> api(String action, Map<String, dynamic> body) async {
+    calls.add({'action': action, ...body});
+    if (action == 'customers_auto_candidates') return {'groups': [{'members': members, 'default_selected': true}]};
+    if (action == 'customers_auto_preview') return {'merged_count': 1, 'excluded_count': 0, 'groups': [{'members': members.skip(1).toList(), 'customer_code': '004', 'name': 'Name 1 / Name 2', 'phone': '02012345678'}]};
+    return {'merged_count': 1};
+  }
+  await tester.pumpWidget(MaterialApp(home: CustomerRegistryAutoMerge(language: AppLanguage.korean, callApi: api)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('auto-select-a0')));await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('auto-submit')));await tester.pumpAndSettle();
+  final preview = calls.last['selection'] as List;
+  expect(preview.map((e) => e['id']), ['a1','a2']);
+  expect(tester.widget<FilledButton>(find.byKey(const ValueKey('auto-submit'))).onPressed, isNull);
+  await tester.ensureVisible(find.byKey(const ValueKey('auto-reviewed')));
+  await tester.tap(find.byKey(const ValueKey('auto-reviewed')));await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('auto-submit')));await tester.pumpAndSettle();
+  expect(calls.last['action'], 'customers_auto_commit');
+  expect((calls.last['selection'] as List).map((e) => e['id']), ['a1','a2']);
+});
+
 }

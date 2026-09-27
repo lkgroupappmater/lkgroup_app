@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
@@ -19,7 +21,15 @@ class NoticeManagementScreen extends StatefulWidget {
   State<NoticeManagementScreen> createState() => _NoticeManagementScreenState();
 }
 
-class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
+class _NoticeManagementScreenState extends State<NoticeManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
+  List<Map<String, dynamic>> get _searchRows => _items.where(_fieldFilter.matches).toList(growable: false);
+
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
 
@@ -46,20 +56,20 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
   }
 
   void _message(String text) {
-    if (!mounted) return;
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _load() async {
     try {
       final rows = await ContentService.fetchNotices(includePendingDeletion: true);
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _items = rows;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() => _loading = false);
       _message(_ue('공지 및 안내 조회 실패', e));
     }
@@ -287,6 +297,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'title':'제목','content':'내용','created_at':'작성일','is_pinned':'상단 고정'}, onChanged: () => setState(() {})),
         title: Text(_u('공지 및 안내 목록 관리')),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
@@ -304,9 +315,9 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  if (_items.isEmpty)
+                  if (_searchRows.isEmpty)
                     Card(child: ListTile(title: Text(_u('등록된 공지 및 안내가 없습니다.')))),
-                  ..._items.map((row) {
+                  ..._searchRows.map((row) {
                     final pending = _text(row, 'deletion_status') == 'pending';
                     return Card(
                       margin: const EdgeInsets.only(bottom: 10),

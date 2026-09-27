@@ -2,6 +2,20 @@ import 'app_language.dart';
 import 'domestic_tracking_text.dart';
 
 const intakeWords = <String, List<String>> {
+  "autoMerge": ["중복 ID 자동 통합", "Automatic duplicate ID merge", "ລວມ ID ຊ້ຳອັດຕະໂນມັດ"],
+  "autoMergeHelp": ["같은 연락처에 이름이 /로 하나 추가되거나, 같은 이름에 연락처가 하나 추가된 고객을 묶습니다. 체크를 풀면 해당 ID는 유지됩니다.", "Groups equal contacts with one additional slash-separated name, or equal names with one additional phone. Uncheck any ID to keep it separate.", "ຈັດກຸ່ມຊື່ທີ່ເພີ່ມຜ່ານ / ເມື່ອເບີຄືກັນ ຫຼື ຊື່ຄືກັນທີ່ເພີ່ມເບີໜຶ່ງ. ຍົກເລີກເຄື່ອງໝາຍເພື່ອແຍກ ID."],
+  "deliveryMergeReminder": ["지방배송·수령인·선결제 등으로 구분한 고객은 통합하지 마세요. 배송 정보가 있는 그룹은 직접 선택해 주세요. 지정된 별도 ID는 함께 통합할 수 없습니다.", "Keep customers separate when provincial delivery, recipients or prepayment differ. Groups with delivery information require manual selection. Protected identities cannot be merged together.", "ຢ່າລວມລູກຄ້າທີ່ແຍກຕາມການສົ່ງ, ຜູ້ຮັບ ຫຼື ການຈ່າຍລ່ວງໜ້າ. ເລືອກກຸ່ມທີ່ມີຂໍ້ມູນສົ່ງດ້ວຍຕົນເອງ. ID ທີ່ປ້ອງກັນຈະລວມກັນບໍ່ໄດ້."],
+  "autoPreview": ["선택 내용 미리보기", "Preview selection", "ເບິ່ງການເລືອກລ່ວງໜ້າ"],
+  "autoReviewConfirm": ["배송 구분과 제외할 ID를 확인했습니다. 선택된 고객만 가장 작은 ID로 통합합니다.", "I checked delivery distinctions and excluded IDs. Merge selected customers into their lowest ID.", "ກວດການແຍກຈັດສົ່ງ ແລະ ID ທີ່ຍົກເວັ້ນແລ້ວ. ລວມສະເພາະທີ່ເລືອກເຂົ້າ ID ນ້ອຍສຸດ."],
+  "autoCommit": ["확인한 ID 통합 실행", "Merge reviewed IDs", "ລວມ ID ທີ່ກວດແລ້ວ"],
+  "autoBack": ["선택 변경", "Change selection", "ປ່ຽນການເລືອກ"],
+  "autoExcluded": ["조건에 맞는 짝이 없어 유지되는 ID 수", "Selected IDs kept separate because no matching partner remains", "ຈຳນວນ ID ທີ່ແຍກເພາະບໍ່ມີຄູ່ກົງ"],
+  "protectedIdentity": ["별도 ID 유지 대상", "Protected separate identity", "ID ທີ່ຕ້ອງແຍກ"],
+  "noDeliveryInfo": ["등록된 배송 구분 없음 · 통합 전 확인 필요", "No saved delivery distinction; verify before merging", "ບໍ່ມີຂໍ້ມູນແຍກການສົ່ງ; ກວດກ່ອນລວມ"],
+  "LOWEST_CUSTOMER_ID_REQUIRED": ["가장 작은 고객 ID를 남길 ID로 선택해 주세요.", "Choose the lowest customer ID to retain.", "ເລືອກເກັບ ID ນ້ອຍສຸດ."],
+  "SEPARATE_CUSTOMER_IDS": ["별도 유지하도록 지정된 고객입니다. 서로 다른 이름의 ID는 체크를 풀고 따로 처리해 주세요.", "These identities must remain separate. Uncheck the different identity and review each separately.", "ID ເຫຼົ່ານີ້ຕ້ອງແຍກ. ຍົກເລີກເຄື່ອງໝາຍຊື່ທີ່ຕ່າງ ແລະ ກວດແຍກ."],
+  "COMBINED_CONTACT_TOO_LONG": ["합친 이름 또는 연락처가 160자를 초과합니다. 통합 전에 내용을 정리해 주세요.", "Combined name or phones exceed 160 characters. Review the details before merging.", "ຊື່ ຫຼື ເບີທີ່ລວມເກີນ 160 ຕົວອັກສອນ. ກວດຂໍ້ມູນກ່ອນລວມ."],
+  "AUTO_SELECTION_INVALID": ["조건에 맞는 고객을 같은 그룹에서 2개 이상 선택해 주세요.", "Select at least two matching customers in the same group.", "ເລືອກລູກຄ້າທີ່ກົງກັນຢ່າງໜ້ອຍ 2 ລາຍໃນກຸ່ມ."],
   "close": [
     "닫기",
     "Close",

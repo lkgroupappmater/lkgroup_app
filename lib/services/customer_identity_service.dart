@@ -14,4 +14,14 @@ class CustomerIdentityService {
       for (final m in group) { m['customer_code'] = codes['${m['id']}']?['customer_code']; m['identity_status'] = codes['${m['id']}']?['status']; }
     }
   }
+  static Future<Map<int, String>> deliveryCodes(List<int> ids) async {
+    final result = <int, String>{};
+    for (var start = 0; start < ids.length; start += 500) {
+      final response = await WaybillIntakeService.call('delivery_customer_index', {'delivery_ids': ids.skip(start).take(500).toList()});
+      for (final row in response['deliveries'] as List) {
+        if (row['customer_code'] != null) result[(row['id'] as num).toInt()] = '${row['customer_code']}';
+      }
+    }
+    return result;
+  }
 }

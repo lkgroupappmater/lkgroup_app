@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validateFiles, imageMime, normalizeDrafts, validateReviewed } from './validation.mjs';
+import { autoCandidates, previewAutoSelection, deliveryIdentityIndex } from './auto-merge.mjs';
 import { registrySummary, mapLimit, validateBulkRows } from './registry.mjs';
 
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
@@ -7,7 +8,7 @@ const json = (status:number,body:unknown) => new Response(JSON.stringify(body), 
 class RequestError extends Error { constructor(public status:number, code:string) { super(code); } }
 const require = (ok:unknown,code:string,status=400) => { if (!ok) throw new RequestError(status,code); };
 const result = (r:any) => {
- if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID','BULK_SELECTION_INVALID','UNKNOWN_CUSTOMER_NAME'].find(c=>String(r.error.message).includes(c));
+ if(r.error){const code=['RECORD_CHANGED','RESERVED_CUSTOMER_ID','DUPLICATE_RECORD','FORBIDDEN','INVALID_CUSTOMER_ID','BULK_SELECTION_INVALID','UNKNOWN_CUSTOMER_NAME','SEPARATE_CUSTOMER_IDS','LOWEST_CUSTOMER_ID_REQUIRED','COMBINED_CONTACT_TOO_LONG','AUTO_SELECTION_INVALID'].find(c=>String(r.error.message).includes(c));
   throw new RequestError(code==='FORBIDDEN'?403:code||r.error.code==='23505'?409:500,code??(r.error.code==='23505'?'DUPLICATE_RECORD':'DATABASE_ERROR'));}
  return r.data;
 };
@@ -110,9 +111,28 @@ Deno.serve(async(req:Request)=>{
    const output=state.rows.filter((r:any)=>(!query||[r.customer_code,r.name,r.phone].some(v=>String(v).toLowerCase().includes(query))||(pk.length>=4&&r.phone_key.includes(pk)))&&(!b.conflicts_only||r.conflict)&&(!b.mismatches_only||r.mismatch));
    const page=Math.max(0,Math.floor(Number(b.page)||0));return json(200,{customers:output.slice(page*100,page*100+100),total:output.length,has_more:output.length>(page+1)*100,summary:state.summary});
   }
+  if(b.action==='delivery_customer_index'){
+   require(admin,'FORBIDDEN',403);
+   require(Array.isArray(b.delivery_ids)&&b.delivery_ids.length<=500&&b.delivery_ids.every((v:any)=>Number.isSafeInteger(v)&&v>0),'INVALID_REQUEST');
+   if(!b.delivery_ids.length)return json(200,{deliveries:[]});
+   const [customers,aliasRows,profiles]=await Promise.all([registry(),rows(()=>db.from('customer_registry_aliases').select('*').order('name_key').order('phone_key')),rows(()=>db.from('local_delivery_profiles').select('id,customer_name,alternate_name,phone,phone_display').in('id',b.delivery_ids).order('id'))]);
+   return json(200,{deliveries:deliveryIdentityIndex(customers,aliasRows,profiles)});
+  }
+  if(['customers_auto_candidates','customers_auto_preview','customers_auto_commit'].includes(b.action)){
+   require(admin,'FORBIDDEN',403);
+   if(b.action==='customers_auto_commit')require(b.confirmed===true,'REVIEW_REQUIRED');
+   const [customers,aliasRows,rules,profiles]=await Promise.all([registry(),rows(()=>db.from('customer_registry_aliases').select('*').order('name_key').order('phone_key')),rows(()=>db.from('customer_registry_separation_names').select('*').order('name_key')),rows(()=>db.from('local_delivery_profiles').select('id,route_key,customer_name,alternate_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,active').eq('active',true).order('id'))]);
+   const groups=autoCandidates(customers,aliasRows,rules,profiles);
+   if(b.action==='customers_auto_candidates')return json(200,{groups});
+   let preview;try{preview=previewAutoSelection(groups,b.selection);}catch(e){throw new RequestError(409,(e as Error).message);}
+   if(b.action==='customers_auto_preview')return json(200,preview);
+   // Commit must use the exact reviewed selection; singleton exclusions are explicit in preview.
+   const saved=result(await db.rpc('customer_registry_auto_apply',{p_owner:owner,p_groups:preview.groups.map((g:any)=>g.members.map((c:any)=>({id:c.id,updated_at:c.updated_at})))}));
+   return json(200,saved);
+  }
   if(b.action==='customers_update'){
    require(admin,'FORBIDDEN',403);require(Number.isSafeInteger(b.customer_no)&&b.customer_no>0&&b.customer_no<1000000000,'INVALID_CUSTOMER_ID');require(field(b.name),'RECEIVER_REQUIRED');
-   const updated=result(await db.rpc('customer_registry_change',{p_id:b.id,p_owner:owner,p_number:b.customer_no,p_name:field(b.name),p_phone:field(b.phone,40),p_reason:field(b.reason,500),p_expected:b.updated_at}));return json(200,{customer:updated});
+   const updated=result(await db.rpc('customer_registry_change',{p_id:b.id,p_owner:owner,p_number:b.customer_no,p_name:field(b.name),p_phone:field(b.phone,160),p_reason:field(b.reason,500),p_expected:b.updated_at}));return json(200,{customer:updated});
   }
   if(b.action==='customers_bulk'){
    require(admin,'FORBIDDEN',403);require(b.confirmed===true,'REVIEW_REQUIRED');

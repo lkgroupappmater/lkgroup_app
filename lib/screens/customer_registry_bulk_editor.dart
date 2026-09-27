@@ -89,7 +89,7 @@ class _CustomerRegistryBulkEditorState extends State<CustomerRegistryBulkEditor>
         onChanged: _busy || [1,2].contains(c['customer_no']) ? null : (v) { if (v != null) setState(() { _targets[id] = v; _reviewed = false; }); }),
       TextFormField(key: ValueKey('number-$id'), controller: f[0], enabled: !_busy && keep, readOnly: widget.merge || [1,2].contains(c['customer_no']), keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ID'), onChanged: (_) => _invalidate(), validator: (v) => !keep || ((int.tryParse(v ?? '') ?? 0) > 0 && (int.tryParse(v ?? '') ?? 0) < 1000000000) ? null : t('error')),
       TextFormField(key: ValueKey('name-$id'), controller: f[1], enabled: !_busy && keep, maxLength: 160, decoration: InputDecoration(labelText: t('receiver')), onChanged: (_) => _invalidate(), validator: (v) => !keep || (v ?? '').trim().isNotEmpty ? null : t('error')),
-      TextFormField(key: ValueKey('phone-$id'), controller: f[2], enabled: !_busy && keep, maxLength: 40, decoration: InputDecoration(labelText: t('phone')), onChanged: (_) => _invalidate()),
+      TextFormField(key: ValueKey('phone-$id'), controller: f[2], enabled: !_busy && keep, maxLength: 160, decoration: InputDecoration(labelText: t('phone')), onChanged: (_) => _invalidate()),
     ])));
   }
 }

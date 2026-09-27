@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -14,7 +16,15 @@ class CustomerListManagementScreen extends StatefulWidget {
   State<CustomerListManagementScreen> createState() => _CustomerListManagementScreenState();
 }
 
-class _CustomerListManagementScreenState extends State<CustomerListManagementScreen> {
+class _CustomerListManagementScreenState extends State<CustomerListManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
+  List<Map<String, dynamic>> get _searchRows => _rows.where(_fieldFilter.matches).toList(growable: false);
+
   bool _loading = true;
   bool _saving = false;
   String? _route;
@@ -43,7 +53,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     try {
       final raw=await SupabaseService.client.rpc('list_shipment_filter_batches');
       final all=(raw as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList(growable:false);
-      if(!mounted)return;
+      if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return;
       setState(() {
         _batches=all; _route=_routes.isNotEmpty?_routes.first:null;
         _year=_years.isNotEmpty?_years.first:null; _voyage=_voyages.isNotEmpty?_voyages.first:null;
@@ -56,7 +66,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
 
   Future<void> _loadRows() async {
     if(_route==null||_year==null||_voyage==null)return;
-    setState(()=>_loading=true);
+    if (!_automaticLoad) setState(()=>_loading=true);
     try {
       final raw=await SupabaseService.client.from('shipments').select(
         'id,receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number,quantity'
@@ -115,13 +125,13 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         if(aa!=bb)return aa.compareTo(bb);
         return '${a['receipt']??''}'.compareTo('${b['receipt']??''}');
       });
-      if(!mounted)return;
+      if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return;
       setState((){_rows=result;_loading=false;});
     }catch(e){_fail('고객 리스트 조회 실패: $e');}
   }
 
   void _fail(String m){
-    if(!mounted)return; setState(()=>_loading=false);
+    if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return; setState(()=>_loading=false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(m)));
   }
 
@@ -378,7 +388,8 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   Widget build(BuildContext context){
     final totalQty=_rows.fold<num>(0,(a,r)=>a+_num(r['quantity']));
     return Scaffold(
-      appBar:AppBar(title:const Text('고객 리스트')),
+      appBar:AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () => setState(() {})),title:const Text('고객 리스트')),
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
         Row(children:[
           Expanded(flex:4,child:_selector<String>(label:'운송 경로',value:_route,items:_routes,text:(v)=>v,onChanged:(v){
@@ -391,15 +402,15 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         ]),
         const SizedBox(height:6),
         Row(children:[
-          Text('고객 ${_rows.length}명',style:const TextStyle(fontWeight:FontWeight.w800)),
+          Text('검색 ${_searchRows.length} / 고객 ${_rows.length}명',style:const TextStyle(fontWeight:FontWeight.w800)),
           const Spacer(),
           FilledButton.icon(onPressed:_loading||_route==null||_year==null||_voyage==null?null:_loadRows,icon:const Icon(Icons.search),label:const Text('검색')),
         ]),
         const Divider(height:1),
         Expanded(child:_loading?const Center(child:CircularProgressIndicator()):ListView.separated(
-          itemCount:_rows.length,separatorBuilder:(_,__)=>const Divider(height:1),
+          itemCount:_searchRows.length,separatorBuilder:(_,__)=>const Divider(height:1),
           itemBuilder:(context,i){
-            final r=_rows[i], note='${r['note']??''}';
+            final r=_searchRows[i], note='${r['note']??''}';
             return ListTile(dense:true,contentPadding:const EdgeInsets.symmetric(horizontal:4),
               leading:SizedBox(width:66,child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
                 Text('${r['receipt']}',textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w900)),

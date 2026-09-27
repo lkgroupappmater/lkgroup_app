@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
@@ -12,22 +14,20 @@ class DiscountManagementScreen extends StatefulWidget {
 }
 
 class _DiscountManagementScreenState
-    extends State<DiscountManagementScreen> {
+    extends State<DiscountManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<DiscountRule> _rules = const [];
   String _route = 'all';
-  String _query = '';
   bool _loading = true;
 
   List<DiscountRule> get _visible => _rules.where((r) {
         if (_route != 'all' && r.routeKey != _route) return false;
-        if (_query.trim().isEmpty) return true;
-        final q = _query.trim().toLowerCase();
-        return <String>[
-          r.customerName,
-          r.companyName,
-          r.phone,
-          r.groupName,
-        ].any((v) => v.toLowerCase().contains(q));
+        return _fieldFilter.matches({'name':r.customerName,'company':r.companyName,'phone':r.phone,'group':r.groupName,'route':r.routeKey});
       }).toList(growable: false);
 
   @override
@@ -37,7 +37,7 @@ class _DiscountManagementScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (!_automaticLoad) setState(() => _loading = true);
     try {
       final rules =
           await CustomerBenefitService.instance.listDiscountRules();
@@ -426,16 +426,7 @@ class _DiscountManagementScreenState
                           ),
                         ),
                         const SizedBox(height: 8),
-                        TextField(
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText:
-                                '이름 / 회사명 / 전화번호 / 단체 검색',
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (v) =>
-                              setState(() => _query = v),
-                        ),
+                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','company':'회사','phone':'연락처','group':'단체','route':'운송 경로'}, onChanged: () => setState(() {})),
                       ],
                     ),
                   ),

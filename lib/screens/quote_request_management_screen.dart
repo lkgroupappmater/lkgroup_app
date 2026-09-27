@@ -1,3 +1,5 @@
+import '../widgets/management_field_search.dart';
+import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -12,7 +14,15 @@ class QuoteRequestManagementScreen extends StatefulWidget {
 }
 
 class _QuoteRequestManagementScreenState
-    extends State<QuoteRequestManagementScreen> {
+    extends State<QuoteRequestManagementScreen> with AutoRefreshState {
+  bool _automaticLoad = false;
+  final _fieldFilter = ManagementFieldFilter();
+  @override
+  Set<String> get autoRefreshTopics => {'*'};
+  @override
+  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
+  List<Map<String, dynamic>> get _searchRows => _quotes.where(_fieldFilter.matches).toList(growable: false);
+
   List<Map<String, dynamic>> _quotes = const [];
   bool _loading = true;
   int? _replyingQuoteId;
@@ -32,10 +42,10 @@ class _QuoteRequestManagementScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (!_automaticLoad) setState(() => _loading = true);
     try {
       final rows = await QuoteService.instance.listAdminSpecialQuotes();
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() => _quotes = rows);
     } catch (error) {
       _message('견적 요청 조회 실패: $error');
@@ -62,7 +72,7 @@ class _QuoteRequestManagementScreenState
           message: text,
         );
       }
-      if (!mounted) return;
+      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _replyingQuoteId = null;
         _editingMessageId = null;
@@ -153,13 +163,14 @@ class _QuoteRequestManagementScreenState
       false;
 
   void _message(String text) {
-    if (!mounted) return;
+    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'id':'요청 번호','customer_name':'고객명','contact_phone':'연락처','route':'운송 경로','subject':'제목','content':'내용','status':'상태','created_at':'요청일'}, onChanged: () => setState(() {})),
           title: const Text('견적 요청 관리'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -172,13 +183,13 @@ class _QuoteRequestManagementScreenState
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (_quotes.isEmpty)
+                    if (_searchRows.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 50),
                         child: Center(child: Text('견적 요청이 없습니다.')),
                       )
                     else
-                      ..._quotes.map(_quoteCard),
+                      ..._searchRows.map(_quoteCard),
                   ],
                 ),
               ),

@@ -4,7 +4,7 @@ export function validateBulkRows(rows) {
   const ids=new Map();
   for(const r of rows){
     if(!r||typeof r.id!=='string'||!r.id||ids.has(r.id)||typeof r.target_id!=='string'||!r.updated_at)throw Error('BULK_SELECTION_INVALID');
-    if(!Number.isSafeInteger(r.customer_no)||r.customer_no<1||r.customer_no>999999999||typeof r.name!=='string'||!r.name.trim()||r.name.length>160||typeof r.phone!=='string'||r.phone.length>40)throw Error('INVALID_CUSTOMER_ID');
+    if(!Number.isSafeInteger(r.customer_no)||r.customer_no<1||r.customer_no>999999999||typeof r.name!=='string'||!r.name.trim()||r.name.length>160||typeof r.phone!=='string'||r.phone.length>160)throw Error('INVALID_CUSTOMER_ID');
     ids.set(r.id,r);
   }
   for(const r of rows)if(!ids.has(r.target_id)||ids.get(r.target_id).target_id!==r.target_id)throw Error('BULK_SELECTION_INVALID');
