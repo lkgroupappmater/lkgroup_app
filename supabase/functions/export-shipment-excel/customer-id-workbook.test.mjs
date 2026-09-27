@@ -28,3 +28,20 @@ test('locked and manual numbers override generated numbers independently',()=>{
  const tables=makeIdentityTables(context,{prefix:'LKS',shipments:[{customer_no:23,consignee_name:'이경희',receipt_number:'LKS 17',receipt_number_locked:true}]});const r=tables.controls.find(r=>r[0]==='ID|23|0');assert.equal(r[3],'LKS 00023');assert.equal(r[5],'잠금');assert.equal(r[6],'LKS 17');assert.equal(r[7].value,'LKS 17');
  const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.N,/명세서 번호 관리/);assert.match(f.AB,/\$BC\$6:\$BC\$1005/);assert.doesNotMatch(f.N,/AB6/);
 });
+
+test('latest policy inputs refresh without rewriting money or Remark formulas',async()=>{
+ const {applyCustomerIdWorkbook}=await import('./customer-id-workbook.mjs');const e=new TextEncoder(),d=new TextDecoder();
+ const c=(ref,text)=>`<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;
+ const files={
+  'xl/workbook.xml':e.encode('<workbook><sheets><sheet name="Row data" sheetId="1" r:id="r1"/><sheet name="Remark 및 특이사항" sheetId="2" r:id="r2"/></sheets></workbook>'),
+  'xl/_rels/workbook.xml.rels':e.encode('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/><Relationship Id="r2" Target="worksheets/sheet2.xml"/></Relationships>'),
+  '[Content_Types].xml':e.encode('<Types></Types>'),
+  'xl/worksheets/sheet1.xml':e.encode(`<worksheet><sheetData><row r="7">${c('H7','기업 할인 고객 리스트')}</row><row r="8">${c('H8','이름')}${c('K8','전화번호')}${c('L8','할인율')}</row><row r="9">${c('H9','테스트 고객')}${c('K9','02055551234')}<c r="L9"><v>0.1</v></c><c r="M9"><f>SUM(A1:A5)</f><v>99</v></c></row><row r="10">${c('H10','')}</row></sheetData></worksheet>`),
+  'xl/worksheets/sheet2.xml':e.encode(`<worksheet><sheetData><row r="3">${c('A3','1')}${c('B3','테스트 고객')}${c('C3','02055551234')}${c('D3','기존 메모')}<c r="E3"><f>B3&amp;C3</f><v>unchanged</v></c></row></sheetData></worksheet>`),
+  'xl/vbaProject.bin':new Uint8Array([1,2,3]),
+ };
+ applyCustomerIdWorkbook(files,{...context,deliveries:[],discounts:[{id:1,customer_name:'테스트 고객',phone:'02055551234',discount_percent:.2,special_discount_percent:0,group_name:'기업 할인',active:true}],shares:[{id:2,source_no:1,customer_name:'테스트 고객',phone:'02055551234',content:'최신 메모',active:true}]},{prefix:'LKS',base:true});
+ const prices=d.decode(files['xl/worksheets/sheet1.xml']),remarks=d.decode(files['xl/worksheets/sheet2.xml']);
+ assert.match(prices,/<c r="L9"><v>0.2<\/v>/);assert.match(prices,/<f>SUM\(A1:A5\)<\/f><v>99<\/v>/);
+ assert.match(remarks,/최신 메모/);assert.match(remarks,/<f>B3&amp;C3<\/f><v>unchanged<\/v>/);assert.deepEqual([...files['xl/vbaProject.bin']],[1,2,3]);
+});

@@ -30,7 +30,16 @@ function cell(ref,value,style=''){
  if(value&&typeof value==='object'&&'formula' in value)return `<c r="${ref}"${s}${typeof value.value==='number'?'':' t="str"'}><f>${xml(value.formula)}</f><v>${xml(value.value)}</v></c>`;
  return typeof value==='number'?`<c r="${ref}"${s}><v>${value}</v></c>`:`<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
 }
-function sortCells(row){const cells=[...row.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map(m=>m[0]);const idx=c=>[...c.match(/\br="([A-Z]+)/)[1]].reduce((n,x)=>n*26+x.charCodeAt(0)-64,0);cells.sort((a,b)=>idx(a)-idx(b));return row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'').replace('</row>',cells.join('')+'</row>');}
+const columnIndex=ref=>{let n=0;for(const c of ref.match(/^[A-Z]+/)[0])n=n*26+c.charCodeAt(0)-64;return n;};
+function parsedCells(row){return new Map([...row.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map(m=>[m[0].match(/\br="([A-Z]+)\d+"/)[1],m[0]]));}
+function patchRow(row,n,values){
+ if(!values||!Object.keys(values).length)return row;
+ const cells=parsedCells(row);
+ for(const [c,v] of Object.entries(values))cells.set(c,cell(c+n,v,cells.get(c)?.match(/\bs="(\d+)"/)?.[1]??''));
+ const ordered=[...cells].sort((a,b)=>columnIndex(a[0])-columnIndex(b[0])).map(x=>x[1]).join('');
+ return row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'').replace('</row>',ordered+'</row>');
+}
+function readRow(row,c,strings){row.cells??=parsedCells(row.xml);return cellValue(row.cells.get(c)??'',strings);}
 function hideColumns(text,start,end){
  const cols=text.match(/<cols>([\s\S]*?)<\/cols>/)?.[1]??'';
  const pieces=[];for(const m of cols.matchAll(/<col\b[^>]*\/>/g)){const lo=Number(m[0].match(/min="(\d+)"/)[1]),hi=Number(m[0].match(/max="(\d+)"/)[1]);
@@ -120,15 +129,62 @@ export function identityCargoFormulas(r,last,idLast,controlLast,deliveryLast,pre
  };
 }
 
+// Refresh existing input tables only; their pricing/Remark formulas stay intact.
+function refreshPolicyInputs(files,context,strings){
+ const rowsOf=text=>[...text.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g)].map(m=>({n:Number(m[1]),xml:m[0]}));
+ const read=(row,c)=>readRow(row,c,strings);
+ if(Array.isArray(context.shares)){
+  const path=sheetPath(files,'Remark 및 특이사항')||sheetPath(files,'명세서 선공유');
+  if(path){const text=txt(files[path]),physical=rowsOf(text),active=context.shares.filter(d=>d.active).sort((a,b)=>a.source_no-b.source_no||a.id-b.id),body=physical.filter(r=>r.n>=3&&r.n<=800);
+   if(active.length>body.length)throw Error('Remark 입력 공간이 부족합니다.');
+   const replacements=new Map();for(let i=0;i<body.length;i++){const r=body[i],d=active[i];if(!d&&!['A','B','C','D'].some(c=>read(r,c)))continue;replacements.set(r.n,patchRow(r.xml,r.n,d?{A:i+1,B:d.customer_name,C:d.phone_display||d.phone,D:d.content}:{A:'',B:'',C:'',D:''}));}
+   files[path]=bytes(text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>replacements.get(Number(n))||row));
+  }
+ }
+ if(!Array.isArray(context.discounts))return;
+ const path=sheetPath(files,'Row data');if(!path)return;
+ const text=txt(files[path]),physical=rowsOf(text),byRow=new Map(physical.map(r=>[r.n,r])),tables=[];
+ const key=v=>String(v??'').toLowerCase().replace(/[\s._-]/g,'');
+ const groupKey=v=>key(v).replace(/(?:할인)?고객리스트$|할인$/g,'');
+ const nameHeader=v=>['이름','성함','고객명','name','customername'].includes(key(v)),phoneHeader=v=>['전화번호','연락처','tel','phone','telephone','contact'].includes(key(v));
+ for(const row of physical){for(let c=0;c<32;c++){if(!nameHeader(read(row,col(c))))continue;let p=-1,d=-1;for(let j=c+1;j<=c+6;j++){const v=read(row,col(j));if(phoneHeader(v))p=j;if(['할인','할인율','discount','discountrate'].includes(key(v)))d=j;}if(p<0||d<0)continue;
+  let group='';outer:for(let n=row.n;n>=Math.max(1,row.n-12);n--){const prior=byRow.get(n);if(!prior)continue;for(let j=Math.max(0,c-1);j<=c+6;j++){const v=read(prior,col(j));if(!nameHeader(v)&&!phoneHeader(v)&&!['할인','할인율','할인금액','할인액','할인총합'].includes(key(v))&&/라선협|지상사|회원사|법인장|지인|아파트|기업|특별|파트너|협력사|할인/.test(v)){group=v.replace(/customer\s*list|discount\s*list|customer\s*discount|할인\s*고객\s*리스트|고객\s*리스트|할인\s*고객/gi,'').trim();if(group)break outer;}}}
+  tables.push({row:row.n,c,p,d,group});
+ }}
+ const updates=new Map(),set=(n,c,v)=>{if(!updates.has(n))updates.set(n,{});updates.get(n)[col(c)]=v;};
+ const rules=context.discounts,used=new Set();
+ for(const table of tables){let n=table.row+1;const special=groupKey(table.group)==='특별';
+  for(;byRow.has(n)&&read(byRow.get(n),col(table.c));n++){
+   const row=byRow.get(n),name=read(row,col(table.c)),phone=read(row,col(table.p));
+   const candidates=rules.filter(d=>nameKey(d.customer_name)===nameKey(name)&&(!d.group_name||groupKey(d.group_name)===groupKey(table.group)||special&&Number(d.special_discount_percent)>0));
+   let matches=candidates.filter(d=>phoneKey(d.phone)===phoneKey(phone));
+   if(!phoneKey(phone)){const active=candidates.filter(d=>d.active&&(d.excel_source_row===n||candidates.filter(x=>x.active).length===1));if(active.length===1)matches=active;}
+   matches.sort((a,b)=>Number(b.active)-Number(a.active)||String(b.updated_at).localeCompare(String(a.updated_at)));
+   const d=matches[0];if(!d)continue;used.add(d.id+'|'+Number(special));
+   const pct=special?Number(d.special_discount_percent||d.discount_percent):Number(d.discount_percent)-Number(d.special_discount_percent||0);
+   if(!Number.isFinite(pct)||pct<0||pct>1)continue;
+   set(n,table.c,d.customer_name);if(phoneKey(phone)!==phoneKey(d.phone))set(n,table.p,d.phone);
+   set(n,table.d,!d.active&&phoneKey(d.phone)?0:pct);
+  }
+  const additions=rules.filter(d=>d.active&&groupKey(d.group_name)===groupKey(table.group)&&!used.has(d.id+'|'+Number(special))&&d.rate_override==null&&!d.bulk_threshold);
+  for(const d of additions){const row=byRow.get(n);if(!row||[table.c,table.p,table.d].some(c=>read(row,col(c)))||tables.some(t=>t.row===n))break;
+   const pct=special?Number(d.special_discount_percent||d.discount_percent):Number(d.discount_percent)-Number(d.special_discount_percent||0);if(!Number.isFinite(pct)||pct<0||pct>1)continue;
+   set(n,table.c,d.customer_name);set(n,table.p,d.phone);set(n,table.d,pct);used.add(d.id+'|'+Number(special));n++;
+  }
+ }
+ files[path]=bytes(text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n)))));
+}
+
 export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false}={}){
  const strings=sharedStrings(files),cargoPath=sheetPath(files,'물품 입고 내역'),deliveryRefs=new Map(),deliveryRefFormulas=new Map();
+ refreshPolicyInputs(files,context,strings);
  // Refresh only editable delivery input columns, keeping existing calculation,
  // address-selection, validation and print sections intact.
  for(const [name,type,tag] of [['지방배송','province','L'],['시내배송','city','C']]){
   const path=sheetPath(files,name);if(!path)continue;
   const profiles=(context.deliveries??[]).filter(d=>d.delivery_type===type);
   let text=txt(files[path]);const physical=[...text.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g)].map(m=>({n:Number(m[1]),xml:m[0]}));
-  const read=(row,c)=>cellValue(row.xml.match(new RegExp(`<c\\b[^>]*\\br="${c}${row.n}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`))?.[0]??'',strings);
+  const read=(row,c)=>readRow(row,c,strings);
   const blocks=[];let current=null,lastInput=2;
   for(const row of physical){if(row.n<3||row.n>800)continue;const number=Number(read(row,'A'));
    if(number>0){current={number,first:row,rows:[]};blocks.push(current);}
@@ -152,7 +208,7 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
    const first=block.first.n,end=Math.max(...choices.map(r=>r.n));
    deliveryRefFormulas.set(d.id,`IFERROR("${tag}|"&LOOKUP(2,1/('${name}'!$AD${first}:$AD${end}=1),ROW('${name}'!$AD${first}:$AD${end})),"")`);
   }
-  text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{for(const [c,v] of Object.entries(updates.get(Number(n))??{}))row=put(row,c+n,v);return sortCells(row);});
+  text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n))));
   files[path]=bytes(text);
  }
  let cargoXml=cargoPath?txt(files[cargoPath]):'',last=Math.max(6,...[...cargoXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m=>Number(m[1])));
@@ -167,15 +223,15 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
  const summaries=new Map();
  cargoXml=cargoXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
-  const get=c=>cellValue(row.match(new RegExp(`<c\\b[^>]*\\br="${c}${r}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`))?.[0]??'',strings);
+  const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
   const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
   const priorY=get('Y'),cache={R:get('R'),BG:get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
-  row=put(row,'BG'+r,cache.BG);row=put(row,'BH'+r,cache.BH);
+  const updates={BG:cache.BG,BH:cache.BH};
   if(!cache.AH)cache.R=cache.BF;
   const formulas=identityCargoFormulas(r,last,tables.ids.length,tables.controls.length,tables.delivery.length,prefix);
-  for(const [column,f] of Object.entries(formulas))row=put(row,column+r,formula(f,cache[column]??''));
+  for(const [column,f] of Object.entries(formulas))updates[column]=formula(f,cache[column]??'');
   if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,priority:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
-  return sortCells(row);
+  return patchRow(row,r,updates);
  });
  // Keep appended helper cells within the explicit worksheet dimension.
  cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BI${Math.max(last,1010)}"/>`);

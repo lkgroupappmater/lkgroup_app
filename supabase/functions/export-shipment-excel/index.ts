@@ -2079,7 +2079,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const { data: baseTemplate, error: baseTemplateError } = await admin
       .from('shipment_excel_base_templates')
-      .select('route_key,route_label,file_name,storage_path,prefer_for_export')
+      .select('route_key,route_label,file_name,storage_path,prefer_for_export,policy_summary,updated_at')
       .eq('route_key', routeKey).eq('active', true).maybeSingle();
     if (baseTemplateError) throw baseTemplateError;
     const useBase = baseTemplate && (!voyageTemplate || baseTemplate.prefer_for_export);
@@ -2140,8 +2140,20 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     const {data: identityContext, error: identityContextError} = await admin.rpc('lk_excel_identity_context',{p_route_key:routeKey});
     if(identityContextError) throw identityContextError;
+    // Discount rows are deliberately available only through authenticated RLS.
+    // Reuse the verified request identity; do not widen table privileges.
+    const policyReader=createClient(supabaseUrl,serviceRoleKey,{
+      global:{headers:{Authorization:authHeader}},
+      auth:{persistSession:false,autoRefreshToken:false},
+    });
+    const [rates,shares]=await Promise.all([
+      policyReader.from('customer_rate_overrides').select('*').in('route_key',[routeKey,'all']),
+      admin.from('customer_statement_share_rules').select('*').eq('route_key',routeKey),
+    ]);
+    if(rates.error)throw rates.error;if(shares.error)throw shares.error;
+    identityContext.discounts=rates.data??[];identityContext.shares=shares.data??[];
     if(enrichedShipments.length){
-      const {data:pendingReceipts,error:pendingError}=await admin.from('shipment_change_requests').select('shipment_id,changes').eq('status','pending').in('shipment_id',enrichedShipments.map(s=>s.id));
+      const {data:pendingReceipts,error:pendingError}=await policyReader.from('shipment_change_requests').select('shipment_id,changes').eq('status','pending').in('shipment_id',enrichedShipments.map(s=>s.id));
       if(pendingError)throw pendingError;
       identityContext.preserveNumbers=(pendingReceipts??[]).some((r:any)=>Object.prototype.hasOwnProperty.call(r.changes??{},'receipt_number'));
     }
@@ -2450,6 +2462,29 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       });
     if (uploadError) throw uploadError;
 
+    // A latest BASE download also refreshes the registered private BASE. This
+    // does not re-import rules or cargo and never overwrites a concurrent upload.
+    if (isBaseRefresh && profile.role === 'admin' && baseTemplate) {
+      const basePath = `base/${routeKey}/${crypto.randomUUID()}_${outputFileName}`;
+      const stored = await admin.storage.from('shipment-excel-templates').upload(basePath, encoded, {
+        upsert: false,
+        contentType: outputExtension === 'xlsm' ? 'application/vnd.ms-excel.sheet.macroEnabled.12' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      if (stored.error) throw stored.error;
+      const priorPolicy = baseTemplate.policy_summary ?? {};
+      const {data: updatedBase, error: baseUpdateError} = await admin.from('shipment_excel_base_templates').update({
+        storage_path: basePath, file_name: outputFileName, source_sha256: null,
+        policy_summary: {...priorPolicy, automation_version: ID_WORKBOOK_VERSION,
+          previous_storage_path: baseTemplate.storage_path,
+          source_history: [baseTemplate.storage_path, ...(priorPolicy.source_history ?? [])].slice(0, 20)},
+        updated_by: authData.user.id, updated_at: new Date().toISOString(),
+      }).eq('route_key', routeKey).eq('storage_path', baseTemplate.storage_path).eq('updated_at', baseTemplate.updated_at).select('route_key').maybeSingle();
+      if (baseUpdateError || !updatedBase) {
+        await admin.storage.from('shipment-excel-templates').remove([basePath]);
+        throw baseUpdateError ?? new Error('BASE가 다른 작업에서 변경되었습니다. 최신 목록에서 다시 다운로드하세요.');
+      }
+    }
+
     return json(200, {
       ok: true,
       file_name: outputFileName,
@@ -2480,4 +2515,3 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
-
