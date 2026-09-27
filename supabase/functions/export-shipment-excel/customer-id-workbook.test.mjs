@@ -40,6 +40,25 @@ test('historical receipts remain separate even after customer IDs merge',()=>{
  assert.equal(statementCode('LKS',1234,true),'LKS 91234');
 });
 
+test('spot statement ID linkage preserves pricing and survives repeated BASE refresh',async()=>{
+ const {applyCustomerIdWorkbook}=await import('./customer-id-workbook.mjs'),e=new TextEncoder(),d=new TextDecoder();
+ const c=(ref,v)=>`<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`;
+ const pricing='<c r="N6"><f>C6*D6</f><v>4</v></c>';
+ const files={
+  'xl/workbook.xml':e.encode('<workbook><sheets><sheet name="이름(TLxx-xx)" sheetId="1" r:id="r1"/></sheets></workbook>'),
+  'xl/_rels/workbook.xml.rels':e.encode('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),
+  '[Content_Types].xml':e.encode('<Types></Types>'),
+  'xl/worksheets/sheet1.xml':e.encode(`<worksheet><sheetData><row r="1">${c('L1','번호(No.)')}${c('M1','LKTL2026xx-xx')}</row><row r="2">${c('I2','고객명/회사명')}${c('L2','이경희')}</row><row r="4">${c('L4','020 5555 1234')}</row><row r="6">${pricing}</row></sheetData></worksheet>`),
+  'xl/vbaProject.bin':new Uint8Array([1,2,3]),
+ };
+ for(let i=0;i<2;i++){
+  const result=applyCustomerIdWorkbook(files,{...context,deliveries:[]},{prefix:'LKTL',base:true});assert.equal(result.spotCount,1);
+  const source=d.decode(files['xl/worksheets/sheet1.xml']);assert.ok(source.includes(pricing));assert.match(source,/명세서 고객 ID 연결/);assert.match(source,/LKTL 0023/);
+  assert.equal((d.decode(files['xl/workbook.xml']).match(/name="명세서 고객 ID 연결"/g)||[]).length,1);
+ }
+ assert.deepEqual([...files['xl/vbaProject.bin']],[1,2,3]);
+});
+
 test('latest policy inputs refresh without rewriting money or Remark formulas',async()=>{
  const {applyCustomerIdWorkbook}=await import('./customer-id-workbook.mjs');const e=new TextEncoder(),d=new TextDecoder();
  const c=(ref,text)=>`<c r="${ref}" t="inlineStr"><is><t>${text}</t></is></c>`;

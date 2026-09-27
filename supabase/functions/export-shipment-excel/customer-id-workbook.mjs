@@ -1,7 +1,7 @@
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
-export const ID_WORKBOOK_VERSION='2026-09-28.issued-numbers-four-digit-v2';
+export const ID_WORKBOOK_VERSION='2026-09-28.offline-all-templates-v3';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -142,6 +142,27 @@ export function identityCargoFormulas(r,last,idLast,controlLast,deliveryLast,pre
  };
 }
 
+// Spot templates keep their original price/weight calculations and print area.
+// Only the existing statement-number cell links to the shared ID controls.
+function connectSpotStatements(files,tables,strings,prefix){
+ const names=[...txt(files['xl/workbook.xml']).matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map(m=>unxml(m[1]));
+ const rows=[['명세서 고객 ID 연결'],['각 원본 명세서의 고객명(L2)과 연락처(L4)를 입력하면 고객 ID와 번호가 계산됩니다.'],['수동 번호·잠금은 명세서 번호 관리 시트에서 설정하세요. 신규 고객 ID는 업로드 후 발급됩니다.'],['오프라인은 다운로드 당시 고객 정보를 사용합니다. 최신 DB 반영은 업로드·승인 후 다시 다운로드하세요.'],['명세서 시트','고객 고유 ID','자동 번호','적용 번호','고객명','연락처','확인 사항']];
+ const ids=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]])),controls=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
+ for(const name of names){
+  const path=sheetPath(files,name);if(!path)continue;let source=txt(files[path]);
+  const values=new Map([...source.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map(m=>[m[0].match(/\br="([A-Z]+\d+)"/)?.[1],cellValue(m[0],strings)]));
+  if(!/번호/.test(values.get('L1')||'')||!values.has('M1')||!values.has('L2')||!values.has('L4')||!/고객/.test(values.get('I2')||''))continue;
+  const r=rows.length+1,quoted="'"+name.replaceAll("'","''")+"'",n=values.get('L2')||'',p=values.get('L4')||'',id=ids.get(matchKey(n,p))||0,special=specialName(n),current=values.get('M1')||'',applied=id?controls.get(identityKey(id,special))||current:current;
+  const f=identityCargoFormulas(r,r,tables.ids.length,tables.controls.length,tables.delivery.length,prefix),row=Array(61).fill('');
+  const data={A:name,B:formula(`IF(BC${r}>0,"LK "&TEXT(BC${r},"0000"),"")`,id?customerCode(id):''),C:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},4,FALSE),""),"")`,id?statementCode(prefix,id,special):''),D:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},8,FALSE),"ID 확인 필요"),"ID 확인 필요")`,id?applied:'ID 확인 필요'),E:formula(`${quoted}!L2`,n),F:formula(`${quoted}!L4&""`,p),G:formula(`IF(BC${r}>0,"",IF(OR(E${r}="",SUBSTITUTE(E${r}," ","")="고객이름"),"고객명·연락처 입력","고객 ID 확인 필요"))`,id?'':'고객명·연락처 입력'),BA:formula(f.BA,nameKey(baseName(n))),BB:formula(f.BB,'p'+phoneKey(p)),BC:formula(f.BC,id),BD:formula(f.BD,special?1:0),BI:formula(f.BI,'p'+String(p).replace(/\D/g,''))};
+  for(const [c,v]of Object.entries(data))row[columnIndex(c)-1]=v;rows.push(row);
+  source=source.replace(/<row\b[^>]*\br="1"[^>]*>[\s\S]*?<\/row>/,row=>put(row,'M1',formula(`IF('명세서 고객 ID 연결'!BC${r}>0,'명세서 고객 ID 연결'!D${r},IF(OR(L2="",SUBSTITUTE(L2," ","")="고객이름"),${JSON.stringify(current)},"ID 확인 필요"))`,id?applied:(!n||n.replace(/\s/g,'')==='고객이름'?current:'ID 확인 필요'))));
+  files[path]=bytes(source);
+ }
+ if(rows.length>5)newSheet(files,'명세서 고객 ID 연결',rows,{widths:[28,18,20,20,30,28,28],hiddenColumns:Array.from({length:54},(_,i)=>i+8)});
+ return rows.length-5;
+}
+
 // Refresh existing input tables only; their pricing/Remark formulas stay intact.
 function refreshPolicyInputs(files,context,strings){
  const rowsOf=text=>[...text.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g)].map(m=>({n:Number(m[1]),xml:m[0]}));
@@ -224,13 +245,15 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n))));
   files[path]=bytes(text);
  }
- let cargoXml=cargoPath?txt(files[cargoPath]):'',last=Math.max(6,...[...cargoXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m=>Number(m[1])));
+ let cargoXml=cargoPath?txt(files[cargoPath]):'';
+ const hasRanking=/<c\b[^>]*r="AB\d+"/.test(cargoXml);
+ const last=Math.max(6,...[...cargoXml.matchAll(new RegExp(`<c\\b[^>]*r="${hasRanking?'AB':'N'}(\\d+)"`,'g'))].map(m=>Number(m[1])).filter(n=>hasRanking||n<=1005));
  const tables=makeIdentityTables(context,{prefix,shipments,deliveryRefs,deliveryRefFormulas,cargoLast:last,cargo:!!cargoPath});
  const legacy=context.numberingMode==='legacy';
  newSheet(files,'고객 ID',tables.ids,{widths:[48,32,28,15,18],hiddenColumns:[1]});
  newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12,13],inputColumns:[{column:'F',values:['자동','잠금']}]});
  newSheet(files,'배송 매칭 확인',tables.delivery,{widths:[45,18,18,18,70,20,30,26,20,16,14,28,28,24,16,18,50,35],hiddenColumns:[1,2,3,9,10,11,12,13,14,15,16,17,18,19]});
- if(!cargoPath||last<=6)return {tables,applied:false,version:ID_WORKBOOK_VERSION};
+ if(!cargoPath||last<=6){const spotCount=connectSpotStatements(files,tables,strings,prefix);return {tables,applied:spotCount>0,spotCount,version:ID_WORKBOOK_VERSION};}
  const idByKey=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]]));
  const controlByKey=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  const deliveryByKey=new Map(tables.delivery.slice(5).map(r=>[r[0],r]));
@@ -243,6 +266,13 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
   const updates={BG:cache.BG,BH:cache.BH};
   if(!cache.AH)cache.R=cache.BF;
   const formulas=identityCargoFormulas(r,last,tables.ids.length,tables.controls.length,tables.delivery.length,prefix);
+  if(!hasRanking){
+   // Older cargo templates already own their delivery/price formulas. Add only
+   // identity grouping and ordering helpers in previously unused columns.
+   delete formulas.R;delete formulas.AH;
+   formulas.AA=`IF(Y${r}="","",IF(COUNTIF($Y$6:Y${r},Y${r})=1,1,0))`;
+   formulas.AC=`IF(AND(BC${r}=0,ISNUMBER(SEARCH("수취인 불명",E${r}))),1,0)`;
+  }
   if(legacy){
    formulas.BE=`IF(AND(E${r}="",F${r}=""),"",IF(BG${r}="","","LEGACY|"&BG${r}))`;
    formulas.N=`IF(BE${r}="","",IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},8,FALSE),BG${r}))`;
