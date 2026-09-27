@@ -121,6 +121,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       if ('${m['approval_status'] ?? 'approved'}' == 'rejected') return false;
       // 관리자/파트너는 위 고정 목록에 항상 표시하므로 검색 영역에서는 일반회원만 표시합니다.
       if ('${m['role'] ?? 'member'}' != 'member' && CustomerIdentityService.normalizeCode(query) == null) return false;
+      if (_fieldFilter.query.trim().isNotEmpty) return _fieldFilter.matches(m);
       return (CustomerIdentityService.normalizeCode(query) != null && CustomerIdentityService.normalizeCode(query) == m['customer_code']) || '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
           .toLowerCase()
           .contains(query);
@@ -594,7 +595,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                   const SizedBox(height: 8),
                   SubmitSearchField(
                     controller: _search,
-                    onSearch: (value) => setState(() => _submittedSearch = value),
+                    onSearch: (value) => setState(() { _fieldFilter.query = ''; _fieldFilter.field = ''; _submittedSearch = value; }),
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),
                       hintText: '고객 ID·이름·이메일·전화번호 검색',

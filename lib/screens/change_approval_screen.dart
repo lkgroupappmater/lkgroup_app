@@ -26,7 +26,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
   @override
   Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   @override
-  bool get autoRefreshAllowed => !_processing && !_batchDialogOpen;
+  bool get autoRefreshAllowed => !_processing && !_batchDialogOpen && _editing.isEmpty && _selected.isEmpty && _batchDrafts.isEmpty && _singleDrafts.isEmpty;
 
   List<Map<String, dynamic>> _requests = const [];
   List<Map<String, dynamic>> _unknownClaims = const [];
