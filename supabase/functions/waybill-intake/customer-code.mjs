@@ -5,7 +5,7 @@ export function normalizeCustomerCode(value) {
 }
 export function displayCustomerCode(value) {
  const code=normalizeCustomerCode(value);
- return code?'LK '+code.padStart(5,'0'):value;
+ return code?'LK '+code.padStart(4,'0'):value;
 }
 export function customerCodeJson(key,value) {
  return key==='customer_code'&&value!=null?displayCustomerCode(value):value;

@@ -503,7 +503,7 @@ class ExcelImportService {
     String cell(List<String> row, int column) => column < row.length ? row[column].trim() : '';
     final controls = <Map<String, dynamic>>[];
     for (final row in workbook['명세서 번호 관리'] ?? <List<String>>[]) {
-      if (!RegExp(r'^(ID\|\d+\|[01]|UNKNOWN)$').hasMatch(cell(row, 0)) || cell(row, 10).isEmpty) continue;
+      if (!RegExp(r'^(ID\|\d+\|[01]|UNKNOWN|LEGACY\|.+)$').hasMatch(cell(row, 0)) || cell(row, 10).isEmpty) continue;
       final baseline = jsonDecode(cell(row, 10)) as Map<String, dynamic>;
       final manual = cell(row, 4);
       final locked = cell(row, 5) == '잠금';

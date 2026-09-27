@@ -48,12 +48,14 @@ class _ExcelStatementControlsState extends State<ExcelStatementControlsScreen> {
   Widget build(BuildContext context) {
     final receipts = rows(_data?['receipts']).where(matches).toList();
     final reviews = rows(_data?['delivery_reviews']).where(matches).toList();
+    final legacy = _data?['numbering_mode'] == 'legacy';
     final canEdit = _data?['can_edit'] == true && !_busy;
     return Scaffold(
       appBar: AppBar(title: const Text('배송 확인 · 명세서 번호'), actions: [TextButton(onPressed: _busy ? null : _load, child: const Text('새로고침'))]),
       body: Column(children: [
         Padding(padding: const EdgeInsets.all(12), child: Column(children: [
           Text('${widget.batch.routeLabel} · ${widget.batch.year} · V${widget.batch.voyage}'),
+          if (legacy) const Text('기존 발행 번호 유지 · 고객 ID는 별도 표시', style: TextStyle(fontWeight: FontWeight.bold)),
           Text('배송 매칭 확인 필요 ${_data?['review_count'] ?? 0}건', style: TextStyle(color: (_data?['review_count'] ?? 0) > 0 ? Colors.deepOrange : null, fontWeight: FontWeight.bold)),
           const Text('이름·전화번호 중 하나만 비슷하면 직접 확인합니다. 인쇄 전 번호를 잠그면 재연산에도 해당 번호가 유지됩니다.'),
           TextField(decoration: const InputDecoration(labelText: '고객명 · 고객 ID · 명세서 번호'), onChanged: (q) => setState(() => _query = q)),
@@ -77,12 +79,12 @@ class _ExcelStatementControlsState extends State<ExcelStatementControlsScreen> {
             ],
           ]))),
           for (final r in receipts) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CheckboxListTile(contentPadding: EdgeInsets.zero, title: Text('${r['receipt_number']} · ${r['locked'] == true ? '번호 잠금' : r['manual'] == true ? '수동 지정' : '자동 번호'}'), value: _selected.contains('${r['receipt_number']}'), onChanged: !canEdit ? null : (v) => setState(() { v == true ? _selected.add('${r['receipt_number']}') : _selected.remove('${r['receipt_number']}'); })),
+            CheckboxListTile(contentPadding: EdgeInsets.zero, title: Text('${r['receipt_number']} · ${r['locked'] == true ? '번호 잠금' : r['manual'] == true ? '수동 지정' : legacy ? '기존 발행 번호' : '자동 번호'}'), value: _selected.contains('${r['receipt_number']}'), onChanged: !canEdit ? null : (v) => setState(() { v == true ? _selected.add('${r['receipt_number']}') : _selected.remove('${r['receipt_number']}'); })),
             Text('${r['name']} · ${(r['customer_codes'] as List? ?? []).join(', ')}'), Text('${r['phone']} · 화물 ${r['rows']}건'),
             if (_data?['can_edit'] == true) Wrap(children: [
               TextButton(onPressed: !canEdit || r['locked'] == true || r['data_locked'] == true ? null : () => _manual(r), child: const Text('수동 번호 지정')),
               TextButton(onPressed: !canEdit ? null : () => _act('admin_set_statement_control', {..._params, 'p_receipt': r['receipt_number'], 'p_locked': r['locked'] != true}), child: Text(r['locked'] == true ? '번호 잠금 해제' : '번호 잠금')),
-              TextButton(onPressed: !canEdit || r['locked'] == true || r['data_locked'] == true || r['suggested_number'] == null ? null : () => _act('admin_set_statement_control', {..._params, 'p_receipt': r['receipt_number'], 'p_manual': false}), child: Text('고객 ID 자동 번호 (${r['suggested_number'] ?? '연결 확인 필요'})')),
+              TextButton(onPressed: !canEdit || r['locked'] == true || r['data_locked'] == true || r['suggested_number'] == null ? null : () => _act('admin_set_statement_control', {..._params, 'p_receipt': r['receipt_number'], 'p_manual': false}), child: Text(legacy ? '기존 발행 번호 유지' : '고객 ID 자동 번호 (${r['suggested_number'] ?? '연결 확인 필요'})')),
             ]),
           ]))),
         ])),

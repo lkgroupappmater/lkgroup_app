@@ -1,7 +1,7 @@
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
-export const ID_WORKBOOK_VERSION='2026-09-27.customer-id-controls-v1';
+export const ID_WORKBOOK_VERSION='2026-09-28.issued-numbers-four-digit-v2';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -11,8 +11,8 @@ export function phoneKey(v){const d=String(v??'').replace(/\D/g,'');return /^008
 export const phoneTokens=v=>[...new Set(String(v??'').split(/[/,;|\r\n]+/).map(phoneKey).filter(p=>/^\d{8,15}$/.test(p)))];
 export const specialName=v=>/^(수취인\s*불명|비엔티엔\s*픽업|시내\s*픽업|운임\s*따로\s*지불)\s*\//i.test(String(v??'').trim());
 export const baseName=v=>specialName(v)?String(v).slice(String(v).indexOf('/')+1).trim():String(v??'').trim();
-export const customerCode=n=>'LK '+String(n).padStart(5,'0');
-export const statementCode=(prefix,n,special=false)=>`${prefix} ${special?'9':''}${String(n).padStart(5,'0')}`;
+export const customerCode=n=>'LK '+String(n).padStart(4,'0');
+export const statementCode=(prefix,n,special=false)=>`${prefix} ${special?'9':''}${String(n).padStart(special?3:4,'0')}`;
 export const identityKey=(n,special=false)=>`ID|${n}|${special?1:0}`;
 const matchKey=(n,p)=>nameKey(baseName(n))+'|p'+phoneKey(p);
 const col=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
@@ -76,8 +76,9 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  for(const a of context.aliases??[])add(a.name_key+'|p'+a.phone_key,a.name_key,a.phone_key,byId.get(a.customer_registry_id));
  for(const s of context.sources??shipments)if(s.customer_no){const c=customers.find(c=>c.customer_no===s.customer_no);add(matchKey(s.source_name??s.consignee_name,s.source_phone??s.consignee_phone),s.source_name??s.consignee_name,s.source_phone??s.consignee_phone,c);}
  const ids=[['고객 ID 자동 매칭'],['기존 숫자 ID는 유지하며 LK 형식으로 표시합니다.'],['새 고객은 앱·웹 업로드 후 ID 발급 → 최신 자료 Excel 다운로드로 반영합니다.'],['연락처만 같은 고객과 보호된 복수 이름은 자동 통합하지 않습니다.'],['매칭 Key','등록 이름 / 별칭','등록 연락처','고객 번호','고객 고유 ID'],...[...keys.values()].sort((a,b)=>a[3]-b[3]||a[0].localeCompare(b[0]))];
+ const legacy=context.numberingMode==='legacy';
  const controls=[['명세서 번호 관리'],['E열: 수동 번호 / F열: 잠금 선택 / G열: 고정할 번호'],['인쇄 전 G열 번호를 확인하고 F열을 잠금으로 선택하세요. 각 행에서 해제할 수 있습니다.'],['새로 입력한 화물은 앱·웹에 업로드하여 고객 ID를 받은 뒤 최신 자료를 내려받으세요.'],['매칭 Key','고객 고유 ID','고객명 / 구분','자동 번호','수동 지정 번호','번호 상태','고정 번호','적용 번호','화물 행 수','확인 사항','저장 당시 상태','승인 대기 번호 유지']];
- for(const c of customers){for(const special of [false,true]){
+ if(!legacy){for(const c of customers){for(const special of [false,true]){
   const row=controls.length+1,key=identityKey(c.customer_no,special),group=shipments.filter(s=>s.customer_no===c.customer_no&&specialName(s.consignee_name)===special),numbers=[...new Set(group.map(s=>s.receipt_number).filter(Boolean))];
   if(numbers.length>1)throw new Error('같은 고객 ID에 서로 다른 명세서 번호가 있습니다. 번호 변경 승인을 완료하거나 고객 ID 구분을 확인하세요.');
   const current=numbers.length===1?numbers[0]:'',manual=group.find(s=>s.receipt_number_override)?.receipt_number_override??'',locked=group.some(s=>s.receipt_number_locked||s.data_locked),auto=statementCode(prefix,c.customer_no,special);
@@ -88,6 +89,18 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  const ur=controls.length+1,unknownNumbers=[...new Set(unknownGroup.map(s=>s.receipt_number).filter(Boolean))];
  const un=unknownNumbers[0]||`${prefix} XX`,um=unknownGroup.find(s=>s.receipt_number_override)?.receipt_number_override||'',ul=unknownGroup.some(s=>s.receipt_number_locked||s.data_locked);
  controls.push(['UNKNOWN','고객 ID 미확정','수취인 불명 / 미확인',`${prefix} XX`,um,ul?'잠금':'자동',un,formula(`IF(F${ur}="잠금",G${ur},IF(E${ur}<>"",E${ur},D${ur}))`,ul?un:um||`${prefix} XX`),cargo?formula(`COUNTIF('물품 입고 내역'!$BE$6:$BE$${cargoLast},A${ur})`,unknownGroup.length):unknownGroup.length,'',JSON.stringify({receipt_number:un,manual:um,locked:ul,fixed:un}),0]);
+ }else{
+  controls[2]=['기존 발행 항차: 명세서 번호는 유지하고 현재 고객 ID는 별도로 연결합니다.'];
+  controls[3]=['과거 명세서는 고객 ID가 같아도 합치지 않습니다. 번호 변경은 수동 지정과 기존 승인 절차를 따릅니다.'];
+  controls[4][3]='기존 발행 번호';controls[4].push('기존 번호 순서');
+  const groups=new Map();for(const row of shipments){const number=String(row.receipt_number??'').trim();if(!number)continue;if(!groups.has(number))groups.set(number,[]);groups.get(number).push(row);}
+  const ordered=[...groups].sort((a,b)=>a[0].localeCompare(b[0],'en',{numeric:true}));
+  for(const [number,group] of ordered){
+   const r=controls.length+1,locked=group.some(s=>s.receipt_number_locked||s.data_locked),manual=group.find(s=>s.receipt_number_override)?.receipt_number_override||'';
+   const codes=[...new Set(group.filter(s=>s.customer_no).map(s=>customerCode(s.customer_no)))].join(', '),names=[...new Set(group.map(s=>s.consignee_name||''))].join(' / ');
+   controls.push(['LEGACY|'+number,codes||'고객 ID 미확정',names,number,manual,locked?'잠금':'자동',number,formula(`IF(F${r}="잠금",IF(G${r}="","고정번호 입력",G${r}),IF(E${r}<>"",E${r},D${r}))`,number),cargo?formula(`COUNTIF('물품 입고 내역'!$BE$6:$BE$${cargoLast},A${r})`,group.length):group.length,formula(`IF(I${r}=0,"",IF(COUNTIFS($H$6:$H$${5+ordered.length},H${r},$I$6:$I$${5+ordered.length},">0")>1,"번호 중복 확인",""))`),JSON.stringify({receipt_number:number,manual,locked,fixed:number}),1,r-5]);
+  }
+ }
  const pairs=new Map([...keys.values()].map(r=>[r[0],{name:r[1],phone:r[2]}]));
  for(const s of shipments)pairs.set(matchKey(s.consignee_name,s.consignee_phone),{name:s.consignee_name,phone:s.consignee_phone});
  const delivery=[['배송 매칭 확인'],['같은 연락처·한글/영문 이름 차이는 확인 후보입니다. F열에서 배송 프로필 번호를 선택해 확정합니다.'],['후보에 없는 배송지는 앱·웹 배송 목록에서 먼저 수정하세요. 고객 ID는 통합하지 않습니다.'],['확인 결과는 Excel 업로드 후 앱·웹 DB와 함께 반영됩니다.'],['매칭 Key','확정 배송 참조','자동 확인 참조','매칭 상태','확인 후보 (프로필 번호 / 고객명)','확인할 프로필 번호','입고 고객명','입고 연락처','후보 번호 목록','프로필 번호','참조','고객명','수령인','연락처','Type','업체','주소','자료 지문','전체 연락처 비교']];
@@ -213,8 +226,9 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
  }
  let cargoXml=cargoPath?txt(files[cargoPath]):'',last=Math.max(6,...[...cargoXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m=>Number(m[1])));
  const tables=makeIdentityTables(context,{prefix,shipments,deliveryRefs,deliveryRefFormulas,cargoLast:last,cargo:!!cargoPath});
+ const legacy=context.numberingMode==='legacy';
  newSheet(files,'고객 ID',tables.ids,{widths:[48,32,28,15,18],hiddenColumns:[1]});
- newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12],inputColumns:[{column:'F',values:['자동','잠금']}]});
+ newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12,13],inputColumns:[{column:'F',values:['자동','잠금']}]});
  newSheet(files,'배송 매칭 확인',tables.delivery,{widths:[45,18,18,18,70,20,30,26,20,16,14,28,28,24,16,18,50,35],hiddenColumns:[1,2,3,9,10,11,12,13,14,15,16,17,18,19]});
  if(!cargoPath||last<=6)return {tables,applied:false,version:ID_WORKBOOK_VERSION};
  const idByKey=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]]));
@@ -224,11 +238,17 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
  cargoXml=cargoXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
   const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
-  const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
-  const priorY=get('Y'),cache={R:get('R'),BG:get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
+  const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=legacy?(get('N')?'LEGACY|'+get('N'):''):id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=legacy?get('N'):control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
+  const priorY=get('Y'),cache={R:get('R'),BG:legacy?get('N'):get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
   const updates={BG:cache.BG,BH:cache.BH};
   if(!cache.AH)cache.R=cache.BF;
   const formulas=identityCargoFormulas(r,last,tables.ids.length,tables.controls.length,tables.delivery.length,prefix);
+  if(legacy){
+   formulas.BE=`IF(AND(E${r}="",F${r}=""),"",IF(BG${r}="","","LEGACY|"&BG${r}))`;
+   formulas.N=`IF(BE${r}="","",IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},8,FALSE),BG${r}))`;
+   formulas.AB=`IF(AA${r}<>1,"",IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$M$${tables.controls.length},13,FALSE),""))`;
+   cache.BE=control;cache.Y=control;
+  }
   for(const [column,f] of Object.entries(formulas))updates[column]=formula(f,cache[column]??'');
   if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,priority:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
   return patchRow(row,r,updates);
@@ -238,7 +258,7 @@ export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[]
  cargoXml=hideColumns(cargoXml,53,61);
  files[cargoPath]=bytes(cargoXml);
  const customerPath=sheetPath(files,'고객 리스트');
- if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>a.priority-b.priority||a.id-b.id);let text=txt(files[customerPath]);
+ if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>legacy?a.receipt.localeCompare(b.receipt,'en',{numeric:true}):a.priority-b.priority||a.id-b.id);let text=txt(files[customerPath]);
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
    const r=Number(n),a=row.match(new RegExp(`<c\\b[^>]*r="A${r}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`))?.[0]??'';
    // A formula identifies a previously upgraded slot; preserve the original

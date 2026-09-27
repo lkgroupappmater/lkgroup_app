@@ -2133,13 +2133,16 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     // Receipt numbers are assigned only by the common database automation.
     // Export never performs an independent allocation or writes shipment rows.
+    const {data: usesCustomerIds,error: numberingPolicyError}=await admin.rpc('lk_uses_customer_id_receipts',{p_route:routeKey,p_year:shipmentYear,p_voyage:voyage});
+    if(numberingPolicyError)throw numberingPolicyError;
     const enrichedShipments = exportShipmentRows;
-    if (enrichedShipments.some(row => !String(row.receipt_number ?? '').trim())) {
+    if (usesCustomerIds && enrichedShipments.some(row => !String(row.receipt_number ?? '').trim())) {
       throw new Error('명세서 번호 정리가 필요합니다. 항차 자료를 새로고침한 뒤 다시 다운로드하세요.');
     }
 
     const {data: identityContext, error: identityContextError} = await admin.rpc('lk_excel_identity_context',{p_route_key:routeKey});
     if(identityContextError) throw identityContextError;
+    identityContext.numberingMode=usesCustomerIds?'customer_id':'legacy';
     // Discount rows are deliberately available only through authenticated RLS.
     // Reuse the verified request identity; do not widen table privileges.
     const policyReader=createClient(supabaseUrl,serviceRoleKey,{

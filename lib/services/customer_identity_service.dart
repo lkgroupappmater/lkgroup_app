@@ -8,7 +8,7 @@ class CustomerIdentityService {
   }
   static String displayCode(Object? value) {
     final code = normalizeCode('${value ?? ''}');
-    return code == null ? '${value ?? ''}' : 'LK ${code.padLeft(5, '0')}';
+    return code == null ? '${value ?? ''}' : 'LK ${code.padLeft(4, '0')}';
   }
   static Future<void> enrichMembers(List<Map<String, dynamic>> members) async {
     for (var start = 0; start < members.length; start += 200) {

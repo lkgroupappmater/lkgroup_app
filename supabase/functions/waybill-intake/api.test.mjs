@@ -135,14 +135,14 @@ test('bulk customer endpoint requires active admin and review and performs one a
 
 test('member identity is owner-only; it does not expose registry or operational actions',async()=>{
  const api=setup({role:'member'});const r=await api.call({action:'my_customer_id',owner:'other',p_owner:'other',id:'other'});
- assert.equal(r.status,200);assert.equal(r.body.customer_code,'LK 00023');assert.deepEqual(api.rpcCalls.map(x=>x.name),['customer_registry_member_id']);assert.equal(api.rpcCalls[0].args.p_owner,'owner');
+ assert.equal(r.status,200);assert.equal(r.body.customer_code,'LK 0023');assert.deepEqual(api.rpcCalls.map(x=>x.name),['customer_registry_member_id']);assert.equal(api.rpcCalls[0].args.p_owner,'owner');
  assert.equal((await api.call({action:'customers_list'})).status,403);
  for(const blocked of [setup({authenticated:false}),setup({active:false})]){const r=await blocked.call({action:'my_customer_id'});assert.ok([401,403].includes(r.status));assert.equal(blocked.rpcCalls.length,0);}
 });
 
 test('customer ID search normalizes leading zeros and only filters existing authorized cargo',async()=>{
  const api=setup({role:'member',data:{shipments:[{id:1},{id:2,visible:false},{id:3}],customer_registry_statement_mapping:[{shipment_id:1,customer_code:'023'},{shipment_id:2,customer_code:'023'},{shipment_id:3,customer_code:'123'}]}});
- for(const code of ['23','023','ID 023','LK 00023']){const r=await api.call({action:'customer_id_search',customer_code:code,p_owner:'forged'});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'LK 00023'}]);}
+ for(const code of ['23','023','ID 023','LK 0023']){const r=await api.call({action:'customer_id_search',customer_code:code,p_owner:'forged'});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'LK 0023'}]);}
  assert.equal((await api.call({action:'customer_id_search',customer_code:'9023'})).body.shipments.length,0);
  assert.equal((await api.call({action:'customer_id_search',customer_code:'0'})).status,400);
  assert.equal(api.rpcCalls.every(c=>c.name==='customer_registry_search_shipments'&&c.args.p_owner==='owner'),true);assert.equal(api.writes.length,0);
@@ -152,7 +152,7 @@ test('bulk identity lookup is read-only and role-scoped',async()=>{
  for(const role of ['member','staff','partner'])assert.equal((await setup({role,data}).call({action:'customer_identity_index',profile_ids:['owner']})).status,403);
  assert.equal((await setup({role:'member',data}).call({action:'customer_identity_index',shipment_ids:[1]})).status,403);
  const api=setup({data});const r=await api.call({action:'customer_identity_index',profile_ids:['owner','missing'],shipment_ids:[1,2]});
- assert.equal(r.status,200);assert.equal(r.body.profiles.length,1);assert.equal(r.body.profiles[0].customer_code,'LK 00023');assert.equal(r.body.shipments.length,1);assert.equal(api.writes.length,0);
+ assert.equal(r.status,200);assert.equal(r.body.profiles.length,1);assert.equal(r.body.profiles[0].customer_code,'LK 0023');assert.equal(r.body.shipments.length,1);assert.equal(api.writes.length,0);
  assert.equal((await api.call({action:'customer_identity_index',shipment_ids:Array(501).fill(1)})).status,400);
 });
 
