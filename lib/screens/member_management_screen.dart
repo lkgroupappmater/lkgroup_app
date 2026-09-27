@@ -12,7 +12,6 @@ import '../core/app_colors.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../utils/form_validators.dart';
-import '../widgets/submit_search_field.dart';
 
 class MemberManagementScreen extends StatefulWidget {
   const MemberManagementScreen({super.key,this.language=AppLanguage.korean});
@@ -31,7 +30,6 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   @override
   Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadMembers(); } finally { _automaticLoad = false; } }
 
-  final _search = TextEditingController();
   String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
   bool _loading = false;
@@ -53,7 +51,6 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
   @override
   void dispose() {
-    _search.dispose();
     super.dispose();
   }
 
@@ -522,7 +519,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
     return Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () => setState(() { _submittedSearch = _fieldFilter.query; _search.text = _fieldFilter.query; })),
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () => setState(() { _submittedSearch = _fieldFilter.query; })),
         title: const Text('회원 종합 관리'),
         actions:[TextButton(onPressed:_openRegistry,child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,
@@ -593,14 +590,6 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
-                  SubmitSearchField(
-                    controller: _search,
-                    onSearch: (value) => setState(() { _fieldFilter.query = ''; _fieldFilter.field = ''; _submittedSearch = value; }),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: '고객 ID·이름·이메일·전화번호 검색',
-                    ),
-                  ),
                   const SizedBox(height: 8),
                   if (_submittedSearch.trim().isNotEmpty && list.isEmpty)
                     const Card(child: ListTile(title: Text('검색된 회원이 없습니다.'))),

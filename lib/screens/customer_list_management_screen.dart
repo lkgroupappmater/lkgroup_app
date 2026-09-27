@@ -22,6 +22,8 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
+  bool get autoRefreshAllowed => !_saving && !_loading;
+  @override
   Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _rows.where(_fieldFilter.matches).toList(growable: false);
 

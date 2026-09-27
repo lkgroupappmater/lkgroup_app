@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../lib/core/app_language.dart';
 import '../lib/screens/customer_registry_screen.dart';
 import '../lib/screens/customer_registry_auto_merge.dart';
+import '../lib/widgets/management_field_search.dart';
 import '../lib/screens/customer_registry_bulk_editor.dart';
 import '../lib/services/domestic_tracking_service.dart';
 
@@ -86,4 +87,13 @@ testWidgets('reviewed auto merge excludes unchecked IDs and requires delivery co
   expect((calls.last['selection'] as List).map((e) => e['id']), ['a1','a2']);
 });
 
+
+  test('management filters isolate fields and match nested contacts and normalized IDs', () {
+    final filter = ManagementFieldFilter();
+    final row = <String, dynamic>{'customer_code': '003', 'name': 'Alpha', 'company': 'Beta', 'shipment': {'consignee_phone': '020-1234-5678'}};
+    filter.field = 'name'; filter.query = 'Beta'; expect(filter.matches(row), false);
+    filter.field = 'company'; expect(filter.matches(row), true);
+    filter.field = 'customer_code'; filter.query = 'ID 3'; expect(filter.matches(row), true);
+    filter.field = 'consignee_phone'; filter.query = '5678'; expect(filter.matches(row), true);
+  });
 }
