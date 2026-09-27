@@ -1,4 +1,5 @@
-import { receiptOrderFormulas, fixedDiscountFormulas, RECEIPT_RULE_VERSION } from './receipt-order.mjs';
+import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
+import { receiptOrderFormulas, fixedDiscountFormulas } from './receipt-order.mjs';
 import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
 import { formatDeliveryNumbers } from './delivery-number-format.mjs';
@@ -2053,6 +2054,7 @@ Deno.serve(async (req) => {
     const requestedRouteLabel = String(body.route_label ?? '').trim();
     const shipmentYear = Number(body.shipment_year);
     const voyage = String(body.voyage ?? '').trim();
+    const isBaseRefresh = body.refresh_base === true && voyage === '00';
 
     const { data: routeDefinition, error: routeDefinitionError } = await admin
       .from('route_definitions')
@@ -2110,7 +2112,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: shipments, error: shipmentError } = await admin
       .from('shipments')
       .select(
-        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,unloading_zone,recipient_unknown,notes,special_note_auto,received_at,created_at',
+        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,receipt_number_locked,receipt_number_override,data_locked,unloading_zone,recipient_unknown,notes,special_note_auto,received_at,created_at',
       )
       .eq('route', shipmentRouteLabel)
       .eq('shipment_year', shipmentYear)
@@ -2136,6 +2138,26 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       throw new Error('명세서 번호 정리가 필요합니다. 항차 자료를 새로고침한 뒤 다시 다운로드하세요.');
     }
 
+    const {data: identityContext, error: identityContextError} = await admin.rpc('lk_excel_identity_context',{p_route_key:routeKey});
+    if(identityContextError) throw identityContextError;
+    if(enrichedShipments.length){
+      const {data:pendingReceipts,error:pendingError}=await admin.from('shipment_change_requests').select('shipment_id,changes').eq('status','pending').in('shipment_id',enrichedShipments.map(s=>s.id));
+      if(pendingError)throw pendingError;
+      identityContext.preserveNumbers=(pendingReceipts??[]).some((r:any)=>Object.prototype.hasOwnProperty.call(r.changes??{},'receipt_number'));
+    }
+    const {data: identityMappings,error: identityMappingError} = await admin.from('customer_registry_statement_mapping').select('shipment_id,customer_no').eq('route',shipmentRouteLabel).eq('shipment_year',shipmentYear).eq('voyage',voyage);
+    if(identityMappingError) throw identityMappingError;
+    const customerNumbers=new Map((identityMappings??[]).map((m:any)=>[m.shipment_id,m.customer_no]));
+    for(const row of enrichedShipments)row.customer_no=customerNumbers.get(row.id)??null;
+    // Operators receive the IDs needed for this route's authorized cargo. The
+    // complete matching catalog is included only in an administrator export.
+    if(profile.role!=='admin'){
+      const visible=new Set(enrichedShipments.map(row=>row.customer_no));
+      identityContext.customers=identityContext.customers.filter((c:any)=>visible.has(c.customer_no));
+      const ids=new Set(identityContext.customers.map((c:any)=>c.id));
+      identityContext.aliases=identityContext.aliases.filter((a:any)=>ids.has(a.customer_registry_id));
+      identityContext.sources=(identityContext.sources??[]).filter((s:any)=>visible.has(s.customer_no));
+    }
     const customerSet = [...new Map(enrichedShipments.map(row => [
       JSON.stringify([row.consignee_name || '', row.consignee_phone || '']),
       {name: row.consignee_name || '', phone: row.consignee_phone || ''},
@@ -2273,6 +2295,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const targetPath = workbookSheetPath(files, '물품 입고 내역');
     const strings = sharedStrings(files);
 
+    if (!isBaseRefresh) {
     if (targetPath && files[targetPath]) {
       files[targetPath] = strToU8(
         updateCargoSheet(
@@ -2366,6 +2389,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       voyageExtraCosts,
       settlementForExcel as Record<string, unknown> | null,
     );
+    }
+    applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh});
     // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
 // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
     // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
@@ -2428,7 +2453,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(200, {
       ok: true,
       file_name: outputFileName,
-      automation_version: RECEIPT_RULE_VERSION,
+      automation_version: ID_WORKBOOK_VERSION,
       storage_path: exportPath,
       shipment_count: shipments?.length ?? 0,
       mode: 'archive-preserving-cargo-list-v2',

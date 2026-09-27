@@ -1,3 +1,4 @@
+import '../services/customer_identity_service.dart';
 import 'package:flutter/material.dart';
 import '../core/app_language.dart';
 import '../core/waybill_intake_text.dart';
@@ -36,7 +37,7 @@ class _CustomerIdentityCardState extends State<CustomerIdentityCard> {
     } catch (_) { if (mounted && request == _request) setState(() => _failed = true); }
     finally { if (mounted && request == _request) setState(() => _busy = false); }
   }
-  String get _value => _busy ? t('identityLoading') : _failed ? t('identityError') : _identity?['customer_code'] == null ? t('identityUnmatched') : '${_identity!['customer_code']}${_identity!['status'] == 'review_required' ? ' · ${t('identityReview')}' : ''}';
+  String get _value => _busy ? t('identityLoading') : _failed ? t('identityError') : _identity?['customer_code'] == null ? t('identityUnmatched') : '${CustomerIdentityService.displayCode(_identity!['customer_code'])}${_identity!['status'] == 'review_required' ? ' · ${t('identityReview')}' : ''}';
   @override
   Widget build(BuildContext context) {
     if (widget.compact) return TextButton(

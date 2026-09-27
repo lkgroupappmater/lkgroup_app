@@ -2,9 +2,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { validateFiles, imageMime, normalizeDrafts, validateReviewed } from './validation.mjs';
 import { autoCandidates, previewAutoSelection, deliveryIdentityIndex } from './auto-merge.mjs';
 import { registrySummary, mapLimit, validateBulkRows } from './registry.mjs';
+import { customerCodeJson } from './customer-code.mjs';
 
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
-const json = (status:number,body:unknown) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
+const json = (status:number,body:unknown) => new Response(JSON.stringify(body, customerCodeJson), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
 class RequestError extends Error { constructor(public status:number, code:string) { super(code); } }
 const require = (ok:unknown,code:string,status=400) => { if (!ok) throw new RequestError(status,code); };
 const result = (r:any) => {
@@ -92,7 +93,7 @@ Deno.serve(async(req:Request)=>{
    return json(200,{profiles,shipments});
   }
   if(b.action==='customer_id_search'){
-   const code=field(b.customer_code,20).match(/^(?:ID\s*[:#-]?\s*)?(\d{1,9})$/i);
+   const code=field(b.customer_code,20).match(/^(?:(?:ID|LK)\s*[:#-]?\s*)?(\d{1,9})$/i);
    require(code&&Number(code[1])>0,'INVALID_CUSTOMER_ID');
    const customerCode=String(Number(code![1])).padStart(3,'0');
    require(b.year==null||(Number.isInteger(Number(b.year))&&Number(b.year)>=1900&&Number(b.year)<=9999),'INVALID_REQUEST');
@@ -108,7 +109,7 @@ Deno.serve(async(req:Request)=>{
     return json(200,{customer,candidates:customer.duplicates.map((d:any)=>({...state.rows.find((r:any)=>r.id===d.id),reasons:d.reasons})),sources:state.sourceRows.filter((s:any)=>s.customer_registry_id===b.id),choices:state.rows.map((r:any)=>({id:r.id,customer_code:r.customer_code,name:r.name,phone:r.phone}))});
    }
    const query=field(b.query).toLowerCase(),pk=phoneKey(query);
-   const output=state.rows.filter((r:any)=>(!query||[r.customer_code,r.name,r.phone].some(v=>String(v).toLowerCase().includes(query))||(pk.length>=4&&r.phone_key.includes(pk)))&&(!b.conflicts_only||r.conflict)&&(!b.mismatches_only||r.mismatch));
+   const output=state.rows.filter((r:any)=>(!query||[r.customer_code,'LK '+String(r.customer_no).padStart(5,'0'),r.name,r.phone].some(v=>String(v).toLowerCase().includes(query))||(pk.length>=4&&r.phone_key.includes(pk)))&&(!b.conflicts_only||r.conflict)&&(!b.mismatches_only||r.mismatch));
    const page=Math.max(0,Math.floor(Number(b.page)||0));return json(200,{customers:output.slice(page*100,page*100+100),total:output.length,has_more:output.length>(page+1)*100,summary:state.summary});
   }
   if(b.action==='delivery_customer_index'){

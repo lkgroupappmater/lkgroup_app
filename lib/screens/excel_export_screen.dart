@@ -8,6 +8,7 @@ import '../services/excel_import_queue_service.dart';
 import '../services/receipt_settlement_service.dart';
 import '../services/settlement_snapshot_service.dart';
 import '../services/supabase_service.dart';
+import 'excel_statement_controls_screen.dart';
 
 class ExcelExportScreen extends StatefulWidget {
   const ExcelExportScreen({super.key});
@@ -27,6 +28,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   String _message = '';
 
   List<ExcelExportBatch> _batches = const [];
+  List<ExcelExportBatch> _bases = const [];
   String? _route;
   int? _year;
   String? _voyage;
@@ -90,9 +92,11 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     });
     try {
       final batches = await ExcelExportService.instance.listBatches();
+      final bases = await ExcelExportService.instance.listBaseTemplates();
       if (!mounted) return;
       setState(() {
         _batches = batches;
+        _bases = bases;
         _route = null;
         _year = null;
         _voyage = null;
@@ -202,8 +206,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  Future<void> _export() async {
-    final selected = _selected;
+  Future<void> _export([ExcelExportBatch? base]) async {
+    final selected = base ?? _selected;
     if (selected == null || _exporting) return;
     setState(() {
       _exporting = true;
@@ -223,6 +227,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  Future<void> _pickBase() async {
+    final selected = await showModalBottomSheet<ExcelExportBatch>(context: context, builder: (context) => SafeArea(child: ListView(shrinkWrap: true, children: [
+      const ListTile(title: Text('최신 BASE Excel 다운로드')),
+      for (final base in _bases) ListTile(title: Text(base.routeLabel), onTap: () => Navigator.pop(context, base)),
+    ])));
+    if (selected != null && mounted) await _export(selected);
   }
 
   Color _jobColor(ExcelImportJobStatus status) {
@@ -327,6 +339,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               label: const Text('Excel 파일 업로드'),
             ),
 
+            OutlinedButton(onPressed: _bases.isEmpty || _exporting || _recalculating ? null : _pickBase, child: const Text('최신 BASE Excel 다운로드 · 고객 ID / 배송 정보')),
+
             if (_queue.jobs.isNotEmpty) ...[
               const SizedBox(height: 10),
               const Text(
@@ -418,6 +432,10 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
 
             const SizedBox(height: 12),
 
+            OutlinedButton(
+              onPressed: _selected == null || _recalculating || _exporting ? null : () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ExcelStatementControlsScreen(batch: _selected!))),
+              child: const Text('배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정'),
+            ),
             OutlinedButton.icon(
               onPressed: _selected == null || _recalculating || _exporting
                   ? null

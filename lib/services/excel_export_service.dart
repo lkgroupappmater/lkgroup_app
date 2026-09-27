@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config/supabase_config.dart';
 import '../core/route_catalog.dart';
+import '../models/app_user.dart';
+import 'auth_service.dart';
 import 'supabase_service.dart';
 import 'excel_bulk_management_service.dart';
 import 'receipt_settlement_service.dart';
@@ -113,6 +115,12 @@ class ExcelExportService {
     return result;
   }
 
+  Future<List<ExcelExportBatch>> listBaseTemplates() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final rows = await SupabaseService.client.from('shipment_excel_base_templates').select('route_key,route_label').eq('active', true).order('route_label');
+    return rows.map((r) => ExcelExportBatch(routeKey: '${r['route_key']}', routeLabel: '${r['route_label']}', year: DateTime.now().year, voyage: '00', hasBaseTemplate: true)).toList();
+  }
+
   Future<ExcelExportResult> exportAndSave(ExcelExportBatch batch) async {
     if (!SupabaseConfig.isConfigured) {
       return const ExcelExportResult(
@@ -127,6 +135,10 @@ class ExcelExportService {
       );
     }
 
+    final isBase = batch.voyage == '00';
+    List<Map<String, dynamic>> settlementRows = [];
+    if (!isBase) {
+    if (AuthService.instance.currentUser?.role == UserRole.admin) await SupabaseService.client.rpc('admin_apply_customer_id_receipts', params: {'p_route': batch.routeLabel, 'p_year': batch.year, 'p_voyage': batch.voyage});
     await SupabaseService.client.rpc('admin_finalize_excel_batch_rules_fast', params: {
       'p_route': batch.routeLabel, 'p_year': batch.year,
       'p_voyage': batch.voyage, 'p_resequence': true,
@@ -134,7 +146,7 @@ class ExcelExportService {
     // Excel 생성 직전 DB의 현재 화물을 중앙 FreightService로 영수번호별 정산하고
     // 동일 결과를 snapshot으로 저장합니다. Edge Function은 다음 단계부터 이 snapshot을
     // Row data에 그대로 사용하므로 Excel용 별도 운임 계산식을 만들지 않습니다.
-    final settlementRows =
+    settlementRows =
         await ExcelBulkManagementService.instance.listRows(
       route: batch.routeLabel,
       year: batch.year,
@@ -150,6 +162,8 @@ class ExcelExportService {
       settlement: settlement,
     );
 
+    }
+
     final response = await SupabaseService.client.functions.invoke(
       'export-shipment-excel',
       body: {
@@ -158,6 +172,7 @@ class ExcelExportService {
         'shipment_rows': settlementRows,
         'shipment_year': batch.year,
         'voyage': batch.voyage,
+        if (isBase) 'refresh_base': true,
       },
     );
 

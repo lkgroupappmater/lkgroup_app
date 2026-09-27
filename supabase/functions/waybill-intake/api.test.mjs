@@ -6,6 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import * as validation from './validation.mjs';
 import * as registry from './registry.mjs';
 import * as autoMerge from './auto-merge.mjs';
+import {customerCodeJson} from './customer-code.mjs';
 const source=stripTypeScriptTypes(fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8').replace(/^import .+;\n/gm,''),{mode:'transform'});
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0,0]);
 function setup({role='admin',active=true,authenticated=true,data:initial={},ocr={waybills:[]},ocrFailure=false}={}){
@@ -39,7 +40,7 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
    if(name==='customer_registry_resolve_source')return {data:true};
    assert.fail(name);
   }};
- vm.runInNewContext(source,{...validation,...registry,...autoMerge,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
+ vm.runInNewContext(source,{...validation,...registry,...autoMerge,customerCodeJson,createClient:()=>db,Deno:{env:{get:()=> 'configured'},serve:fn=>handler=fn},Request,Response,Date,crypto,Uint8Array,TextDecoder,AbortSignal,console,
   fetch:async(_url,options)=>{ocrCalls++;ocrBody=JSON.parse(options.body);return new Response(JSON.stringify({output:[{content:[{type:'output_text',text:JSON.stringify(ocr)}]}]}),{status:ocrFailure?503:200});}});
  return {data,writes,rpcCalls,signed,get ocrCalls(){return ocrCalls},get ocrBody(){return ocrBody},async call(body,token='valid'){
   const r=await handler(new Request('https://test.invalid',{method:'POST',headers:token?{Authorization:`Bearer ${token}`}:{},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};
@@ -134,14 +135,14 @@ test('bulk customer endpoint requires active admin and review and performs one a
 
 test('member identity is owner-only; it does not expose registry or operational actions',async()=>{
  const api=setup({role:'member'});const r=await api.call({action:'my_customer_id',owner:'other',p_owner:'other',id:'other'});
- assert.equal(r.status,200);assert.equal(r.body.customer_code,'023');assert.deepEqual(api.rpcCalls.map(x=>x.name),['customer_registry_member_id']);assert.equal(api.rpcCalls[0].args.p_owner,'owner');
+ assert.equal(r.status,200);assert.equal(r.body.customer_code,'LK 00023');assert.deepEqual(api.rpcCalls.map(x=>x.name),['customer_registry_member_id']);assert.equal(api.rpcCalls[0].args.p_owner,'owner');
  assert.equal((await api.call({action:'customers_list'})).status,403);
  for(const blocked of [setup({authenticated:false}),setup({active:false})]){const r=await blocked.call({action:'my_customer_id'});assert.ok([401,403].includes(r.status));assert.equal(blocked.rpcCalls.length,0);}
 });
 
 test('customer ID search normalizes leading zeros and only filters existing authorized cargo',async()=>{
  const api=setup({role:'member',data:{shipments:[{id:1},{id:2,visible:false},{id:3}],customer_registry_statement_mapping:[{shipment_id:1,customer_code:'023'},{shipment_id:2,customer_code:'023'},{shipment_id:3,customer_code:'123'}]}});
- for(const code of ['23','023','ID 023']){const r=await api.call({action:'customer_id_search',customer_code:code,p_owner:'forged'});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'023'}]);}
+ for(const code of ['23','023','ID 023','LK 00023']){const r=await api.call({action:'customer_id_search',customer_code:code,p_owner:'forged'});assert.equal(r.status,200);assert.deepEqual(r.body.shipments,[{id:1,customer_code:'LK 00023'}]);}
  assert.equal((await api.call({action:'customer_id_search',customer_code:'9023'})).body.shipments.length,0);
  assert.equal((await api.call({action:'customer_id_search',customer_code:'0'})).status,400);
  assert.equal(api.rpcCalls.every(c=>c.name==='customer_registry_search_shipments'&&c.args.p_owner==='owner'),true);assert.equal(api.writes.length,0);
@@ -151,7 +152,7 @@ test('bulk identity lookup is read-only and role-scoped',async()=>{
  for(const role of ['member','staff','partner'])assert.equal((await setup({role,data}).call({action:'customer_identity_index',profile_ids:['owner']})).status,403);
  assert.equal((await setup({role:'member',data}).call({action:'customer_identity_index',shipment_ids:[1]})).status,403);
  const api=setup({data});const r=await api.call({action:'customer_identity_index',profile_ids:['owner','missing'],shipment_ids:[1,2]});
- assert.equal(r.status,200);assert.equal(r.body.profiles.length,1);assert.equal(r.body.profiles[0].customer_code,'023');assert.equal(r.body.shipments.length,1);assert.equal(api.writes.length,0);
+ assert.equal(r.status,200);assert.equal(r.body.profiles.length,1);assert.equal(r.body.profiles[0].customer_code,'LK 00023');assert.equal(r.body.shipments.length,1);assert.equal(api.writes.length,0);
  assert.equal((await api.call({action:'customer_identity_index',shipment_ids:Array(501).fill(1)})).status,400);
 });
 

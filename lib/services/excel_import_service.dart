@@ -120,6 +120,18 @@ class ExcelImportService {
     final voyage = meta.voyage;
     final isBaseUpdate = voyage == '00';
 
+    if (SupabaseConfig.isConfigured && AuthService.instance.currentUser?.role == UserRole.admin) {
+      final customers = <Map<String, dynamic>>[];
+      final deliveryRows = AutomationWorkbookRules.deliveries(workbook, routeKey);
+      if (deliveryRows != null) { for (final row in deliveryRows) { customers.add({'name': row['customer_name'], 'phone': row['phone_display'] ?? row['phone']}); } }
+      if (isBaseUpdate) {
+        for (final row in workbook['물품 입고 내역']?.skip(5) ?? <List<String>>[]) {
+          if (row.length > 5 && row[4].trim().isNotEmpty) customers.add({'name': row[4], 'phone': row[5]});
+        }
+      }
+      if (customers.isNotEmpty) await SupabaseService.client.rpc('admin_register_excel_customers', params: {'p_rows': customers});
+    }
+
     // V00 is NEVER a real shipment voyage.
     // It is a route-wide BASE/policy workbook. Even if a template happens to
     // contain reserved cargo numbers/formulas, V00 must not upsert shipments.
@@ -132,6 +144,7 @@ class ExcelImportService {
           await _importCustomerDiscountRules(workbook, routeKey: routeKey);
       await _importStatementShareRules(workbook, routeKey: routeKey);
 
+      await _importIdentityControls(workbook, routeKey, routeLabel, year, voyage);
       if (SupabaseConfig.isConfigured) {
         await _saveWorkbookTemplate(bytes: bytes, fileName: fileName,
           routeKey: routeKey, routeLabel: routeLabel, year: year, voyage: voyage);
@@ -264,6 +277,7 @@ class ExcelImportService {
       });
     }
 
+    await _importIdentityControls(workbook, routeKey, routeLabel, year, voyage);
     onProgress?.call(0.86, '최종 규칙 반영 완료 · 원본 Excel 보관 중');
 
     if (SupabaseConfig.isConfigured) {
@@ -482,6 +496,32 @@ class ExcelImportService {
         .replaceAll('&quot;', '"')
         .replaceAll('&apos;', "'")
         .replaceAll('&amp;', '&');
+  }
+
+  Future<void> _importIdentityControls(Map<String, List<List<String>>> workbook, String routeKey, String routeLabel, int year, String voyage) async {
+    if (!SupabaseConfig.isConfigured || AuthService.instance.currentUser?.role != UserRole.admin) return;
+    String cell(List<String> row, int column) => column < row.length ? row[column].trim() : '';
+    final controls = <Map<String, dynamic>>[];
+    for (final row in workbook['명세서 번호 관리'] ?? <List<String>>[]) {
+      if (!RegExp(r'^(ID\|\d+\|[01]|UNKNOWN)$').hasMatch(cell(row, 0)) || cell(row, 10).isEmpty) continue;
+      final baseline = jsonDecode(cell(row, 10)) as Map<String, dynamic>;
+      final manual = cell(row, 4);
+      final locked = cell(row, 5) == '잠금';
+      final fixed = cell(row, 6);
+      if (manual != '${baseline['manual'] ?? ''}' || locked != (baseline['locked'] == true) || fixed != '${baseline['fixed'] ?? ''}') {
+        controls.add({'key': cell(row, 0), 'manual': manual, 'locked': locked, 'fixed': fixed, 'baseline': baseline});
+      }
+    }
+    if (controls.isNotEmpty && voyage != '00') await SupabaseService.client.rpc('admin_import_excel_statement_controls', params: {'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_controls': controls});
+    final sheet = workbook['배송 매칭 확인'] ?? <List<String>>[];
+    final profiles = {for (final row in sheet) if (int.tryParse(cell(row, 9)) != null) int.parse(cell(row, 9)): row};
+    for (final row in sheet) {
+      if (cell(row, 5).isEmpty || cell(row, 0) == '매칭 Key' || !cell(row, 0).contains('|p')) continue;
+      final id = int.tryParse(cell(row, 5));
+      final profile = profiles[id];
+      if (id == null || profile == null || !cell(row, 8).contains('|$id|')) throw const FormatException('배송 매칭 확인: 후보 목록의 배송 번호를 선택하세요.');
+      await SupabaseService.client.rpc('admin_review_excel_delivery_match', params: {'p_route_key': routeKey, 'p_name': cell(row, 6), 'p_phone': cell(row, 7), 'p_profile_id': id, 'p_fingerprint': cell(profile, 17), 'p_approved': true});
+    }
   }
 
   Future<void> _saveWorkbookTemplate({

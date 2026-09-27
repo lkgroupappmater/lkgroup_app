@@ -119,7 +119,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       // 관리자/파트너는 위 고정 목록에 항상 표시하므로 검색 영역에서는 일반회원만 표시합니다.
       if ('${m['role'] ?? 'member'}' != 'member' && CustomerIdentityService.normalizeCode(query) == null) return false;
       if (_fieldFilter.query.trim().isNotEmpty) return _fieldFilter.matches(m);
-      return (CustomerIdentityService.normalizeCode(query) != null && CustomerIdentityService.normalizeCode(query) == m['customer_code']) || '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
+      return (CustomerIdentityService.normalizeCode(query) != null && CustomerIdentityService.normalizeCode(query) == CustomerIdentityService.normalizeCode('${m['customer_code'] ?? ''}')) || '${m['name']} ${m['email']} ${m['phone']} ${m['company']} ${m['role']}'
           .toLowerCase()
           .contains(query);
     }).toList();

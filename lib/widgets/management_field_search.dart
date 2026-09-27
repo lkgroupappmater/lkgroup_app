@@ -13,9 +13,9 @@ class ManagementFieldFilter {
     final values = field.isEmpty ? row.values : _values(row, field);
     return values.any((value) {
       final text = '${value ?? ''}'.toLowerCase();
-      if (field == 'customer_code' && RegExp(r'^(?:id\s*[:#-]?\s*)?\d+$').hasMatch(q)) {
+      if (field == 'customer_code' && RegExp(r'^(?:(?:id|lk)\s*[:#-]?\s*)?\d+$').hasMatch(q)) {
         final digits = q.replaceAll(RegExp(r'\D'), '');
-        return int.tryParse(text) == int.tryParse(digits);
+        return int.tryParse(text.replaceAll(RegExp(r'\D'), '')) == int.tryParse(digits);
       }
       return text.contains(q) || (field.contains('phone') && text.replaceAll(RegExp(r'\D'), '').contains(q.replaceAll(RegExp(r'\D'), '')) && q.replaceAll(RegExp(r'\D'), '').isNotEmpty);
     });
