@@ -2,7 +2,7 @@
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
-import {rewriteWorksheetRows} from './worksheet-rows.mjs';
+import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
 export const ID_WORKBOOK_VERSION='2026-09-28.offline-customer-id-v7';
 const enc=new TextEncoder(),dec=new TextDecoder();
@@ -296,9 +296,8 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n))));
   files[path]=bytes(text);
  }
- let cargoXml=cargoPath?txt(files[cargoPath]):'';
- const hasRanking=/<c\b[^>]*r="AB\d+"/.test(cargoXml);
- const last=Math.max(6,...[...cargoXml.matchAll(new RegExp(`<c\\b[^>]*r="${hasRanking?'AB':'N'}(\\d+)"`,'g'))].map(m=>Number(m[1])).filter(n=>hasRanking||n<=1005));
+ const cargoData=cargoPath?files[cargoPath]:new Uint8Array();
+ const {hasRanking,last}=worksheetIdentityRange(cargoData);
  const tables=makeIdentityTables(context,{prefix,shipments,deliveryRefs,deliveryRefFormulas,cargoLast:last,cargo:!!cargoPath});
  const legacy=context.numberingMode==='legacy';
  newSheet(files,'고객 ID',tables.ids,{widths:[48,32,28,15,18],hiddenColumns:[1]});
@@ -310,11 +309,7 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  const controlByKey=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  const deliveryByKey=new Map(tables.delivery.slice(5).map(r=>[r[0],r]));
  const summaries=new Map(),recoveryByReceipt=new Map(tables.controls.slice(5).map(r=>[r[7].value,Number(r[13])||0]));
- // Update metadata before emitting rows to avoid decoding/rebuilding the large
- // finished worksheet just to change its dimension and hidden columns.
- cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BL${Math.max(last,1010)}"/>`);
- cargoXml=hideColumns(cargoXml,53,64);
- files[cargoPath]=rewriteWorksheetRows(cargoXml,(row,n)=>{
+ files[cargoPath]=rewriteWorksheetRows(cargoData,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
   const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
   const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=legacy?(get('N')?'LEGACY|'+get('N'):''):id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=legacy?get('N'):control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
@@ -338,8 +333,7 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
   for(const [column,f] of Object.entries(formulas))updates[column]=formula(f,cache[column]??'');
   if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,recovered:recoveryByReceipt.get(receipt)||0,priority:unknownPrefixZone(name)&&special?7:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
   return patchRow(row,r,updates,cells);
- });
- cargoXml='';
+ },header=>hideColumns(header.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BL${Math.max(last,1010)}"/>`),53,64));
  const customerPath=sheetPath(files,'고객 리스트');
  if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>legacy?(a.recovered&&b.recovered?a.recovered-b.recovered:a.recovered?1:b.recovered?-1:a.receipt.localeCompare(b.receipt,'en',{numeric:true})):a.priority-b.priority||(a.priority===7?(a.recovered||1e12)-(b.recovered||1e12):a.id-b.id));let text=txt(files[customerPath]);
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{

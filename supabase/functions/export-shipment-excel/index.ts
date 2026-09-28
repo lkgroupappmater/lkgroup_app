@@ -1,3 +1,4 @@
+import {rewriteWorksheetRows,worksheetRowEntries,worksheetMetadata} from './worksheet-rows.mjs';
 import { applyUnknownPrefixZones } from './unknown-zone.mjs';
 import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
 import { canReuseValidatedBase } from './validated-base.mjs';
@@ -401,22 +402,31 @@ function updateCell(
 }
 
 function updateCargoSheet(
-  sheetXml: string,
+  inputSheet: string | Uint8Array,
   strings: string[],
   shipments: Record<string, unknown>[],
   routeKey = '',
-): string {
-  const headerRow = findHeaderRow(sheetXml, strings);
-  if (headerRow < 0) {
-    throw new Error('"물품 입고 내역" 헤더 행을 찾지 못했습니다.');
-  }
-
+  byteOutput = false,
+  title = '',
+): string | Uint8Array {
+  const sheetXml = typeof inputSheet === 'string' ? inputSheet : '';
+  let headerRow = -1;
+  if (byteOutput) {
+    for (const row of worksheetRowEntries(inputSheet)) {
+      headerRow = findHeaderRow(row[0],strings);
+      if (headerRow >= 0 || Number(row[1]) > 20) break;
+    }
+  } else headerRow = findHeaderRow(sheetXml, strings);
+  if (headerRow < 0) throw new Error('"물품 입고 내역" 헤더 행을 찾지 못했습니다.');
   const firstDataRow = headerRow + 1;
-  const formulaRows = ['kr_la_sea','kr_la_air'].includes(routeKey) && /<c\b[^>]*r="AK6"/.test(sheetXml)
-    ? [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6)
-    : [];
-  const lastFormulaRow = formulaRows.length ? Math.max(...formulaRows) : 0;
-  let nextSharedId = 1 + Math.max(-1,...[...sheetXml.matchAll(/<f\b[^>]*\bsi="(\d+)"/g)].map(m => Number(m[1])));
+  const metadata = byteOutput ? worksheetMetadata(inputSheet) : null;
+  const formulaRows = !byteOutput && ['kr_la_sea','kr_la_air'].includes(routeKey) && /<c\b[^>]*r="AK6"/.test(sheetXml)
+    ? [...sheetXml.matchAll(/<c\b[^>]*r="AB(\d+)"/g)].map(m => Number(m[1])).filter(n => n >= 6) : [];
+  const lastFormulaRow = byteOutput
+    ? (['kr_la_sea','kr_la_air'].includes(routeKey) && metadata.hasAK6 && metadata.hasRanking ? metadata.last : 0)
+    : (formulaRows.length ? Math.max(...formulaRows) : 0);
+  let nextSharedId = 1 + (byteOutput ? metadata.maxSharedId : Math.max(-1,...[...sheetXml.matchAll(/<f\b[^>]*\bsi="(\d+)"/g)].map(m => Number(m[1]))));
+
   const sharedColumns = new Map<string, number>();
   const shareGeneratedFormulas = (rowXml: string) => rowXml.replace(
     /<c\b[^>]*\br="(N|Y|Z|AB|AC|AK|AL|AM)(\d+)"[^>]*>[\s\S]*?<\/c>/g,
@@ -492,7 +502,8 @@ function updateCargoSheet(
 
   const slots: Array<{row: number; box: string}> = [];
   const labels = new Map<string, string>();
-  for (const match of sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g)) {
+  const inputRows = byteOutput ? worksheetRowEntries(inputSheet) : sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g);
+  for (const match of inputRows) {
     const row = Number(match[1]);
     if (row < firstDataRow) continue;
     const boxCell = match[0].match(new RegExp(`<c\\b[^>]*r="B${row}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`));
@@ -546,6 +557,7 @@ function updateCargoSheet(
   // worksheet 전체는 한 번만 순회하고, callback 안에서 해당 행만 갱신합니다.
   const updateRow = (candidateXml: string, rowText: string) => {
       const rowNumber = Number(rowText);
+      if (rowNumber === 1 && title) return setStringCellInSheet(candidateXml,'B1',title);
       const slot = slotByRow.get(rowNumber);
       if (!slot) return finishRow(candidateXml);
       const normalizedBox = assignments.get(rowNumber);
@@ -593,16 +605,21 @@ function updateCargoSheet(
 
       return finishRow(rowXml);
     };
-  // Iterate lazily instead of letting replace retain all callback arguments
-  // and intermediate replacement strings for a large worksheet.
-  const pieces: string[] = [];
-  let cursor = 0;
-  for (const match of sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g)) {
-    pieces.push(sheetXml.slice(cursor,match.index),updateRow(match[0],match[1]));
-    cursor = match.index! + match[0].length;
+  // The deployed path emits rows directly into bytes. It avoids keeping the
+  // original, all UTF-16 row replacements and their joined worksheet at once.
+  let output: string | Uint8Array;
+  if (byteOutput) {
+    output = rewriteWorksheetRows(inputSheet, updateRow, lastFormulaRow ? formatCargoDiscountColumns : undefined);
+  } else {
+    const pieces: string[] = [];
+    let cursor = 0;
+    for (const match of sheetXml.matchAll(/<row\b[^>]*r="(\d+)"[^>]*>[\s\S]*?<\/row>/g)) {
+      pieces.push(sheetXml.slice(cursor,match.index),updateRow(match[0],match[1]));
+      cursor = match.index! + match[0].length;
+    }
+    pieces.push(sheetXml.slice(cursor));
+    output = lastFormulaRow ? formatCargoDiscountColumns(pieces.join('')) : pieces.join('');
   }
-  pieces.push(sheetXml.slice(cursor));
-  const output = lastFormulaRow ? formatCargoDiscountColumns(pieces.join('')) : pieces.join('');
 
   const missing = [...shipmentByBox.keys()].filter((box) => !matchedBoxes.has(box));
   if (missing.length > 0) {
@@ -2351,14 +2368,11 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     if (!isBaseRefresh) {
     if (targetPath && files[targetPath]) {
-      files[targetPath] = strToU8(
-        updateCargoSheet(
-          strFromU8(files[targetPath]),
-          strings,
-          enrichedShipments,
-          routeKey,
-        ),
-      );
+      const voyageLabel = voyage.endsWith('항차') ? voyage : voyage + '항차';
+      files[targetPath] = updateCargoSheet(
+        files[targetPath], strings, enrichedShipments, routeKey, true,
+        `${shipmentYear}년 ${voyageLabel} ${shipmentRouteLabel} 물품 입고 내역 (Cargo list)`,
+      ) as Uint8Array;
     } else if (routeKey !== 'th_la_land') {
       return json(422, {
         error:
@@ -2395,18 +2409,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // Patch127d: 기존 명세서 수식 셀 cached value 직접 수정은 Excel XML 손상 가능성이 있어 비활성화.
     // 명세서 동적 연결은 다음 단계에서 안전한 방식으로 처리합니다.
 
-    // 템플릿의 xx항차 제목을 실제 선택한 항차로 바꿉니다.
-    // TH-LA LAND 같은 스팟형은 물품 입고 내역 시트가 없으므로 건너뜁니다.
-    if (targetPath && files[targetPath]) {
-      let cargoTitleXml = strFromU8(files[targetPath]);
-      const voyageLabel = voyage.endsWith('항차') ? voyage : voyage + '항차';
-      cargoTitleXml = setStringCellInSheet(
-        cargoTitleXml,
-        'B1',
-        `${shipmentYear}년 ${voyageLabel} ${shipmentRouteLabel} 물품 입고 내역 (Cargo list)`,
-      );
-      files[targetPath] = strToU8(cargoTitleXml);
-    }
+    // The voyage title is written in the cargo row stream above.
 
     if (exchangeRate) {
       updateExchangeRates(files, {
