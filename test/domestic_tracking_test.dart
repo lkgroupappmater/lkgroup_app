@@ -213,7 +213,7 @@ void main() {
     tester.view.physicalSize = const Size(1000, 2600); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
     var deleted=false; final writes=<Map<String,dynamic>>[];
-    final row=<String,dynamic>{'id':'ref-photo','is_reference_photo':true,'can_manage':true,'updated_at':'version','group_key':'group','photo_urls':[],'statement':statement};
+    final row=<String,dynamic>{'id':'ref-photo','is_reference_photo':true,'can_manage':true,'updated_at':'version','group_key':'group','photo_urls':['https://photo.test/ref.jpg'],'managed_photos':[{'path':'ref.jpg','url':'https://photo.test/ref.jpg'}],'statement':statement};
     await tester.pumpWidget(MaterialApp(home:DomesticTrackingScreen(language:AppLanguage.korean,
       user:const AppUser(id:'test',role:UserRole.admin),manage:true,loadFilterBatches:()async=>[],callApi:(action,body)async{
         if(action=='delete'){writes.add(body);deleted=true;return {'deleted_ids':['ref-photo'],'parcels':[]};}
@@ -238,6 +238,18 @@ void main() {
     await tester.pumpAndSettle();expect(find.byKey(const Key('delivery-tracking-number')),findsNothing);
     await tester.tap(find.byKey(const Key('delivery-save')));await tester.pumpAndSettle();
     expect(calls.single['action'],'save');expect(calls.single['statement'],statement);expect(tester.takeException(),isNull);
+  });
+  testWidgets('delivery history starts compact and expands chronologically', (tester) async {
+    tester.view.physicalSize=const Size(1000,2600);tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
+    final row={'id':'timeline','carrier_name':'ANS','tracking_number':'8262698692960','delivery_kind':'province','service_kind':'domestic','status':'in_transit','photo_urls':[],'origin':'','destination':'','events':[
+      {'occurred_at':'2026-09-28T03:08:00Z','source':'carrier','status':'in_transit','description':'LATEST SCAN','location':''},
+      {'occurred_at':'2026-09-26T04:32:00Z','source':'carrier','status':'accepted','description':'EARLIEST SCAN','location':''}]};
+    await tester.pumpWidget(MaterialApp(home:DomesticTrackingScreen(language:AppLanguage.korean,user:const AppUser(id:'test',role:UserRole.admin),manage:true,loadFilterBatches:()async=>[],callApi:(action,body)async=>{'parcels':[row]})));
+    await tester.pumpAndSettle();expect(find.text('LATEST SCAN'),findsOneWidget);expect(find.text('EARLIEST SCAN'),findsNothing);
+    await tester.tap(find.byKey(const ValueKey('domestic-history-timeline')));await tester.pumpAndSettle();
+    expect(find.text('EARLIEST SCAN'),findsOneWidget);expect(tester.getTopLeft(find.text('EARLIEST SCAN')).dy,lessThan(tester.getTopLeft(find.text('LATEST SCAN')).dy));
+    await tester.tap(find.byKey(const ValueKey('domestic-history-timeline')));await tester.pumpAndSettle();expect(find.text('EARLIEST SCAN'),findsNothing);expect(tester.takeException(),isNull);
   });
   test('carrier detection is conservative and leaves numeric ANS candidates for confirmation', () {
     expect(DomesticTrackingService.detectCarrier('vte12345678901'), 'HAL');

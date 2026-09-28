@@ -6,6 +6,10 @@ String domesticText(AppLanguage language, String key) =>
       (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index]);
 
 const domesticWords = <String, List<String>>{
+  "latestEvent": ["최신 진행 상태", "Latest update", "ສະຖານະລ່າສຸດ"],
+  "expandHistory": ["자세히 · 전체 이력", "Details · full history", "ລາຍລະອຽດ · ປະຫວັດທັງໝົດ"],
+  "collapseHistory": ["접기", "Collapse", "ຫຍໍ້"],
+
   "delete": ["송장·사진 등록 삭제", "Delete registration", "ລຶບລາຍການ"],
   "deleteConfirm": ["이 등록 건과 연결된 사진을 목록에서 삭제할까요? 연결된 명세서와 화물 자료는 유지됩니다.", "Delete this registration and its photo links? The linked statement and cargo stay unchanged.", "ລຶບລາຍການ ແລະ ລິ້ງຮູບນີ້ບໍ? ໃບລາຍການ ແລະ ສິນຄ້າຍັງຄົງຢູ່."],
   "deletePhoto": ["사진 삭제", "Delete photo", "ລຶບຮູບ"],

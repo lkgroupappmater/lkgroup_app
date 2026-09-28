@@ -46,6 +46,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
   int _page = 0;
   String? _message;
   List<Map<String, dynamic>> _rows = [];
+  final Set<String> _expandedHistory = {};
   String? _owner;
   bool get _valid => mounted && widget.user?.id == _owner && (widget.callApi != null || DomesticTrackingService.currentUserId == _owner);
   String t(String k) => domesticText(widget.language, k);
@@ -66,7 +67,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
   void didUpdateWidget(covariant DomesticTrackingScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user?.id != widget.user?.id) {
-      _rows = []; _submitted = {}; _resolvedLink = null; _more = false; _page = 0;
+      _rows = []; _submitted = {}; _resolvedLink = null; _expandedHistory.clear(); _more = false; _page = 0;
       _owner = widget.user?.id;
     }
   }
@@ -189,6 +190,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
       }
     }
     return Column(mainAxisSize:MainAxisSize.min,children:[_photoView(url),
+      if(isOperator)for(final row in linked.where((r)=>r['is_reference_photo']==true&&r['can_manage']==true))_managementActions(row),
       if(isOperator&&photo!=null&&linked.isNotEmpty&&linked.every((r)=>r['can_manage']==true))
         TextButton(key:ValueKey('domestic-photo-delete-${photo['path']}'),onPressed:_busy?null:()=>_remove(linked,photo:photo),child:Text(t('deletePhoto'))),
     ]);
@@ -392,7 +394,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
     child: Image.network(url, height: 160, width: 180, fit: BoxFit.contain, errorBuilder: (_, __, ___) => SizedBox(width: 180, child: Text(t('REQUEST_FAILED')))));
 
   Widget _card(Map<String, dynamic> r) {
-    if(r['is_reference_photo']==true)return Padding(padding:const EdgeInsets.symmetric(vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(intakeText(widget.language,'referencePhotos')),if(r['can_manage']==true&&isOperator)_managementActions(r)]));
+    if(r['is_reference_photo']==true)return const SizedBox.shrink();
     final integration = r['integration'];
     final notice = ['planned', 'connection_required'].contains(integration)
         ? t('connection')
@@ -402,6 +404,8 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
         ? t('failed')
         : null;
     final events = (r['events'] as List? ?? []).cast<Map>();
+    final expanded = _expandedHistory.contains('${r['id']}');
+    final displayedEvents = expanded ? events.reversed : events.take(1);
     final cargo = r['cargo'];
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 12),
@@ -482,11 +486,12 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
                 ],
               ],
             ),
-            Text(t('history'), style: Theme.of(context).textTheme.titleMedium),
+            Text(t(expanded ? 'history' : 'latestEvent'), style: Theme.of(context).textTheme.titleMedium),
+            if(events.length>1) TextButton(key:ValueKey('domestic-history-${r['id']}'),onPressed:()=>setState((){if(expanded){_expandedHistory.remove('${r['id']}');}else{_expandedHistory.add('${r['id']}');}}),child:Text(t(expanded?'collapseHistory':'expandHistory'))),
             Text(t('timezone'), style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
             if (events.isEmpty) Text(t('noEvents')),
-            ...events.map(
+            ...displayedEvents.map(
               (e) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Row(
