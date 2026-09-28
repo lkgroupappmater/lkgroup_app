@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../core/route_catalog.dart';
 import 'excel_file_metadata.dart';
+import 'excel_upload_transport.dart';
 import 'automation_workbook_rules.dart';
 import 'shipment_service.dart';
 import 'supabase_service.dart';
@@ -557,11 +558,11 @@ class ExcelImportService {
     required int year,
     required String voyage,
   }) async {
-    final path = '$routeKey/$year/V$voyage/$fileName';
+    final path = excelSourceObjectPath(routeKey, year, voyage, fileName);
     final storage = SupabaseService.client.storage.from('shipment-excel-templates');
     final isMacroEnabled = fileName.toLowerCase().endsWith('.xlsm');
 
-    await storage.uploadBinary(
+    await retryExcelSourceUpload(() => storage.uploadBinary(
       path,
       bytes,
       fileOptions: FileOptions(
@@ -570,7 +571,7 @@ class ExcelImportService {
             ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
             : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ),
-    );
+    ));
 
     if (voyage == '00') {
       await SupabaseService.client.from('shipment_excel_base_templates').upsert({
