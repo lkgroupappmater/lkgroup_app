@@ -4,7 +4,7 @@
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-09-28.zone-discount-sync-v6';
+export const ID_WORKBOOK_VERSION='2026-09-28.offline-customer-id-v7';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -33,11 +33,12 @@ function cell(ref,value,style=''){
  if(value&&typeof value==='object'&&'formula' in value)return `<c r="${ref}"${s}${typeof value.value==='number'?'':' t="str"'}><f>${xml(value.formula)}</f><v>${xml(value.value)}</v></c>`;
  return typeof value==='number'?`<c r="${ref}"${s}><v>${value}</v></c>`:`<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
 }
-const columnIndex=ref=>{let n=0;for(const c of ref.match(/^[A-Z]+/)[0])n=n*26+c.charCodeAt(0)-64;return n;};
+const columnIndexes=new Map();
+const columnIndex=ref=>{if(columnIndexes.has(ref))return columnIndexes.get(ref);let n=0;for(const c of ref)n=n*26+c.charCodeAt(0)-64;columnIndexes.set(ref,n);return n;};
 function parsedCells(row){return new Map([...row.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map(m=>[m[0].match(/\br="([A-Z]+)\d+"/)[1],m[0]]));}
-function patchRow(row,n,values){
+function patchRow(row,n,values,existingCells){
  if(!values||!Object.keys(values).length)return row;
- const cells=parsedCells(row);
+ const cells=existingCells??parsedCells(row);
  for(const [c,v] of Object.entries(values))cells.set(c,cell(c+n,v,cells.get(c)?.match(/\bs="(\d+)"/)?.[1]??''));
  const ordered=[...cells].sort((a,b)=>columnIndex(a[0])-columnIndex(b[0])).map(x=>x[1]).join('');
  return row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'').replace('</row>',ordered+'</row>');
@@ -79,9 +80,9 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  for(const c of customers)add(c.name_key+'|p'+c.phone_key,c.name,c.phone,c);
  for(const a of context.aliases??[])add(a.name_key+'|p'+a.phone_key,a.name_key,a.phone_key,byId.get(a.customer_registry_id));
  for(const s of context.sources??shipments)if(s.customer_no){const c=byNumber.get(s.customer_no);add(matchKey(s.source_name??s.consignee_name,s.source_phone??s.consignee_phone),s.source_name??s.consignee_name,s.source_phone??s.consignee_phone,c);}
- const ids=[['고객 ID 자동 매칭'],['기존 숫자 ID는 유지하며 LK 형식으로 표시합니다.'],['새 고객은 앱·웹 업로드 후 ID 발급 → 최신 자료 Excel 다운로드로 반영합니다.'],['연락처만 같은 고객과 보호된 복수 이름은 자동 통합하지 않습니다.'],['매칭 Key','등록 이름 / 별칭','등록 연락처','고객 번호','고객 고유 ID'],...[...keys.values()].sort((a,b)=>a[3]-b[3]||a[0].localeCompare(b[0]))];
+ const ids=[['고객 ID 자동 매칭'],['기존 숫자 ID는 유지하며 LK 형식으로 표시합니다.'],['신규 고객 ID 시트에서 빈 번호를 임시 배정합니다. 업로드 후 DB 확정 ID로 최신 자료를 받으세요.'],['연락처만 같은 고객과 보호된 복수 이름은 자동 통합하지 않습니다.'],['매칭 Key','등록 이름 / 별칭','등록 연락처','고객 번호','고객 고유 ID'],...[...keys.values()].sort((a,b)=>a[3]-b[3]||a[0].localeCompare(b[0]))];
  const legacy=context.numberingMode==='legacy';
- const controls=[['명세서 번호 관리'],['E열: 수동 번호 / F열: 잠금 선택 / G열: 고정할 번호'],['인쇄 전 G열 번호를 확인하고 F열을 잠금으로 선택하세요. 각 행에서 해제할 수 있습니다.'],['새로 입력한 화물은 앱·웹에 업로드하여 고객 ID를 받은 뒤 최신 자료를 내려받으세요.'],['매칭 Key','고객 고유 ID','고객명 / 구분','자동 번호','수동 지정 번호','번호 상태','고정 번호','적용 번호','화물 행 수','확인 사항','저장 당시 상태','승인 대기 번호 유지']];
+ const controls=[['명세서 번호 관리'],['E열: 수동 번호 / F열: 잠금 선택 / G열: 고정할 번호'],['인쇄 전 G열 번호를 확인하고 F열을 잠금으로 선택하세요. 각 행에서 해제할 수 있습니다.'],['신규 고객의 임시 번호는 업로드 후 DB가 확정합니다. 임시 명세서는 확정·인쇄 전에 최신 자료로 교체하세요.'],['매칭 Key','고객 고유 ID','고객명 / 구분','자동 번호','수동 지정 번호','번호 상태','고정 번호','적용 번호','화물 행 수','확인 사항','저장 당시 상태','승인 대기 번호 유지']];
  if(!legacy){for(const c of customers){for(const special of [false,true]){
   const row=controls.length+1,key=identityKey(c.customer_no,special),group=shipments.filter(s=>s.customer_no===c.customer_no&&specialName(s.consignee_name)===special),numbers=[...new Set(group.map(s=>s.receipt_number).filter(Boolean))];
   if(numbers.length>1)throw new Error('같은 고객 ID에 서로 다른 명세서 번호가 있습니다. 번호 변경 승인을 완료하거나 고객 ID 구분을 확인하세요.');
@@ -141,7 +142,7 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
   delivery.push([key,formula(`IF(F${row}="",C${row},IF(ISNUMBER(SEARCH("|"&F${row}&"|",I${row})),IFERROR(INDEX($K$6:$K$${5+profiles.length},MATCH(F${row},$J$6:$J$${5+profiles.length},0)),""),""))`,ref),confirmed?reference(confirmed.d.id):'',formula(`IF(B${row}<>"","확정",IF(E${row}<>"","확인 필요","일반"))`,ref?'확정':candidates.length?'확인 필요':'일반'),candidates.map(d=>`${d.id} / ${d.customer_name} / ${d.alternate_name} / ${d.local_company}`).join('\n'),'',pair.name,pair.phone,candidates.map(d=>'|'+d.id+'|').join(''),...profile]);
  }
  for(let i=delivery.length-5;i<profiles.length;i++){const d=profiles[i];delivery.push(['','','','','','','','','',d.id,reference(d.id),d.customer_name,d.alternate_name,d.phone_display||d.phone,d.delivery_type,d.local_company,d.destination_address,d.fingerprint||'',phoneTokens(d.phone_display||d.phone).map(p=>'|p'+p+'|').join('')]);}
- return {ids,controls,delivery};
+ return {ids,controls,delivery,unusedNumbers:context.unused_customer_numbers??[]};
 }
 const strip=(expr,tokens)=>tokens.reduce((out,t)=>`SUBSTITUTE(${out}&"",${typeof t==='string'?JSON.stringify(t):t.f},"")`,expr);
 export function identityCargoFormulas(r,last,idLast,controlLast,deliveryLast,prefix){
@@ -153,24 +154,43 @@ export function identityCargoFormulas(r,last,idLast,controlLast,deliveryLast,pre
 
  const fullName=`IF(BD${r}=1,TRIM(MID(E${r},FIND("/",E${r})+1,LEN(E${r}))),E${r})`;
  return {
- BJ:`IF(AND(BD${r}=1,${unknownZoneCondition(`E${r}`)}),IFERROR(IF(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE)>0,VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE),1000000000000+ROW()),1000000000000+ROW()),BC${r})`,
+ BK:provisionalNumber(r),
+ BL:`IF(BC${r}>0,"LK "&TEXT(BC${r},"0000"),IF(BK${r}>0,"LK "&TEXT(BK${r},"0000")&" (임시)",""))`,
+ BJ:`IF(AND(BD${r}=1,${unknownZoneCondition(`E${r}`)}),IFERROR(IF(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE)>0,VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE),1000000000000+ROW()),1000000000000+ROW()),IF(BC${r}>0,BC${r},BK${r}))`,
  BI:rawPhone,BA:`LOWER(${strip(fullName,[' ',{f:'CHAR(160)'},{f:'CHAR(9)'},{f:'CHAR(10)'},{f:'CHAR(13)'}])})`,BB:phone,BD:`IF(${special},1,0)`,
  BC:`IFERROR(IF(COUNTIF('고객 ID'!$A$6:$A$${idLast},BA${r}&"|"&BB${r})=1,VLOOKUP(BA${r}&"|"&BB${r},'고객 ID'!$A$6:$E$${idLast},4,FALSE),0),0)`,
- BE:`IF(AND(E${r}="",F${r}=""),"",IF(BC${r}>0,"ID|"&BC${r}&"|"&BD${r},IF(AC${r}=1,"UNKNOWN","SRC|"&BA${r}&"|"&BB${r})))`,
+ BE:`IF(AND(E${r}="",F${r}=""),"",IF(BC${r}>0,"ID|"&BC${r}&"|"&BD${r},IF(AC${r}=1,"UNKNOWN","SRC|"&BA${r}&"|"&BB${r}&"|"&BD${r})))`,
  R:`IF(AH${r}="",IF(ISNUMBER(SEARCH("확인 필요",BF${r})),BF${r},""),IF(LEFT(AH${r},1)="L",INDEX(지방배송!$Y:$Y,VALUE(MID(AH${r},3,10))),INDEX(시내배송!$Y:$Y,VALUE(MID(AH${r},3,10)))))`,
- Y:`BE${r}`,N:`IF(BE${r}="","",IF(OR(BC${r}>0,AC${r}=1),IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$H$${controlLast},8,FALSE),"ID 확인 필요"),IF(AND(BH${r}=BA${r}&"|"&BB${r},BG${r}<>""),BG${r},"ID 확인 필요")))`,
+ Y:`BE${r}`,N:`IF(BE${r}="","",IF(OR(BC${r}>0,AC${r}=1),IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$H$${controlLast},8,FALSE),"ID 확인 필요"),IF(AND(BH${r}=BA${r}&"|"&BB${r},BG${r}<>""),BG${r},IF(BK${r}>0,${provisionalStatement(r,prefix)},"ID 확인 필요"))))`,
  Z:`IF(Y${r}="","",IF(BD${r}=1,IF(${unknownZoneCondition(`E${r}`)},7,6),IF(AC${r}=1,5,IF(ISNUMBER(SEARCH("지방배송",R${r}&"")),1,IF(ISNUMBER(SEARCH("시내배송",R${r}&"")),2,IF(OR(SUBSTITUTE(E${r}," ","")="박성호대표",SUBSTITUTE(E${r}," ","")="박성호대표님"),4,3))))))`,
  AB:`IF(AA${r}<>1,"",COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},"<"&Z${r})+COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},Z${r},$BJ$6:$BJ$${last},"<"&BJ${r})+COUNTIFS($AA$6:AA${r},1,$Z$6:Z${r},Z${r},$BJ$6:BJ${r},BJ${r}))`,
  AH:`IF(BE${r}="","",IFERROR(VLOOKUP(BA${r}&"|"&BB${r},'배송 매칭 확인'!$A$6:$D$${deliveryLast},2,FALSE),""))`,
- BF:`IF(BE${r}="","",IF(AND(BC${r}=0,AC${r}=0),IF(COUNTIF('배송 매칭 확인'!$S$6:$S$${deliveryLast},"*|"&BB${r}&"|*")>0,"고객 ID · 배송 매칭 확인 필요","고객 ID 확인 필요"),IFERROR(IF(VLOOKUP(BA${r}&"|"&BB${r},'배송 매칭 확인'!$A$6:$D$${deliveryLast},4,FALSE)="확인 필요","배송 매칭 확인 필요",""),"")))`,
+ BF:`IF(BE${r}="","",IF(AND(BC${r}=0,AC${r}=0),IF(COUNTIF('배송 매칭 확인'!$S$6:$S$${deliveryLast},"*|"&BB${r}&"|*")>0,"고객 ID · 배송 매칭 확인 필요",IF(BK${r}>0,"임시 ID · 업로드 후 확정","고객 ID 확인 필요")),IFERROR(IF(VLOOKUP(BA${r}&"|"&BB${r},'배송 매칭 확인'!$A$6:$D$${deliveryLast},4,FALSE)="확인 필요","배송 매칭 확인 필요",""),"")))`,
  };
 }
 
+// These numbers are a download-time availability snapshot, never DB identities.
+// Per-row references keep duplicates together without accepting a provisional
+// number as an alias or an ID| control during import.
+export function provisionalCustomerRows(source,last,idLast,numbers,{spot=false}={}){
+ const q="'"+source.replaceAll("'","''")+"'",available=[...new Set(numbers)].filter(n=>Number.isInteger(n)&&n>=3&&n<=9999).slice(0,Math.max(0,last-5));
+ const rows=[['신규 고객 임시 ID'],['이름·전체 연락처가 같은 신규 고객은 같은 임시 ID를 사용합니다. 기존·통합된 번호는 재사용하지 않습니다.'],['임시 ID는 이 파일에서만 유효합니다. 업로드 시 DB에서 정식 고객 ID를 확정하고 최신 Excel에 반영합니다.'],['(임시) 명세서는 확정 번호가 아닙니다. 발급·인쇄 전 업로드하고 최신 자료를 다시 다운로드하세요.'],['매칭 Key','고객명','연락처','배정 순서','임시 번호','고객 ID','상태','다운로드 당시 빈 번호']];
+ for(let r=6;r<=last;r++){
+  const n=`${q}!BA${r}`,p=`${q}!BB${r}`,id=`${q}!BC${r}`,known=`COUNTIF('고객 ID'!$A$6:$A$${idLast},${n}&"|"&${p})`,uncertain=spot?`OR(${n}="고객이름",ISNUMBER(SEARCH("미확인",${n})),ISNUMBER(SEARCH("~?",${n})))`:`${q}!AC${r}=1`;
+  rows.push([formula(`IF(AND(${id}=0,${n}<>"",${known}=0,NOT(${uncertain})),${n}&"|"&${p},"")`),formula(`IF(A${r}="","",${q}!E${r})`),formula(`IF(A${r}="","",${q}!F${r}&"")`),formula(`IF(A${r}="",0,IF(COUNTIF($A$6:A${r},A${r})=1,MAX($D$5:D${r-1})+1,0))`,0),formula(`IF(A${r}="","",IFERROR(IF(INDEX($H$6:$H$${last},INDEX($D$6:$D$${last},MATCH(A${r},$A$6:$A$${last},0)))>0,INDEX($H$6:$H$${last},INDEX($D$6:$D$${last},MATCH(A${r},$A$6:$A$${last},0))),"번호 확인 필요"),"번호 확인 필요"))`),formula(`IF(ISNUMBER(E${r}),"LK "&TEXT(E${r},"0000")&" (임시)","")`),formula(`IF(A${r}="","",IF(ISNUMBER(E${r}),"업로드 후 DB 확정","빈 번호 확인 필요"))`),available[r-6]??'']);
+ }return rows;
+}
+function addProvisionalSheet(files,tables,source,last,spot=false){
+ newSheet(files,'신규 고객 ID',provisionalCustomerRows(source,last,tables.ids.length,tables.unusedNumbers,{spot}),{widths:[40,32,28,14,14,24,28,18],hiddenColumns:[1,4,5,8]});
+}
+const provisionalNumber=r=>`IFERROR(IF(ISNUMBER('신규 고객 ID'!E${r}),'신규 고객 ID'!E${r},0),0)`;
+const provisionalStatement=(r,prefix)=>`"${prefix} "&IF(BD${r}=1,"9"&TEXT(BK${r},"000"),TEXT(BK${r},"0000"))&" (임시)"`;
+
 // Spot templates keep their original price/weight calculations and print area.
 // Only the existing statement-number cell links to the shared ID controls.
-function connectSpotStatements(files,tables,strings,prefix){
+function connectSpotStatements(files,tables,strings,prefix,legacy=false){
  const names=[...txt(files['xl/workbook.xml']).matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map(m=>unxml(m[1]));
- const rows=[['명세서 고객 ID 연결'],['각 원본 명세서의 고객명(L2)과 연락처(L4)를 입력하면 고객 ID와 번호가 계산됩니다.'],['수동 번호·잠금은 명세서 번호 관리 시트에서 설정하세요. 신규 고객 ID는 업로드 후 발급됩니다.'],['오프라인은 다운로드 당시 고객 정보를 사용합니다. 최신 DB 반영은 업로드·승인 후 다시 다운로드하세요.'],['명세서 시트','고객 고유 ID','자동 번호','적용 번호','고객명','연락처','확인 사항']];
+ const rows=[['명세서 고객 ID 연결'],['각 원본 명세서의 고객명(L2)과 연락처(L4)를 입력하면 고객 ID와 번호가 계산됩니다.'],['수동 번호·잠금은 명세서 번호 관리 시트에서 설정하세요. 신규 고객은 임시 ID를 쓰고 업로드 후 정식 ID로 확정됩니다.'],['오프라인은 다운로드 당시 고객 정보를 사용합니다. 최신 DB 반영은 업로드·승인 후 다시 다운로드하세요.'],['명세서 시트','고객 고유 ID','자동 번호','적용 번호','고객명','연락처','확인 사항']];
  const ids=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]])),controls=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  for(const name of names){
   const path=sheetPath(files,name);if(!path)continue;let source=txt(files[path]);
@@ -178,12 +198,12 @@ function connectSpotStatements(files,tables,strings,prefix){
   if(!/번호/.test(values.get('L1')||'')||!values.has('M1')||!values.has('L2')||!values.has('L4')||!/고객/.test(values.get('I2')||''))continue;
   const r=rows.length+1,quoted="'"+name.replaceAll("'","''")+"'",n=values.get('L2')||'',p=values.get('L4')||'',id=ids.get(matchKey(n,p))||0,special=specialName(n),current=values.get('M1')||'',applied=id?controls.get(identityKey(id,special))||current:current;
   const f=identityCargoFormulas(r,r,tables.ids.length,tables.controls.length,tables.delivery.length,prefix),row=Array(61).fill('');
-  const data={A:name,B:formula(`IF(BC${r}>0,"LK "&TEXT(BC${r},"0000"),"")`,id?customerCode(id):''),C:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},4,FALSE),""),"")`,id?statementCode(prefix,id,special):''),D:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},8,FALSE),"ID 확인 필요"),"ID 확인 필요")`,id?applied:'ID 확인 필요'),E:formula(`${quoted}!L2`,n),F:formula(`${quoted}!L4&""`,p),G:formula(`IF(BC${r}>0,"",IF(OR(E${r}="",SUBSTITUTE(E${r}," ","")="고객이름"),"고객명·연락처 입력","고객 ID 확인 필요"))`,id?'':'고객명·연락처 입력'),BA:formula(f.BA,nameKey(baseName(n))),BB:formula(f.BB,'p'+phoneKey(p)),BC:formula(f.BC,id),BD:formula(f.BD,special?1:0),BI:formula(f.BI,'p'+String(p).replace(/\D/g,''))};
+  const data={BK:formula(provisionalNumber(r),0),A:name,B:formula(`IF(BC${r}>0,"LK "&TEXT(BC${r},"0000"),IF(BK${r}>0,"LK "&TEXT(BK${r},"0000")&" (임시)",""))`,id?customerCode(id):''),C:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},4,FALSE),""),"")`,id?statementCode(prefix,id,special):''),D:formula(`IF(BC${r}>0,IFERROR(VLOOKUP("ID|"&BC${r}&"|"&BD${r},'명세서 번호 관리'!$A$6:$H$${tables.controls.length},8,FALSE),"ID 확인 필요"),${legacy?JSON.stringify(current):`IF(BK${r}>0,${provisionalStatement(r,prefix)},"ID 확인 필요")`})`,id?applied:'ID 확인 필요'),E:formula(`${quoted}!L2`,n),F:formula(`${quoted}!L4&""`,p),G:formula(`IF(BC${r}>0,"",IF(OR(E${r}="",SUBSTITUTE(E${r}," ","")="고객이름"),"고객명·연락처 입력","고객 ID 확인 필요"))`,id?'':'고객명·연락처 입력'),BA:formula(f.BA,nameKey(baseName(n))),BB:formula(f.BB,'p'+phoneKey(p)),BC:formula(f.BC,id),BD:formula(f.BD,special?1:0),BI:formula(f.BI,'p'+String(p).replace(/\D/g,''))};
   for(const [c,v]of Object.entries(data))row[columnIndex(c)-1]=v;rows.push(row);
-  source=source.replace(/<row\b[^>]*\br="1"[^>]*>[\s\S]*?<\/row>/,row=>put(row,'M1',formula(`IF('명세서 고객 ID 연결'!BC${r}>0,'명세서 고객 ID 연결'!D${r},IF(OR(L2="",SUBSTITUTE(L2," ","")="고객이름"),${JSON.stringify(current)},"ID 확인 필요"))`,id?applied:(!n||n.replace(/\s/g,'')==='고객이름'?current:'ID 확인 필요'))));
+  source=source.replace(/<row\b[^>]*\br="1"[^>]*>[\s\S]*?<\/row>/,row=>put(row,'M1',formula(`IF(OR('명세서 고객 ID 연결'!BC${r}>0,'명세서 고객 ID 연결'!BK${r}>0),'명세서 고객 ID 연결'!D${r},IF(OR(L2="",SUBSTITUTE(L2," ","")="고객이름"),${JSON.stringify(current)},"ID 확인 필요"))`,id?applied:(!n||n.replace(/\s/g,'')==='고객이름'?current:'ID 확인 필요'))));
   files[path]=bytes(source);
  }
- if(rows.length>5)newSheet(files,'명세서 고객 ID 연결',rows,{widths:[28,18,20,20,30,28,28],hiddenColumns:Array.from({length:54},(_,i)=>i+8)});
+ if(rows.length>5){newSheet(files,'명세서 고객 ID 연결',rows,{widths:[28,24,20,24,30,28,28],hiddenColumns:Array.from({length:56},(_,i)=>i+8)});addProvisionalSheet(files,tables,'명세서 고객 ID 연결',rows.length,true);}
  return rows.length-5;
 }
 
@@ -284,20 +304,21 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  newSheet(files,'고객 ID',tables.ids,{widths:[48,32,28,15,18],hiddenColumns:[1]});
  newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12,13,15],inputColumns:[{column:'F',values:['자동','잠금']}]});
  newSheet(files,'배송 매칭 확인',tables.delivery,{widths:[45,18,18,18,70,20,30,26,20,16,14,28,28,24,16,18,50,35],hiddenColumns:[1,2,3,9,10,11,12,13,14,15,16,17,18,19]});
- if(!cargoPath||last<=6){const spotCount=connectSpotStatements(files,tables,strings,prefix);return {tables,applied:spotCount>0,spotCount,version:ID_WORKBOOK_VERSION};}
+ if(!cargoPath||last<=6){const spotCount=connectSpotStatements(files,tables,strings,prefix,legacy);return {tables,applied:spotCount>0,spotCount,version:ID_WORKBOOK_VERSION};}
+ addProvisionalSheet(files,tables,'물품 입고 내역',last);
  const idByKey=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]]));
  const controlByKey=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  const deliveryByKey=new Map(tables.delivery.slice(5).map(r=>[r[0],r]));
  const summaries=new Map(),recoveryByReceipt=new Map(tables.controls.slice(5).map(r=>[r[7].value,Number(r[13])||0]));
  // Update metadata before emitting rows to avoid decoding/rebuilding the large
  // finished worksheet just to change its dimension and hidden columns.
- cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BJ${Math.max(last,1010)}"/>`);
- cargoXml=hideColumns(cargoXml,53,62);
+ cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BL${Math.max(last,1010)}"/>`);
+ cargoXml=hideColumns(cargoXml,53,64);
  files[cargoPath]=rewriteWorksheetRows(cargoXml,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
   const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
   const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=legacy?(get('N')?'LEGACY|'+get('N'):''):id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=legacy?get('N'):control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
-  const priorY=get('Y'),cache={BJ:unknownPrefixZone(name)&&special?(recoveryByReceipt.get(receipt)||1e12+r):id,R:get('R'),BG:legacy?get('N'):get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
+  const priorY=get('Y'),cache={BK:0,BL:id?customerCode(id):'',BJ:unknownPrefixZone(name)&&special?(recoveryByReceipt.get(receipt)||1e12+r):id,R:get('R'),BG:legacy?get('N'):get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
   const updates={BG:cache.BG,BH:cache.BH};
   if(!cache.AH)cache.R=cache.BF;
   const formulas=identityCargoFormulas(r,last,tables.ids.length,tables.controls.length,tables.delivery.length,prefix);
@@ -316,7 +337,7 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
   }
   for(const [column,f] of Object.entries(formulas))updates[column]=formula(f,cache[column]??'');
   if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,recovered:recoveryByReceipt.get(receipt)||0,priority:unknownPrefixZone(name)&&special?7:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
-  return patchRow(row,r,updates);
+  return patchRow(row,r,updates,cells);
  });
  cargoXml='';
  const customerPath=sheetPath(files,'고객 리스트');

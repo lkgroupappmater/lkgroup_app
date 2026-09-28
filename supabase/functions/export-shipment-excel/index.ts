@@ -515,8 +515,9 @@ function updateCargoSheet(
     const parent = box.match(/^([A-Z]*\d+)\s*\(\s*\d+\s*\)$/u)?.[1];
     if (parent && !shipmentByBox.has(parent)) labels.delete(parent);
   }
+  const boxCollator = new Intl.Collator('en', {numeric:true});
   const ordered = [...labels.keys()]
-    .sort((a, b) => a.localeCompare(b, 'en', {numeric:true}) || (a < b ? -1 : a > b ? 1 : 0));
+    .sort((a, b) => boxCollator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0));
   // Retain ordinary unused-number gaps where possible. Make room for split
   // rows by dropping only unused placeholders, starting at the numeric tail.
   let placeholdersToDrop = Math.max(0, ordered.length - slots.length);

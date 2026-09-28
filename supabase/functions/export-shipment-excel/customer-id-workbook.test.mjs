@@ -84,3 +84,17 @@ test('recovered customers keep confirmation order independently of customer IDs 
  assert.match(tables.controls[5][12].formula,/COUNTIF/);
  const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.BJ,/14,FALSE/);assert.doesNotMatch(f.N,/BJ/);assert.match(f.Z,/수취인불명/);
 });
+
+
+test('offline allocation is separate from canonical ID matching and receipt controls',async()=>{
+ const {provisionalCustomerRows}=await import('./customer-id-workbook.mjs');
+ const rows=provisionalCustomerRows('물품 입고 내역',10,10,[3,3,7,0,10000,9]);
+ assert.deepEqual(rows.slice(5).map(r=>r[7]),[3,7,9,'','']);
+ const f=identityCargoFormulas(6,10,10,10,10,'LKS');
+ assert.match(f.N,/\(임시\)/);assert.match(f.BK,/신규 고객 ID/);
+ assert.doesNotMatch(f.BC,/신규 고객 ID|BK/);assert.doesNotMatch(f.BE,/BK/);
+ assert.match(rows[5][0].formula,/COUNTIF\('고객 ID'/);
+ assert.match(rows[5][6].formula,/업로드 후 DB 확정/);
+ const ambiguous=makeIdentityTables({...context,customers:[customer,{...customer,id:'b',customer_no:99}]},{prefix:'LKS'});
+ assert.equal(ambiguous.ids.find(r=>r[0]==='이경희|p02055551234')[3],0);
+});

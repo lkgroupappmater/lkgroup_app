@@ -229,6 +229,13 @@ class ExcelImportService {
             map['received_at'] = _normaliseExcelDateValue(receivedAtRaw);
           }
 
+          // Workbook-local temporary numbers are never customer identities or
+          // requested final bill numbers. The shared DB assigns both on import.
+          if (RegExp(r'^[A-Z]+\s+\d{4,5}\s+\(임시\)$')
+              .hasMatch('${map['receipt_number'] ?? ''}'.trim())) {
+            map.remove('receipt_number');
+          }
+
           rows.add({
             ...map,
             'route': routeLabel,
@@ -258,6 +265,14 @@ class ExcelImportService {
     final uniqueRows = uniqueRowsByImportKey.values.toList(growable: false);
     if (uniqueRows.isEmpty) throw const FormatException('화물 행이 없는 파일은 동기화할 수 없습니다.');
     final synchronize = AuthService.instance.currentUser?.role == UserRole.admin;
+    if (synchronize) {
+      await SupabaseService.client.rpc('admin_register_excel_customers', params: {
+        'p_rows': uniqueRows.map((row) => {
+          'name': row['consignee_name'], 'phone': row['consignee_phone'],
+        }).toList(growable: false),
+      });
+    }
+
 
     // Patch167: current BASE Excel delivery table is the source of truth.
     // Import it before shipment upsert so normalize/finalize can see city/province

@@ -35,8 +35,8 @@ const special = `'Row data'!$AG$3:$AG$256="특별할인"`;
 const ordinary = `'Row data'!$AG$3:$AG$256<>"특별할인"`;
 export function separateCargoRowDiscounts(rowXml, rowNumber, onChange) {
     const r = Number(rowNumber); if (r < 6) return rowXml;
+    const f = formulaAt(rowXml, `AJ${r}`); if (!f || f.includes(ordinary)) return rowXml;
     const cells = new Map([...rowXml.matchAll(/<c\b[^>]*\br="([A-Z]+\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)].map(m => [m[1],m[0]]));
-    const f = formulaAt(cells.get(`AJ${r}`) || '', `AJ${r}`); if (!f || f.includes(ordinary)) return rowXml;
     const pending = new Map();
     const set = (ref, formula, styleRef) => {
       const source = cells.get(ref) || cells.get(styleRef) || '';
