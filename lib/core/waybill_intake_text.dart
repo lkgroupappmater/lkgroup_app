@@ -2,6 +2,14 @@ import 'app_language.dart';
 import 'domestic_tracking_text.dart';
 
 const intakeWords = <String, List<String>> {
+  "ansNumberHelp": ["Anousith: 바코드 아래 | 오른쪽 전체 13자리 번호를 사용합니다. 앞쪽 관리번호와 하단 큰 6자리 숫자는 제외합니다.", "Anousith: use the full 13-digit number right of | below the barcode. Exclude the left account number and large six-digit suffix.", "Anousith: ໃຊ້ເລກເຕັມ 13 ຫຼັກດ້ານຂວາຂອງ | ໃຕ້ບາໂຄດ. ບໍ່ໃຊ້ເລກບັນຊີດ້ານຊ້າຍ ຫຼື 6 ຫຼັກດ້ານລຸ່ມ."],
+  "ANS_TRACKING_REQUIRED": ["Anousith 송장번호를 다시 확인해 주세요. 바코드 아래 | 오른쪽 전체 13자리 번호가 필요합니다.", "Check the Anousith waybill: enter the full 13-digit number right of | below the barcode.", "ກວດເລກ Anousith: ໃຊ້ເລກເຕັມ 13 ຫຼັກດ້ານຂວາຂອງ | ໃຕ້ບາໂຄດ."],
+
+  "addReferencePhotos": ["화물·참고 사진 추가", "Add cargo / reference photos", "ເພີ່ມຮູບສິນຄ້າ / ຮູບປະກອບ"],
+  "referencePhotoChoice": ["화물·참고 사진 (번호 입력 없음)", "Cargo / reference photo (no number required)", "ຮູບສິນຄ້າ / ຮູບປະກອບ (ບໍ່ຕ້ອງລະບຸເລກ)"],
+  "mixedPhotoHelp": ["일반 화물 사진은 아래에서 화물·참고 사진으로 선택하세요. 송장번호·배송업체 입력 없이 같은 명세서에 저장됩니다.", "Mark ordinary cargo images as reference photos below. They are saved with the selected statement without tracking or carrier details.", "ເລືອກຮູບສິນຄ້າເປັນຮູບປະກອບ. ບັນທຶກກັບໃບລາຍການທີ່ເລືອກ ໂດຍບໍ່ຕ້ອງລະບຸເລກ ຫຼື ບໍລິສັດ."],
+  "attachPhotoHelp": ["현재 배송 건에 사진만 추가합니다. 송장번호·수령인 등 추가 입력은 필요 없습니다.", "Add photos to this delivery. No tracking number or recipient details are required.", "ເພີ່ມສະເພາະຮູບໃສ່ລາຍການຈັດສົ່ງນີ້. ບໍ່ຕ້ອງລະບຸເລກ ຫຼື ຂໍ້ມູນຜູ້ຮັບ."],
+
   "autoMerge": ["중복 ID 자동 통합", "Automatic duplicate ID merge", "ລວມ ID ຊ້ຳອັດຕະໂນມັດ"],
   "autoMergeHelp": ["같은 연락처에 이름이 /로 하나 추가되거나, 같은 이름에 연락처가 하나 추가된 고객을 묶습니다. 체크를 풀면 해당 ID는 유지됩니다.", "Groups equal contacts with one additional slash-separated name, or equal names with one additional phone. Uncheck any ID to keep it separate.", "ຈັດກຸ່ມຊື່ທີ່ເພີ່ມຜ່ານ / ເມື່ອເບີຄືກັນ ຫຼື ຊື່ຄືກັນທີ່ເພີ່ມເບີໜຶ່ງ. ຍົກເລີກເຄື່ອງໝາຍເພື່ອແຍກ ID."],
   "deliveryMergeReminder": ["지방배송·수령인·선결제 등으로 구분한 고객은 통합하지 마세요. 배송 정보가 있는 그룹은 직접 선택해 주세요. 지정된 별도 ID는 함께 통합할 수 없습니다.", "Keep customers separate when provincial delivery, recipients or prepayment differ. Groups with delivery information require manual selection. Protected identities cannot be merged together.", "ຢ່າລວມລູກຄ້າທີ່ແຍກຕາມການສົ່ງ, ຜູ້ຮັບ ຫຼື ການຈ່າຍລ່ວງໜ້າ. ເລືອກກຸ່ມທີ່ມີຂໍ້ມູນສົ່ງດ້ວຍຕົນເອງ. ID ທີ່ປ້ອງກັນຈະລວມກັນບໍ່ໄດ້."],

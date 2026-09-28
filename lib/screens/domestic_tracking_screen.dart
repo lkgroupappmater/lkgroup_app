@@ -149,6 +149,11 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
     }
   }
 
+  Future<void> _addReferencePhotos(Map<String,dynamic> row) async {
+    final result=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(
+      language:widget.language,referenceOnly:true,fixedLink:{'parcel_id':row['id'],'receiver_name':row['receiver_name']})));
+    if(result!=null&&mounted)await _loadPage();
+  }
   Future<void> _automatic() async {
     final result=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language)));
     if(result!=null&&mounted)await _list();
@@ -323,6 +328,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
           if (statement is Map) Text('${RouteCatalog.localizedLabel('${statement['route']}', widget.language)} · ${statement['shipment_year']} / ${statement['voyage']}'),
           Text('${t('waybillCount')}: ${rows.where((r)=>r['is_reference_photo']!=true).length}'),
           if (isOperator) TextButton.icon(onPressed: _busy ? null : () => _edit(null, first), icon: const Icon(Icons.add), label: Text(t('addWaybill'))),
+          if(isOperator&&rows.any((r)=>r['can_manage']==true)) TextButton.icon(onPressed:_busy?null:()=>_addReferencePhotos(rows.firstWhere((r)=>r['can_manage']==true)),icon:const Icon(Icons.add_photo_alternate_outlined),label:Text(intakeText(widget.language,'addReferencePhotos'))),
           const SizedBox(height: 12),
           Text(t('photo'), style: Theme.of(context).textTheme.titleSmall),
           if (photos.isEmpty) Text(t(rows.any((r) => r['photo_restricted'] == true) ? 'restricted' : 'noPhoto')),
@@ -625,6 +631,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
         if(_scope=='statement'&&_confirmed!=null)fixed={'link_scope':'statement','statement':_confirmed};
         if(_scope=='cargo'&&_cargo!=null)fixed={'link_scope':'cargo','shipment_id':_cargo};
         if(_scope=='reference'&&_reference.text.trim().isNotEmpty)fixed={'link_scope':'reference','reference':{'reference_type':_referenceType,'reference_number':_reference.text.trim()}};
+        if(_referencePhotos&&widget.row!=null)fixed={'parcel_id':widget.row!['id']};
         fixed?.addAll({'receiver_name':_name.text,'receiver_phone':_phone.text,'delivery_kind':_kind,'service_kind':_service});
         if(_referencePhotos&&fixed==null)throw const DomesticTrackingException('STATEMENT_REQUIRED');
         final saved=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>WaybillIntakeScreen(language:widget.language,files:files,fixedLink:fixed,referenceOnly:_referencePhotos)));
@@ -775,6 +782,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
       TextField(controller: _name, enabled: !_busy, readOnly: ['statement','cargo'].contains(_scope), maxLength: 160, decoration: InputDecoration(labelText: t('receiver'))),
       TextField(controller: _phone, enabled: !_busy, readOnly: ['statement','cargo'].contains(_scope), maxLength: 40, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: t('phone'))),
       Text(t('photoHelp')),
+      OutlinedButton.icon(key:const Key('delivery-add-reference-photos'),onPressed:_busy||_picking?null:(){setState(()=>_referencePhotos=true);_pick();},icon:const Icon(Icons.add_photo_alternate_outlined),label:Text(intakeText(widget.language,'addReferencePhotos'))),
       OutlinedButton.icon(key: const Key('delivery-pick-photos'), onPressed: _busy || _picking ? null : _pick, icon: const Icon(Icons.image_outlined), label: Text(t('photoInput'))),
       for (final photo in _photos) ListTile(title: Text(photo.name), leading: Image.memory(photo.bytes, width: 48, height: 48, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined)), trailing: IconButton(tooltip: t('removePhoto'), icon: const Icon(Icons.close), onPressed: _busy ? null : () => setState(() => _photos.remove(photo)))),
       if (_message != null) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(_message!)),

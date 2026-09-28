@@ -10,7 +10,7 @@ import {customerCodeJson} from './customer-code.mjs';
 const source=stripTypeScriptTypes(fs.readFileSync(new URL('./index.ts',import.meta.url),'utf8').replace(/^import .+;\n/gm,''),{mode:'transform'});
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,0,0]);
 function setup({role='admin',active=true,authenticated=true,data:initial={},ocr={waybills:[]},ocrFailure=false}={}){
- const data={profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_aliases:[],customer_registry_separation_names:[],local_delivery_profiles:[],customer_registry_sources:[],customer_registry_source_status:[],shipments:[],customer_registry_statement_mapping:[],...structuredClone(initial)};
+ const data={domestic_parcels:[],profiles:[{id:'owner',role,approval_status:active?'approved':'pending'}],waybill_intake_batches:[],waybill_intake_files:[],unknown_cargo_photos:[],customer_registry:[],customer_registry_aliases:[],customer_registry_separation_names:[],local_delivery_profiles:[],customer_registry_sources:[],customer_registry_source_status:[],shipments:[],customer_registry_statement_mapping:[],...structuredClone(initial)};
  let handler,ocrCalls=0,ocrBody=null;const writes=[],rpcCalls=[],signed=[];
  function query(table){let filters=[],write=null,insert=null,count=false,window=null;
   function run(){let rows=data[table].filter(r=>filters.every(f=>f(r)));
@@ -27,6 +27,7 @@ function setup({role='admin',active=true,authenticated=true,data:initial={},ocr=
    if(name==='list_unknown_recipient_cargo')return {data:data.shipments.filter(s=>s.recipient_unknown)};
    if(name==='domestic_find_delivery_cargo')return {data:data.shipments.filter(s=>s.receipt_number===args.p_number)};
    if(name==='commit_waybill_intake'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=['saved'];return {data:b.result_ids};}
+   if(name==='attach_domestic_reference_photos'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=[args.p_parcel];return {data:b.result_ids};}
    if(name==='commit_reference_photos'){const b=data.waybill_intake_batches.find(b=>b.id===args.p_batch);b.status='committed';b.result_ids=['reference'];return {data:b.result_ids};}
    if(name==='commit_unknown_cargo_photos')return {data:true};
    if(name==='waybill_recipient_candidates'){
@@ -167,4 +168,32 @@ test('auto merge candidates and preview are read only; commit requires review an
  assert.equal((await api.call({action:'customers_auto_commit',selection,confirmed:true})).status,200);
  assert.equal(api.rpcCalls[0].name,'customer_registry_auto_apply');assert.equal(api.rpcCalls[0].args.p_owner,'owner');
  for(const role of ['member','staff','partner'])for(const action of ['customers_auto_candidates','customers_auto_preview','customers_auto_commit'])assert.equal((await setup({role}).call({action,selection,confirmed:true})).status,403);
+});
+
+test('mixed intake saves cargo photos without fabricated tracking fields in the same atomic commit',async()=>{
+ const reference={...entry,is_reference_photo:true,tracking_number:'',carrier:'',receiver_name:'',receiver_phone:'',link_scope:'cargo',shipment_id:42};
+ const api=setup({data:{...ready,shipments:[{id:42,consignee_name:'Selected recipient',consignee_phone:'02012345678'}]}});
+ const r=await api.call({action:'commit',batch_id:'batch',entries:[entry,reference]});assert.equal(r.status,200);
+ const values=api.rpcCalls.find(r=>r.name==='commit_waybill_intake').args.p_values;
+ assert.equal(values.length,2);assert.equal(values[1].is_reference_photo,true);assert.equal(values[1].carrier,null);assert.equal(values[1].tracking_number,null);assert.equal(values[1].receiver_name,'Selected recipient');
+ for(const bad of [{...reference,confirmed:false},{...reference,file_ids:['foreign']},{...reference,link_scope:'standalone'}]){
+  const x=setup({data:{...ready,shipments:[{id:42}]}});assert.equal((await x.call({action:'commit',batch_id:'batch',entries:[bad]})).status,400);assert.equal(x.rpcCalls.some(r=>r.name==='commit_waybill_intake'),false);
+ }
+});
+test('direct cargo photos attach to an existing parcel with no OCR or tracking edits; retries are idempotent and partners are scoped',async()=>{
+ const data={...ready,waybill_intake_batches:[{...batch,purpose:'photos'}],domestic_parcels:[{id:'parcel',created_by:'owner'},{id:'foreign',created_by:'another'}]};
+ const api=setup({role:'partner',data}),body={action:'parcel_photos_commit',batch_id:'batch',parcel_id:'parcel'};
+ assert.equal((await api.call(body)).status,200);assert.equal((await api.call(body)).status,200);assert.equal(api.ocrCalls,0);
+ assert.equal(api.rpcCalls.filter(r=>r.name==='attach_domestic_reference_photos').length,1);
+ assert.equal(api.writes.includes('domestic_parcels'),false);
+ assert.equal((await setup({role:'partner',data}).call({...body,parcel_id:'foreign'})).status,403);
+ assert.equal((await setup({role:'member',data}).call(body)).status,403);
+ assert.equal((await setup({data:{...data,waybill_intake_files:[{...file,verified_at:null}]}}).call(body)).status,400);
+ assert.equal((await setup({data:{...data,waybill_intake_batches:[{...batch,purpose:'photos',owner_id:'another'}]}}).call(body)).status,403);
+});
+test('cached Anousith scans discard internal IDs and explicit retry reads the image again',async()=>{
+ const data={...ready,waybill_intake_files:[{...file,extracted:[{carrier:'ANS',tracking_number:'8262697813144'},{carrier:'ANS',tracking_number:'6084853'}]}]};
+ const api=setup({data,ocr:{waybills:[{carrier:'ANS',tracking_number:'8262697937809'}]}});
+ const cached=await api.call({action:'scan',batch_id:'batch',file_id:'file'});assert.equal(cached.body.waybills.length,1);assert.equal(api.ocrCalls,0);
+ const fresh=await api.call({action:'scan',batch_id:'batch',file_id:'file',force_rescan:true});assert.equal(fresh.body.waybills[0].tracking_number,'8262697937809');assert.equal(api.ocrCalls,1);assert.match(api.ocrBody.instructions,/RIGHT of the separator/);
 });

@@ -23,23 +23,39 @@ export function imageMime(bytes) {
 }
 export function normalizeDrafts(data) {
   if (!data || !Array.isArray(data.waybills) || data.waybills.length > MAX_FILES) throw Error('OCR_FAILED');
-  return data.waybills.map(w => ({
+  const drafts = data.waybills.map(w => ({
     tracking_number: String(w.tracking_number ?? '').replace(/\s/g, '').toUpperCase().slice(0,40),
     carrier: CARRIER_CODES.includes(w.carrier) ? w.carrier : '',
     receiver_name: String(w.receiver_name ?? '').trim().slice(0,160),
     receiver_phone: String(w.receiver_phone ?? '').trim().slice(0,40),
     note: String(w.note ?? '').trim().slice(0,240),
   }));
+  // Anousith labels show account | full tracking, plus a large six-digit suffix.
+  for(const d of drafts) if(d.carrier==='ANS'){
+    const split=/^\d+[|｜]([0-9]{13})$/.exec(d.tracking_number);
+    if(split)d.tracking_number=split[1];
+  }
+  const fullAns=drafts.filter(d=>d.carrier==='ANS'&&/^\d{13}$/.test(d.tracking_number));
+  const seen=new Set();
+  return drafts.filter(d=>!(d.carrier==='ANS'&&fullAns.length&&/^\d{6,7}$/.test(d.tracking_number))).map(d=>{
+    if(d.carrier==='ANS'&&!/^\d{13}$/.test(d.tracking_number)){
+      d.tracking_number='';d.note='Read the complete 13-digit Anousith number to the right of | below the barcode. The left account number and large six-digit suffix are not waybills.';
+    }
+    return d;
+  }).filter(d=>{if(!d.tracking_number)return true;const key=d.carrier+':'+d.tracking_number;if(seen.has(key))return false;seen.add(key);return true;});
 }
 export function validateReviewed(entries, files) {
   if (!Array.isArray(entries) || !entries.length || entries.length > MAX_FILES) throw Error('INVALID_BATCH');
   const seen = new Set();
   for (const e of entries) {
     if (e.confirmed !== true) throw Error('REVIEW_REQUIRED');
-    if (!CARRIER_CODES.includes(e.carrier) || !/^[A-Z0-9][A-Z0-9-]{5,39}$/.test(e.tracking_number ?? '')) throw Error('INVALID_TRACKING');
-    const key = e.carrier + ':' + e.tracking_number;
-    if (seen.has(key)) throw Error('DUPLICATE_TRACKING');
-    seen.add(key);
+    if (e.is_reference_photo !== true) {
+      if (!CARRIER_CODES.includes(e.carrier) || !/^[A-Z0-9][A-Z0-9-]{5,39}$/.test(e.tracking_number ?? '')) throw Error('INVALID_TRACKING');
+      if(e.carrier==='ANS'&&!/^\d{13}$/.test(e.tracking_number))throw Error('ANS_TRACKING_REQUIRED');
+      const key = e.carrier + ':' + e.tracking_number;
+      if (seen.has(key)) throw Error('DUPLICATE_TRACKING');
+      seen.add(key);
+    }
     if (!Array.isArray(e.file_ids) || !e.file_ids.length || e.file_ids.some(id => !files.some(f => f.id === id && f.verified_at))) throw Error('INVALID_IMAGE');
   }
   return entries;

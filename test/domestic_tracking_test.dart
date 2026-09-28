@@ -98,6 +98,17 @@ void main() {
     expect(calls.any((c)=>c['action']=='save_batch'), isFalse);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('dedicated cargo photo button bypasses tracking details', (tester) async {
+    final image=base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZkAAAAASUVORK5CYII=');
+    await editor(tester,(action,body) async => {'statement':statement,'cargo_count':1,'cargo':[]},pickPhotos:()async=>[DomesticPhotoSelection('box.png',image)]);
+    await enterStatement(tester);
+    await tester.tap(find.byKey(const Key('delivery-confirm-statement')));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('delivery-add-reference-photos')));
+    await tester.tap(find.byKey(const Key('delivery-add-reference-photos')));await tester.pumpAndSettle();
+    final screen=tester.widget<WaybillIntakeScreen>(find.byType(WaybillIntakeScreen));
+    expect(screen.referenceOnly,isTrue);expect(screen.files.single.name,'box.png');expect(screen.fixedLink?['statement'],statement);
+    expect(tester.takeException(),isNull);
+  });
   testWidgets('reference photos attach to a confirmed statement without requiring a waybill number', (tester) async {
     final calls = <Map<String, dynamic>>[];
     final image = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZkAAAAASUVORK5CYII=');
