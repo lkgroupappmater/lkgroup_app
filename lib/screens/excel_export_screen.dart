@@ -32,6 +32,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   String? _route;
   int? _year;
   String? _voyage;
+  bool _searched = false;
+  int _completedUploads = 0;
 
   List<String> get _routes =>
       _batches.map((e) => e.routeLabel).toSet().toList()..sort();
@@ -57,7 +59,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   }
 
   ExcelExportBatch? get _selected {
-    if (_route == null || _year == null || _voyage == null) return null;
+    if (!_searched || _route == null || _year == null || _voyage == null) return null;
     for (final b in _batches) {
       if (b.routeLabel == _route &&
           b.year == _year &&
@@ -82,12 +84,21 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   }
 
   void _queueRefresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final completed = _queue.jobs.where((job) => job.status == ExcelImportJobStatus.completed).length;
+    if (completed > _completedUploads) {
+      _completedUploads = completed;
+      _load();
+    } else {
+      _completedUploads = completed;
+      setState(() {});
+    }
   }
 
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _searched = false;
       _message = '';
     });
     try {
@@ -102,7 +113,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
         _voyage = null;
         _message = batches.isEmpty
             ? '실제 화물 데이터가 등록된 운송 경로/년도/항차가 없습니다.'
-            : '업로드는 위 버튼에서 바로 실행하고, 재연산/다운로드만 아래 항차 선택값을 사용합니다.';
+            : '등록된 운송 경로·년도·항차를 선택하고 검색해 주세요. BASE는 바로 다운로드할 수 있습니다.';
       });
     } catch (e) {
       if (mounted) setState(() => _message = '목록 불러오기 실패: $e');
@@ -356,7 +367,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
             const Divider(height: 32),
 
             const Text(
-              '재연산 / 다운로드 대상 선택',
+              '항차 Excel 검색',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
@@ -364,7 +375,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
             ),
             const SizedBox(height: 5),
             const Text(
-              '아래 운송 경로·년도·항차는 재연산 또는 다운로드에만 사용됩니다.',
+              '실제 등록된 항차만 검색할 수 있습니다. 검색 후 재연산·다운로드 버튼이 표시됩니다.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -376,6 +387,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               const Center(child: CircularProgressIndicator())
             else if (_batches.isNotEmpty) ...[
               DropdownButtonFormField<String>(
+                key: ValueKey('route-$_route'),
                 initialValue: _route,
                 isExpanded: true,
                 decoration: _dec('운송 경로'),
@@ -385,6 +397,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                 onChanged: _exporting || _recalculating
                     ? null
                     : (v) => setState(() {
+                          _searched = false;
                           _route = v;
                           _year = null;
                           _voyage = null;
@@ -404,6 +417,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                       onChanged: _route == null || _exporting || _recalculating
                           ? null
                           : (v) => setState(() {
+                                _searched = false;
                                 _year = v;
                                 _voyage = null;
                               }),
@@ -423,7 +437,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                           .toList(),
                       onChanged: _year == null || _exporting || _recalculating
                           ? null
-                          : (v) => setState(() => _voyage = v),
+                          : (v) => setState(() { _searched = false; _voyage = v; }),
                     ),
                   ),
                 ],
@@ -432,6 +446,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
 
             const SizedBox(height: 12),
 
+            FilledButton.icon(
+              onPressed: _voyage == null || _loading || _exporting || _recalculating
+                  ? null : () => setState(() { _searched = true; _message = ''; }),
+              icon: const Icon(Icons.search),
+              label: const Text('항차 검색'),
+            ),
+            if (_selected != null) ...[
+            Text(_selected!.displayLabel),
             OutlinedButton(
               onPressed: _selected == null || _recalculating || _exporting ? null : () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ExcelStatementControlsScreen(batch: _selected!))),
               child: const Text('배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정'),
@@ -473,6 +495,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               ),
             ),
 
+            ],
             const SizedBox(height: 18),
             Text(
               _message,

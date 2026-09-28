@@ -15,6 +15,10 @@ Deno.serve(async(req)=>{
   const result=await response.json();if(!response.ok)throw Error(result.error||result.message||`BASE export failed (${response.status})`);return result;
  };
  try{
+  // Common quote copy updates independently from BASE regeneration.
+  EdgeRuntime.waitUntil(fetch(url+'/functions/v1/sync-excel-quote-context',{
+   method:'POST',headers:{Authorization:'Bearer '+key,apikey:key,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(60000),
+  }).then(async response=>{if(!response.ok)console.error('Quote workbook sync',response.status,await response.text());}).catch(error=>console.error('Quote workbook sync',String(error))));
   const version=await invoke({action:'automation_version'});
   const claimed=await admin.rpc('lk_claim_excel_base_sync',{p_exporter_revision:version.exporter_revision});
   if(claimed.error)throw claimed.error;

@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart' show DownloadBehavior;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/supabase_config.dart';
-import '../core/route_catalog.dart';
 import '../models/app_user.dart';
 import 'auth_service.dart';
 import 'supabase_service.dart';
@@ -61,58 +60,15 @@ class ExcelExportService {
   Future<List<ExcelExportBatch>> listBatches() async {
     if (!SupabaseConfig.isConfigured) return const [];
 
-    final shipmentRows = await SupabaseService.client
-        .from('shipments')
-        .select('route,shipment_year,voyage')
-        .not('shipment_year', 'is', null)
-        .neq('voyage', '')
-        .order('shipment_year', ascending: false);
-
-    final voyageTemplates = await SupabaseService.client
-        .from('shipment_excel_templates')
-        .select('route_key,shipment_year,voyage');
-
-    final baseTemplates = await SupabaseService.client
-        .from('shipment_excel_base_templates')
-        .select('route_key')
-        .eq('active', true);
-
-    final voyageKeys = <String>{
-      for (final raw in voyageTemplates)
-        '${raw['route_key']}|${raw['shipment_year']}|${raw['voyage']}',
-    };
-    final baseKeys = <String>{
-      for (final raw in baseTemplates) '${raw['route_key']}',
-    };
-
-    final dedup = <String, ExcelExportBatch>{};
-    for (final raw in shipmentRows) {
-      final routeLabel = '${raw['route'] ?? ''}'.trim();
-      final year = (raw['shipment_year'] as num?)?.toInt();
-      final voyage = '${raw['voyage'] ?? ''}'.trim();
-      if (routeLabel.isEmpty || year == null || voyage.isEmpty) continue;
-
-      final routeKey = RouteCatalog.keyFor(routeLabel);
-      final key = '$routeKey|$year|$voyage';
-      dedup[key] = ExcelExportBatch(
-        routeKey: routeKey,
-        routeLabel: routeLabel,
-        year: year,
-        voyage: voyage,
-        hasVoyageTemplate: voyageKeys.contains(key),
-        hasBaseTemplate: baseKeys.contains(routeKey),
-      );
-    }
-
-    final result = dedup.values.toList();
-    result.sort((a, b) {
-      final yearCompare = b.year.compareTo(a.year);
-      if (yearCompare != 0) return yearCompare;
-      final routeCompare = a.routeLabel.compareTo(b.routeLabel);
-      if (routeCompare != 0) return routeCompare;
-      return b.voyage.compareTo(a.voyage);
-    });
-    return result;
+    final rows = await SupabaseService.client.rpc('list_excel_file_batches');
+    return (rows as List).map((raw) => ExcelExportBatch(
+      routeKey: '${raw['route_key']}',
+      routeLabel: '${raw['route_label']}',
+      year: (raw['shipment_year'] as num).toInt(),
+      voyage: '${raw['voyage']}',
+      hasVoyageTemplate: raw['has_voyage_template'] == true,
+      hasBaseTemplate: raw['has_base_template'] == true,
+    )).toList(growable: false);
   }
 
   Future<List<ExcelExportBatch>> listBaseTemplates() async {

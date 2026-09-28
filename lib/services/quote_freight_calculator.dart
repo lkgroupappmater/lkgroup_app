@@ -1,5 +1,6 @@
 import '../core/route_catalog.dart';
 import 'freight_policy_service.dart';
+import 'supabase_service.dart';
 
 class QuoteBoxInput {
   const QuoteBoxInput({
@@ -51,12 +52,14 @@ class QuoteFreightResult {
     required this.lines,
     required this.totalUsd,
     required this.sourceFile,
+    this.footerLines,
   });
 
   final String route;
   final List<QuoteBoxFreightResult> lines;
   final double totalUsd;
   final String sourceFile;
+  final List<String>? footerLines;
 }
 
 class QuoteFreightCalculator {
@@ -80,6 +83,10 @@ class QuoteFreightCalculator {
   }) async {
     final routeKey = RouteCatalog.keyFor(routeLabel);
     final policy = await FreightPolicyService.instance.fetch(routeKey);
+    final context = SupabaseService.client.auth.currentUser == null ? <String, dynamic>{}
+      : await SupabaseService.client.rpc('get_quote_workbook_context',
+          params: {'p_route_key': routeKey});
+    final footer = context is Map ? context['footer_lines'] : null;
 
     final lines = <QuoteBoxFreightResult>[];
     for (final box in boxes) {
@@ -136,6 +143,7 @@ class QuoteFreightCalculator {
         (sum, line) => sum + line.amountUsd,
       ),
       sourceFile: policy.sourceNote,
+      footerLines: footer is List ? footer.map((line) => '$line').toList(growable: false) : null,
     );
   }
 }

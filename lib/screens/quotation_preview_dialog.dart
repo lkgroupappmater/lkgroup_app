@@ -399,7 +399,13 @@ class DigitalQuotationPainter extends CustomPainter {
   static const appliedColor = DocumentFormStyle.applied;
   static const totalColor = DocumentFormStyle.total;
 
-  DocumentTextContent get _docText => DocumentTextCatalog.quotation(routeLabel, issuedAt, language: language);
+  DocumentTextContent get _docText {
+    final original = DocumentTextCatalog.quotation(routeLabel, issuedAt, language: language);
+    final footer = result.footerLines;
+    if (footer == null) return original;
+    return DocumentTextContent(remark: original.remark, language: language,
+      footerLines: footer.where((line) => !RegExp(r'이용.*감사|thank.*you', caseSensitive: false).hasMatch(line)).toList());
+  }
   String get _remarkText => [taxRemark, _docText.remark].where((s) => s.trim().isNotEmpty).join('\n\n');
 
   DocumentFormLayout get _layout => DocumentFormLayout(

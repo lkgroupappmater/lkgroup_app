@@ -581,6 +581,7 @@ class ExcelImportService {
         'updated_by': SupabaseService.client.auth.currentUser?.id,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'route_key');
+      await _syncQuoteWorkbook(routeKey);
       return;
     }
 
@@ -593,6 +594,13 @@ class ExcelImportService {
       'storage_path': path,
       'uploaded_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'route_key,shipment_year,voyage');
+    await _syncQuoteWorkbook(routeKey);
+  }
+
+  Future<void> _syncQuoteWorkbook(String routeKey) async {
+    final response = await SupabaseService.client.functions.invoke(
+      'sync-excel-quote-context', body: {'route_key': routeKey});
+    if (response.status >= 400) throw StateError('가견적 안내 동기화 실패: ${response.data}');
   }
 
   static bool _unknownPrefixZone(dynamic name) => RegExp(r'^수취인불명([/／]|$)').hasMatch('$name'.replaceAll(RegExp(r'[\s　]'), ''));

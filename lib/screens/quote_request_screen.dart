@@ -327,9 +327,10 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   }
 
   Future<void> _showQuotationPreview() async {
-    if (_calculation == null || _calculationRates == null) {
-      await _calculateFreight();
-    }
+    // Preview must use the latest uploaded common copy and live DB rates.
+    _calculation = null;
+    _calculationRates = null;
+    await _calculateFreight();
     final calculation = _calculation;
     final rates = _calculationRates;
     if (calculation == null || rates == null || !mounted) return;
