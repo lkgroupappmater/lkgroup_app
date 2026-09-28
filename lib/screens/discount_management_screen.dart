@@ -16,14 +16,15 @@ class DiscountManagementScreen extends StatefulWidget {
 class _DiscountManagementScreenState
     extends State<DiscountManagementScreen> with AutoRefreshState {
   bool _automaticLoad = false;
+  bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
-  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
+  Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<DiscountRule> _rules = const [];
   String _route = 'all';
-  bool _loading = true;
+  bool _loading = false;
 
   List<DiscountRule> get _visible => _rules.where((r) {
         if (_route != 'all' && r.routeKey != _route) return false;
@@ -33,10 +34,10 @@ class _DiscountManagementScreenState
   @override
   void initState() {
     super.initState();
-    _load();
   }
 
   Future<void> _load() async {
+    if (!_automaticLoad) _searched = true;
     if (!_automaticLoad) setState(() => _loading = true);
     try {
       final rules =
@@ -426,7 +427,7 @@ class _DiscountManagementScreenState
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','company':'회사','phone':'연락처','group':'단체','route':'운송 경로'}, onChanged: () => setState(() {})),
+                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','company':'회사','phone':'연락처','group':'단체','route':'운송 경로'}, onChanged: () { _searched = true; _load(); }),
                       ],
                     ),
                   ),

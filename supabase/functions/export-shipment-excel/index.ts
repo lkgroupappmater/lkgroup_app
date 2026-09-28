@@ -1,3 +1,4 @@
+import { applyUnknownPrefixZones } from './unknown-zone.mjs';
 import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters,validateWorkbookFormulas} from './workbook-integrity.mjs';
 import { receiptOrderFormulas, fixedDiscountFormulas } from './receipt-order.mjs';
@@ -2133,7 +2134,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const { data: shipments, error: shipmentError } = await admin
       .from('shipments')
       .select(
-        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,receipt_number_locked,receipt_number_override,data_locked,unloading_zone,recipient_unknown,notes,special_note_auto,received_at,created_at',
+        'id,box_number,invoice_number,sender_name,consignee_name,consignee_phone,contents,package_type,quantity,weight_kg,length_cm,width_cm,height_cm,receipt_number,receipt_number_locked,receipt_number_override,data_locked,unloading_zone,recipient_unknown,recipient_recovered_order,notes,special_note_auto,received_at,created_at',
       )
       .eq('route', shipmentRouteLabel)
       .eq('shipment_year', shipmentYear)
@@ -2477,6 +2478,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     // Native DEFLATE retains normal XLSM size without spending Edge CPU on a
     // JavaScript compressor. VBA and all other parts remain byte-identical.
     restoreSharedFormulaMasters(files,originalSharedMasters);
+    applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
     const integrity=validateWorkbookFormulas(files);
     console.log('[EXCEL200C] zip start');
     const encoded = await zipWorkbook(files, { Zip, ZipPassThrough });

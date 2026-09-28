@@ -19,13 +19,14 @@ class CustomerListManagementScreen extends StatefulWidget {
 
 class _CustomerListManagementScreenState extends State<CustomerListManagementScreen> with AutoRefreshState {
   bool _automaticLoad = false;
+  bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
   bool get autoRefreshAllowed => !_saving && !_loading;
   @override
-  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
+  Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _rows.where(_fieldFilter.matches).toList(growable: false);
 
   bool _loading = true;
@@ -68,11 +69,12 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   num _num(dynamic v)=>v is num?v:(num.tryParse('${v??''}')??0);
 
   Future<void> _loadRows() async {
+    if (!_automaticLoad) _searched = true;
     if(_route==null||_year==null||_voyage==null)return;
     if (!_automaticLoad) setState(()=>_loading=true);
     try {
       final raw=await SupabaseService.client.from('shipments').select(
-        'id,receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number,quantity'
+        'id,recipient_recovered_order,receipt_number,consignee_name,consignee_phone,unloading_zone,special_note_auto,box_number,quantity'
       ).eq('route',_route!).eq('shipment_year',_year!).eq('voyage',_voyage!)
        .isFilter('deletion_requested_at',null).order('receipt_number').order('box_number');
       final source=(raw as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList(growable:false);
@@ -94,6 +96,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
             .toList(growable:false);
         final delivery=_deliveryOnlyLabel(notes);
         result.add({
+          'recovered_order':e.value.map((r)=>_num(r['recipient_recovered_order'])).where((v)=>v>0).fold<num>(0,(a,b)=>a==0||b<a?b:a),
           'receipt':e.key,'name':'${first['consignee_name']??''}'.trim(),
           'phone':'${first['consignee_phone']??''}'.trim(),'zone':'${first['unloading_zone']??''}'.trim(),
           'note':notes,'delivery':delivery,'boxes':boxes,'rows':e.value.length,'quantity':qty,
@@ -119,6 +122,9 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         return receiptNo(receipt)==100 || name.startsWith('박성호');
       }
       result.sort((a,b){
+        final ar=_num(a['recovered_order']),br=_num(b['recovered_order']);
+        if(ar>0||br>0){if(ar==0)return -1;if(br==0)return 1;return ar.compareTo(br);}
+
         final au=isUnknownReceipt(a), bu=isUnknownReceipt(b);
         if(au!=bu)return au?1:-1; // unknown is absolute last
         final ap=isPark100(a), bp=isPark100(b);

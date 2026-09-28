@@ -235,7 +235,9 @@ class ExcelImportService {
             'shipment_year': year,
             'voyage': voyage,
             'import_key': '$routeLabel|$year|$voyage|$box',
-            if (routeKey == 'kr_la_air' &&
+            if (_unknownPrefixZone(map['consignee_name']))
+              'unloading_zone': 'F'
+            else if (routeKey == 'kr_la_air' &&
                 '${map['unloading_zone'] ?? ''}'.trim().isEmpty)
               'unloading_zone': '102',
           });
@@ -569,6 +571,8 @@ class ExcelImportService {
     }, onConflict: 'route_key,shipment_year,voyage');
   }
 
+  static bool _unknownPrefixZone(dynamic name) => RegExp(r'^수취인불명([/／]|$)').hasMatch('$name'.replaceAll(RegExp(r'[\s　]'), ''));
+
   void _applyCalculatedZones(
     List<Map<String, dynamic>> rows, {
     required String routeKey,
@@ -582,6 +586,10 @@ class ExcelImportService {
     }
 
     for (final row in rows) {
+      if (_unknownPrefixZone(row['consignee_name'])) {
+        row['unloading_zone'] = 'F';
+        continue;
+      }
       final current = '${row['unloading_zone'] ?? ''}'.trim();
       final usableCurrent = current.isNotEmpty && !current.startsWith('=');
       if (usableCurrent) continue;
@@ -1437,18 +1445,11 @@ class ExcelImportService {
 
     final uniqueRules = CustomerDiscounts.mergeImportRules(rules);
 
-    // One-row-at-a-time is intentional.
-    // DB unique/index normalization may collapse names that look different in
-    // Excel (spacing/punctuation/etc.). A multi-row INSERT ... ON CONFLICT can
-    // then hit the same target row twice and fail with SQLSTATE 21000.
-    for (final rule in uniqueRules) {
-      await SupabaseService.client
-          .from('customer_rate_overrides')
-          .upsert(
-            rule,
-            onConflict: 'customer_name,phone,route_key',
-          );
-    }
+    // Shared transactional importer preserves any discount category absent
+    // from this workbook and validates the saved ordinary/special split.
+    await SupabaseService.client.rpc('web_import_excel_rules', params: {
+      'p_route_key': routeKey, 'p_discounts': uniqueRules,
+    });
 
     return (applied: applied, waitingForPhone: waitingForPhone);
   }

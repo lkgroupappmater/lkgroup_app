@@ -1,8 +1,9 @@
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
+import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-09-28.validated-base-sync-v4';
+export const ID_WORKBOOK_VERSION='2026-09-28.zone-discount-sync-v5';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -70,6 +71,7 @@ function newSheet(files,name,rows,{widths=[],inputColumns=[],hiddenColumns=[]}={
  files[path]=bytes(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${col(columns-1)}${last}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="5" topLeftCell="A6" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="22"/><cols>${Array.from({length:columns},(_,i)=>`<col min="${i+1}" max="${i+1}" width="${widths[i]??24}" customWidth="1"${hiddenColumns.includes(i+1)?' hidden="1"':''}/>`).join('')}</cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}"${i<4?' ht="30" customHeight="1"':''}>${r.map((v,j)=>cell(col(j+(i<4?firstVisible:0))+(i+1),v,i<5?headerStyle:bodyStyle)).join('')}</row>`).join('')}</sheetData><autoFilter ref="A5:${col(columns-1)}${last}"/><mergeCells count="4">${[1,2,3,4].map(r=>`<mergeCell ref="${col(firstVisible)}${r}:${col(lastVisible)}${r}"/>`).join('')}</mergeCells>${validations?`<dataValidations count="${inputColumns.length}">${validations}</dataValidations>`:''}</worksheet>`);
  return path;
 }
+const recoveredOrder=rows=>Math.min(...rows.filter(r=>unknownPrefixZone(r.consignee_name)&&Number(r.recipient_recovered_order)>0).map(r=>Number(r.recipient_recovered_order)),Infinity);
 export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new Map(),deliveryRefFormulas=new Map(),cargoLast=1005,cargo=true}={}){
  const customers=context.customers.filter(c=>!specialName(c.name)&&!/수취인\s*불명/.test(c.name)),byId=new Map(customers.map(c=>[c.id,c])),byNumber=new Map(customers.map(c=>[c.customer_no,c]));
  const keys=new Map();const add=(key,name,phone,c)=>{if(c&&!keys.has(key))keys.set(key,[key,name,phone,c.customer_no,customerCode(c.customer_no)]);else if(c&&keys.get(key)?.[3]!==c.customer_no)keys.set(key,[key,name,phone,0,'연결 확인 필요']);};
@@ -95,11 +97,25 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
   controls[3]=['과거 명세서는 고객 ID가 같아도 합치지 않습니다. 번호 변경은 수동 지정과 기존 승인 절차를 따릅니다.'];
   controls[4][3]='기존 발행 번호';controls[4].push('기존 번호 순서');
   const groups=new Map();for(const row of shipments){const number=String(row.receipt_number??'').trim();if(!number)continue;if(!groups.has(number))groups.set(number,[]);groups.get(number).push(row);}
-  const ordered=[...groups].sort((a,b)=>a[0].localeCompare(b[0],'en',{numeric:true}));
+  const ordered=[...groups].sort((a,b)=>{const ar=recoveredOrder(a[1]),br=recoveredOrder(b[1]);if(Number.isFinite(ar)!==Number.isFinite(br))return Number.isFinite(ar)?1:-1;return Number.isFinite(ar)?ar-br:a[0].localeCompare(b[0],'en',{numeric:true});});
   for(const [number,group] of ordered){
    const r=controls.length+1,locked=group.some(s=>s.receipt_number_locked||s.data_locked),manual=group.find(s=>s.receipt_number_override)?.receipt_number_override||'';
    const codes=[...new Set(group.filter(s=>s.customer_no).map(s=>customerCode(s.customer_no)))].join(', '),names=[...new Set(group.map(s=>s.consignee_name||''))].join(' / ');
    controls.push(['LEGACY|'+number,codes||'고객 ID 미확정',names,number,manual,locked?'잠금':'자동',number,formula(`IF(F${r}="잠금",IF(G${r}="","고정번호 입력",G${r}),IF(E${r}<>"",E${r},D${r}))`,number),cargo?formula(`COUNTIF('물품 입고 내역'!$BE$6:$BE$${cargoLast},A${r})`,group.length):group.length,formula(`IF(I${r}=0,"",IF(COUNTIFS($H$6:$H$${5+ordered.length},H${r},$I$6:$I$${5+ordered.length},">0")>1,"번호 중복 확인",""))`),JSON.stringify({receipt_number:number,manual,locked,fixed:number}),1,r-5]);
+  }
+ }
+ controls[4][13]='확인 순서';
+ controls[3]=[String(controls[3]?.[0]||'')+' / 오프라인에서 새로 확인한 건은 N열에 기존 최댓값 다음 순서를 입력하세요.'];
+ for(const row of controls.slice(5)){
+  const group=shipments.filter(x=>legacy?String(x.receipt_number||'')===row[3]:identityKey(x.customer_no,specialName(x.consignee_name))===row[0]);
+  const order=recoveredOrder(group);row[13]=Number.isFinite(order)?order:'';
+ }
+ if(legacy){
+  controls[4][14]='확인 정렬 Key';
+  for(let i=5;i<controls.length;i++){
+   const r=i+1,row=controls[i],rank=row[12];
+   row[14]=formula(`IF(N${r}>0,1000000000000+N${r},${rank})`,row[13]?1e12+row[13]:rank);
+   row[12]=formula(`COUNTIF($O$6:$O$${controls.length},"<"&O${r})+COUNTIF($O$6:O${r},O${r})`,rank);
   }
  }
  const pairs=new Map([...keys.values()].map(r=>[r[0],{name:r[1],phone:r[2]}]));
@@ -135,13 +151,14 @@ export function identityCargoFormulas(r,last,idLast,controlLast,deliveryLast,pre
 
  const fullName=`IF(BD${r}=1,TRIM(MID(E${r},FIND("/",E${r})+1,LEN(E${r}))),E${r})`;
  return {
+ BJ:`IF(AND(BD${r}=1,${unknownZoneCondition(`E${r}`)}),IFERROR(IF(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE)>0,VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$N$${controlLast},14,FALSE),1000000000000+ROW()),1000000000000+ROW()),BC${r})`,
  BI:rawPhone,BA:`LOWER(${strip(fullName,[' ',{f:'CHAR(160)'},{f:'CHAR(9)'},{f:'CHAR(10)'},{f:'CHAR(13)'}])})`,BB:phone,BD:`IF(${special},1,0)`,
  BC:`IFERROR(IF(COUNTIF('고객 ID'!$A$6:$A$${idLast},BA${r}&"|"&BB${r})=1,VLOOKUP(BA${r}&"|"&BB${r},'고객 ID'!$A$6:$E$${idLast},4,FALSE),0),0)`,
  BE:`IF(AND(E${r}="",F${r}=""),"",IF(BC${r}>0,"ID|"&BC${r}&"|"&BD${r},IF(AC${r}=1,"UNKNOWN","SRC|"&BA${r}&"|"&BB${r})))`,
  R:`IF(AH${r}="",IF(ISNUMBER(SEARCH("확인 필요",BF${r})),BF${r},""),IF(LEFT(AH${r},1)="L",INDEX(지방배송!$Y:$Y,VALUE(MID(AH${r},3,10))),INDEX(시내배송!$Y:$Y,VALUE(MID(AH${r},3,10)))))`,
  Y:`BE${r}`,N:`IF(BE${r}="","",IF(OR(BC${r}>0,AC${r}=1),IFERROR(VLOOKUP(BE${r},'명세서 번호 관리'!$A$6:$H$${controlLast},8,FALSE),"ID 확인 필요"),IF(AND(BH${r}=BA${r}&"|"&BB${r},BG${r}<>""),BG${r},"ID 확인 필요")))`,
- Z:`IF(Y${r}="","",IF(BD${r}=1,6,IF(AC${r}=1,5,IF(ISNUMBER(SEARCH("지방배송",R${r}&"")),1,IF(ISNUMBER(SEARCH("시내배송",R${r}&"")),2,IF(OR(SUBSTITUTE(E${r}," ","")="박성호대표",SUBSTITUTE(E${r}," ","")="박성호대표님"),4,3))))))`,
- AB:`IF(AA${r}<>1,"",COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},"<"&Z${r})+COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},Z${r},$BC$6:$BC$${last},"<"&BC${r})+COUNTIFS($AA$6:AA${r},1,$Z$6:Z${r},Z${r},$BC$6:BC${r},BC${r}))`,
+ Z:`IF(Y${r}="","",IF(BD${r}=1,IF(${unknownZoneCondition(`E${r}`)},7,6),IF(AC${r}=1,5,IF(ISNUMBER(SEARCH("지방배송",R${r}&"")),1,IF(ISNUMBER(SEARCH("시내배송",R${r}&"")),2,IF(OR(SUBSTITUTE(E${r}," ","")="박성호대표",SUBSTITUTE(E${r}," ","")="박성호대표님"),4,3))))))`,
+ AB:`IF(AA${r}<>1,"",COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},"<"&Z${r})+COUNTIFS($AA$6:$AA$${last},1,$Z$6:$Z$${last},Z${r},$BJ$6:$BJ$${last},"<"&BJ${r})+COUNTIFS($AA$6:AA${r},1,$Z$6:Z${r},Z${r},$BJ$6:BJ${r},BJ${r}))`,
  AH:`IF(BE${r}="","",IFERROR(VLOOKUP(BA${r}&"|"&BB${r},'배송 매칭 확인'!$A$6:$D$${deliveryLast},2,FALSE),""))`,
  BF:`IF(BE${r}="","",IF(AND(BC${r}=0,AC${r}=0),IF(COUNTIF('배송 매칭 확인'!$S$6:$S$${deliveryLast},"*|"&BB${r}&"|*")>0,"고객 ID · 배송 매칭 확인 필요","고객 ID 확인 필요"),IFERROR(IF(VLOOKUP(BA${r}&"|"&BB${r},'배송 매칭 확인'!$A$6:$D$${deliveryLast},4,FALSE)="확인 필요","배송 매칭 확인 필요",""),"")))`,
  };
@@ -200,14 +217,14 @@ function refreshPolicyInputs(files,context,strings){
    if(!phoneKey(phone)){const active=candidates.filter(d=>d.active&&(d.excel_source_row===n||candidates.filter(x=>x.active).length===1));if(active.length===1)matches=active;}
    matches.sort((a,b)=>Number(b.active)-Number(a.active)||String(b.updated_at).localeCompare(String(a.updated_at)));
    const d=matches[0];if(!d)continue;used.add(d.id+'|'+Number(special));
-   const pct=special?Number(d.special_discount_percent||d.discount_percent):Number(d.discount_percent)-Number(d.special_discount_percent||0);
+   const pct=special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0)):Number(d.discount_percent)-Number(d.special_discount_percent||0);
    if(!Number.isFinite(pct)||pct<0||pct>1)continue;
    set(n,table.c,d.customer_name);if(phoneKey(phone)!==phoneKey(d.phone))set(n,table.p,d.phone);
    set(n,table.d,!d.active&&phoneKey(d.phone)?0:pct);
   }
-  const additions=rules.filter(d=>d.active&&groupKey(d.group_name)===groupKey(table.group)&&!used.has(d.id+'|'+Number(special))&&d.rate_override==null&&!d.bulk_threshold);
+  const additions=rules.filter(d=>d.active&&(special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0))>0:groupKey(d.group_name)===groupKey(table.group))&&!used.has(d.id+'|'+Number(special))&&d.rate_override==null&&!d.bulk_threshold);
   for(const d of additions){const row=byRow.get(n);if(!row||[table.c,table.p,table.d].some(c=>read(row,col(c)))||tables.some(t=>t.row===n))break;
-   const pct=special?Number(d.special_discount_percent||d.discount_percent):Number(d.discount_percent)-Number(d.special_discount_percent||0);if(!Number.isFinite(pct)||pct<0||pct>1)continue;
+   const pct=special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0)):Number(d.discount_percent)-Number(d.special_discount_percent||0);if(!Number.isFinite(pct)||pct<0||pct>1)continue;
    set(n,table.c,d.customer_name);set(n,table.p,d.phone);set(n,table.d,pct);used.add(d.id+'|'+Number(special));n++;
   }
  }
@@ -263,18 +280,18 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  const tables=makeIdentityTables(context,{prefix,shipments,deliveryRefs,deliveryRefFormulas,cargoLast:last,cargo:!!cargoPath});
  const legacy=context.numberingMode==='legacy';
  newSheet(files,'고객 ID',tables.ids,{widths:[48,32,28,15,18],hiddenColumns:[1]});
- newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12,13],inputColumns:[{column:'F',values:['자동','잠금']}]});
+ newSheet(files,'명세서 번호 관리',tables.controls,{widths:[22,18,34,20,20,14,20,20,14,22],hiddenColumns:[1,11,12,13,15],inputColumns:[{column:'F',values:['자동','잠금']}]});
  newSheet(files,'배송 매칭 확인',tables.delivery,{widths:[45,18,18,18,70,20,30,26,20,16,14,28,28,24,16,18,50,35],hiddenColumns:[1,2,3,9,10,11,12,13,14,15,16,17,18,19]});
  if(!cargoPath||last<=6){const spotCount=connectSpotStatements(files,tables,strings,prefix);return {tables,applied:spotCount>0,spotCount,version:ID_WORKBOOK_VERSION};}
  const idByKey=new Map(tables.ids.slice(5).map(r=>[r[0],r[3]]));
  const controlByKey=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  const deliveryByKey=new Map(tables.delivery.slice(5).map(r=>[r[0],r]));
- const summaries=new Map();
+ const summaries=new Map(),recoveryByReceipt=new Map(tables.controls.slice(5).map(r=>[r[7].value,Number(r[13])||0]));
  cargoXml=cargoXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
   const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
   const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=legacy?(get('N')?'LEGACY|'+get('N'):''):id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=legacy?get('N'):control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
-  const priorY=get('Y'),cache={R:get('R'),BG:legacy?get('N'):get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
+  const priorY=get('Y'),cache={BJ:unknownPrefixZone(name)&&special?(recoveryByReceipt.get(receipt)||1e12+r):id,R:get('R'),BG:legacy?get('N'):get('BG')||get('N'),BH:get('BH')||key,BI:'p'+String(phone??'').replace(/\D/g,''),BA:nameKey(baseName(name)),BB:'p'+phoneKey(phone),BC:id,BD:special?1:0,BE:control||(!name&&!phone?'':get('AC')==='1'?'UNKNOWN':'SRC|'+key),Y:control||priorY,N:receipt,AH:delivery?.[1]?.value??'',BF:id?(delivery?.[3]?.value==='확인 필요'?'배송 매칭 확인 필요':''):name&&get('AC')!=='1'?'고객 ID 확인 필요':''};
   const updates={BG:cache.BG,BH:cache.BH};
   if(!cache.AH)cache.R=cache.BF;
   const formulas=identityCargoFormulas(r,last,tables.ids.length,tables.controls.length,tables.delivery.length,prefix);
@@ -292,15 +309,15 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
    cache.BE=control;cache.Y=control;
   }
   for(const [column,f] of Object.entries(formulas))updates[column]=formula(f,cache[column]??'');
-  if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,priority:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
+  if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,recovered:recoveryByReceipt.get(receipt)||0,priority:unknownPrefixZone(name)&&special?7:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
   return patchRow(row,r,updates);
  });
  // Keep appended helper cells within the explicit worksheet dimension.
- cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BI${Math.max(last,1010)}"/>`);
- cargoXml=hideColumns(cargoXml,53,61);
+ cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BJ${Math.max(last,1010)}"/>`);
+ cargoXml=hideColumns(cargoXml,53,62);
  files[cargoPath]=bytes(cargoXml);
  const customerPath=sheetPath(files,'고객 리스트');
- if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>legacy?a.receipt.localeCompare(b.receipt,'en',{numeric:true}):a.priority-b.priority||a.id-b.id);let text=txt(files[customerPath]);
+ if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>legacy?(a.recovered&&b.recovered?a.recovered-b.recovered:a.recovered?1:b.recovered?-1:a.receipt.localeCompare(b.receipt,'en',{numeric:true})):a.priority-b.priority||(a.priority===7?(a.recovered||1e12)-(b.recovered||1e12):a.id-b.id));let text=txt(files[customerPath]);
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
    const r=Number(n),a=row.match(new RegExp(`<c\\b[^>]*r="A${r}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`))?.[0]??'';
    // A formula identifies a previously upgraded slot; preserve the original

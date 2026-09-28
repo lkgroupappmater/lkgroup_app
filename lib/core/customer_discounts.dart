@@ -36,6 +36,8 @@ class CustomerDiscounts {
         ...(specialRule && previous != null && ordinary > 0 ? previous : rule),
         'discount_percent': ordinary + special,
         'special_discount_percent': special,
+        'regular_discount_present': !specialRule || previous?['regular_discount_present'] == true,
+        'special_discount_present': specialRule || previous?['special_discount_present'] == true,
       };
     }
     return merged.values.toList(growable: false);

@@ -20,14 +20,15 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   @override
   Set<String> get autoRefreshTopics => {'customers', 'local_delivery_profiles'};
   @override
-  Future<void> refreshAutomatically() => _load(silent: true);
+  Future<void> refreshAutomatically() async { if (_searched) await _load(silent: true); }
+  bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
   Map<int, String> _customerCodes = {};
   String _typeFilter = '', _companyFilter = '';
   List<String> get _companies => _rules.map((r) => r.localCompany).where((v) => v.isNotEmpty).toSet().toList()..sort();
   List<LocalDeliveryRule> _rules = const [];
   String _route = 'kr_la_sea';
-  bool _loading = true;
+  bool _loading = false;
 
   List<LocalDeliveryRule> get _visible => _rules.where((r) =>
     (_route.isEmpty || r.routeKey == _route) && (_typeFilter.isEmpty || r.deliveryType == _typeFilter) && (_companyFilter.isEmpty || r.localCompany == _companyFilter) &&
@@ -36,7 +37,6 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   @override
   void initState() {
     super.initState();
-    _load();
   }
 
   @override
@@ -45,6 +45,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   }
 
   Future<void> _load({bool silent = false}) async {
+    if (!silent) _searched = true;
     if (!silent) setState(() => _loading = true);
     try {
       final rows = await CustomerBenefitService.instance.listLocalDeliveryRules();
@@ -209,7 +210,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
                           const SizedBox(width: 8),
                           Expanded(child: DropdownButtonFormField<String>(key: ValueKey(_companyFilter), initialValue: _companyFilter, isExpanded: true, decoration: const InputDecoration(labelText: '현지 업체'), items: ['', ..._companies].map((v) => DropdownMenuItem(value: v, child: Text(v.isEmpty ? '전체 업체' : v, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) => setState(() => _companyFilter = v ?? ''))),
                         ]),
-                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_name':'고객명', 'customer_code':'고객 ID', 'phone':'연락처', 'route':'운송 경로', 'local_company':'현지 업체', 'delivery_type':'Type', 'address':'배송 주소', 'paid_by':'결제 구분', 'notes':'비고'}, onChanged: () => setState(() {})),
+                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_name':'고객명', 'customer_code':'고객 ID', 'phone':'연락처', 'route':'운송 경로', 'local_company':'현지 업체', 'delivery_type':'Type', 'address':'배송 주소', 'paid_by':'결제 구분', 'notes':'비고'}, onChanged: () { _searched = true; _load(); }),
                       ],
                     ),
                   ),

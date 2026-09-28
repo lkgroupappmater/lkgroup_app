@@ -26,7 +26,7 @@ test('a reviewed delivery confirmation never merges customer IDs',()=>{
 });
 test('locked and manual numbers override generated numbers independently',()=>{
  const tables=makeIdentityTables(context,{prefix:'LKS',shipments:[{customer_no:23,consignee_name:'이경희',receipt_number:'LKS 17',receipt_number_locked:true}]});const r=tables.controls.find(r=>r[0]==='ID|23|0');assert.equal(r[3],'LKS 0023');assert.equal(r[5],'잠금');assert.equal(r[6],'LKS 17');assert.equal(r[7].value,'LKS 17');
- const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.N,/명세서 번호 관리/);assert.match(f.AB,/\$BC\$6:\$BC\$1005/);assert.doesNotMatch(f.N,/AB6/);
+ const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.N,/명세서 번호 관리/);assert.match(f.AB,/\$BJ\$6:\$BJ\$1005/);assert.match(f.BJ,/BC6/);assert.doesNotMatch(f.N,/AB6/);
 });
 
 test('historical receipts remain separate even after customer IDs merge',()=>{
@@ -35,7 +35,7 @@ test('historical receipts remain separate even after customer IDs merge',()=>{
  assert.deepEqual(controls.slice(5).map(r=>r[0]),['LEGACY|LKS 05','LEGACY|LKS 61','LEGACY|LKS XX']);
  assert.deepEqual(controls.slice(5).map(r=>r[7].value),['LKS 05','LKS 61','LKS XX']);
  assert.equal(controls[5][1],'LK 0023');assert.equal(controls[6][1],'LK 0023');
- assert.deepEqual(controls.slice(5).map(r=>r[12]),[1,2,3]);
+ assert.deepEqual(controls.slice(5).map(r=>r[12].value),[1,2,3]);
  assert.equal(statementCode('LKS',68),'LKS 0068');assert.equal(statementCode('LKA',68,true),'LKA 9068');
  assert.equal(statementCode('LKS',1234,true),'LKS 91234');
 });
@@ -74,4 +74,13 @@ test('latest policy inputs refresh without rewriting money or Remark formulas',a
  const prices=d.decode(files['xl/worksheets/sheet1.xml']),remarks=d.decode(files['xl/worksheets/sheet2.xml']);
  assert.match(prices,/<c r="L9"><v>0.2<\/v>/);assert.match(prices,/<f>SUM\(A1:A5\)<\/f><v>99<\/v>/);
  assert.match(remarks,/최신 메모/);assert.match(remarks,/<f>B3&amp;C3<\/f><v>unchanged<\/v>/);assert.deepEqual([...files['xl/vbaProject.bin']],[1,2,3]);
+});
+
+test('recovered customers keep confirmation order independently of customer IDs and bill text',()=>{
+ const shipments=[{customer_no:23,consignee_name:'수취인 불명 / 이경희',consignee_phone:customer.phone,receipt_number:'LKS 75',recipient_recovered_order:101},{customer_no:2,consignee_name:'수취인 불명 / 가나다',consignee_phone:'02055550002',receipt_number:'LKS 76',recipient_recovered_order:102}];
+ const tables=makeIdentityTables({...context,numberingMode:'legacy'},{prefix:'LKS',shipments});
+ assert.deepEqual(tables.controls.slice(5).map(r=>r[7].value),['LKS 75','LKS 76']);
+ assert.deepEqual(tables.controls.slice(5).map(r=>r[13]),[101,102]);
+ assert.match(tables.controls[5][12].formula,/COUNTIF/);
+ const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.BJ,/14,FALSE/);assert.doesNotMatch(f.N,/BJ/);assert.match(f.Z,/수취인불명/);
 });

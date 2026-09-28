@@ -25,11 +25,12 @@ class MemberManagementScreen extends StatefulWidget {
 
 class _MemberManagementScreenState extends State<MemberManagementScreen> with AutoRefreshState {
   bool _automaticLoad = false;
+  bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
-  Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadMembers(); } finally { _automaticLoad = false; } }
+  Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadMembers(); } finally { _automaticLoad = false; } }
 
   String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
@@ -47,7 +48,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   @override
   void initState() {
     super.initState();
-    _loadMembers();
+    _loadRegistrySummary();
   }
 
   @override
@@ -56,6 +57,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   }
 
   Future<void> _loadMembers() async {
+    if (!_automaticLoad) _searched = true;
     if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     if (!_automaticLoad) setState(() => _loading = true);
     _loadRegistrySummary();
@@ -520,7 +522,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
     return Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () => setState(() { _submittedSearch = _fieldFilter.query; })),
+        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () { setState(() { _submittedSearch = _fieldFilter.query; _searched = true; }); _loadMembers(); }),
         title: const Text('회원 종합 관리'),
         actions:[TextButton(onPressed:_openRegistry,child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,
