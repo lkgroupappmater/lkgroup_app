@@ -12,7 +12,7 @@ const ref={route:'한국->라오스 해상',shipment_year:2026,voyage:'08',recei
 const cargo=(n,extra={})=>({id:n,...ref,invoice_number:'SUPPLIER-1',box_number:`S-TEST-${n}`,customer_id:'user',consignee_name:'Customer',consignee_phone:'2012345678',...extra});
 const parcel=(n,extra={})=>({id:id(n),carrier:'ANS',tracking_number:`TEST0000${n}`,link_scope:'cargo',shipment_id:1,delivery_kind:'province',service_kind:'domestic',events:[],photo_path:'photo.jpg',status:'registered',created_by:'user',updated_at:'2026-09-17T00:00:00Z',created_at:`2026-09-17T00:00:${String(n%60).padStart(2,'0')}Z`,checked_at:new Date(Date.now()+600000).toISOString(),...extra});
 const direct=(n,extra={})=>parcel(n,{shipment_id:null,link_scope:'statement',link_route:ref.route,link_year:2026,link_voyage:'08',link_receipt_number:'LKS 03',...extra});
-function setup({role='member',active=true,authenticated=true,rate=true,shipments=[],parcels=[],uploadFailure=0,fetchTracking=async()=>({events:[],status:'accepted',origin:'',destination:''})}={}){
+function setup({role='member',companyApproved=[],active=true,authenticated=true,rate=true,shipments=[],parcels=[],uploadFailure=0,fetchTracking=async()=>({events:[],status:'accepted',origin:'',destination:''})}={}){
  let handler,mutations=0,signed=0;const uploaded=[],removed=[];const data={domestic_parcel_removals:[],shipments:structuredClone(shipments),domestic_parcels:structuredClone(parcels)};
  const profile={id:'user',role,approval_status:active?'approved':'pending',deletion_status:null,name:'User',phone:'2099999999'};
  const activeCargo=r=>!r.deleted_at&&!r.deletion_requested_at;
@@ -37,6 +37,7 @@ function setup({role='member',active=true,authenticated=true,rate=true,shipments
   from(table){return table==='profiles'?query(table,[profile]):query(table)},
   rpc(name,args){
    if(name==='manage_domestic_parcels')return Promise.resolve({data:{deleted_ids:args.p_parcels.map(r=>r.id),parcels:[]}});
+   if(name==='member_company_shipment_ids'){assert.equal(args.p_owner,'user');return Promise.resolve({data:args.p_ids.filter(id=>companyApproved.includes(id))});}
    if(name==='consume_domestic_tracking_limit')return Promise.resolve({data:rate});
    if(name==='domestic_parcel_group_page'){
     const groups=new Map();for(const r of data.domestic_parcels){const key=links.deliveryGroup(r,data.shipments.find(s=>s.id===r.shipment_id));if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
@@ -232,4 +233,23 @@ test('deletion requires operator, confirmation and valid concurrency fields befo
  assert.equal((await api.call({...body,updated_at:null})).body.error,'INVALID_REQUEST');
  assert.equal((await api.call({...body,action:'remove_photo',parcels:[body],photo_path:''})).body.error,'PHOTO_NOT_FOUND');
  const r=await api.call(body);assert.equal(r.status,200);assert.deepEqual(r.body.deleted_ids,[id(1)]);assert.equal(api.removed.length,0);
+});
+
+test('only DB-approved company cargo exposes full delivery details and photos',async()=>{
+ const records=[cargo(1,{customer_id:'other',consignee_name:'뷰티판다'}),cargo(2,{customer_id:'other',consignee_name:'Other Company',receipt_number:'LKS 99'})];
+ for(const approved of [false,true]){
+  const api=setup({shipments:records,companyApproved:approved?[1]:[],parcels:[parcel(1,{receiver_name:'뷰티판다',receiver_phone:'2012345678'}),direct(2),parcel(3,{shipment_id:2})]});
+  const result=await api.call({action:'statement_lookup',...ref});
+  assert.equal(result.status,200);assert.equal(result.body.cargo_count,approved?1:0);
+  assert.equal(result.body.parcels.length,approved?2:0);
+  if(approved){assert.ok(result.body.parcels.every(p=>!p.recipient_masked&&p.photo_url));assert.equal(result.body.parcels[0].receiver_name,'뷰티판다');}
+  const denied=await api.call({action:'statement_lookup',...ref,receipt_number:'LKS 99'});
+  assert.equal(denied.body.cargo_count,0);assert.deepEqual(denied.body.parcels,[]);
+ }
+});
+test('company approval does not expose mixed-owner statement or shared photos',async()=>{
+ const path='intake/user/batch/company-and-other.png';
+ const api=setup({companyApproved:[1],shipments:[cargo(1,{customer_id:'other'}),cargo(2,{customer_id:'other'})],parcels:[direct(1),parcel(2,{photo_path:path,photo_paths:[path]}),parcel(3,{shipment_id:2,photo_path:path,photo_paths:[path]})]});
+ const result=await api.call({action:'statement_lookup',...ref});
+ assert.deepEqual(result.body.parcels.map(p=>p.id),[id(2)]);assert.deepEqual(result.body.parcels[0].photo_urls,[]);assert.equal(api.signed,0);
 });

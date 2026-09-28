@@ -1,3 +1,4 @@
+import '../widgets/company_verification.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -354,6 +355,8 @@ class _AccountBodyState extends State<AccountBody> with SharedUiTextState {
               _info(_t('phone'), user.phone),
               _info(_t('role'), user.role.localizedLabel(widget.language)),
               _info(_t('company'), user.company),
+              if (user.role == UserRole.member && user.company.trim().isNotEmpty)
+                CompanyVerificationStatus(key: ValueKey('${user.id}|${user.name}|${user.phone}|${user.company}'), language: widget.language),
               _info(_t('address'), user.address),
             ],
           ),

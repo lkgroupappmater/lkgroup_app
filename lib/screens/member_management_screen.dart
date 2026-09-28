@@ -1,3 +1,4 @@
+import '../widgets/company_verification.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'customer_registry_screen.dart';
@@ -537,6 +538,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                 children: [
+                  CompanyVerificationButton(language: widget.language),
                   if(_registrySummary!=null) Card(color:Colors.orange.shade50,child:ListTile(title:Text('${intakeText(widget.language,'mismatches')} ${_registrySummary!['mismatch_customers']}'),subtitle:Text('${intakeText(widget.language,'duplicates')} ${_registrySummary!['duplicate_customers']} · ${intakeText(widget.language,'sourceRows')} ${_registrySummary!['mismatch_sources']}'),trailing:const Icon(Icons.chevron_right),onTap:()=>_openRegistry(mismatchesOnly:true))),
                   const Text(
                     '가입 권한 승인 요청',

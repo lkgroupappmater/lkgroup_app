@@ -55,11 +55,23 @@ Deno.serve(async req=>{
    })());
    return await statementCache.get(key);
   }
+  const companyChecked=new Set<number>(),companyAllowed=new Set<number>();
+  async function loadCompanyAccess(rows:any[]){
+   if(operator)return;
+   const ids=[...new Set(rows.filter(Boolean).map(r=>Number(r.id)))].filter(id=>Number.isSafeInteger(id)&&!companyChecked.has(id));
+   for(let offset=0;offset<ids.length;offset+=500){
+    const batch=ids.slice(offset,offset+500);
+    const allowed=dbResult(await db.rpc('member_company_shipment_ids',{p_owner:user.id,p_ids:batch}));
+    batch.forEach(id=>companyChecked.add(id));
+    (allowed??[]).forEach((id:number)=>companyAllowed.add(Number(id)));
+   }
+  }
   async function photoAccess(row:any,s:any){
    if(operator)return true;
    const ref=rowStatement(row);
-   if(ref){const linked=await resolveStatement(ref);return linked.rows.length>0&&linked.rows.every((r:any)=>canSeePhoto(profile,{},r));}
-   return canSeePhoto(profile,row,s);
+   if(ref){const linked=await resolveStatement(ref);await loadCompanyAccess(linked.rows);return linked.rows.length>0&&linked.rows.every((r:any)=>canSeePhoto(profile,{},r)||companyAllowed.has(Number(r.id)));}
+   await loadCompanyAccess([s]);
+   return canSeePhoto(profile,row,s)||!!s&&companyAllowed.has(Number(s.id));
   }
   const photoCache=new Map<string,Promise<string|null>>();
   async function serialize(row:any,full=false){
@@ -170,7 +182,8 @@ Deno.serve(async req=>{
    return json(200,{statement:result.rows.length?result.statement:null,cargo:result.rows,cargo_count:result.rows.length});
   }
   if(b.action==='statement_lookup'){
-   const found=(await findCargo(b)).filter((r:any)=>operator||canSeePhoto(profile,{},r));
+   const candidates=await findCargo(b);await loadCompanyAccess(candidates);
+   const found=candidates.filter((r:any)=>operator||canSeePhoto(profile,{},r)||companyAllowed.has(Number(r.id)));
    if(!found.length)return json(200,{parcels:[],has_more:false,cargo_count:0});
    const refs=new Map<string,any>();
    for(const r of found)if(r.receipt_number){

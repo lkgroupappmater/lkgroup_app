@@ -139,7 +139,7 @@ class ShipmentService {
       }
     }
 
-    // Registered company aliases enable discovery, never full-record access.
+    // The database returns complete company cargo only after administrator verification.
     if (currentUser.role == UserRole.member) {
       final companyRaw = await SupabaseService.client.rpc(
         'search_shipments_by_registered_company',

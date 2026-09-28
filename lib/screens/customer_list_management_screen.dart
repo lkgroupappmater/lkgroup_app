@@ -1,3 +1,4 @@
+import '../widgets/company_verification.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'dart:typed_data';
@@ -393,6 +394,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       appBar:AppBar(
         bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () => setState(() {})),title:const Text('고객 리스트')),
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
+        const CompanyVerificationButton(),
         Row(children:[
           Expanded(flex:4,child:_selector<String>(label:'운송 경로',value:_route,items:_routes,text:(v)=>v,onChanged:(v){
             setState((){_route=v;_year=_years.isNotEmpty?_years.first:null;_voyage=_voyages.isNotEmpty?_voyages.first:null;_rows=const [];});})),
