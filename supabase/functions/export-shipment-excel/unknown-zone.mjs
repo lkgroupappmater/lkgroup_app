@@ -1,4 +1,4 @@
-const enc=new TextEncoder(),dec=new TextDecoder();
+import {rewriteWorksheetRows} from './worksheet-rows.mjs';
 export const unknownPrefixZone=name=>/^수취인불명([/／]|$)/.test(String(name??'').replace(/[\s　]/g,''));
 const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 export function unknownZoneCondition(ref){
@@ -11,8 +11,7 @@ export function applyUnknownPrefixZones(files,{sheetPath,strings=[],cellText}){
  let changed=0;
  for(const [name,column,source,start,end] of [['물품 입고 내역','O','E',6,1005],['고객 리스트','C','B',4,114]]){
   const path=sheetPath(files,name);if(!path||!files[path])continue;
-  let xml=dec.decode(files[path]);
-  xml=xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
+  files[path]=rewriteWorksheetRows(files[path],(row,n)=>{
    const r=Number(n);if(r<start||r>end)return row;
    const sourceCell=row.match(new RegExp(`<c\\b[^>]*r="${source}${r}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`))?.[0];
    const isF=unknownPrefixZone(sourceCell?cellText(sourceCell,strings):'');
@@ -28,6 +27,6 @@ export function applyUnknownPrefixZones(files,{sheetPath,strings=[],cellText}){
     if(isF){body=body.replace(/<v\b[^>]*?(?:\/>|>[\s\S]*?<\/v>)/,'');body+='<v>F</v>';attrs=attrs.replace(/\s+t="[^"]*"/g,'')+' t="str"';}
     return `<c${attrs}>${body}</c>`;
    });
-  });files[path]=enc.encode(xml);
+ });
  }return changed;
 }

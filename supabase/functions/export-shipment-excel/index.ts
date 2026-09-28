@@ -2447,6 +2447,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       baseKip:Number(exchangeRate.base_kip??0),baseThb:Number(exchangeRate.base_thb??0),baseKrw:Number(exchangeRate.base_krw??0),
       kipAdjustment:Number(exchangeRate.kip_adjustment??2000),thbAdjustment:Number(exchangeRate.thb_adjustment??1.5),krwAdjustment:Number(exchangeRate.krw_adjustment??40),
     });
+    await new Promise<void>((resolve)=>setTimeout(resolve,0));
     applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false});
     // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
 // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.

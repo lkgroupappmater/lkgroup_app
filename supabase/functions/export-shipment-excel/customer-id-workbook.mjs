@@ -2,6 +2,7 @@
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
+import {rewriteWorksheetRows} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
 export const ID_WORKBOOK_VERSION='2026-09-28.zone-discount-sync-v6';
 const enc=new TextEncoder(),dec=new TextDecoder();
@@ -288,7 +289,11 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  const controlByKey=new Map(tables.controls.slice(5).map(r=>[r[0],r[7].value]));
  const deliveryByKey=new Map(tables.delivery.slice(5).map(r=>[r[0],r]));
  const summaries=new Map(),recoveryByReceipt=new Map(tables.controls.slice(5).map(r=>[r[7].value,Number(r[13])||0]));
- cargoXml=cargoXml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
+ // Update metadata before emitting rows to avoid decoding/rebuilding the large
+ // finished worksheet just to change its dimension and hidden columns.
+ cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BJ${Math.max(last,1010)}"/>`);
+ cargoXml=hideColumns(cargoXml,53,62);
+ files[cargoPath]=rewriteWorksheetRows(cargoXml,(row,n)=>{
   const r=Number(n);if(r<6||r>last)return row;
   const cells=parsedCells(row),get=c=>cellValue(cells.get(c)??'',strings);
   const name=get('E'),phone=get('F'),key=matchKey(name,phone),id=idByKey.get(key)||0,special=specialName(name),control=legacy?(get('N')?'LEGACY|'+get('N'):''):id?identityKey(id,special):get('AC')==='1'?'UNKNOWN':'',receipt=legacy?get('N'):control?controlByKey.get(control):name||phone?get('N')||'ID 확인 필요':'',delivery=deliveryByKey.get(key);
@@ -313,10 +318,7 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
   if(receipt&&!summaries.has(receipt))summaries.set(receipt,{id,receipt,recovered:recoveryByReceipt.get(receipt)||0,priority:unknownPrefixZone(name)&&special?7:special?6:receipt.endsWith(' XX')?5:delivery?.[1]?.value?.startsWith('L|')?1:delivery?.[1]?.value?.startsWith('C|')?2:/^박성호\s*대표님?$/.test(name)?4:3});
   return patchRow(row,r,updates);
  });
- // Keep appended helper cells within the explicit worksheet dimension.
- cargoXml=cargoXml.replace(/<dimension\b[^>]*\/>/,`<dimension ref="A1:BJ${Math.max(last,1010)}"/>`);
- cargoXml=hideColumns(cargoXml,53,62);
- files[cargoPath]=bytes(cargoXml);
+ cargoXml='';
  const customerPath=sheetPath(files,'고객 리스트');
  if(customerPath){let i=0;const ordered=[...summaries.values()].sort((a,b)=>legacy?(a.recovered&&b.recovered?a.recovered-b.recovered:a.recovered?1:b.recovered?-1:a.receipt.localeCompare(b.receipt,'en',{numeric:true})):a.priority-b.priority||(a.priority===7?(a.recovered||1e12)-(b.recovered||1e12):a.id-b.id));let text=txt(files[customerPath]);
   text=text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>{
