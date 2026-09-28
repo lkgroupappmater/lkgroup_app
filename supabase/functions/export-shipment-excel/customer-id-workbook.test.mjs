@@ -24,6 +24,41 @@ test('a reviewed delivery confirmation never merges customer IDs',()=>{
  const tables=makeIdentityTables({...context,customers:[customer,{...customer,id:'b',customer_no:509,name:'곽낭아/이경희',name_key:'곽낭아/이경희'}],deliveries:[{...profile,fingerprint:'version1'}],reviews:[{delivery_profile_id:1,name_key:'이경희',phone_key:customer.phone_key,profile_fingerprint:'version1',approved:true}]},{prefix:'LKS',deliveryRefs:new Map([[1,'L|3']])});
  assert.equal(tables.ids.find(r=>r[0]==='곽낭아/이경희|p02055551234')[3],509);assert.equal(tables.delivery.find(r=>r[0]==='이경희|p02055551234')[2],'L|3');assert.equal(tables.delivery.find(r=>r[0]==='곽낭아/이경희|p02055551234')[2],'');
 });
+
+const mergedCustomer={id:'merged',customer_no:128,name:'입고 이름 / Delivery Name',phone:'02011110001 / 02022220002',name_key:'입고이름/deliveryname',phone_key:'0201111000102022220002'};
+const mergedProfile={...profile,id:501,customer_name:'Delivery Name',alternate_name:'Delivery Name',phone:'02022220002',fingerprint:'current'};
+const mergedContext={customers:[mergedCustomer],aliases:[{customer_registry_id:'merged',name_key:'입고이름',phone_key:'02011110001'},{customer_registry_id:'merged',name_key:'deliveryname',phone_key:'02022220002'}],deliveries:[mergedProfile],reviews:[]};
+const mergedRow=ctx=>makeIdentityTables(ctx,{prefix:'LKS',deliveryRefs:new Map([[501,'L|7'],[502,'L|8']])}).delivery.find(r=>r[0]==='입고이름|p02011110001');
+test('saved merged aliases connect different names and complete phones to one delivery',()=>{
+ const row=mergedRow(mergedContext);assert.equal(row[2],'L|7');assert.equal(row[3].value,'확정');
+ const special=makeIdentityTables(mergedContext,{prefix:'LKS',shipments:[{consignee_name:'수취인 불명 / 입고 이름',consignee_phone:'02011110001'}],deliveryRefs:new Map([[501,'L|7']])});
+ assert.equal(special.delivery.find(r=>r[0]==='입고이름|p02011110001')[2],'L|7');
+});
+test('merged identity requires review when more than one delivery profile exists',()=>{
+ const row=mergedRow({...mergedContext,deliveries:[mergedProfile,{...mergedProfile,id:502,destination_address:'다른 배송지'}]});
+ assert.equal(row[2],'');assert.equal(row[3].value,'확인 필요');assert.match(row[8],/\|501\|/);assert.match(row[8],/\|502\|/);
+});
+test('excluded profiles remain excluded after identity merging; current approvals select an address',()=>{
+ const review={name_key:'입고이름',phone_key:'02011110001',delivery_profile_id:501,profile_fingerprint:'current',approved:false};
+ const excluded=mergedRow({...mergedContext,reviews:[review]});assert.equal(excluded[2],'');assert.equal(excluded[8],'');
+ const ctx={...mergedContext,deliveries:[mergedProfile,{...mergedProfile,id:502}],reviews:[{...review,approved:true}]};assert.equal(mergedRow(ctx)[2],'L|7');
+ ctx.reviews[0].profile_fingerprint='old';assert.equal(mergedRow(ctx)[2],'');
+});
+test('a conflicting full pair and a source-only link cannot infer a shared delivery identity',()=>{
+ const ambiguous={...mergedCustomer,id:'other',customer_no:129,name:'입고 이름',phone:'02011110001',name_key:'입고이름',phone_key:'02011110001'};
+ assert.equal(mergedRow({...mergedContext,customers:[mergedCustomer,ambiguous]})[2],'');
+ const ctx={...mergedContext,aliases:mergedContext.aliases.slice(1),sources:[{customer_no:128,source_name:'입고 이름',source_phone:'02011110001'}]};
+ assert.equal(mergedRow(ctx)[2],'');
+});
+test('missing phone information cannot confirm a delivery through identity alone',()=>{
+ const ctx={...mergedContext,aliases:[...mergedContext.aliases,{customer_registry_id:'merged',name_key:'이름만',phone_key:''}]};
+ const row=makeIdentityTables(ctx,{prefix:'LKS',deliveryRefs:new Map([[501,'L|7']])}).delivery.find(r=>r[0]==='이름만|p');
+ assert.equal(row[2],'');
+});
+test('identity fallback does not replace an existing exact-name and phone delivery',()=>{
+ const ctx={...mergedContext,deliveries:[{...mergedProfile,id:501,source_row:99},{...mergedProfile,id:502,customer_name:'Separate company',alternate_name:'입고 이름',phone:'02011110001',source_row:1}]};
+ assert.equal(mergedRow(ctx)[2],'L|8');
+});
 test('locked and manual numbers override generated numbers independently',()=>{
  const tables=makeIdentityTables(context,{prefix:'LKS',shipments:[{customer_no:23,consignee_name:'이경희',receipt_number:'LKS 17',receipt_number_locked:true}]});const r=tables.controls.find(r=>r[0]==='ID|23|0');assert.equal(r[3],'LKS 0023');assert.equal(r[5],'잠금');assert.equal(r[6],'LKS 17');assert.equal(r[7].value,'LKS 17');
  const f=identityCargoFormulas(6,1005,800,700,900,'LKS');assert.match(f.N,/명세서 번호 관리/);assert.match(f.AB,/\$BJ\$6:\$BJ\$1005/);assert.match(f.BJ,/BC6/);assert.doesNotMatch(f.N,/AB6/);

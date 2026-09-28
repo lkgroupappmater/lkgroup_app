@@ -4,7 +4,7 @@
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-09-28.offline-customer-id-v7';
+export const ID_WORKBOOK_VERSION='2026-09-28.merged-delivery-id-v8';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -126,17 +126,27 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  const delivery=[['배송 매칭 확인'],['같은 연락처·한글/영문 이름 차이는 확인 후보입니다. F열에서 배송 프로필 번호를 선택해 확정합니다.'],['후보에 없는 배송지는 앱·웹 배송 목록에서 먼저 수정하세요. 고객 ID는 통합하지 않습니다.'],['확인 결과는 Excel 업로드 후 앱·웹 DB와 함께 반영됩니다.'],['매칭 Key','확정 배송 참조','자동 확인 참조','매칭 상태','확인 후보 (프로필 번호 / 고객명)','확인할 프로필 번호','입고 고객명','입고 연락처','후보 번호 목록','프로필 번호','참조','고객명','수령인','연락처','Type','업체','주소','자료 지문','전체 연락처 비교']];
  const profiles=context.deliveries??[];
  // Normalize each profile once, retaining the same matching and review rules.
- const normalizedProfiles=profiles.map(d=>({d,names:[d.customer_name,d.alternate_name,d.company_name].map(nameKey).filter(Boolean),phones:phoneTokens(d.phone_display||d.phone)}));
+ // Only complete registry/alias pairs establish identity. Do not infer it from
+ // a shared phone, a recipient token, or an unreviewed source association.
+ const deliveryIdentityKeys=new Map();
+ const addDeliveryIdentity=(key,id)=>{if(!deliveryIdentityKeys.has(key))deliveryIdentityKeys.set(key,id);else if(deliveryIdentityKeys.get(key)!==id)deliveryIdentityKeys.set(key,null);};
+ for(const c of customers)if(c.name_key&&c.phone_key)addDeliveryIdentity(c.name_key+'|p'+c.phone_key,c.id);
+ for(const a of context.aliases??[])if(a.name_key&&a.phone_key&&byId.has(a.customer_registry_id))addDeliveryIdentity(a.name_key+'|p'+a.phone_key,a.customer_registry_id);
+ const deliveryIdentity=(name,phone)=>deliveryIdentityKeys.get(matchKey(name,phone));
+ const normalizedProfiles=profiles.map(d=>({d,names:[d.customer_name,d.alternate_name,d.company_name].map(nameKey).filter(Boolean),phones:phoneTokens(d.phone_display||d.phone),customerId:deliveryIdentity(d.customer_name,d.phone_display||d.phone)}));
+ const profileCounts=new Map();
+ for(const p of normalizedProfiles)if(p.customerId)profileCounts.set(p.customerId,(profileCounts.get(p.customerId)||0)+1);
  const reviewsByPair=new Map();
  for(const review of context.reviews??[]){const key=JSON.stringify([review.name_key,review.phone_key]);if(!reviewsByPair.has(key))reviewsByPair.set(key,[]);reviewsByPair.get(key).push(review);}
  const reference=id=>deliveryRefFormulas.has(id)?formula(deliveryRefFormulas.get(id),deliveryRefs.get(id)||''):deliveryRefs.get(id)||'';
  for(const [key,pair] of pairs){
-  const n=nameKey(baseName(pair.name)),phones=phoneTokens(pair.phone),reviews=reviewsByPair.get(JSON.stringify([nameKey(pair.name),phoneKey(pair.phone)]))??[],matches=normalizedProfiles.map(({d,names,phones:profilePhones})=>{
+  const n=nameKey(baseName(pair.name)),phones=phoneTokens(pair.phone),customerId=deliveryIdentity(pair.name,pair.phone),reviews=reviewsByPair.get(JSON.stringify([nameKey(pair.name),phoneKey(pair.phone)]))??[],matches=normalizedProfiles.map(({d,names,phones:profilePhones,customerId:profileCustomerId})=>{
    const exact=names.includes(n),phone=profilePhones.some(p=>phones.includes(p)),partial=n.length>=2&&names.some(x=>x.length>=2&&(x.includes(n)||n.includes(x)));
    const review=reviews.find(r=>r.delivery_profile_id===d.id&&r.profile_fingerprint===d.fingerprint);
-   return {d,exact,phone,partial,review};
-  }).filter(m=>m.review?.approved!==false&&(m.exact||m.phone||m.partial||m.review?.approved));
-  const confirmed=matches.filter(m=>m.review?.approved===true||m.exact&&m.phone).sort((a,b)=>Number(b.review?.approved===true)-Number(a.review?.approved===true)||Number(b.d.delivery_type==='province')-Number(a.d.delivery_type==='province')||Number(b.d.preferred)-Number(a.d.preferred)||Number(b.d.source_row||b.d.source_no||0)-Number(a.d.source_row||a.d.source_no||0)||b.d.id-a.d.id)[0];
+   const sameCustomer=!!customerId&&customerId===profileCustomerId;
+   return {d,exact,phone,partial,review,sameCustomer,uniqueCustomer:sameCustomer&&profileCounts.get(customerId)===1};
+  }).filter(m=>m.review?.approved!==false&&(m.exact||m.phone||m.partial||m.sameCustomer||m.review?.approved));
+  const confirmed=matches.filter(m=>m.review?.approved===true||m.exact&&m.phone||m.uniqueCustomer).sort((a,b)=>Number(b.review?.approved===true)-Number(a.review?.approved===true)||Number(b.review?.approved===true||b.exact&&b.phone)-Number(a.review?.approved===true||a.exact&&a.phone)||Number(b.d.delivery_type==='province')-Number(a.d.delivery_type==='province')||Number(b.d.preferred)-Number(a.d.preferred)||Number(b.d.source_row||b.d.source_no||0)-Number(a.d.source_row||a.d.source_no||0)||b.d.id-a.d.id)[0];
   const row=delivery.length+1,ref=confirmed?deliveryRefs.get(confirmed.d.id)||'':'',candidates=matches.map(m=>m.d);
   const fp=profiles[row-6],profile=fp?[fp.id,reference(fp.id),fp.customer_name,fp.alternate_name,fp.phone_display||fp.phone,fp.delivery_type,fp.local_company,fp.destination_address,fp.fingerprint||'',phoneTokens(fp.phone_display||fp.phone).map(p=>'|p'+p+'|').join('')]:[];
   delivery.push([key,formula(`IF(F${row}="",C${row},IF(ISNUMBER(SEARCH("|"&F${row}&"|",I${row})),IFERROR(INDEX($K$6:$K$${5+profiles.length},MATCH(F${row},$J$6:$J$${5+profiles.length},0)),""),""))`,ref),confirmed?reference(confirmed.d.id):'',formula(`IF(B${row}<>"","확정",IF(E${row}<>"","확인 필요","일반"))`,ref?'확정':candidates.length?'확인 필요':'일반'),candidates.map(d=>`${d.id} / ${d.customer_name} / ${d.alternate_name} / ${d.local_company}`).join('\n'),'',pair.name,pair.phone,candidates.map(d=>'|'+d.id+'|').join(''),...profile]);
