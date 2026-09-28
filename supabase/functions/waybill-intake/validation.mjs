@@ -29,7 +29,33 @@ export function normalizeDrafts(data) {
     receiver_name: String(w.receiver_name ?? '').trim().slice(0,160),
     receiver_phone: String(w.receiver_phone ?? '').trim().slice(0,40),
     note: String(w.note ?? '').trim().slice(0,240),
+    ...(Object.hasOwn(w,'carrier_text')?{carrier_text:String(w.carrier_text??'').trim().slice(0,160)}:{}),
+    ...(Object.hasOwn(w,'tracking_text')?{tracking_text:String(w.tracking_text??'').trim().slice(0,160)}:{}),
   }));
+  for(const d of drafts){
+    // Literal logo evidence takes precedence over the model's enum guess.
+    // Do not infer a courier from an unbranded 13-digit number.
+    if(Object.hasOwn(d,'carrier_text')){
+      const brand=d.carrier_text.toUpperCase();
+      const brands=[['ANS',/\bANOUSITH\b|\bAN[ZS]\b/],['LAOPOST',/\bLAO\s*POST\b|\bPOST[\s-]*X\b/],['HAL',/\bHOUNG\s*ALOUN\b|\bHAL\b/],['MIXAY',/\bMIXAY\b/],['JT',/\bJ\s*&\s*T\b|\bJ\s*AND\s*T\b/]].filter(([,pattern])=>pattern.test(brand));
+      const evidence=brands.length===1?brands[0][0]:'';
+      if(d.carrier!==evidence)d.note='Carrier checked against the printed brand. '+d.note;
+      d.carrier=evidence;
+      if(!evidence)d.note='Carrier logo/name is unclear. Select the carrier after checking the photo. '+d.note;
+    }
+    if(/(?:included|copied|taken|provided).{0,70}(?:instruction|example)|per (?:developer )?instruction|not actually visible/i.test(d.note)){
+      d.tracking_number='';d.note='Tracking number was not grounded in the image. Read the original label again.';
+    }
+    if(Object.hasOwn(d,'tracking_text')){
+      const printed=d.tracking_text.replace(/\s/g,'').toUpperCase();
+      const right=d.carrier==='ANS'?/^\d+[|｜](\d{13})$/.exec(printed):null;
+      if(right)d.tracking_number=right[1];
+      else if(d.tracking_number&&!printed.split(/[|｜]/).includes(d.tracking_number)){
+        d.tracking_number='';d.note='The complete tracking number could not be confirmed from the printed barcode caption.';
+      }
+    }
+    d.note=d.note.slice(0,240);
+  }
   // Anousith labels show account | full tracking, plus a large six-digit suffix.
   for(const d of drafts) if(d.carrier==='ANS'){
     const split=/^\d+[|｜]([0-9]{13})$/.exec(d.tracking_number);

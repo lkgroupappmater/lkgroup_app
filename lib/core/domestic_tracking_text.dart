@@ -6,6 +6,16 @@ String domesticText(AppLanguage language, String key) =>
       (domesticWords[key] ?? domesticWords['REQUEST_FAILED']!)[language.index]);
 
 const domesticWords = <String, List<String>>{
+  "delete": ["송장·사진 등록 삭제", "Delete registration", "ລຶບລາຍການ"],
+  "deleteConfirm": ["이 등록 건과 연결된 사진을 목록에서 삭제할까요? 연결된 명세서와 화물 자료는 유지됩니다.", "Delete this registration and its photo links? The linked statement and cargo stay unchanged.", "ລຶບລາຍການ ແລະ ລິ້ງຮູບນີ້ບໍ? ໃບລາຍການ ແລະ ສິນຄ້າຍັງຄົງຢູ່."],
+  "deletePhoto": ["사진 삭제", "Delete photo", "ລຶບຮູບ"],
+  "deletePhotoConfirm": ["이 사진을 아래 등록 건들에서 삭제할까요? 마지막 참고 사진이면 해당 사진 등록 건도 함께 삭제됩니다. 다른 명세서의 사진은 유지됩니다.", "Remove this photo from the registrations below? A reference-only registration is removed with its last photo. Other statements keep their photos.", "ລຶບຮູບຈາກລາຍການຂ້າງລຸ່ມບໍ? ຖ້າເປັນຮູບອ້າງອີງສຸດທ້າຍ ລາຍການນັ້ນຈະຖືກລຶບ. ຮູບໃນໃບລາຍການອື່ນຍັງຢູ່."],
+  "deleted": ["삭제했습니다.", "Deleted.", "ລຶບແລ້ວ."],
+  "cancel": ["취소", "Cancel", "ຍົກເລີກ"],
+  "NOT_FOUND": ["이미 삭제되었거나 찾을 수 없습니다. 다시 조회해 주세요.", "Already deleted or not found. Reload the list.", "ລຶບແລ້ວ ຫຼື ບໍ່ພົບ. ໂຫຼດໃໝ່."],
+  "PHOTO_NOT_FOUND": ["사진이 변경되었습니다. 다시 조회해 주세요.", "The photo changed. Reload the list.", "ຮູບປ່ຽນແລ້ວ. ໂຫຼດໃໝ່."],
+  "REVIEW_REQUIRED": ["삭제할 항목을 확인해 주세요.", "Confirm the items to delete.", "ຢືນຢັນລາຍການທີ່ຈະລຶບ."],
+
   "INVALID_BATCH": ["송장번호는 한 번에 1~50개까지 등록할 수 있습니다.", "Register 1–50 tracking numbers at a time.", "ລົງທະບຽນໄດ້ 1–50 ເລກຕໍ່ຄັ້ງ."],
 
   "TOO_MANY_PHOTOS": ["기존 사진을 포함해 송장당 최대 50장까지 등록할 수 있습니다.", "Each waybill can have up to 50 photos, including existing photos.", "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 50 ຮູບ ລວມຮູບເກົ່າ."],

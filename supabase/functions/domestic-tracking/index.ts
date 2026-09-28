@@ -71,18 +71,21 @@ Deno.serve(async req=>{
      if(!operator&&path.startsWith('intake/')){
       const linked=await allRows(()=>db.from('domestic_parcels').select('*').contains('photo_paths',[path]).order('id'));
       for(const other of linked)if(!await photoAccess(other,await shipment(other.shipment_id)))return null;
+      const removed=await allRows(()=>db.from('domestic_parcel_removals').select('snapshot').contains('photo_paths',[path]).order('id'));
+      for(const {snapshot:other} of removed)if(!await photoAccess(other,await shipment(other.shipment_id)))return null;
      }
      const r=await db.storage.from('domestic-waybills').createSignedUrl(path,600);return r.error?null:r.data.signedUrl;
     })());
     return photoCache.get(path);
    }));
+   const managed_photos=canManageParcel(profile,row)?paths.map((path:string,i:number)=>({path,url:photo_urls[i]??null})):[];
    photo_urls=photo_urls.filter(Boolean);
    const events=own?row.events:(row.events??[]).map((e:any,i:number)=>({key:`redacted:${i}`,occurred_at:e.occurred_at,status:e.status,source:e.source,description:'',location:''}));
    return {id:row.id,carrier:row.carrier,is_reference_photo:row.is_reference_photo===true,carrier_name:CARRIERS[row.carrier]?.name??'',tracking_number:row.tracking_number,
     delivery_kind:row.delivery_kind,service_kind:row.service_kind,origin:own?row.origin:'',destination:own?row.destination:'',
     status:row.status,events,sync_state:row.sync_state,sync_error:row.sync_error,checked_at:row.checked_at,synced_at:row.synced_at,
     official_url:own&&!row.is_reference_photo?carrierUrl(row.carrier,row.tracking_number):null,integration:CARRIERS[row.carrier]?.mode??'reference_photo',
-    has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&(!own||photo_urls.length<paths.length),
+    managed_photos,has_photo:paths.length>0,photo_url:photo_urls[0]??null,photo_urls,photo_count:paths.length,photo_restricted:paths.length>0&&(!own||photo_urls.length<paths.length),
     group_key:deliveryGroup(row,s),link_scope:row.link_scope??(s?'cargo':'standalone'),statement,
     reference_type:row.reference_type??null,reference_number:row.reference_number??null,
     shipment_id:own?row.shipment_id:null,
@@ -95,27 +98,28 @@ Deno.serve(async req=>{
    const now=new Date(),cutoff=new Date(now.getTime()-300000).toISOString();
    if(row.checked_at&&row.checked_at>cutoff)return row;
    const claimed=dbResult(await db.from('domestic_parcels').update({checked_at:now.toISOString()}).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).or(`checked_at.is.null,checked_at.lt.${cutoff}`).select().maybeSingle());
-   if(!claimed)return dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
+   if(!claimed)return dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).maybeSingle());
    let update:any;
    try{
     const result=await fetchTracking(row.carrier,row.tracking_number);
     // Re-read to preserve a staff entry made while the carrier request was in flight.
-    const latest=dbResult(await db.from('domestic_parcels').select('events,updated_at').eq('id',row.id).single());
+    const latest=dbResult(await db.from('domestic_parcels').select('events,updated_at').eq('id',row.id).maybeSingle());
+    if(!latest)return null;
     const events=mergeEvents(latest.events,result.events);
     update={events,status:result.status==='returned'?'returned':events[0]?.status??result.status,updated_at:new Date().toISOString(),origin:result.origin,destination:result.destination,sync_state:'synced',sync_error:null,synced_at:now.toISOString()};
     const saved=dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).eq('updated_at',latest.updated_at).select().maybeSingle());
-    return saved??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
+    return saved??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).maybeSingle());
    }catch(e){
     const code=String((e as Error).message);const known=['CONNECTION_REQUIRED','PLANNED','VERIFICATION_REQUIRED','AUTH_REQUIRED','NOT_FOUND','NO_EVENTS','ANS_ORIGINAL_NUMBER_REQUIRED','RATE_LIMITED','CARRIER_FORMAT_CHANGED'];
     update={sync_state:code==='PLANNED'?'planned':code==='VERIFICATION_REQUIRED'?'verification_required':'error',sync_error:known.includes(code)?code:'CARRIER_UNAVAILABLE'};
    }
-   return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).select().maybeSingle())??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).single());
+   return dbResult(await db.from('domestic_parcels').update(update).eq('id',row.id).eq('carrier',row.carrier).eq('tracking_number',row.tracking_number).select().maybeSingle())??dbResult(await db.from('domestic_parcels').select('*').eq('id',row.id).maybeSingle());
   }
   async function refreshRows(rows:any[]){
    const cutoff=new Date(Date.now()-300000).toISOString();
    const pending=rows.filter(r=>!r.is_reference_photo&&(!r.checked_at||r.checked_at<cutoff)).sort((a,b)=>String(a.checked_at??'').localeCompare(String(b.checked_at??''))).slice(0,20);
-   const refreshed=new Map((await mapLimited(pending,async(r:any)=>await sync(r),4)).map((r:any)=>[r.id,r]));
-   return rows.map(r=>refreshed.get(r.id)??r);
+   const refreshed=new Map(await mapLimited(pending,async(r:any)=>[r.id,await sync(r)],4));
+   return rows.map(r=>refreshed.has(r.id)?refreshed.get(r.id):r).filter(Boolean);
   }
   async function present(rows:any[]){return await mapLimited(await refreshRows(rows),async(r:any)=>await serialize(r));}
   async function uploadPhotos(body:any,existing:string[]=[],folder=crypto.randomUUID()){
@@ -184,7 +188,9 @@ Deno.serve(async req=>{
    const page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
    must(!b.grouped||rows.length<=1000,'NARROW_SEARCH');
    const parcels=await present(b.grouped?rows:rows.slice(page*20,page*20+20));
-   return json(200,{parcels,has_more:!b.grouped&&rows.length>(page+1)*20,cargo_count:found.length,statement:[...refs.values()][0]??null});
+   const statement=[...refs.values()][0]??null;
+   const link_context=operator&&statement?{link_scope:'statement',statement,receiver_name:found[0].consignee_name??'',receiver_phone:found[0].consignee_phone??'',delivery_kind:'province',service_kind:'domestic'}:null;
+   return json(200,{parcels,has_more:!b.grouped&&rows.length>(page+1)*20,cargo_count:found.length,statement,link_context});
   }
   if(b.action==='reference_lookup'){
    const ref=referenceInput(b),page=Math.max(0,Math.min(10000,Math.floor(Number(b.page)||0)));
@@ -225,6 +231,16 @@ Deno.serve(async req=>{
    return json(200,{cargo:[...found.values()].sort((a,b)=>b.id-a.id).slice(0,30)});
   }
   must(operator,'FORBIDDEN',403);
+  if(['delete','remove_photo'].includes(b.action)){
+   must(b.confirmed===true,'REVIEW_REQUIRED');
+   const targets=b.action==='delete'?[{id:b.id,updated_at:b.updated_at}]:b.parcels;
+   must(Array.isArray(targets)&&targets.length>0&&targets.length<=1000&&targets.every((r:any)=>uuid(r.id)&&typeof r.updated_at==='string'&&!Number.isNaN(Date.parse(r.updated_at)))&&new Set(targets.map((r:any)=>r.id)).size===targets.length,'INVALID_REQUEST');
+   const photo=b.action==='remove_photo'?text(b.photo_path,1024):null;
+   if(b.action==='remove_photo')must(photo,'PHOTO_NOT_FOUND');
+   const result=await db.rpc('manage_domestic_parcels',{p_owner:user.id,p_action:b.action,p_parcels:targets,p_photo_path:photo});
+   if(result.error){const code=result.error.message;throw new ApiError(code==='FORBIDDEN'?403:code==='NOT_FOUND'?404:code==='RECORD_CHANGED'?409:400,['FORBIDDEN','NOT_FOUND','RECORD_CHANGED','PHOTO_NOT_FOUND','INVALID_REQUEST'].includes(code)?code:'DATABASE_ERROR');}
+   return json(200,{deleted_ids:result.data.deleted_ids,parcels:await mapLimited(result.data.parcels,async(r:any)=>await serialize(r))});
+  }
   if(b.action==='save_batch'){
    must(Array.isArray(b.waybills)&&b.waybills.length>=1&&b.waybills.length<=50,'INVALID_BATCH');
    const entries=b.waybills.map((w:any)=>{must(w&&CARRIERS[w.carrier],'INVALID_CARRIER');return {carrier:w.carrier,tracking_number:trackingNumber(w.tracking_number)};});
@@ -237,11 +253,15 @@ Deno.serve(async req=>{
    return json(200,{parcels:await present(result.data),saved_count:result.data.length});
   }
   if(b.action==='save'){
-   const id=b.id||crypto.randomUUID();must(uuid(id),'INVALID_ID');must(CARRIERS[b.carrier],'INVALID_CARRIER');
-   const number=trackingNumber(b.tracking_number),old=b.id?dbResult(await db.from('domestic_parcels').select('*').eq('id',id).maybeSingle()):null;
+   const id=b.id||crypto.randomUUID();must(uuid(id),'INVALID_ID');
+   const old=b.id?dbResult(await db.from('domestic_parcels').select('*').eq('id',id).maybeSingle()):null;
    if(b.id){must(old,'NOT_FOUND',404);must(canManageParcel(profile,old),'FORBIDDEN',403);must(b.updated_at===old.updated_at,'RECORD_CHANGED',409);}
-   const value:any={...(await linkValues(b,old)),id,carrier:b.carrier,tracking_number:number};
-   if(old&&(old.carrier!==b.carrier||old.tracking_number!==number)){
+   const reference=old?.is_reference_photo===true;
+   if(!reference)must(CARRIERS[b.carrier],'INVALID_CARRIER');
+   const number=reference?null:trackingNumber(b.tracking_number);
+   const value:any={...(await linkValues(b,old)),id,carrier:reference?null:b.carrier,tracking_number:number};
+   if(reference)must(value.link_scope!=='standalone','INVALID_LINK_SCOPE');
+   if(old&&!reference&&(old.carrier!==b.carrier||old.tracking_number!==number)){
     const events=(old.events??[]).filter((e:any)=>e.source==='staff');
     Object.assign(value,{events,status:events[0]?.status??'registered',origin:'',destination:'',checked_at:null,synced_at:null,sync_state:'never',sync_error:null});
    }
@@ -255,7 +275,7 @@ Deno.serve(async req=>{
    must(uuid(b.id),'INVALID_ID');must(STATUSES.includes(b.status),'INVALID_STATUS');
    const at=laoTimestamp(b.occurred_at);must(at&&new Date(at).getTime()<=Date.now()+300000,'INVALID_DATE');
    const description=text(b.description,1200),location=text(b.location,240);must(description,'DESCRIPTION_REQUIRED');
-   const old=dbResult(await db.from('domestic_parcels').select('*').eq('id',b.id).maybeSingle());must(old,'NOT_FOUND',404);must(canManageParcel(profile,old),'FORBIDDEN',403);must(old.updated_at===b.updated_at,'RECORD_CHANGED',409);
+   const old=dbResult(await db.from('domestic_parcels').select('*').eq('id',b.id).maybeSingle());must(old,'NOT_FOUND',404);must(!old.is_reference_photo,'INVALID_ACTION');must(canManageParcel(profile,old),'FORBIDDEN',403);must(old.updated_at===b.updated_at,'RECORD_CHANGED',409);
    const event={key:'manual:'+crypto.randomUUID(),occurred_at:at,location,description,status:b.status,source:'staff'};
    const events=mergeEvents(old.events,[event]);const result=dbResult(await db.from('domestic_parcels').update({events,status:events[0].status,updated_at:new Date().toISOString(),updated_by:user.id}).eq('id',b.id).eq('updated_at',old.updated_at).select().maybeSingle());must(result,'RECORD_CHANGED',409);
    return json(200,{parcel:await serialize(result,true)});

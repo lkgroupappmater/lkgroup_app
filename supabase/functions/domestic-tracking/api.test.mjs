@@ -13,7 +13,7 @@ const cargo=(n,extra={})=>({id:n,...ref,invoice_number:'SUPPLIER-1',box_number:`
 const parcel=(n,extra={})=>({id:id(n),carrier:'ANS',tracking_number:`TEST0000${n}`,link_scope:'cargo',shipment_id:1,delivery_kind:'province',service_kind:'domestic',events:[],photo_path:'photo.jpg',status:'registered',created_by:'user',updated_at:'2026-09-17T00:00:00Z',created_at:`2026-09-17T00:00:${String(n%60).padStart(2,'0')}Z`,checked_at:new Date(Date.now()+600000).toISOString(),...extra});
 const direct=(n,extra={})=>parcel(n,{shipment_id:null,link_scope:'statement',link_route:ref.route,link_year:2026,link_voyage:'08',link_receipt_number:'LKS 03',...extra});
 function setup({role='member',active=true,authenticated=true,rate=true,shipments=[],parcels=[],uploadFailure=0,fetchTracking=async()=>({events:[],status:'accepted',origin:'',destination:''})}={}){
- let handler,mutations=0,signed=0;const uploaded=[],removed=[];const data={shipments:structuredClone(shipments),domestic_parcels:structuredClone(parcels)};
+ let handler,mutations=0,signed=0;const uploaded=[],removed=[];const data={domestic_parcel_removals:[],shipments:structuredClone(shipments),domestic_parcels:structuredClone(parcels)};
  const profile={id:'user',role,approval_status:active?'approved':'pending',deletion_status:null,name:'User',phone:'2099999999'};
  const activeCargo=r=>!r.deleted_at&&!r.deletion_requested_at;
  const same=(a,b)=>links.receiptKey(a)===links.receiptKey(b);
@@ -36,6 +36,7 @@ function setup({role='member',active=true,authenticated=true,rate=true,shipments
   storage:{from:()=>({async createSignedUrl(path){signed++;return {data:{signedUrl:'https://signed.test/'+path}}},async upload(path){if(uploadFailure===uploaded.length+1)return {error:{code:'upload'}};uploaded.push(path);return {data:{}}},async remove(paths){removed.push(...paths);return {data:{}}}})},
   from(table){return table==='profiles'?query(table,[profile]):query(table)},
   rpc(name,args){
+   if(name==='manage_domestic_parcels')return Promise.resolve({data:{deleted_ids:args.p_parcels.map(r=>r.id),parcels:[]}});
    if(name==='consume_domestic_tracking_limit')return Promise.resolve({data:rate});
    if(name==='domestic_parcel_group_page'){
     const groups=new Map();for(const r of data.domestic_parcels){const key=links.deliveryGroup(r,data.shipments.find(s=>s.id===r.shipment_id));if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
@@ -201,4 +202,34 @@ test('reference photos appear under the statement without carrier requests and r
  const api=setup({shipments:[cargo(1)],parcels:[photo],fetchTracking:async()=>{carrierRequests++;throw Error('must not run');}});
  const r=await api.call({action:'statement_lookup',...ref});assert.equal(r.status,200);assert.equal(r.body.parcels.length,1);assert.equal(r.body.parcels[0].is_reference_photo,true);assert.equal(r.body.parcels[0].photo_urls.length,1);assert.equal(r.body.parcels[0].official_url,null);assert.equal(carrierRequests,0);
  const other=setup({shipments:[cargo(1,{customer_id:'other'})],parcels:[photo]});const hidden=await other.call({action:'statement_lookup',...ref});assert.equal(hidden.body.parcels.length,0);assert.equal(other.signed,0);
+});
+test('lookup supplies canonical registration context only to operators, even with no linked waybill',async()=>{
+ for(const role of ['admin','partner','member']){
+  const r=await setup({role,shipments:[cargo(1)]}).call({action:'statement_lookup',statement_number:'lks03'});
+  assert.equal(r.status,200);assert.equal(r.body.parcels.length,0);
+  if(role==='member')assert.equal(r.body.link_context,null);
+  else {assert.deepEqual(r.body.link_context.statement,ref);assert.equal(r.body.link_context.receiver_name,'Customer');}
+ }
+});
+test('reference-only registration metadata can be edited without inventing a tracking number',async()=>{
+ const row=direct(1,{is_reference_photo:true,carrier:null,tracking_number:null,photo_paths:['box.jpg'],photo_path:'box.jpg'});
+ const api=setup({role:'admin',shipments:[cargo(1)],parcels:[row]});
+ const r=await api.call({...saveBody,id:row.id,updated_at:row.updated_at,carrier:'',tracking_number:'',delivery_kind:'city'});
+ assert.equal(r.status,200);assert.equal(r.body.parcel.carrier,null);assert.equal(r.body.parcel.tracking_number,null);assert.equal(r.body.parcel.delivery_kind,'city');assert.equal(r.body.parcel.photo_count,1);
+});
+test('deleted cross-recipient links still protect shared image privacy',async()=>{
+ const path='intake/owner/mixed.jpg';const other=parcel(2,{shipment_id:2});
+ const api=setup({shipments:[cargo(1),cargo(2,{customer_id:'other'})],parcels:[parcel(1,{photo_paths:[path],photo_path:path})]});
+ api.data.domestic_parcel_removals.push({id:'archive',photo_paths:[path],snapshot:other});
+ const r=await api.call({action:'lookup',carrier:'ANS',tracking_number:'TEST00001'});
+ assert.equal(r.status,200);assert.equal(r.body.parcels[0].photo_urls.length,0);assert.equal(api.signed,0);assert.deepEqual(r.body.parcels[0].managed_photos,[]);
+});
+test('deletion requires operator, confirmation and valid concurrency fields before invoking the transaction',async()=>{
+ const body={action:'delete',id:id(1),updated_at:'2026-09-28T00:00:00Z',confirmed:true};
+ assert.equal((await setup().call(body)).status,403);
+ const api=setup({role:'admin'});
+ assert.equal((await api.call({...body,confirmed:false})).body.error,'REVIEW_REQUIRED');
+ assert.equal((await api.call({...body,updated_at:null})).body.error,'INVALID_REQUEST');
+ assert.equal((await api.call({...body,action:'remove_photo',parcels:[body],photo_path:''})).body.error,'PHOTO_NOT_FOUND');
+ const r=await api.call(body);assert.equal(r.status,200);assert.deepEqual(r.body.deleted_ids,[id(1)]);assert.equal(api.removed.length,0);
 });

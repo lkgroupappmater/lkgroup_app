@@ -194,6 +194,51 @@ void main() {
     expect(find.text('선택할 운송 데이터가 없습니다. 번호만으로 조회할 수 있습니다.'), findsOneWidget);
     expect(calls, 2); expect(tester.takeException(), isNull);
   });
+  testWidgets('an unlinked searched statement carries its canonical details into registration', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2600); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final calls=<String>[];
+    await tester.pumpWidget(MaterialApp(home:DomesticTrackingScreen(language:AppLanguage.korean,
+      user:const AppUser(id:'test',role:UserRole.admin),loadFilterBatches:()async=>const [ShipmentBatchOption(route:'sea',year:2026,voyage:'08')],
+      callApi:(action,body)async{calls.add(action);return {'parcels':[],'cargo_count':2,'link_context':{'link_scope':'statement','statement':statement,'receiver_name':'Matched customer','receiver_phone':'02012345678','delivery_kind':'province','service_kind':'domestic'}};})));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first,'LKS03');
+    await tester.tap(find.text(domesticText(AppLanguage.korean,'search')));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('domestic-new')));await tester.pumpAndSettle();
+    expect(find.text('LKS 03'),findsWidgets);expect(find.text('Matched customer'),findsOneWidget);
+    expect(find.text('02012345678'),findsOneWidget);expect(find.textContaining('연결할 명세서 확인 완료'),findsOneWidget);
+    expect(calls,['statement_lookup']);expect(tester.takeException(),isNull);
+  });
+  testWidgets('registered reference-only rows expose editing and confirmed deletion', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2600); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    var deleted=false; final writes=<Map<String,dynamic>>[];
+    final row=<String,dynamic>{'id':'ref-photo','is_reference_photo':true,'can_manage':true,'updated_at':'version','group_key':'group','photo_urls':[],'statement':statement};
+    await tester.pumpWidget(MaterialApp(home:DomesticTrackingScreen(language:AppLanguage.korean,
+      user:const AppUser(id:'test',role:UserRole.admin),manage:true,loadFilterBatches:()async=>[],callApi:(action,body)async{
+        if(action=='delete'){writes.add(body);deleted=true;return {'deleted_ids':['ref-photo'],'parcels':[]};}
+        return {'parcels':deleted?[]:[row]};
+      })));
+    await tester.pumpAndSettle();expect(find.byKey(const ValueKey('domestic-edit-ref-photo')),findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('domestic-delete-ref-photo')));await tester.pumpAndSettle();expect(writes,isEmpty);
+    await tester.tap(find.text(domesticText(AppLanguage.korean,'cancel')));await tester.pumpAndSettle();expect(writes,isEmpty);
+    await tester.tap(find.byKey(const ValueKey('domestic-delete-ref-photo')));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('domestic-delete-confirm')));await tester.pumpAndSettle();
+    expect(writes.single,{'confirmed':true,'id':'ref-photo','updated_at':'version'});
+    expect(find.byKey(const ValueKey('domestic-delete-ref-photo')),findsNothing);expect(tester.takeException(),isNull);
+  });
+  testWidgets('reference-only editor saves metadata with no tracking field', (tester) async {
+    tester.view.physicalSize=const Size(1000,2600);tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
+    final calls=<Map<String,dynamic>>[];
+    await tester.pumpWidget(MaterialApp(home:DomesticWaybillEditor(language:AppLanguage.korean,
+      row:{'id':'photo','is_reference_photo':true,'link_scope':'statement','statement':statement,'delivery_kind':'province','service_kind':'domestic','updated_at':'v'},
+      loadFilterBatches:()async=>const [ShipmentBatchOption(route:'sea',year:2026,voyage:'08')],
+      callApi:(action,body)async{calls.add({'action':action,...body});return {'parcel':{}};})));
+    await tester.pumpAndSettle();expect(find.byKey(const Key('delivery-tracking-number')),findsNothing);
+    await tester.tap(find.byKey(const Key('delivery-save')));await tester.pumpAndSettle();
+    expect(calls.single['action'],'save');expect(calls.single['statement'],statement);expect(tester.takeException(),isNull);
+  });
   test('carrier detection is conservative and leaves numeric ANS candidates for confirmation', () {
     expect(DomesticTrackingService.detectCarrier('vte12345678901'), 'HAL');
     expect(DomesticTrackingService.detectCarrier('JTLA123456789012'), 'JT');
