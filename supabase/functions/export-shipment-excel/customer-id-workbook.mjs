@@ -1,7 +1,8 @@
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
-export const ID_WORKBOOK_VERSION='2026-09-28.offline-all-templates-v3';
+import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
+export const ID_WORKBOOK_VERSION='2026-09-28.validated-base-sync-v4';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -209,7 +210,14 @@ function refreshPolicyInputs(files,context,strings){
  files[path]=bytes(text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n)))));
 }
 
-export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false}={}){
+export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false,preserveSharedMasters=true}={}){
+ if(preserveSharedMasters)recoverDeliverySelectorMasters(files,sheetPath);
+ const sharedMasters=preserveSharedMasters?captureSharedFormulaMasters(files):null;
+ const result=applyCustomerIdWorkbookContent(files,context,{prefix,shipments,base});
+ if(sharedMasters)restoreSharedFormulaMasters(files,sharedMasters);
+ return result;
+}
+function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[],base=false}={}){
  const strings=sharedStrings(files),cargoPath=sheetPath(files,'물품 입고 내역'),deliveryRefs=new Map(),deliveryRefFormulas=new Map();
  refreshPolicyInputs(files,context,strings);
  // Refresh only editable delivery input columns, keeping existing calculation,

@@ -1,4 +1,5 @@
 import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
+import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters,validateWorkbookFormulas} from './workbook-integrity.mjs';
 import { receiptOrderFormulas, fixedDiscountFormulas } from './receipt-order.mjs';
 import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
@@ -2035,10 +2036,15 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: authData, error: authError } = await admin.auth.getUser(jwt);
+  const workerRequest=jwt===serviceRoleKey;
+  const { data: authData, error: authError } = workerRequest
+    ? {data:{user:{id:null}},error:null}
+    : await admin.auth.getUser(jwt);
   if (authError || !authData.user) return json(401, { error: '로그인 정보를 확인할 수 없습니다.' });
 
-  const { data: profile, error: profileError } = await admin
+  const { data: profile, error: profileError } = workerRequest
+    ? {data:{role:'admin'},error:null}
+    : await admin
     .from('profiles')
     .select('role')
     .eq('id', authData.user.id)
@@ -2050,11 +2056,20 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    const exporterRevision=Deno.env.get('DENO_DEPLOYMENT_ID')||ID_WORKBOOK_VERSION;
+    if(workerRequest&&body.action==='automation_version')return json(200,{exporter_revision:exporterRevision,automation_version:ID_WORKBOOK_VERSION});
     const routeKey = String(body.route_key ?? '').trim();
     const requestedRouteLabel = String(body.route_label ?? '').trim();
     const shipmentYear = Number(body.shipment_year);
     const voyage = String(body.voyage ?? '').trim();
     const isBaseRefresh = body.refresh_base === true && voyage === '00';
+    if(workerRequest&&!isBaseRefresh)return json(403,{error:'The BASE worker cannot export or modify a voyage.'});
+    if(isBaseRefresh&&profile.role!=='admin')return json(403,{error:'BASE 최신화는 관리자 권한이 필요합니다.'});
+    let baseRevision:number|null=null;
+    if(isBaseRefresh){
+      const {data:sync,error:syncError}=await admin.from('excel_base_sync_state').select('revision').eq('route_key',routeKey).single();
+      if(syncError)throw syncError;baseRevision=sync.revision;
+    }
 
     const { data: routeDefinition, error: routeDefinitionError } = await admin
       .from('route_definitions')
@@ -2082,7 +2097,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       .select('route_key,route_label,file_name,storage_path,prefer_for_export,policy_summary,updated_at')
       .eq('route_key', routeKey).eq('active', true).maybeSingle();
     if (baseTemplateError) throw baseTemplateError;
-    const useBase = baseTemplate && (!voyageTemplate || baseTemplate.prefer_for_export);
+    const useBase = baseTemplate && (isBaseRefresh || !voyageTemplate || baseTemplate.prefer_for_export);
     const template = useBase ? {...baseTemplate,shipment_year:shipmentYear,voyage} : voyageTemplate;
     const templateSource = useBase ? 'base' : 'voyage';
     if (!template) return json(404,{error:'해당 운송 경로의 기본 Excel 폼과 항차별 변경 폼이 모두 없습니다.'});
@@ -2150,7 +2165,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       auth:{persistSession:false,autoRefreshToken:false},
     });
     const [rates,shares]=await Promise.all([
-      policyReader.from('customer_rate_overrides').select('*').in('route_key',[routeKey,'all']),
+      workerRequest?admin.rpc('lk_excel_discount_context',{p_route_key:routeKey}):policyReader.from('customer_rate_overrides').select('*').in('route_key',[routeKey,'all']),
       admin.from('customer_statement_share_rules').select('*').eq('route_key',routeKey),
     ]);
     if(rates.error)throw rates.error;if(shares.error)throw shares.error;
@@ -2307,6 +2322,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     });
     console.log('[EXCEL200C] unzip done');
 
+    recoverDeliverySelectorMasters(files,workbookSheetPath);
+    const originalSharedMasters=captureSharedFormulaMasters(files);
+
     const targetPath = workbookSheetPath(files, '물품 입고 내역');
     const strings = sharedStrings(files);
 
@@ -2405,7 +2423,11 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       settlementForExcel as Record<string, unknown> | null,
     );
     }
-    applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh});
+    if(isBaseRefresh&&exchangeRate)updateExchangeRates(files,{
+      baseKip:Number(exchangeRate.base_kip??0),baseThb:Number(exchangeRate.base_thb??0),baseKrw:Number(exchangeRate.base_krw??0),
+      kipAdjustment:Number(exchangeRate.kip_adjustment??2000),thbAdjustment:Number(exchangeRate.thb_adjustment??1.5),krwAdjustment:Number(exchangeRate.krw_adjustment??40),
+    });
+    applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false});
     // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
 // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
     // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
@@ -2448,6 +2470,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
 
     // Native DEFLATE retains normal XLSM size without spending Edge CPU on a
     // JavaScript compressor. VBA and all other parts remain byte-identical.
+    restoreSharedFormulaMasters(files,originalSharedMasters);
+    const integrity=validateWorkbookFormulas(files);
     console.log('[EXCEL200C] zip start');
     const encoded = await zipWorkbook(files, { Zip, ZipPassThrough });
     console.log('[EXCEL200C] zip done', encoded.byteLength);
@@ -2474,14 +2498,19 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
         contentType: outputExtension === 'xlsm' ? 'application/vnd.ms-excel.sheet.macroEnabled.12' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       if (stored.error) throw stored.error;
-      const priorPolicy = baseTemplate.policy_summary ?? {};
-      const {data: updatedBase, error: baseUpdateError} = await admin.from('shipment_excel_base_templates').update({
-        storage_path: basePath, file_name: outputFileName, source_sha256: null,
-        policy_summary: {...priorPolicy, automation_version: ID_WORKBOOK_VERSION,
-          previous_storage_path: baseTemplate.storage_path,
-          source_history: [baseTemplate.storage_path, ...(priorPolicy.source_history ?? [])].slice(0, 20)},
-        updated_by: authData.user.id, updated_at: new Date().toISOString(),
-      }).eq('route_key', routeKey).eq('storage_path', baseTemplate.storage_path).eq('updated_at', baseTemplate.updated_at).select('route_key').maybeSingle();
+      // Verify the bytes actually stored, before publishing this path as BASE.
+      const downloaded=await admin.storage.from('shipment-excel-templates').download(basePath);
+      const hash=async(data:Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data))).map(v=>v.toString(16).padStart(2,'0')).join('');
+      if(downloaded.error||!downloaded.data||await hash(new Uint8Array(await downloaded.data.arrayBuffer()))!==await hash(encoded)){
+        await admin.storage.from('shipment-excel-templates').remove([basePath]);
+        throw new Error('BASE 저장 후 다운로드 무결성 검증에 실패했습니다. 이전 원본을 유지합니다.');
+      }
+      const {data: updatedBase, error: baseUpdateError} = await admin.rpc('lk_commit_validated_excel_base',{
+        p_route_key:routeKey,p_revision:baseRevision,p_exporter_revision:exporterRevision,
+        p_old_path:baseTemplate.storage_path,p_old_updated_at:baseTemplate.updated_at,
+        p_path:basePath,p_file_name:outputFileName,p_version:ID_WORKBOOK_VERSION,
+        p_integrity:{...integrity,stored_download_verified:true},p_actor:authData.user.id,
+      });
       if (baseUpdateError || !updatedBase) {
         await admin.storage.from('shipment-excel-templates').remove([basePath]);
         throw baseUpdateError ?? new Error('BASE가 다른 작업에서 변경되었습니다. 최신 목록에서 다시 다운로드하세요.');
@@ -2492,6 +2521,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       ok: true,
       file_name: outputFileName,
       automation_version: ID_WORKBOOK_VERSION,
+      integrity,
       storage_path: exportPath,
       shipment_count: shipments?.length ?? 0,
       mode: 'archive-preserving-cargo-list-v2',
