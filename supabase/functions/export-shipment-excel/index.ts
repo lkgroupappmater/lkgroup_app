@@ -1,5 +1,6 @@
 import { applyUnknownPrefixZones } from './unknown-zone.mjs';
 import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
+import { canReuseValidatedBase } from './validated-base.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters,validateWorkbookFormulas} from './workbook-integrity.mjs';
 import { receiptOrderFormulas, fixedDiscountFormulas } from './receipt-order.mjs';
 import { formatStatementAmounts } from './statement-amount-format.mjs';
@@ -2072,10 +2073,10 @@ Deno.serve(async (req) => {
     const isBaseRefresh = body.refresh_base === true && voyage === '00';
     if(workerRequest&&!isBaseRefresh)return json(403,{error:'The BASE worker cannot export or modify a voyage.'});
     if(isBaseRefresh&&profile.role!=='admin')return json(403,{error:'BASE 최신화는 관리자 권한이 필요합니다.'});
-    let baseRevision:number|null=null;
+    let baseRevision:number|null=null, baseSync:any=null;
     if(isBaseRefresh){
-      const {data:sync,error:syncError}=await admin.from('excel_base_sync_state').select('revision').eq('route_key',routeKey).single();
-      if(syncError)throw syncError;baseRevision=sync.revision;
+      const {data:sync,error:syncError}=await admin.from('excel_base_sync_state').select('revision,completed_revision,status').eq('route_key',routeKey).single();
+      if(syncError)throw syncError;baseRevision=sync.revision;baseSync=sync;
     }
 
     const { data: routeDefinition, error: routeDefinitionError } = await admin
@@ -2104,6 +2105,18 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       .select('route_key,route_label,file_name,storage_path,prefer_for_export,policy_summary,updated_at')
       .eq('route_key', routeKey).eq('active', true).maybeSingle();
     if (baseTemplateError) throw baseTemplateError;
+    if(isBaseRefresh&&!workerRequest&&canReuseValidatedBase(baseTemplate,baseSync,ID_WORKBOOK_VERSION)){
+      const {data:blob,error:downloadError}=await admin.storage.from('shipment-excel-templates').download(baseTemplate.storage_path);
+      if(downloadError||!blob)throw downloadError??new Error('검증된 BASE 다운로드 실패');
+      const {data:latest,error:latestError}=await admin.from('excel_base_sync_state').select('revision,completed_revision,status').eq('route_key',routeKey).single();
+      if(latestError)throw latestError;
+      if(canReuseValidatedBase(baseTemplate,latest,ID_WORKBOOK_VERSION)){
+        const exportPath=`${routeKey}/${shipmentYear}/00/${crypto.randomUUID()}_${baseTemplate.file_name}`;
+        const {error:copyError}=await admin.storage.from('shipment-excel-exports').upload(exportPath,new Uint8Array(await blob.arrayBuffer()),{upsert:false,contentType:baseTemplate.file_name.endsWith('.xlsm')?'application/vnd.ms-excel.sheet.macroEnabled.12':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        if(copyError)throw copyError;
+        return json(200,{ok:true,file_name:baseTemplate.file_name,automation_version:ID_WORKBOOK_VERSION,integrity:baseTemplate.policy_summary.integrity,storage_path:exportPath,shipment_count:0,mode:'validated-current-base',template_source:'base'});
+      }
+    }
     const useBase = baseTemplate && (isBaseRefresh || !voyageTemplate || baseTemplate.prefer_for_export);
     const template = useBase ? {...baseTemplate,shipment_year:shipmentYear,voyage} : voyageTemplate;
     const templateSource = useBase ? 'base' : 'voyage';

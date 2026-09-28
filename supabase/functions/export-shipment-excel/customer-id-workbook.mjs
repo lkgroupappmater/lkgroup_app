@@ -3,7 +3,7 @@
 // shared with the authored spreadsheet prototype and the online exporter.
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-09-28.zone-discount-sync-v5';
+export const ID_WORKBOOK_VERSION='2026-09-28.zone-discount-sync-v6';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -109,6 +109,7 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  for(const row of controls.slice(5)){
   const group=shipments.filter(x=>legacy?String(x.receipt_number||'')===row[3]:identityKey(x.customer_no,specialName(x.consignee_name))===row[0]);
   const order=recoveredOrder(group);row[13]=Number.isFinite(order)?order:'';
+  row[10]=JSON.stringify({...JSON.parse(row[10]),recovered_order:row[13]||null});
  }
  if(legacy){
   controls[4][14]='확인 정렬 Key';

@@ -504,17 +504,25 @@ class ExcelImportService {
     if (!SupabaseConfig.isConfigured || AuthService.instance.currentUser?.role != UserRole.admin) return;
     String cell(List<String> row, int column) => column < row.length ? row[column].trim() : '';
     final controls = <Map<String, dynamic>>[];
+    final confirmationOrders = <Map<String, dynamic>>[];
     for (final row in workbook['명세서 번호 관리'] ?? <List<String>>[]) {
       if (!RegExp(r'^(ID\|\d+\|[01]|UNKNOWN|LEGACY\|.+)$').hasMatch(cell(row, 0)) || cell(row, 10).isEmpty) continue;
       final baseline = jsonDecode(cell(row, 10)) as Map<String, dynamic>;
       final manual = cell(row, 4);
       final locked = cell(row, 5) == '잠금';
       final fixed = cell(row, 6);
+      final confirmationOrder = cell(row, 13);
+      if (confirmationOrder.isNotEmpty && int.tryParse(confirmationOrder) != (baseline['recovered_order'] ?? 0)) {
+        final order = int.tryParse(confirmationOrder);
+        if (order == null || order < 1 || order > 999999999) throw const FormatException('확인 순서는 양의 정수로 입력하세요.');
+        confirmationOrders.add({'key': cell(row, 0), 'order': order, 'baseline_order': baseline['recovered_order']});
+      }
       if (manual != '${baseline['manual'] ?? ''}' || locked != (baseline['locked'] == true) || fixed != '${baseline['fixed'] ?? ''}') {
         controls.add({'key': cell(row, 0), 'manual': manual, 'locked': locked, 'fixed': fixed, 'baseline': baseline});
       }
     }
     if (controls.isNotEmpty && voyage != '00') await SupabaseService.client.rpc('admin_import_excel_statement_controls', params: {'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_controls': controls});
+    if (confirmationOrders.isNotEmpty && voyage != '00') await SupabaseService.client.rpc('admin_import_recipient_confirmation_order', params: {'p_route': routeLabel, 'p_year': year, 'p_voyage': voyage, 'p_items': confirmationOrders});
     final sheet = workbook['배송 매칭 확인'] ?? <List<String>>[];
     final profiles = {for (final row in sheet) if (int.tryParse(cell(row, 9)) != null) int.parse(cell(row, 9)): row};
     for (final row in sheet) {
