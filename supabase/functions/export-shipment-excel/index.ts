@@ -209,7 +209,11 @@ function updateCellPreservingFormula(
   const cellRe = new RegExp(
     `<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`,
   );
-  const existing = rowXml.match(cellRe);
+  // Cargo callbacks already supply one cell. Reuse a fixed expression there
+  // instead of compiling a different RegExp for every cell address.
+  const existing = rowXml.startsWith('<c ')
+    ? rowXml.match(/^<c\b([^>]*)r="[A-Z]+\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)$/)
+    : rowXml.match(cellRe);
 
   // 원본 Excel의 수식 셀은 절대 지우거나 값 셀로 바꾸지 않습니다.
   if (existing) {
@@ -348,7 +352,9 @@ function updateCell(
   const cellRe = new RegExp(
     `<c\\b([^>]*)r="${ref}"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)`,
   );
-  const existing = rowXml.match(cellRe);
+  const existing = rowXml.startsWith('<c ')
+    ? rowXml.match(/^<c\b([^>]*)r="[A-Z]+\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)$/)
+    : rowXml.match(cellRe);
   const attrs = existing
     ? `${existing[1] ?? ''}${existing[2] ?? ''}`
     : '';
@@ -367,7 +373,7 @@ function updateCell(
     replacement = inlineCell(ref, style, value);
   }
 
-  if (existing) return rowXml.replace(cellRe, () => replacement);
+  if (existing) return rowXml.replace(existing[0], () => replacement);
 
   // OOXML에서는 row 안의 <c> 셀이 열 순서대로 있어야 합니다.
   // 기존 템플릿 행이 A/B/O처럼 일부 셀만 가진 경우,

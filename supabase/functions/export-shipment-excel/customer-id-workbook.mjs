@@ -71,11 +71,11 @@ function newSheet(files,name,rows,{widths=[],inputColumns=[],hiddenColumns=[]}={
  return path;
 }
 export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new Map(),deliveryRefFormulas=new Map(),cargoLast=1005,cargo=true}={}){
- const customers=context.customers.filter(c=>!specialName(c.name)&&!/수취인\s*불명/.test(c.name)),byId=new Map(customers.map(c=>[c.id,c]));
+ const customers=context.customers.filter(c=>!specialName(c.name)&&!/수취인\s*불명/.test(c.name)),byId=new Map(customers.map(c=>[c.id,c])),byNumber=new Map(customers.map(c=>[c.customer_no,c]));
  const keys=new Map();const add=(key,name,phone,c)=>{if(c&&!keys.has(key))keys.set(key,[key,name,phone,c.customer_no,customerCode(c.customer_no)]);else if(c&&keys.get(key)?.[3]!==c.customer_no)keys.set(key,[key,name,phone,0,'연결 확인 필요']);};
  for(const c of customers)add(c.name_key+'|p'+c.phone_key,c.name,c.phone,c);
  for(const a of context.aliases??[])add(a.name_key+'|p'+a.phone_key,a.name_key,a.phone_key,byId.get(a.customer_registry_id));
- for(const s of context.sources??shipments)if(s.customer_no){const c=customers.find(c=>c.customer_no===s.customer_no);add(matchKey(s.source_name??s.consignee_name,s.source_phone??s.consignee_phone),s.source_name??s.consignee_name,s.source_phone??s.consignee_phone,c);}
+ for(const s of context.sources??shipments)if(s.customer_no){const c=byNumber.get(s.customer_no);add(matchKey(s.source_name??s.consignee_name,s.source_phone??s.consignee_phone),s.source_name??s.consignee_name,s.source_phone??s.consignee_phone,c);}
  const ids=[['고객 ID 자동 매칭'],['기존 숫자 ID는 유지하며 LK 형식으로 표시합니다.'],['새 고객은 앱·웹 업로드 후 ID 발급 → 최신 자료 Excel 다운로드로 반영합니다.'],['연락처만 같은 고객과 보호된 복수 이름은 자동 통합하지 않습니다.'],['매칭 Key','등록 이름 / 별칭','등록 연락처','고객 번호','고객 고유 ID'],...[...keys.values()].sort((a,b)=>a[3]-b[3]||a[0].localeCompare(b[0]))];
  const legacy=context.numberingMode==='legacy';
  const controls=[['명세서 번호 관리'],['E열: 수동 번호 / F열: 잠금 선택 / G열: 고정할 번호'],['인쇄 전 G열 번호를 확인하고 F열을 잠금으로 선택하세요. 각 행에서 해제할 수 있습니다.'],['새로 입력한 화물은 앱·웹에 업로드하여 고객 ID를 받은 뒤 최신 자료를 내려받으세요.'],['매칭 Key','고객 고유 ID','고객명 / 구분','자동 번호','수동 지정 번호','번호 상태','고정 번호','적용 번호','화물 행 수','확인 사항','저장 당시 상태','승인 대기 번호 유지']];
@@ -106,11 +106,15 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  for(const s of shipments)pairs.set(matchKey(s.consignee_name,s.consignee_phone),{name:s.consignee_name,phone:s.consignee_phone});
  const delivery=[['배송 매칭 확인'],['같은 연락처·한글/영문 이름 차이는 확인 후보입니다. F열에서 배송 프로필 번호를 선택해 확정합니다.'],['후보에 없는 배송지는 앱·웹 배송 목록에서 먼저 수정하세요. 고객 ID는 통합하지 않습니다.'],['확인 결과는 Excel 업로드 후 앱·웹 DB와 함께 반영됩니다.'],['매칭 Key','확정 배송 참조','자동 확인 참조','매칭 상태','확인 후보 (프로필 번호 / 고객명)','확인할 프로필 번호','입고 고객명','입고 연락처','후보 번호 목록','프로필 번호','참조','고객명','수령인','연락처','Type','업체','주소','자료 지문','전체 연락처 비교']];
  const profiles=context.deliveries??[];
+ // Normalize each profile once, retaining the same matching and review rules.
+ const normalizedProfiles=profiles.map(d=>({d,names:[d.customer_name,d.alternate_name,d.company_name].map(nameKey).filter(Boolean),phones:phoneTokens(d.phone_display||d.phone)}));
+ const reviewsByPair=new Map();
+ for(const review of context.reviews??[]){const key=JSON.stringify([review.name_key,review.phone_key]);if(!reviewsByPair.has(key))reviewsByPair.set(key,[]);reviewsByPair.get(key).push(review);}
  const reference=id=>deliveryRefFormulas.has(id)?formula(deliveryRefFormulas.get(id),deliveryRefs.get(id)||''):deliveryRefs.get(id)||'';
  for(const [key,pair] of pairs){
-  const n=nameKey(baseName(pair.name)),phones=phoneTokens(pair.phone),matches=profiles.map(d=>{
-   const names=[d.customer_name,d.alternate_name,d.company_name].map(nameKey).filter(Boolean),exact=names.includes(n),phone=phoneTokens(d.phone_display||d.phone).some(p=>phones.includes(p)),partial=n.length>=2&&names.some(x=>x.length>=2&&(x.includes(n)||n.includes(x)));
-   const review=(context.reviews??[]).find(r=>r.delivery_profile_id===d.id&&r.name_key===nameKey(pair.name)&&r.phone_key===phoneKey(pair.phone)&&r.profile_fingerprint===d.fingerprint);
+  const n=nameKey(baseName(pair.name)),phones=phoneTokens(pair.phone),reviews=reviewsByPair.get(JSON.stringify([nameKey(pair.name),phoneKey(pair.phone)]))??[],matches=normalizedProfiles.map(({d,names,phones:profilePhones})=>{
+   const exact=names.includes(n),phone=profilePhones.some(p=>phones.includes(p)),partial=n.length>=2&&names.some(x=>x.length>=2&&(x.includes(n)||n.includes(x)));
+   const review=reviews.find(r=>r.delivery_profile_id===d.id&&r.profile_fingerprint===d.fingerprint);
    return {d,exact,phone,partial,review};
   }).filter(m=>m.review?.approved!==false&&(m.exact||m.phone||m.partial||m.review?.approved));
   const confirmed=matches.filter(m=>m.review?.approved===true||m.exact&&m.phone).sort((a,b)=>Number(b.review?.approved===true)-Number(a.review?.approved===true)||Number(b.d.delivery_type==='province')-Number(a.d.delivery_type==='province')||Number(b.d.preferred)-Number(a.d.preferred)||Number(b.d.source_row||b.d.source_no||0)-Number(a.d.source_row||a.d.source_no||0)||b.d.id-a.d.id)[0];
