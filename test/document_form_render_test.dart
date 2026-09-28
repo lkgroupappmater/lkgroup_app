@@ -52,9 +52,11 @@ void main() {
   tearDownAll(() { for (final asset in assets) { asset.dispose(); } });
 
   DigitalQuotationPainter quotation(String route, {double discount = 0,
+      String customerName = '', String customerPhone = '',
       AppLanguage language = AppLanguage.korean,
       List<ExtraCostItem> extras = const []}) => DigitalQuotationPainter(
     routeLabel: route, language: language, boxes: const [quoteBox],
+    customerName: customerName, customerPhone: customerPhone,
     result: QuoteFreightResult(route: route, lines: const [quoteLine],
       totalUsd: 15, sourceFile: 'synthetic-print-fixture'),
     rates: rates, extraCosts: extras, discountPercent: discount, issuedAt: date,
@@ -178,6 +180,23 @@ void main() {
     expect(shell.contains('data: laoFont == null ? theme : theme.copyWith('), true);
     expect(shell.contains('showModalBottomSheet<bool>'), true);
     expect(File('lib/screens/dashboard_home_screen.dart').readAsStringSync().contains('DomesticTrackingScreen('), false);
+  });
+
+  test('quotation image and PDF painter prints the requested customer', () async {
+    final empty = quotation('한국->라오스 해상');
+    final named = quotation('한국->라오스 해상',
+      customerName: 'Guest Customer', customerPhone: '+856 20 1234 5678');
+    final before = await render(empty, empty.documentHeight, 'quotation_blank_customer');
+    final after = await render(named, named.documentHeight, 'quotation_requested_customer');
+    expect(named.documentHeight, empty.documentHeight);
+    final right = Rect.fromLTWH(DocumentFormStyle.pagePadding +
+      DocumentFormStyle.contentWidth / 2 + 184,
+      DocumentFormStyle.pagePadding + 124, DocumentFormStyle.contentWidth / 2 - 200, 96);
+    bool dark(int color) => ((color >> 16) & 255) < 100 &&
+      ((color >> 8) & 255) < 100 && (color & 255) < 100;
+    expect(pixelsWhere(after.rgba, right, dark),
+      greaterThan(pixelsWhere(before.rgba, right, dark) + 100));
+    before.image.dispose(); after.image.dispose();
   });
 
   test('delivery tint is drawn for every type and absent on empty estimates', () async {

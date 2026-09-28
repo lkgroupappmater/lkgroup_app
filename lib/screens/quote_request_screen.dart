@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
+import '../models/app_user.dart';
+import '../services/auth_service.dart';
 import '../core/app_colors.dart';
 import '../core/app_language.dart';
 import '../core/route_catalog.dart';
@@ -54,6 +56,23 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   List<Map<String, dynamic>> _specialQuotes = const [];
   bool _loadingQuotes = false;
   bool _movingCargo = false;
+  final _quoteCustomerName = TextEditingController();
+  final _quoteCustomerPhone = TextEditingController();
+  String? _quoteCustomerOwner;
+  bool get _canEditQuoteCustomer => const [UserRole.admin, UserRole.staff]
+      .contains(AuthService.instance.currentUser?.role);
+  String get _quoteNameLabel => widget.language == AppLanguage.korean ? '견적 고객 이름'
+      : widget.language == AppLanguage.lao ? 'ຊື່ລູກຄ້າຂໍລາຄາ' : 'Quote customer name';
+  String get _quotePhoneLabel => widget.language == AppLanguage.korean ? '고객 연락처'
+      : widget.language == AppLanguage.lao ? 'ເບີໂທລູກຄ້າ' : 'Customer contact';
+
+  @override
+  void dispose() {
+    _quoteCustomerName.dispose();
+    _quoteCustomerPhone.dispose();
+    super.dispose();
+  }
+
 
   String _t(String key) => AppStrings.get(widget.language, key);
   String _u(String korean) => UiLocalizations.get(widget.language, korean);
@@ -360,6 +379,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
       builder: (_) => QuotationPreviewDialog(
         language: widget.language,
         routeLabel: _selectedRoute,
+        customerName: _canEditQuoteCustomer ? _quoteCustomerName.text.trim() : '',
+        customerPhone: _canEditQuoteCustomer ? _quoteCustomerPhone.text.trim() : '',
         boxes: previewBoxes,
         result: calculation,
         rates: rates,
@@ -610,12 +631,38 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
 
   @override
   Widget build(BuildContext context) {
+    final owner = AuthService.instance.currentUser?.id;
+    if (_quoteCustomerOwner != owner) {
+      _quoteCustomerOwner = owner;
+      _quoteCustomerName.clear();
+      _quoteCustomerPhone.clear();
+    }
     final allSelected = _boxes.isNotEmpty && _boxes.every((box) => box.selected);
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: ListView(
         padding: const EdgeInsets.all(14),
         children: [
+          if (_canEditQuoteCustomer) ...[
+            TextField(
+              key: const ValueKey('quote-customer-name'),
+              controller: _quoteCustomerName,
+              maxLength: 120,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(labelText: _quoteNameLabel,
+                border: const OutlineInputBorder(), counterText: ''),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey('quote-customer-phone'),
+              controller: _quoteCustomerPhone,
+              keyboardType: TextInputType.phone,
+              maxLength: 80,
+              decoration: InputDecoration(labelText: _quotePhoneLabel,
+                border: const OutlineInputBorder(), counterText: ''),
+            ),
+            const SizedBox(height: 18),
+          ],
           _SectionLabel(_t('route')),
           const SizedBox(height: 8),
           _RouteDropdown(

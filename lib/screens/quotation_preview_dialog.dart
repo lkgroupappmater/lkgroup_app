@@ -61,6 +61,8 @@ class QuotationPreviewDialog extends StatefulWidget {
     this.extraCosts = const <ExtraCostItem>[],
     this.discountPercent = 0,
     this.taxRemark = '',
+    this.customerName = '',
+    this.customerPhone = '',
   });
 
   final String routeLabel;
@@ -72,6 +74,8 @@ class QuotationPreviewDialog extends StatefulWidget {
   final List<ExtraCostItem> extraCosts;
   final double discountPercent;
   final String taxRemark;
+  final String customerName;
+  final String customerPhone;
   @override
   State<QuotationPreviewDialog> createState() => _QuotationPreviewDialogState();
 }
@@ -153,6 +157,8 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         extraCosts: widget.extraCosts,
         discountPercent: widget.discountPercent,
         taxRemark: widget.taxRemark,
+        customerName: widget.customerName,
+        customerPhone: widget.customerPhone,
         issuedAt: _issuedAt,
         logo: _logo!,
         qrUsd: _qrUsd!,
@@ -366,6 +372,8 @@ class DigitalQuotationPainter extends CustomPainter {
     required this.extraCosts,
     required this.discountPercent,
     this.taxRemark = '',
+    this.customerName = '',
+    this.customerPhone = '',
     required this.issuedAt,
     required this.logo,
     required this.qrUsd,
@@ -383,6 +391,8 @@ class DigitalQuotationPainter extends CustomPainter {
   final List<ExtraCostItem> extraCosts;
   final double discountPercent;
   final String taxRemark;
+  final String customerName;
+  final String customerPhone;
   final DateTime issuedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
@@ -425,7 +435,8 @@ class DigitalQuotationPainter extends CustomPainter {
     c.translate(DocumentFormStyle.pagePadding, DocumentFormStyle.pagePadding);
     DocumentFormPainter.header(c, logo: logo, language: language,
       title: '${language == AppLanguage.korean ? RouteCatalog.documentTitleFor(routeLabel) : RouteCatalog.localizedLabel(routeLabel, language)} ${DocumentLocalizations.text(language, '가견적서')}',
-      zone: '-', customer: '-', phone: '-', lastLabel: '견적일',
+      zone: '-', customer: customerName.trim().isEmpty ? '-' : customerName.trim(),
+      phone: customerPhone.trim().isEmpty ? '-' : customerPhone.trim(), lastLabel: '견적일',
       lastValue: '${issuedAt.year}-${issuedAt.month.toString().padLeft(2, '0')}-${issuedAt.day.toString().padLeft(2, '0')}');
 
     const tableTop = DocumentFormStyle.tableTop;
