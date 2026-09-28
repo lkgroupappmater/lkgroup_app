@@ -17,3 +17,10 @@ test('a partial Anousith read stays editable and cannot pass review; distinct co
  assert.equal(normalizeDrafts({waybills:[ans('8262697813144'),ans('8262697937809')]}).length,2);
  assert.equal(normalizeDrafts({waybills:[{carrier:'HAL',tracking_number:'123456'}]})[0].tracking_number,'123456');
 });
+
+test('an unreadable second label remains for review rather than being discarded beside a complete label',()=>{
+ const result=normalizeDrafts({waybills:[ans('8262697813144'),ans('937809','full number unreadable')]});
+ assert.equal(result.length,2);assert.equal(result[1].tracking_number,'');
+ const otherCarrier={carrier:'HAL',tracking_number:'123456'};
+ assert.equal(normalizeDrafts({waybills:[otherCarrier,otherCarrier]}).length,2);
+});

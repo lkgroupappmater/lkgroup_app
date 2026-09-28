@@ -192,7 +192,7 @@ test('direct cargo photos attach to an existing parcel with no OCR or tracking e
  assert.equal((await setup({data:{...data,waybill_intake_batches:[{...batch,purpose:'photos',owner_id:'another'}]}}).call(body)).status,403);
 });
 test('cached Anousith scans discard internal IDs and explicit retry reads the image again',async()=>{
- const data={...ready,waybill_intake_files:[{...file,extracted:[{carrier:'ANS',tracking_number:'8262697813144'},{carrier:'ANS',tracking_number:'6084853'}]}]};
+ const data={...ready,waybill_intake_files:[{...file,extracted:[{carrier:'ANS',tracking_number:'8262697813144'},{carrier:'ANS',tracking_number:'6084853',note:'short number maybe internal'}]}]};
  const api=setup({data,ocr:{waybills:[{carrier:'ANS',tracking_number:'8262697937809'}]}});
  const cached=await api.call({action:'scan',batch_id:'batch',file_id:'file'});assert.equal(cached.body.waybills.length,1);assert.equal(api.ocrCalls,0);
  const fresh=await api.call({action:'scan',batch_id:'batch',file_id:'file',force_rescan:true});assert.equal(fresh.body.waybills[0].tracking_number,'8262697937809');assert.equal(api.ocrCalls,1);assert.match(api.ocrBody.instructions,/RIGHT of the separator/);

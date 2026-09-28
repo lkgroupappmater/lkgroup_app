@@ -37,12 +37,15 @@ export function normalizeDrafts(data) {
   }
   const fullAns=drafts.filter(d=>d.carrier==='ANS'&&/^\d{13}$/.test(d.tracking_number));
   const seen=new Set();
-  return drafts.filter(d=>!(d.carrier==='ANS'&&fullAns.length&&/^\d{6,7}$/.test(d.tracking_number))).map(d=>{
+  return drafts.filter(d=>!(d.carrier==='ANS'&&fullAns.length&&(
+    (/^\d{6}$/.test(d.tracking_number)&&fullAns.some(full=>full.tracking_number.endsWith(d.tracking_number)))||
+    (/^\d{7}$/.test(d.tracking_number)&&/internal|account|secondary|short number under barcode/i.test(d.note))
+  ))).map(d=>{
     if(d.carrier==='ANS'&&!/^\d{13}$/.test(d.tracking_number)){
       d.tracking_number='';d.note='Read the complete 13-digit Anousith number to the right of | below the barcode. The left account number and large six-digit suffix are not waybills.';
     }
     return d;
-  }).filter(d=>{if(!d.tracking_number)return true;const key=d.carrier+':'+d.tracking_number;if(seen.has(key))return false;seen.add(key);return true;});
+  }).filter(d=>{if(d.carrier!=='ANS'||!d.tracking_number)return true;const key=d.carrier+':'+d.tracking_number;if(seen.has(key))return false;seen.add(key);return true;});
 }
 export function validateReviewed(entries, files) {
   if (!Array.isArray(entries) || !entries.length || entries.length > MAX_FILES) throw Error('INVALID_BATCH');
