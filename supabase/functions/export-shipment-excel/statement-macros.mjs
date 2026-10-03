@@ -1,6 +1,7 @@
 // Narrow MS-CFB / MS-OVBA edit: replace only the fixed-range generator.
 // Worksheet XML, formula cells, and the two row-fit procedures remain unchanged.
 // Format references: Microsoft [MS-CFB] and [MS-OVBA] 2.3.4 / 2.4.1.
+import {enhanceStatementFeatures} from './statement-features.mjs';
 const FREE=0xffffffff,END=0xfffffffe,FAT=0xfffffffd;
 const u16=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint16(p,true);
 const u32=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint32(p,true);
@@ -53,7 +54,7 @@ export function writeCompound(c){
  return join([header,...sectors]);
 }
 const GENERATOR=`Public Sub CreateInvoiceSheets02To100()
-    ' LK_CURRENT_VOYAGE_STATEMENTS_V1 - keep the old entry point for existing buttons.
+    ' LK_CURRENT_VOYAGE_STATEMENTS_V2 - keep the old entry point for existing buttons.
     CreateCurrentVoyageInvoiceSheets
 End Sub
 
@@ -61,7 +62,7 @@ Public Sub CreateCurrentVoyageInvoiceSheets()
     Dim customers As Worksheet, template As Worksheet, anchor As Worksheet
     Dim s As Worksheet, originalSheet As Object, bills As Collection
     Dim header As Range, r As Long, lastRow As Long, billCol As Long, headerRow As Long
-    Dim nm As String, suffix As String, customerName As String, value As Variant
+    Dim nm As String, suffix As String, customerName As String, value As Variant, badChar As Variant
     Dim priorEvents As Boolean, priorScreen As Boolean, failText As String
     Set originalSheet = ActiveSheet
     priorEvents = Application.EnableEvents
@@ -69,6 +70,7 @@ Public Sub CreateCurrentVoyageInvoiceSheets()
     On Error GoTo Failed
     Application.EnableEvents = False
     Application.ScreenUpdating = False
+    LKEnsureUngrouped
     Application.Calculate
     Set customers = ThisWorkbook.Worksheets(ChrW(&HACE0) & ChrW(&HAC1D) & " " & ChrW(&HB9AC) & ChrW(&HC2A4) & ChrW(&HD2B8))
     For Each header In customers.Range("A1:Z20")
@@ -90,10 +92,13 @@ Public Sub CreateCurrentVoyageInvoiceSheets()
         End If
         nm = Trim$(CStr(customers.Cells(r, billCol).Value2))
         customerName = Trim$(CStr(customers.Cells(r, billCol + 1).Value2))
-        If Len(nm) > 0 And Len(customerName) > 0 And Left$(nm, Len(InvoicePrefix)) = InvoicePrefix Then
-            suffix = Mid$(nm, Len(InvoicePrefix) + 1)
-            If Len(suffix) = 0 Or Len(nm) > 31 Then Err.Raise vbObjectError + 516, , "Invalid No. Bill at row " & r
-            If suffix <> "XX" And suffix Like "*[!0-9]*" Then Err.Raise vbObjectError + 516, , "Invalid No. Bill at row " & r
+        If Len(nm) > 0 And Len(customerName) > 0 And StrComp(Left$(nm, Len(Trim$(InvoicePrefix))), Trim$(InvoicePrefix), vbTextCompare) = 0 Then
+            suffix = Trim$(Mid$(nm, Len(Trim$(InvoicePrefix)) + 1))
+            If Len(suffix) = 0 Or Len(nm) > 31 Then Err.Raise vbObjectError + 516, , "Check No. Bill at row " & r & ": [" & nm & "]"
+            ' Preserve the actual issued number, including valid manual suffixes.
+            For Each badChar In Array(":", ChrW(92), "/", "?", "*", "[", "]")
+                If InStr(nm, CStr(badChar)) > 0 Then Err.Raise vbObjectError + 516, , "No. Bill contains an invalid sheet-name character at row " & r & ": [" & nm & "]"
+            Next badChar
             On Error Resume Next
             bills.Add nm, LCase$(nm)
             Err.Clear
@@ -101,10 +106,20 @@ Public Sub CreateCurrentVoyageInvoiceSheets()
         End If
     Next r
     If bills.Count = 0 Then GoTo CleanUp
-    Set template = ThisWorkbook.Worksheets(InvoicePrefix & "01")
     On Error Resume Next
+    Set template = ThisWorkbook.Worksheets(InvoicePrefix & "01")
+    If template Is Nothing Then Set template = ThisWorkbook.Worksheets(ChrW(&HBA85) & ChrW(&HC138) & ChrW(&HC11C) & " " & ChrW(&HBE60) & ChrW(&HB974) & ChrW(&HAC8C) & " " & ChrW(&HD655) & ChrW(&HC778))
     Set anchor = ThisWorkbook.Worksheets(InvoicePrefix & "XX")
     On Error GoTo Failed
+    If template Is Nothing Then
+        For Each s In ThisWorkbook.Worksheets
+            If IsInvoiceSheet(s) Then
+                Set template = s
+                Exit For
+            End If
+        Next s
+    End If
+    If template Is Nothing Then Err.Raise vbObjectError + 517, , "An invoice template was not found."
     For Each value In bills
         nm = CStr(value)
         Set s = Nothing
@@ -143,12 +158,14 @@ const ascii=new TextEncoder();
 function indexOfBytes(bytes,needle,start=0){outer:for(let i=start;i<=bytes.length-needle.length;i++){for(let j=0;j<needle.length;j++)if(bytes[i+j]!==needle[j])continue outer;return i;}return -1;}
 export function upgradeStatementMacros(files){
  const original=files['xl/vbaProject.bin'];if(!original)return {present:false,changed:false};
- const c=readCompound(original),marker=ascii.encode('LK_CURRENT_VOYAGE_STATEMENTS_V1'),entry=ascii.encode('Public Sub CreateInvoiceSheets02To100()'),end=ascii.encode('End Sub');let changed=0,present=false,dirChanged=false,groupGuard=false,unsafeGroupRefresh=false;const eventSources=[];
+ const c=readCompound(original),marker=ascii.encode('LK_CURRENT_VOYAGE_STATEMENTS_V2'),entry=ascii.encode('Public Sub CreateInvoiceSheets02To100()'),end=ascii.encode('End Sub');let changed=0,present=false,dirChanged=false,groupGuard=false,unsafeGroupRefresh=false;const eventSources=[];
  const dirEntry=c.entries.find(e=>e.name==='dir'),dir=dirEntry?decompressVba(dirEntry.data):null;
  for(const e of c.entries){if(e.type!==2||['dir','_VBA_PROJECT','PROJECT','PROJECTwm'].includes(e.name)||e.name.startsWith('__SRP_'))continue;
   let src,offsetRecord=-1,offset=0;
   if(dir){const name=ascii.encode(e.name),prefix=new Uint8Array(6);prefix[0]=25;put32(prefix,2,name.length);const moduleStart=indexOfBytes(dir,join([prefix,name]));if(moduleStart>=0){const termination=indexOfBytes(dir,new Uint8Array([43,0,0,0,0,0]),moduleStart),found=indexOfBytes(dir,new Uint8Array([49,0,4,0,0,0]),moduleStart);if(found>=0&&(termination<0||found<termination)){offsetRecord=found+6;offset=u32(dir,offsetRecord);}}}
   try{src=decompressVba(e.data.subarray(offset));}catch{continue;}
+  const enhanced=enhanceStatementFeatures(src,e.name);
+  if(enhanced){src=enhanced;e.data=compressVba(src);if(offset){if(offsetRecord<0)throw Error('Missing feature module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
   if(/Workbook_(SheetActivate|SheetChange|Open)/.test(new TextDecoder().decode(src)))eventSources.push({module:e.name,source:new TextDecoder('euc-kr').decode(src)});
   if(e.name==='ThisWorkbook'){
    const refresh=ascii.encode('Private Sub RefreshInvoice(ByVal Sh As Object)\r\n    On Error GoTo Failed\r\n');
@@ -174,8 +191,10 @@ export function upgradeStatementMacros(files){
    }
   }
   if(indexOfBytes(src,marker)>=0){present=true;continue;}
-  const start=indexOfBytes(src,entry);if(start<0)continue;present=true;const finish=indexOfBytes(src,end,start);if(finish<0)throw Error('Invoice generator is incomplete');
-  const old=new TextDecoder('windows-1252').decode(src.subarray(start,finish));if(!/For i = 2 To 100\b/.test(old))throw Error('Invoice generator has another revision; review before updating');
+  const start=indexOfBytes(src,entry);if(start<0)continue;present=true;let finish=indexOfBytes(src,end,start);if(finish<0)throw Error('Invoice generator is incomplete');
+  const old=new TextDecoder('windows-1252').decode(src.subarray(start,finish));
+  if(old.includes('LK_CURRENT_VOYAGE_STATEMENTS_V1')){const next=indexOfBytes(src,ascii.encode('Public Sub CreateCurrentVoyageInvoiceSheets()'),finish);if(next<0)throw Error('Current-voyage generator is incomplete');finish=indexOfBytes(src,end,next);if(finish<0)throw Error('Current-voyage generator is incomplete');}
+  else if(!/For i = 2 To 100\b/.test(old))throw Error('Invoice generator has another revision; review before updating');
   const next=join([src.subarray(0,start),ascii.encode(GENERATOR),src.subarray(finish+end.length)]);e.data=compressVba(next);const roundtrip=decompressVba(e.data);if(indexOfBytes(roundtrip,marker)<0)throw Error('VBA roundtrip failed');if(offset){if(offsetRecord<0)throw Error('Missing VBA module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;
  }
  if(!present){if(Object.entries(files).some(([p,b])=>/\.(xml|vml)$/.test(p)&&/CreateInvoiceSheets02To100/.test(new TextDecoder().decode(b))))throw Error('Invoice macro source needs review');return {present:false,changed:false};}
@@ -186,9 +205,9 @@ export function upgradeStatementMacros(files){
   const xml=new TextDecoder().decode(data);
   const next=xml.replace(/<v:shape\b[\s\S]*?<\/v:shape>/g,shape=>{
    if(!/CreateInvoiceSheets02To100|CreateCurrentVoyageInvoiceSheets/.test(shape))return shape;
-   return shape.replace(/(<v:textbox\b[^>]*>)[\s\S]*?(<\/v:textbox>)/,(m,a,b)=>{if(m.includes('현재 항차 고객 명세서 전체 생성'))return m;buttons++;return a+'<div style="text-align:center"><font face="맑은 고딕" size="640" color="#000000">현재 항차 고객 명세서 전체 생성</font></div>'+b;});
-  }).replace(/(label=")[^"]*(?:LKA|LKS)\s*02\s*[~～–-]\s*100[^"]*(")/g,'$1현재 항차 고객 명세서 전체 생성$2');
+   return shape.replace(/(<v:textbox\b[^>]*>)[\s\S]*?(<\/v:textbox>)/,(m,a,b)=>{if(m.includes('모든 명세서 생성'))return m;buttons++;return a+'<div style="text-align:center"><font face="맑은 고딕" size="640" color="#000000">모든 명세서 생성</font></div>'+b;});
+  }).replace(/(label=")[^"]*(?:(?:LKA|LKS)\s*02\s*[~～–-]\s*100|현재 항차 고객 명세서 전체 생성)[^"]*(")/g,'$1모든 명세서 생성$2');
   if(next!==xml)files[path]=new TextEncoder().encode(next);
  }
- return {present:true,changed:!!(changed||buttons),modules:changed,buttons,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'current-voyage-statements-v1'};
+ return {present:true,changed:!!(changed||buttons),modules:changed,buttons,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-statements-features-v2'};
 }
