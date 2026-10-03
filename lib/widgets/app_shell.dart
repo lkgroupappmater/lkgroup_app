@@ -651,13 +651,10 @@ class _AppShellState extends State<AppShell>
     final laoFont = _language.fontFamily;
     final theme = Theme.of(context);
     return Theme(
-      data: laoFont == null
-          ? theme
-          : theme.copyWith(
-              textTheme: theme.textTheme.apply(fontFamily: laoFont),
-              primaryTextTheme:
-                  theme.primaryTextTheme.apply(fontFamily: laoFont),
-            ),
+      data: laoFont == null ? theme : theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: laoFont),
+        primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: laoFont),
+      ),
       child: scaffold,
     );
   }
