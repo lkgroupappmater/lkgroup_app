@@ -846,7 +846,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             const SizedBox(height: 18),
             const Center(child: CircularProgressIndicator()),
           ],
-          TextButton.icon(icon:const Icon(Icons.chat_outlined),onPressed:()=>startStaffConsultation(context,widget.language),label:Text(staffTitle(widget.language))),
+          TextButton.icon(icon:const Icon(Icons.chat_bubble_outline),onPressed:()=>startStaffConsultation(context,widget.language),label:Text(staffTitle(widget.language))),
           if (_specialQuotes.isNotEmpty) ...[
             const SizedBox(height: 20),
             _SectionLabel(_t('quote_history')),

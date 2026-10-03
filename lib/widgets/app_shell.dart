@@ -189,9 +189,12 @@ class _AppShellState extends State<AppShell>
           Map<String, dynamic> row, BuildContext dialogContext) =>
       ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: Icon(row['is_read'] == true
-            ? Icons.notifications_none
-            : Icons.notifications_active_outlined),
+        leading: Icon(
+          Icons.notifications_outlined,
+          color: row['is_read'] == true
+              ? null
+              : Theme.of(context).colorScheme.primary,
+        ),
         title: Text('${row['title'] ?? ''}'),
         subtitle: Text('${row['message'] ?? ''}'),
         onTap: () => Navigator.pop(dialogContext, row),
