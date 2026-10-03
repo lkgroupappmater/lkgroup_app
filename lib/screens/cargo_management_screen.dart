@@ -455,7 +455,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
   }
   Future<void> _save() async {
     if (_selectedIds.isEmpty) return;
-    if(_canSaveDirectly&&!MeasurementInput.valid({'weight_kg':_weightController.text,'length_cm':_lengthController.text,'width_cm':_widthController.text,'height_cm':_heightController.text})){_message(MeasurementInput.message(widget.language));return;}
+    final originalMeasurements = _selectedIds.length == 1 ? _results.firstWhere((row)=>_selectedIds.contains('${row['id']}'),orElse:()=> <String,dynamic>{}) : <String,dynamic>{};
+    if(_canSaveDirectly&&!MeasurementInput.validEdit({'weight_kg':_weightController.text,'length_cm':_lengthController.text,'width_cm':_widthController.text,'height_cm':_heightController.text},originalMeasurements)){_message(MeasurementInput.message(widget.language));return;}
     final changes = _canSaveDirectly ? _managerChanges() : _memberChanges();
     if (changes.isEmpty) {
       _message(_l('수정할 내용을 입력해 주세요.'));
@@ -1601,7 +1602,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
-          FilledButton(onPressed: () {if(!MeasurementInput.valid({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text})){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);}, child: Text(_l('화물 정보 저장'))),
+          FilledButton(onPressed: () {if(!MeasurementInput.validEdit({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text},one ?? <String,dynamic>{})){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);}, child: Text(_l('화물 정보 저장'))),
         ],
       ),
     );
@@ -1920,7 +1921,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
             child: Text(_l('취소')),
           ),
           FilledButton(
-            onPressed: () {if(!MeasurementInput.valid({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text})){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);},
+            onPressed: () {if(!MeasurementInput.validEdit({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text},item)){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);},
             child: Text(_l('저장')),
           ),
         ],

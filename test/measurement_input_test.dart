@@ -4,6 +4,14 @@ import 'package:lkgroup_app/core/app_language.dart';
 import 'package:lkgroup_app/core/measurement_input.dart';
 import 'package:lkgroup_app/widgets/measurement_warning.dart';
 void main(){
+ test('unrelated edits preserve legacy incomplete measurements',(){
+   final original={'weight_kg':5,'length_cm':null,'width_cm':null,'height_cm':null};
+   expect(MeasurementInput.validEdit({'weight_kg':'5.0','length_cm':'','width_cm':'','height_cm':''},original),true);
+   expect(MeasurementInput.validEdit({'weight_kg':'6','length_cm':'','width_cm':'','height_cm':''},original),false);
+   expect(MeasurementInput.validEdit({'weight_kg':'bad','length_cm':'','width_cm':'','height_cm':''},original),false);
+   expect(MeasurementInput.validEdit({for(final k in MeasurementInput.fields) k:''},original),true);
+   expect(MeasurementInput.validEdit({for(final k in MeasurementInput.fields) k:'2'},original),true);
+ });
  test('blank is optional; every partial combination is rejected',(){
   expect(MeasurementInput.valid({}),true);
   for(var mask=1;mask<15;mask++){
