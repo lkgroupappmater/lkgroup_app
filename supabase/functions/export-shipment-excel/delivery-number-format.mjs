@@ -76,6 +76,15 @@ export function formatDeliveryNumbers(files, routeKey) {
       if (/^no\.?$/i.test((label || '').trim())) headers.set(ref[1], Number(ref[2]));
     }
     if (!headers.size) continue;
+    // The two delivery-list titles share the damaged number style in older
+    // BASEs. Other sheets and their deliberately larger headings stay intact.
+    xml = xml.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, cell => {
+      if (attr(cell, 'r') !== 'A1') return cell;
+      const label = attr(cell, 't') === 's' ? strings[Number(cell.match(/<v>([^<]*)<\/v>/)?.[1])]
+        : textOf(cell);
+      if (!/^(지방|시내)배송\s*고객\s*list$/i.test((label || '').trim())) return cell;
+      return cell.replace(/^<c\b[^>]*>/, tag => setAttr(tag, 's', styleFor(Number(attr(tag, 's') || 0), true)));
+    });
     xml = xml.replace(/<c\b[^>]*>/g, tag => {
       const ref = attr(tag, 'r')?.match(/^([A-Z]+)(\d+)$/);
       if (!ref || !headers.has(ref[1]) || Number(ref[2]) < headers.get(ref[1])) return tag;

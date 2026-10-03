@@ -2438,7 +2438,6 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     formatStatementAmounts(files, routeKey);
     separateStatementDiscounts(files, routeKey, false, true);
     console.log('[EXCEL] discounts separated', Deno.memoryUsage().heapUsed);
-    formatDeliveryNumbers(files, routeKey);
     appendDocumentAutomationBlock(
       files,
       enrichedShipments,
@@ -2453,6 +2452,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     });
     await new Promise<void>((resolve)=>setTimeout(resolve,0));
     applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false});
+    // BASE refreshes and voyage exports must both repair inherited presentation.
+    // Run after delivery input updates so newly filled number cells are covered.
+    formatDeliveryNumbers(files, routeKey);
     // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
 // 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
     // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
