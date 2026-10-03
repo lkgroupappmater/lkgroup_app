@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/approval_batch.dart';
+import '../core/measurement_input.dart';
 
 class ApprovalBatchEditor extends StatefulWidget {
   const ApprovalBatchEditor({
@@ -50,7 +51,7 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
                         child: TextFormField(
                           key: ValueKey('${draft.item.key}:$field'),
                           initialValue: draft.values[field],
-                          onChanged: (value) => draft.values[field] = value,
+                          onChanged: (value) => setState(() => draft.values[field] = value),
                           keyboardType: approvalNumericFields.contains(field)
                               ? const TextInputType.numberWithOptions(
                                   decimal: true,
@@ -63,6 +64,8 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
                           ),
                         ),
                       ),
+                    if (draft.item.kind == ApprovalKind.changes && !MeasurementInput.valid(draft.values))
+                      Text(MeasurementInput.message(),style: TextStyle(color: Theme.of(context).colorScheme.error)),
                     if (draft.item.kind == ApprovalKind.incomplete)
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,

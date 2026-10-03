@@ -1,3 +1,6 @@
+import '../core/measurement_input.dart';
+import 'support_screen.dart';
+import '../services/support_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -299,6 +302,9 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     for (var i = 0; i < _boxes.length; i++) {
       final box = _boxes[i];
       if (!box.selected) continue;
+      final measurements={'weight_kg':box.weight,'length_cm':box.length,'width_cm':box.width,'height_cm':box.height};
+      if(MeasurementInput.empty(measurements))continue;
+      if(!MeasurementInput.valid(measurements)){_message(MeasurementInput.message(widget.language));return;}
       final weight = double.tryParse(box.weight);
       final width = double.tryParse(box.width);
       final length = double.tryParse(box.length);
@@ -397,7 +403,8 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     }
     setState(() => _loadingQuotes = true);
     try {
-      final rows = await QuoteService.instance.listMySpecialQuotes();
+      final page = await SupportService.list();
+      final rows = List<Map<String,dynamic>>.from(page['rows'] as List);
       if (!mounted) return;
       setState(() => _specialQuotes = rows);
       widget.onNotificationsChanged?.call();
@@ -532,97 +539,6 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     contentCtrl.dispose();
     contactCtrl.dispose();
   }
-
-  Future<void> _addReply(Map<String, dynamic> quote) async {
-    final ctrl = TextEditingController();
-    final send = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(_u('추가 회신')),
-        content: TextField(
-          controller: ctrl,
-          minLines: 3,
-          maxLines: 7,
-          decoration: InputDecoration(
-            labelText: _u('추가 내용'),
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(_u('취소')),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(_u('송부')),
-          ),
-        ],
-      ),
-    );
-    if (send == true && ctrl.text.trim().isNotEmpty) {
-      try {
-        await QuoteService.instance.addSpecialQuoteMessage(
-          quoteId: _int(quote['id']),
-          message: ctrl.text.trim(),
-        );
-        await _loadSpecialQuotes();
-      } catch (error) {
-        _message(_ue('추가 회신 실패', error));
-      }
-    }
-    ctrl.dispose();
-  }
-
-  Future<void> _requestDelete(Map<String, dynamic> quote) async {
-    final ok = await _confirm(_u('견적 요청을 삭제하시겠습니까?'));
-    if (!ok) return;
-    try {
-      await QuoteService.instance.requestDelete(_int(quote['id']));
-      await _loadSpecialQuotes();
-    } catch (error) {
-      _message(_ue('삭제 처리 실패', error));
-    }
-  }
-
-  Future<void> _cancelDelete(Map<String, dynamic> quote) async {
-    try {
-      await QuoteService.instance.cancelDelete(_int(quote['id']));
-      await _loadSpecialQuotes();
-    } catch (error) {
-      _message(_ue('삭제 취소 실패', error));
-    }
-  }
-
-  Future<void> _deleteNow(Map<String, dynamic> quote) async {
-    final ok = await _confirm(_u('지금 목록에서 삭제하시겠습니까?'));
-    if (!ok) return;
-    try {
-      await QuoteService.instance.deleteNow(_int(quote['id']));
-      await _loadSpecialQuotes();
-    } catch (error) {
-      _message(_ue('바로 삭제 실패', error));
-    }
-  }
-
-  Future<bool> _confirm(String text) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          content: Text(text),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(_u('취소')),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(_u('확인')),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 
   void _message(String text) {
     if (!mounted) return;
@@ -930,9 +846,11 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
             const SizedBox(height: 18),
             const Center(child: CircularProgressIndicator()),
           ],
+          TextButton.icon(icon:const Icon(Icons.chat_outlined),onPressed:()=>startStaffConsultation(context,widget.language),label:Text(staffTitle(widget.language))),
           if (_specialQuotes.isNotEmpty) ...[
             const SizedBox(height: 20),
             _SectionLabel(_t('quote_history')),
+            TextButton(onPressed:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>SupportInboxScreen(language:widget.language))),child:Text(supportText(widget.language,'견적·상담 전체 내역','All quotes & consultations','ຄຳຂໍລາຄາ ແລະ ປຶກສາທັງໝົດ'))),
             const SizedBox(height: 8),
             ..._specialQuotes.map(_specialQuoteCard),
           ],
@@ -1164,134 +1082,19 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
     );
   }
 
-  Widget _specialQuoteCard(Map<String, dynamic> quote) {
-    final messages = _messages(quote);
-    final adminReplies = messages.where((m) => '${m['sender_role']}' == 'admin').toList();
-    final adminViewed = quote['admin_viewed_at'] != null;
-    final hasReply = adminReplies.isNotEmpty;
-    final deletePending = quote['deletion_requested_at'] != null;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${quote['subject'] ?? ''}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.navyPrimary),
-                  ),
-                ),
-                Text(
-                  _u(deletePending
-                      ? '삭제 대기'
-                      : hasReply
-                          ? '회신 완료'
-                          : adminViewed
-                              ? '관리자 확인'
-                              : '확인 전'),
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              RouteCatalog.localizedLabel(
-                '${quote['route'] ?? ''}',
-                widget.language,
-              ),
-              style: const TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            Text('${quote['content'] ?? ''}'),
-            if ('${quote['other_contact'] ?? ''}'.trim().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                _uf('기타 연락처: {contact}', {
-                  'contact': quote['other_contact'],
-                }),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-            if (messages.isNotEmpty) ...[
-              const Divider(height: 22),
-              ...messages.map(_messageBubble),
-            ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  if (deletePending) ...[
-                    OutlinedButton(
-                      onPressed: () => _cancelDelete(quote),
-                      child: Text(_u('삭제 취소')),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => _deleteNow(quote),
-                      child: Text(_u('바로 삭제')),
-                    ),
-                  ] else if (!adminViewed) ...[
-                    TextButton(
-                      onPressed: () => _openSpecialQuoteForm(existing: quote),
-                      child: Text(_u('수정')),
-                    ),
-                    TextButton(
-                      onPressed: () => _requestDelete(quote),
-                      child: Text(_u('삭제')),
-                    ),
-                  ] else if (hasReply) ...[
-                    OutlinedButton(
-                      onPressed: () => _addReply(quote),
-                      child: Text(_u('추가 회신')),
-                    ),
-                    TextButton(
-                      onPressed: () => _requestDelete(quote),
-                      child: Text(_u('삭제')),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _messageBubble(Map<String, dynamic> message) {
-    final admin = '${message['sender_role']}' == 'admin';
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(9),
-      decoration: BoxDecoration(
-        color: admin ? AppColors.inputFill : AppColors.background,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(_u(admin ? '관리자 회신' : '추가 회신'),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 3),
-          Text('${message['message'] ?? ''}', style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _messages(Map<String, dynamic> quote) {
-    final raw = quote['messages'];
-    if (raw is! List) return const [];
-    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-  }
+  Widget _specialQuoteCard(Map<String,dynamic> quote) => Card(
+    child:ListTile(
+      title:Text('${quote['subject']??''}'),
+      subtitle:Text('#${quote['id']} · ${quote['route']??''}\n${quote['content']??''}',maxLines:3,overflow:TextOverflow.ellipsis),
+      trailing:const Icon(Icons.chevron_right),
+      onTap:() async {
+        await Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>SupportDetailScreen(
+          id:_int(quote['id']),language:widget.language,
+          onEditRequest:(row)=>_openSpecialQuoteForm(existing:row))));
+        if(mounted)_loadSpecialQuotes();
+      },
+    ),
+  );
 
   static int _int(dynamic value) => int.tryParse('$value') ?? 0;
 }
@@ -1407,6 +1210,8 @@ class _BoxRow extends StatelessWidget {
                   ),
               ],
             ),
+            if(entry.selected&&!MeasurementInput.valid({'weight_kg':entry.weight,'length_cm':entry.length,'width_cm':entry.width,'height_cm':entry.height}))
+              Text(MeasurementInput.message(language),style:const TextStyle(color:Color(0xffb34816),fontSize:12)),
             const SizedBox(height: 6),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,

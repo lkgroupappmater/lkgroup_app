@@ -3,6 +3,9 @@ import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
+import '../core/measurement_input.dart';
+import '../widgets/measurement_warning.dart';
 import '../core/approval_batch.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
@@ -424,6 +427,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
   Map<String, dynamic> _adminChanges(Map<String, dynamic> r) {
     final c = _editControllersFor(r);
     final draft = _singleDrafts[(r['request_id'] as num).toInt()]!;
+    final measureChanged = MeasurementInput.fields.any((key) => c[key]!.text != (draft.values[key] ?? ''));
+    if (measureChanged) MeasurementInput.validate({for(final key in MeasurementInput.fields) key: c[key]!.text});
     for (final entry in c.entries) {
       draft.values[entry.key] = entry.value.text;
     }
@@ -1435,6 +1440,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
           Expanded(child: field('height_cm', '높이(cm)', number: true)),
         ],
       ),
+      MeasurementWarning(weight:c['weight_kg']!, length:c['length_cm']!, width:c['width_cm']!, height:c['height_cm']!, language:AppLanguage.korean),
       Row(
         children: [
           Expanded(child: field('receipt_number', '영수번호')),

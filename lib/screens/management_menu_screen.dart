@@ -17,6 +17,7 @@ import 'exchange_rate_screen.dart';
 import 'member_management_screen.dart';
 import 'notice_management_screen.dart';
 import 'quote_request_management_screen.dart';
+import 'support_screen.dart';
 import 'schedule_management_screen.dart';
 import 'discount_management_screen.dart';
 import 'local_delivery_management_screen.dart';
@@ -308,10 +309,10 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
     if (_isAdmin || _isStaff) {
       items.addAll([
         {
-          'label': _m('견적 요청 관리'),
+          'label': supportTitle(widget.language),
           'icon': Icons.request_quote_outlined,
           'menuKey': 'quote_requests',
-          'page': const QuoteRequestManagementScreen(),
+          'page': QuoteRequestManagementScreen(language:widget.language),
         },
         {
           'label': _m('기준 환율 입력'),

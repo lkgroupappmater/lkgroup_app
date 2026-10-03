@@ -174,7 +174,8 @@ const sharedKoreanTextKeys = <String, String>{
   "대표 고정 할인": "statement.representativeDiscount",
   "기타 할인": "statement.otherDiscount",
   "구매대행": "purchase.title",
-  "내 외부 사이트 계정": "memberSites.title"
+  "내 외부 사이트 계정": "memberSites.title",
+  "견적 요청 및 상담 관리": "adminMenu.quoteRequests"
 };
 const sharedTextDefaults = <String, Map<String, String>>{
   "account": {
@@ -253,9 +254,9 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "lo": "ຈັດການແຈ້ງການ ແລະ ຂໍ້ມູນ"
 },
   "adminMenu.quoteRequests": {
-  "ko": "견적 요청 관리",
-  "en": "Quotation requests",
-  "lo": "ຈັດການຄຳຂໍລາຄາ"
+  "ko": "견적 요청 및 상담 관리",
+  "en": "Quotes & consultations",
+  "lo": "ຈັດການຄຳຂໍລາຄາ ແລະ ປຶກສາ"
 },
   "adminMenu.schedules": {
   "ko": "선적 일정 관리",

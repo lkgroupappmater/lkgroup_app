@@ -1,3 +1,5 @@
+import '../core/measurement_input.dart';
+import '../widgets/measurement_warning.dart';
 import '../core/receipt_delivery_cost.dart';
 import '../services/customer_benefit_service.dart';
 import '../widgets/auto_refresh_state.dart';
@@ -287,6 +289,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       context,
       MaterialPageRoute(
         builder: (_) => ShipmentManualAddScreen(
+          language: widget.language,
           initialRoute: route,
           initialYear: parsedYear,
           initialVoyage: selectedVoyage,
@@ -452,6 +455,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
   }
   Future<void> _save() async {
     if (_selectedIds.isEmpty) return;
+    if(_canSaveDirectly&&!MeasurementInput.valid({'weight_kg':_weightController.text,'length_cm':_lengthController.text,'width_cm':_widthController.text,'height_cm':_heightController.text})){_message(MeasurementInput.message(widget.language));return;}
     final changes = _canSaveDirectly ? _managerChanges() : _memberChanges();
     if (changes.isEmpty) {
       _message(_l('수정할 내용을 입력해 주세요.'));
@@ -1283,6 +1287,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                     Expanded(child: _numberField(_heightController, _l('높이(cm)'))),
                   ],
                 ),
+                MeasurementWarning(weight:_weightController,length:_lengthController,width:_widthController,height:_heightController,language:widget.language),
               ],
               const SizedBox(height: 12),
               ElevatedButton.icon(
@@ -1573,6 +1578,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              MeasurementWarning(weight:weight,length:length,width:width,height:height,language:widget.language),
               if (selected.length > 1)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -1595,7 +1601,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(_l('취소'))),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_l('화물 정보 저장'))),
+          FilledButton(onPressed: () {if(!MeasurementInput.valid({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text})){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);}, child: Text(_l('화물 정보 저장'))),
         ],
       ),
     );
@@ -1857,6 +1863,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              MeasurementWarning(weight:weight,length:length,width:width,height:height,language:widget.language),
               TextField(
                 controller: weight,
                 keyboardType:
@@ -1913,7 +1920,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
             child: Text(_l('취소')),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {if(!MeasurementInput.valid({'weight_kg':weight.text,'length_cm':length.text,'width_cm':width.text,'height_cm':height.text})){_message(MeasurementInput.message(widget.language));return;}Navigator.pop(dialogContext,true);},
             child: Text(_l('저장')),
           ),
         ],

@@ -6,7 +6,8 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   Future<List<Map<String, dynamic>>> fetchUnread() async {
-    if (!SupabaseConfig.isConfigured || SupabaseService.client.auth.currentUser == null) {
+    if (!SupabaseConfig.isConfigured ||
+        SupabaseService.client.auth.currentUser == null) {
       return const [];
     }
     final rows = await SupabaseService.client
@@ -41,13 +42,19 @@ class NotificationService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
-  Future<void> markAllRead() async {
-    final user = SupabaseService.client.auth.currentUser;
-    if (!SupabaseConfig.isConfigured || user == null) return;
-    await SupabaseService.client
-        .from('user_notifications')
-        .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
-        .eq('user_id', user.id)
-        .eq('is_read', false);
+  Future<Map<String, dynamic>> feed({int offset = 0}) async {
+    if (!SupabaseConfig.isConfigured ||
+        SupabaseService.client.auth.currentUser == null)
+      return {'rows': <Map<String, dynamic>>[], 'unread_count': 0};
+    return Map<String, dynamic>.from(await SupabaseService.client
+        .rpc('list_my_notification_feed', params: {'p_offset': offset}) as Map);
+  }
+
+  Future<void> read(int id) async => SupabaseService.client
+      .rpc('read_my_notification', params: {'p_notification_id': id});
+  Future<Map<String, dynamic>?> relatedRequest(int id) async {
+    final data = await SupabaseService.client
+        .rpc('get_my_notification_request', params: {'p_notification_id': id});
+    return data is Map ? Map<String, dynamic>.from(data) : null;
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../screens/support_screen.dart';
+import '../services/notification_alert.dart';
 import '../services/code_update_service.dart';
 import 'code_update_panel.dart';
 import '../services/app_update_service.dart';
@@ -46,8 +49,11 @@ class _AppShellState extends State<AppShell>
   AppLanguage _language = AppLanguage.korean;
   AppUser? _currentUser;
   List<String> _cargoSelection = const <String>[];
-  List<Map<String, dynamic>> _unreadNotifications = const [];
-  bool _popupShownForCurrentBatch = false;
+  final _seenNotifications = <String>{};
+  String? _noticeOwner;
+  int _notificationCount = 0;
+  bool _notificationFetching = false;
+  Timer? _notificationPoll;
   final _codeUpdates = CodeUpdateService.instance;
   bool _updatePopupOpen = false;
   bool _notificationPopupOpen = false;
@@ -69,8 +75,7 @@ class _AppShellState extends State<AppShell>
           _updatePopupOpen ||
           _notificationPopupOpen ||
           !_codeUpdates.needsPopup ||
-          !canApplyAutoRefresh)
-        return;
+          !canApplyAutoRefresh) return;
       _updatePopupOpen = true;
       try {
         await showCodeUpdateNotice(context, _codeUpdates, _language);
@@ -94,21 +99,23 @@ class _AppShellState extends State<AppShell>
     AppUpdateService.instance.check();
     _codeUpdates.addListener(_onCodeUpdate);
     _codeUpdates.check();
-    AuthService.instance
-        .restoreSession()
-        .then((_) async {
-          if (!mounted) return;
-          setState(() => _currentUser = AuthService.instance.currentUser);
-          await _refreshNotifications(showPopup: true);
-        })
-        .whenComplete(() {
-          _startupNotificationsReady = true;
-          _scheduleUpdatePopup();
-        });
+    _notificationPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed)
+        _refreshNotifications(showPopup: true);
+    });
+    AuthService.instance.restoreSession().then((_) async {
+      if (!mounted) return;
+      setState(() => _currentUser = AuthService.instance.currentUser);
+      await _refreshNotifications(showPopup: true);
+    }).whenComplete(() {
+      _startupNotificationsReady = true;
+      _scheduleUpdatePopup();
+    });
   }
 
   @override
   void dispose() {
+    _notificationPoll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _codeUpdates.removeListener(_onCodeUpdate);
     super.dispose();
@@ -140,80 +147,140 @@ class _AppShellState extends State<AppShell>
 
   Future<void> _refreshNotifications({required bool showPopup}) async {
     final userId = _currentUser?.id;
+    if (_noticeOwner != userId) {
+      _noticeOwner = userId;
+      _seenNotifications.clear();
+      _notificationCount = 0;
+    }
     if (userId == null) {
-      if (mounted) setState(() => _unreadNotifications = const []);
       return;
     }
+    if (_notificationFetching) return;
+    _notificationFetching = true;
     try {
-      final rows = await NotificationService.instance.fetchUnread();
+      final data = await NotificationService.instance.feed();
       if (!mounted || _currentUser?.id != userId) return;
+      final rows = List<Map<String, dynamic>>.from(data['rows'] as List)
+          .where((r) => r['is_read'] != true)
+          .toList();
+      final fresh = rows
+          .where((r) => !_seenNotifications.contains('${r['id']}'))
+          .toList();
       setState(() {
-        _unreadNotifications = rows;
-        if (rows.isEmpty) _popupShownForCurrentBatch = false;
+        _notificationCount = (data['unread_count'] as num?)?.toInt() ?? 0;
       });
-      if (showPopup && rows.isNotEmpty && !_popupShownForCurrentBatch) {
-        _popupShownForCurrentBatch = true;
-        await WidgetsBinding.instance.endOfFrame;
-        if (mounted) await _showUnreadPopup(rows);
+      if (fresh.isNotEmpty &&
+          (showPopup || _seenNotifications.isNotEmpty) &&
+          !_notificationPopupOpen &&
+          !_updatePopupOpen) {
+        _seenNotifications.addAll(fresh.map((r) => '${r['id']}'));
+        await NotificationAlert.play();
+        if (mounted && ModalRoute.of(context)?.isCurrent != false)
+          await _showUnreadPopup(fresh);
       }
     } catch (_) {
-      // Notification failure must not interrupt login or navigation.
+      /* Notification failure must not interrupt navigation. */
+    } finally {
+      _notificationFetching = false;
     }
   }
 
+  Widget _notificationTile(
+          Map<String, dynamic> row, BuildContext dialogContext) =>
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(row['is_read'] == true
+            ? Icons.notifications_none
+            : Icons.notifications_active_outlined),
+        title: Text('${row['title'] ?? ''}'),
+        subtitle: Text('${row['message'] ?? ''}'),
+        onTap: () => Navigator.pop(dialogContext, row),
+      );
+
   Future<void> _showUnreadPopup(List<Map<String, dynamic>> rows) async {
-    if (!mounted || rows.isEmpty) return;
-    if (_updatePopupOpen) {
-      _accountPopupDeferred = true;
-      _popupShownForCurrentBatch = false;
+    if (!mounted || rows.isEmpty || _notificationPopupOpen || _updatePopupOpen)
       return;
-    }
     _notificationPopupOpen = true;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(AppStrings.get(_language, 'notifications')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: rows
-                .take(5)
-                .map(
-                  (n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text('${n['message'] ?? ''}'),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(AppStrings.get(_language, 'confirm')),
-          ),
-        ],
-      ),
-    );
-
+    final selected = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (c) => AlertDialog(
+              title: Text(
+                  '${AppStrings.get(_language, 'notifications')} ($_notificationCount)'),
+              content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: rows
+                              .take(5)
+                              .map((r) => _notificationTile(r, c))
+                              .toList()))),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(c),
+                    child: Text(supportText(
+                        _language, '나중에 확인', 'Later', 'ກວດພາຍຫຼັງ')))
+              ],
+            ));
     _notificationPopupOpen = false;
+    if (selected != null && mounted) await _openNotificationTarget(selected);
     _scheduleUpdatePopup();
+  }
 
-    // 로그인 팝업에서 사용자가 실제로 '확인'한 알림은 읽음 처리합니다.
-    // 기존에는 팝업만 닫고 is_read=false 상태가 그대로라 다음 로그인 때
-    // 같은 알림이 계속 다시 표시되었습니다.
+  Future<void> _openNotificationTarget(Map<String, dynamic> row) async {
     try {
-      await NotificationService.instance.markAllRead();
-      if (!mounted) return;
-      setState(() {
-        _unreadNotifications = const [];
-        _popupShownForCurrentBatch = false;
-      });
-    } catch (_) {
-      // 읽음 처리 실패가 앱 사용을 막지는 않도록 합니다.
-      // 실패한 경우 DB에는 unread 상태가 남으므로 다음 새로고침에서 다시 확인 가능합니다.
+      if (row['related_quote_id'] != null) {
+        await Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+                builder: (_) => SupportDetailScreen(
+                    id: (row['related_quote_id'] as num).toInt(),
+                    language: _language,
+                    manager: const [UserRole.admin, UserRole.staff]
+                        .contains(_currentUser?.role))));
+      } else {
+        final related = row['related_request_id'] == null
+            ? null
+            : await NotificationService.instance
+                .relatedRequest((row['id'] as num).toInt());
+        if (!mounted) return;
+        await NotificationService.instance.read((row['id'] as num).toInt());
+        if (!mounted) return;
+        await showDialog<void>(
+            context: context,
+            builder: (c) => AlertDialog(
+                    title: Text('${row['title'] ?? ''}'),
+                    content: SingleChildScrollView(
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text('${row['message'] ?? ''}'),
+                          if (related != null) ...[
+                            const Divider(),
+                            Text(
+                                '${related['receipt_number'] ?? ''} · ${related['invoice_number'] ?? ''}'),
+                            Text(
+                                '${related['consignee_name'] ?? ''} · ${related['status'] ?? ''}'),
+                            for (final entry in Map<String, dynamic>.from(
+                                    related['admin_changes'] ??
+                                        related['changes'] ??
+                                        {})
+                                .entries)
+                              Text('${entry.key}: ${entry.value}')
+                          ]
+                        ])),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c),
+                          child: Text(AppStrings.get(_language, 'close')))
+                    ]));
+      }
+      if (mounted) await _refreshNotifications(showPopup: false);
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 
@@ -221,78 +288,97 @@ class _AppShellState extends State<AppShell>
     if (_notificationPopupOpen || _updatePopupOpen) return;
     _notificationPopupOpen = true;
     final userId = _isLoggedIn ? _currentUser?.id : null;
-    var rows = <Map<String, dynamic>>[];
-    var accountReadFailed = false;
+    var rows = <Map<String, dynamic>>[], offset = 0;
+    var more = false, loading = false;
+    String? error;
     try {
-      // Guest users can inspect device updates without querying private notices.
       if (userId != null) {
         try {
-          rows = await NotificationService.instance.fetchRecent();
-        } catch (_) {
-          accountReadFailed = true;
+          final data = await NotificationService.instance.feed();
+          rows = List<Map<String, dynamic>>.from(data['rows'] as List);
+          more = rows.length == 50;
+        } catch (e) {
+          error = '$e';
         }
       }
       if (!mounted) return;
-      if (_currentUser?.id != userId) rows = [];
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(AppStrings.get(_language, 'notifications')),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CodeUpdatePanel(language: _language, service: _codeUpdates),
-                  if (userId != null) ...[
-                    const Divider(),
-                    if (accountReadFailed)
-                      Text(
-                        CodeUpdateText(_language).pick(
-                          '계정 알림을 불러오지 못했습니다.',
-                          'Could not load account notifications.',
-                          'ໂຫຼດແຈ້ງເຕືອນບັນຊີບໍ່ສຳເລັດ.',
-                        ),
-                      )
-                    else if (rows.isEmpty)
-                      Text(AppStrings.get(_language, 'no_notifications'))
-                    else
-                      for (final row in rows)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Text('${row['message'] ?? ''}'),
-                        ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(AppStrings.get(_language, 'close')),
-            ),
-          ],
-        ),
-      );
-      await _codeUpdates.acknowledge();
-      if (userId != null && !accountReadFailed && _currentUser?.id == userId) {
-        await NotificationService.instance.markAllRead();
-        if (mounted)
-          setState(() {
-            _unreadNotifications = const [];
-            _popupShownForCurrentBatch = false;
-          });
+      if (_currentUser?.id != userId) {
+        rows = [];
+        more = false;
       }
-    } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(UiLocalizations.error(_language, '알림 조회 실패', error)),
-          ),
-        );
+      final selected = await showDialog<Map<String, dynamic>>(
+          context: context,
+          builder: (c) => StatefulBuilder(
+              builder: (c, update) => AlertDialog(
+                    title: Text(AppStrings.get(_language, 'notifications')),
+                    content: SizedBox(
+                        width: double.maxFinite,
+                        child: SingleChildScrollView(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                              CodeUpdatePanel(
+                                  language: _language, service: _codeUpdates),
+                              if (userId != null) ...[
+                                const Divider(),
+                                Text(supportText(
+                                    _language,
+                                    '미확인 알림은 계속 보관되며, 요청 내용을 확인한 뒤 24시간 동안 표시됩니다.',
+                                    'Unread alerts stay until reviewed, then for 24 hours.',
+                                    'ແຈ້ງເຕືອນຢູ່ຈົນກວດແລ້ວ ແລະ ອີກ 24 ຊົ່ວໂມງ.')),
+                                if (error != null) Text(error!),
+                                if (rows.isEmpty && error == null)
+                                  Text(AppStrings.get(
+                                      _language, 'no_notifications')),
+                                for (final row in rows)
+                                  _notificationTile(row, c),
+                                if (more)
+                                  TextButton(
+                                      onPressed: loading
+                                          ? null
+                                          : () async {
+                                              update(() => loading = true);
+                                              try {
+                                                final data =
+                                                    await NotificationService
+                                                        .instance
+                                                        .feed(
+                                                            offset:
+                                                                offset + 50);
+                                                if (!c.mounted ||
+                                                    _currentUser?.id != userId)
+                                                  return;
+                                                final page = List<
+                                                        Map<String,
+                                                            dynamic>>.from(
+                                                    data['rows'] as List);
+                                                update(() {
+                                                  offset += 50;
+                                                  rows.addAll(page);
+                                                  more = page.length == 50;
+                                                });
+                                              } catch (e) {
+                                                if (c.mounted)
+                                                  update(() => error = '$e');
+                                              } finally {
+                                                if (c.mounted)
+                                                  update(() => loading = false);
+                                              }
+                                            },
+                                      child: Text(supportText(_language, '더 보기',
+                                          'Load more', 'ເບິ່ງເພີ່ມ')))
+                              ]
+                            ]))),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c),
+                          child: Text(AppStrings.get(_language, 'close')))
+                    ],
+                  )));
+      await _codeUpdates.acknowledge();
+      _notificationPopupOpen = false;
+      if (selected != null && mounted && _currentUser?.id == userId)
+        await _openNotificationTarget(selected);
     } finally {
       _notificationPopupOpen = false;
       _scheduleUpdatePopup();
@@ -334,7 +420,6 @@ class _AppShellState extends State<AppShell>
     setState(() {
       _currentUser = user;
       _currentIndex = 3;
-      _popupShownForCurrentBatch = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       TextSnackBar(
@@ -354,8 +439,9 @@ class _AppShellState extends State<AppShell>
     setState(() {
       _currentUser = null;
       _currentIndex = 0;
-      _unreadNotifications = const [];
-      _popupShownForCurrentBatch = false;
+      _notificationCount = 0;
+      _seenNotifications.clear();
+      _noticeOwner = null;
     });
   }
 
@@ -379,16 +465,21 @@ class _AppShellState extends State<AppShell>
           ),
           ListTile(
             leading: const Icon(Icons.local_shipping_outlined),
-            title: Text(domesticText(_language, _hasManagementMenu ? 'title' : 'publicTitle')),
+            title: Text(domesticText(
+                _language, _hasManagementMenu ? 'title' : 'publicTitle')),
             onTap: () => Navigator.pop(sheetContext, true),
           ),
         ]),
       ),
     );
     if (!mounted || domestic == null) return;
-    if (!domestic) { _selectTab(1); return; }
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) =>
-      DomesticTrackingScreen(language: _language, user: _currentUser)));
+    if (!domestic) {
+      _selectTab(1);
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) =>
+            DomesticTrackingScreen(language: _language, user: _currentUser)));
   }
 
   void _openCargoManagement(List<String> ids) {
@@ -500,7 +591,15 @@ class _AppShellState extends State<AppShell>
     final selected = navIndexes.indexOf(_currentIndex);
     final scaffold = Scaffold(
       appBar: CargoFlowAppBar(
-        customerIdentity: _isLoggedIn ? CustomerIdentityCard(key: ValueKey('header-id-${_currentUser!.id}-${_currentUser!.name}-${_currentUser!.phone}'), userId: _currentUser!.id, language: _language, compact: true, foregroundColor: Colors.white) : null,
+        customerIdentity: _isLoggedIn
+            ? CustomerIdentityCard(
+                key: ValueKey(
+                    'header-id-${_currentUser!.id}-${_currentUser!.name}-${_currentUser!.phone}'),
+                userId: _currentUser!.id,
+                language: _language,
+                compact: true,
+                foregroundColor: Colors.white)
+            : null,
         title: _title,
         selectedLanguage: _language,
         onLanguageChanged: _onLanguageChanged,
@@ -509,7 +608,7 @@ class _AppShellState extends State<AppShell>
         showHomeActions: _currentIndex == 0,
         onNotificationTap: _openNotifications,
         notificationCount:
-            _unreadNotifications.length + (_codeUpdates.hasUnread ? 1 : 0),
+            _notificationCount + (_codeUpdates.hasUnread ? 1 : 0),
         titleFontSize: _currentIndex == 2 ? 17 : 21,
       ),
       body: Column(
@@ -552,10 +651,13 @@ class _AppShellState extends State<AppShell>
     final laoFont = _language.fontFamily;
     final theme = Theme.of(context);
     return Theme(
-      data: laoFont == null ? theme : theme.copyWith(
-        textTheme: theme.textTheme.apply(fontFamily: laoFont),
-        primaryTextTheme: theme.primaryTextTheme.apply(fontFamily: laoFont),
-      ),
+      data: laoFont == null
+          ? theme
+          : theme.copyWith(
+              textTheme: theme.textTheme.apply(fontFamily: laoFont),
+              primaryTextTheme:
+                  theme.primaryTextTheme.apply(fontFamily: laoFont),
+            ),
       child: scaffold,
     );
   }

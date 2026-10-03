@@ -1,3 +1,4 @@
+import '../core/measurement_input.dart';
 import '../config/supabase_config.dart';
 import '../models/app_user.dart';
 import '../models/shipment.dart';
@@ -322,6 +323,11 @@ class ShipmentService {
 
   Future<void> updateRow(String id, Map<String, dynamic> changes) async {
     if (!SupabaseConfig.isConfigured || changes.isEmpty) return;
+    if(MeasurementInput.fields.any(changes.containsKey)){
+      final current=await SupabaseService.client.from('shipments').select('weight_kg,length_cm,width_cm,height_cm').eq('id',id).single();
+      final different=MeasurementInput.fields.any((k)=>changes.containsKey(k)&&changes[k]!=current[k]);
+      if(different)MeasurementInput.validate({...current,...changes});
+    }
     await SupabaseService.client.from('shipments').update(changes).eq('id', id);
   }
 
@@ -394,6 +400,7 @@ class ShipmentService {
     num? widthCm,
     num? heightCm,
   }) async {
+    MeasurementInput.validate({'weight_kg':weightKg,'length_cm':lengthCm,'width_cm':widthCm,'height_cm':heightCm});
     if (!SupabaseConfig.isConfigured) return const {};
     final row = await SupabaseService.client.rpc(
       'admin_add_shipment_row',
