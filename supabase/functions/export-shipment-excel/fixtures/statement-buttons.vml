@@ -1,0 +1,77 @@
+<xml xmlns:v="urn:schemas-microsoft-com:vml"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel">
+ <o:shapelayout v:ext="edit">
+  <o:idmap v:ext="edit" data="100,146"/>
+ </o:shapelayout><v:shapetype id="_x0000_t201" coordsize="21600,21600" o:spt="201"
+  path="m,l,21600r21600,l21600,xe">
+  <v:stroke joinstyle="miter"/>
+  <v:path shadowok="f" o:extrusionok="f" strokeok="f" fillok="f" o:connecttype="rect"/>
+  <o:lock v:ext="edit" shapetype="t"/>
+ </v:shapetype><v:shape id="_x0000_s150001" type="#_x0000_t201" style='position:absolute;
+  margin-left:2896.8pt;margin-top:379.2pt;width:293.4pt;height:80.4pt;
+  z-index:1;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  strokecolor="windowText [64]" o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center;direction:ltr'><font face="맑은 고딕" size="640"
+   color="#000000">현재</font><font face="Calibri" size="640" color="#000000"> </font><font
+   face="맑은 고딕" size="640" color="#000000">명세서</font><font face="Calibri"
+   size="640" color="#000000"> </font><font face="맑은 고딕" size="640"
+   color="#000000">행</font><font face="Calibri" size="640" color="#000000"> </font><font
+   face="맑은 고딕" size="640" color="#000000">맞춤</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    15, 0, 6, 0, 18, 0, 8, 0</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>[0]!FitCurrentInvoiceRows</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="_x0000_s150002" type="#_x0000_t201" style='position:absolute;
+  margin-left:2896.8pt;margin-top:499.8pt;width:293.4pt;height:80.4pt;
+  z-index:2;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  strokecolor="windowText [64]" o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center;direction:ltr'><font face="맑은 고딕" size="640"
+   color="#000000">전체</font><font face="Calibri" size="640" color="#000000"> </font><font
+   face="맑은 고딕" size="640" color="#000000">명세서</font><font face="Calibri"
+   size="640" color="#000000"> </font><font face="맑은 고딕" size="640"
+   color="#000000">행</font><font face="Calibri" size="640" color="#000000"> </font><font
+   face="맑은 고딕" size="640" color="#000000">맞춤</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    15, 0, 9, 0, 18, 0, 11, 0</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>[0]!FitAllInvoiceRows</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape><v:shape id="_x0000_s150003" type="#_x0000_t201" style='position:absolute;
+  margin-left:2896.8pt;margin-top:620.4pt;width:293.4pt;height:80.4pt;
+  z-index:3;mso-wrap-style:tight' o:button="t" fillcolor="buttonFace [67]"
+  strokecolor="windowText [64]" o:insetmode="auto">
+  <v:fill color2="buttonFace [67]" o:detectmouseclick="t"/>
+  <o:lock v:ext="edit" rotation="t"/>
+  <v:textbox style='mso-direction-alt:auto' o:singleclick="f">
+   <div style='text-align:center;direction:ltr'><font face="Calibri" size="800"
+   color="#000000">LKS 02~100 </font><font face="맑은 고딕" size="800"
+   color="#000000">생성</font></div>
+  </v:textbox>
+  <x:ClientData ObjectType="Button">
+   <x:Anchor>
+    15, 0, 12, 0, 18, 0, 14, 0</x:Anchor>
+   <x:PrintObject>False</x:PrintObject>
+   <x:AutoFill>False</x:AutoFill>
+   <x:FmlaMacro>[0]!CreateInvoiceSheets02To100</x:FmlaMacro>
+   <x:TextHAlign>Center</x:TextHAlign>
+   <x:TextVAlign>Center</x:TextVAlign>
+  </x:ClientData>
+ </v:shape></xml>

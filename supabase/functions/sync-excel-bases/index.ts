@@ -15,6 +15,10 @@ Deno.serve(async(req)=>{
   const result=await response.json();if(!response.ok)throw Error(result.error||result.message||`BASE export failed (${response.status})`);return result;
  };
  try{
+  // Independently update only existing statement-generator macros, one file per tick.
+  EdgeRuntime.waitUntil(Promise.all([0,1,2].map(()=>fetch(url+'/functions/v1/sync-statement-macros',{
+   method:'POST',headers:{Authorization:'Bearer '+key,apikey:key,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(120000),
+  }).then(async response=>{if(!response.ok)console.error('Statement macro update',response.status,await response.text());}).catch(error=>console.error('Statement macro update',String(error))))));
   // Common quote copy updates independently from BASE regeneration.
   EdgeRuntime.waitUntil(fetch(url+'/functions/v1/sync-excel-quote-context',{
    method:'POST',headers:{Authorization:'Bearer '+key,apikey:key,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(60000),

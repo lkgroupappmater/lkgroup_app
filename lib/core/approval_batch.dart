@@ -1,3 +1,5 @@
+import 'measurement_input.dart';
+
 enum ApprovalKind {
   changes,
   invoiceClaims,
@@ -102,6 +104,9 @@ class ApprovalDraft {
   late bool lock;
 
   Map<String, dynamic> payload() {
+    if (item.kind == ApprovalKind.changes && MeasurementInput.fields.any((key) => values[key]?.trim() != '${item.values[key] ?? ''}'.trim())) {
+      MeasurementInput.validate(values);
+    }
     final data = <String, dynamic>{};
     for (final field in item.fields) {
       final text = values[field]!.trim();

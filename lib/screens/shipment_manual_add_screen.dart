@@ -2,6 +2,9 @@
 import 'package:flutter/services.dart';
 
 import '../core/app_colors.dart';
+import '../core/app_language.dart';
+import '../core/measurement_input.dart';
+import '../widgets/measurement_warning.dart';
 import '../core/route_catalog.dart';
 import '../services/shipment_service.dart';
 import '../services/supabase_service.dart';
@@ -9,6 +12,7 @@ import '../services/supabase_service.dart';
 class ShipmentManualAddScreen extends StatefulWidget {
   const ShipmentManualAddScreen({
     super.key,
+    this.language = AppLanguage.korean,
     this.initialRoute,
     this.initialYear,
     this.initialVoyage,
@@ -18,6 +22,7 @@ class ShipmentManualAddScreen extends StatefulWidget {
     this.initialPhone = '',
   });
 
+  final AppLanguage language;
   final String? initialRoute;
   final int? initialYear;
   final String? initialVoyage;
@@ -201,6 +206,10 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
       return;
     }
 
+    if (!MeasurementInput.valid({'weight_kg': _weight.text, 'length_cm': _length.text, 'width_cm': _width.text, 'height_cm': _height.text})) {
+      _message(MeasurementInput.message(widget.language));
+      return;
+    }
     final weight = _double(_weight);
     final length = _double(_length);
     final width = _double(_width);
@@ -434,6 +443,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               ],
             ),
             const SizedBox(height: 10),
+            MeasurementWarning(weight: _weight, length: _length, width: _width, height: _height, language: widget.language),
             InkWell(
               onTap: _pickDate,
               child: InputDecorator(

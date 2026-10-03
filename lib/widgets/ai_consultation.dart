@@ -7,6 +7,7 @@ import '../core/app_colors.dart';
 import '../config/supabase_config.dart';
 import '../services/supabase_service.dart';
 import '../services/ai_assistant_service.dart';
+import '../screens/support_screen.dart';
 import 'content_media.dart';
 
 class AiConsultationBubble extends StatelessWidget {
@@ -90,7 +91,7 @@ class _AiConsultationPanelState extends State<AiConsultationPanel> {
       ])),
       if(_error!=null) Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:Text(_error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
       Padding(padding:const EdgeInsets.all(12),child:Row(children:[Expanded(child:TextField(controller:_question,enabled:!_busy&&_owner!=null,maxLength:4000,minLines:1,maxLines:3,decoration:InputDecoration(hintText:_s('궁금한 내용을 입력하세요.','Ask a question.','ປ້ອນຄຳຖາມ.'),counterText:'',border:const OutlineInputBorder()))),const SizedBox(width:8),IconButton(tooltip:_s('보내기','Send','ສົ່ງ'),onPressed:_busy||_owner==null?null:_send,icon:_busy?const SizedBox(width:22,height:22,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send))])),
-      TextButton(onPressed:()=>launchUrl(Uri.parse('https://open.kakao.com/o/sYly2bxf'),mode:LaunchMode.externalApplication),child:Text(_s('담당자에게 상담하기','Contact our team','ຕິດຕໍ່ພະນັກງານ'))),
+      TextButton(onPressed:()=>startStaffConsultation(context,widget.language,content:_rows.isEmpty?'':'${_rows.last['question']??''}'),child:Text(_s('담당자에게 상담하기','Contact our team','ຕິດຕໍ່ພະນັກງານ'))),
     ])),
   );
 }
