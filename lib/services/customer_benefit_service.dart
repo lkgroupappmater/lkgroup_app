@@ -105,12 +105,14 @@ class LocalDeliveryRule {
     required this.active,
     this.preferred = false,
     this.originalSourceNo,
+    this.displayColor,
   });
 
   final int? id;
   final String routeKey;
   final int? sourceNo;
   final int? originalSourceNo;
+  final String? displayColor;
   final String customerName;
   final String alternateName;
   final String companyName;
@@ -153,6 +155,7 @@ class LocalDeliveryRule {
         notes: '${map['notes'] ?? ''}'.trim(),
         active: map['active'] == true,
         preferred: map['preferred'] == true,
+        displayColor: map['display_color'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -412,6 +415,8 @@ class CustomerBenefitService {
     required String routeLabel,
     required String name,
     required String phone,
+    int? year,
+    String? voyage,
   }) async {
     if (!SupabaseConfig.isConfigured ||
         (name.trim().isEmpty && phone.trim().isEmpty)) {
@@ -419,24 +424,12 @@ class CustomerBenefitService {
     }
     final routeKey = RouteCatalog.formRouteKeyFor(routeLabel);
     if (!localDeliveryRouteKeys.contains(routeKey)) return null;
-    final rawId = await SupabaseService.client.rpc(
-      'lk_resolve_delivery_profile_id',
-      params: {
-        'p_route_key': routeKey,
-        'p_shipment_name': name,
-        'p_shipment_phone': phone,
-      },
-    );
-    if (rawId == null) return null;
-    final row = await SupabaseService.client
-        .from('local_delivery_profiles')
-        .select()
-        .eq('id', rawId)
-        .eq('route_key', routeKey)
-        .eq('active', true)
-        .maybeSingle();
+    final row = await SupabaseService.client.rpc('get_excel_delivery_profile', params: {
+      'p_route_key': routeKey, 'p_year': year, 'p_voyage': voyage,
+      'p_name': name, 'p_phone': phone,
+    });
     return row == null ? null : LocalDeliveryRule.fromMap(
-      Map<String, dynamic>.from(row),
+      Map<String, dynamic>.from(row as Map),
     );
   }
 
@@ -449,6 +442,8 @@ class CustomerBenefitService {
         routeLabel: routeLabel,
         name: '${row['consignee_name'] ?? ''}',
         phone: '${row['consignee_phone'] ?? ''}',
+        year: int.tryParse('${row['shipment_year'] ?? ''}'),
+        voyage: '${row['voyage'] ?? ''}',
       );
       if (rule != null) return rule;
     }

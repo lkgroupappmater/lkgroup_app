@@ -9,7 +9,8 @@ class DocumentDeliveryStyle {
   static const provincePrepaid = Color(0xFF5B9BD5);
   static const cityPrepaid = Color(0xFFD6B18A);
 
-  static Color? fromProfile(String type, {required bool prepaid}) {
+  static Color? fromProfile(String type, {required bool prepaid, String? displayColor}) {
+    if (RegExp(r'^[A-Fa-f0-9]{6}$').hasMatch(displayColor ?? '')) return Color(int.parse('FF$displayColor', radix: 16));
     if (type == 'province') return prepaid ? provincePrepaid : province;
     if (type == 'city') return prepaid ? cityPrepaid : city;
     return null;

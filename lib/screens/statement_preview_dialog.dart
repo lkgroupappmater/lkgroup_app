@@ -159,7 +159,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         _freight = freight;
         _inlandDeliveryText = inland?.toStatementText() ?? '';
         _inlandDeliveryColor = inland == null ? null : DocumentDeliveryStyle.fromProfile(
-          inland.deliveryType, prepaid: inland.isPrepaid);
+          inland.deliveryType, prepaid: inland.isPrepaid, displayColor: inland.displayColor);
         _extraCosts = ReceiptDeliveryCost.forStatement(
           extraCosts,
           ReceiptDeliveryCost.prepaidType(
@@ -868,7 +868,7 @@ class StatementDocumentRenderer {
       voyage: request.voyage,
       inlandDeliveryText: inland?.toStatementText() ?? '',
       inlandDeliveryColor: inland == null ? null : DocumentDeliveryStyle.fromProfile(
-        inland.deliveryType, prepaid: inland.isPrepaid),
+        inland.deliveryType, prepaid: inland.isPrepaid, displayColor: inland.displayColor),
       extraCosts: ReceiptDeliveryCost.forStatement(
         extraCosts,
         ReceiptDeliveryCost.prepaidType(

@@ -74,7 +74,7 @@ class _ExcelStatementControlsState extends State<ExcelStatementControlsScreen> {
             for (final c in rows(r['candidates'])) ...[
               const Divider(), Text('${c['name']} / ${c['receiver']}'), Text('${c['phone']} · ${c['type'] == 'province' ? '지방배송' : '시내배송'} · ${c['company']}'), Text('${c['address']}'), Text('${c['reason']}'),
               if (_data?['can_edit'] == true) Wrap(children: [
-                for (final approved in [true, false]) TextButton(onPressed: !canEdit ? null : () => _act('admin_review_excel_delivery_match', {'p_route_key': _data!['route_key'], 'p_name': r['name'], 'p_phone': r['phone'], 'p_profile_id': c['id'], 'p_fingerprint': c['fingerprint'], 'p_approved': approved}), child: Text(approved ? '이 배송지로 확인' : '다른 고객 / 제외')),
+                for (final approved in [true, false]) TextButton(onPressed: !canEdit ? null : () => _act('admin_review_excel_delivery_match_scoped', {'p_year': widget.batch.year, 'p_voyage': widget.batch.voyage, 'p_route_key': _data!['route_key'], 'p_name': r['name'], 'p_phone': r['phone'], 'p_profile_id': c['id'], 'p_fingerprint': c['fingerprint'], 'p_approved': approved}), child: Text(approved ? '이 배송지로 확인' : '다른 고객 / 제외')),
               ]),
             ],
           ]))),
