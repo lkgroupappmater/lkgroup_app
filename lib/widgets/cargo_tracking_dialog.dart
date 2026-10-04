@@ -9,6 +9,7 @@ import '../core/route_map_geometry.dart';
 import '../core/route_catalog.dart';
 import '../core/shipment_period_labels.dart';
 import '../services/schedule_service.dart';
+import 'auto_refresh_state.dart';
 
 class CargoTrackingLabels {
   CargoTrackingLabels._();
@@ -138,8 +139,20 @@ class _CargoTrackingDialogBody extends StatefulWidget {
 }
 
 class _CargoTrackingDialogBodyState
-    extends State<_CargoTrackingDialogBody> {
-  late final Future<Map<String, dynamic>?> _schedule;
+    extends State<_CargoTrackingDialogBody> with AutoRefreshState {
+  late Future<Map<String, dynamic>?> _schedule;
+
+  @override
+  Set<String> get autoRefreshTopics => {'content'};
+
+  @override
+  Future<void> refreshAutomatically() async {
+    // Repaint the time-based phase even if the schedule request is unavailable.
+    if (canApplyAutoRefresh) setState(() {});
+    final schedule = await ScheduleService.instance.findForCargo(widget.cargo);
+    if (!canApplyAutoRefresh) return;
+    setState(() => _schedule = Future.value(schedule));
+  }
 
   String _t(String key) => CargoTrackingLabels.text(widget.language, key);
 
@@ -193,7 +206,8 @@ class _CargoTrackingDialogBodyState
               child: FutureBuilder<Map<String, dynamic>?>(
                 future: _schedule,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
+                  if (!snapshot.hasData &&
+                      snapshot.connectionState != ConnectionState.done) {
                     return Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1053,4 +1067,3 @@ class _CargoRoutePainter extends CustomPainter {
       oldDelegate.language != language ||
       oldDelegate.schedules != schedules;
 }
-
