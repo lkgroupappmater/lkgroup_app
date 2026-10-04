@@ -2,7 +2,7 @@
 const binary=b=>Array.from(b,c=>String.fromCharCode(c)).join('');
 const bytes=s=>Uint8Array.from(s,c=>c.charCodeAt(0));
 const vb=s=>[...s].map(c=>c.charCodeAt(0)>127?`ChrW(&H${c.charCodeAt(0).toString(16).toUpperCase()})`:`"${c.replaceAll('"','""')}"`).join(' & ');
-const routineWords=['한국','카카오톡','카톡','명세서','선공유','온라인','결재','결제','및','일반','라선협','회원','대표','고정','기부','할인율','할인','적용'];
+const routineWords=['지상사협의회회원사','법인장지인','아파트고객','기업','특별','한국','카카오톡','카톡','명세서','선공유','온라인','결재','결제','및','일반','라선협','회원','대표','고정','기부','할인율','할인','적용'];
 // Remove only routine words and percentage syntax. Residual instructions still qualify.
 export function hasSpecialRemark(value){
  let s=String(value??'').replace(/\s/g,'');
@@ -11,7 +11,7 @@ export function hasSpecialRemark(value){
  return s.replace(/[0-9.%/;,|()\[\]:+-]/g,'').length>0;
 }
 const HELPERS=`
-' LK_SPECIAL_STATEMENTS_V1
+' LK_SPECIAL_STATEMENTS_V2
 Private Function LKCompact(ByVal value As Variant) As String
     If IsError(value) Then
         LKCompact = "#ERROR"
@@ -121,7 +121,12 @@ End Function
 `;
 export function addSpecialStatements(source){
  let text=binary(source);
- if(text.includes('LK_SPECIAL_STATEMENTS_V1'))return null;
+ if(text.includes('LK_SPECIAL_STATEMENTS_V2'))return null;
+ if(text.includes('LK_SPECIAL_STATEMENTS_V1')){
+  const pattern=/Private Function LKHasSpecialRemark\b[\s\S]*?End Function/;
+  if(!pattern.test(text))throw Error('Special remark filter needs review');
+  return bytes(text.replace(pattern,HELPERS.match(pattern)[0].replaceAll('\n','\r\n')).replace('LK_SPECIAL_STATEMENTS_V1','LK_SPECIAL_STATEMENTS_V2'));
+ }
  const signature='Public Sub CreateCurrentVoyageInvoiceSheets()\r\n';
  if(!text.includes(signature))return null;
  text=text.replace(signature,`Public Sub CreateCurrentVoyageInvoiceSheets()
