@@ -45,15 +45,41 @@ export function applyTaxStatementColors(files){
  }
  // Set saved tab colors too; VBA refreshes them from displayed customer fills on generation.
  const strings=[...dec.decode(files['xl/sharedStrings.xml']||new Uint8Array()).matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map(m=>decode([...m[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(t=>t[1]).join('')));
- const cv=values(dec.decode(files[cargo]),strings),taxBills=new Set();
+ const cv=values(dec.decode(files[cargo]),strings),taxBills=new Set(),cargoBills=new Set(),deliveries=new Map();
+ for(const [ref,value] of cv)if(/^N\d+$/.test(ref)&&+ref.slice(1)>=6&&compact(value)&&compact(value)!=='0'){
+  cargoBills.add(compact(value));const delivery=cv.get('R'+ref.slice(1));if(delivery)deliveries.set(compact(value),compact(delivery));
+ }
  for(const [ref,value] of cv)if(/^P\d+$/.test(ref)&&tax(value)){const bill=cv.get('N'+ref.slice(1));if(bill)taxBills.add(compact(bill));}
+ const customers=values(xml,strings);
+ for(const [ref,value] of customers)if(/^A\d+$/.test(ref)&&+ref.slice(1)>=4&&compact(value)){
+  const delivery=customers.get('DM'+ref.slice(1))||customers.get('E'+ref.slice(1));if(delivery)deliveries.set(compact(value),compact(delivery));
+ }
+ const allDxfs=[...styles.matchAll(/<dxf\b[^>]*?\/>|<dxf\b[^>]*>[\s\S]*?<\/dxf>/g)].map(m=>m[0]);
+ const palette=new Map();
+ const rules=[...xml.matchAll(/<cfRule\b[^>]*>[\s\S]*?<\/cfRule>/g)].map(m=>m[0]).sort((a,b)=>Number(a.match(/priority="(\d+)"/)?.[1])-Number(b.match(/priority="(\d+)"/)?.[1]));
+ for(const rule of rules){
+  const delivery=decode(rule.match(/<formula>([\s\S]*?)<\/formula>/)?.[1]||'').match(/="((?:지방|시내)배송[^\"]*)"$/)?.[1];
+  const color=allDxfs[Number(rule.match(/dxfId="(\d+)"/)?.[1])]?.match(/<fgColor\b[^>]*rgb="([^"]+)"/)?.[1];
+  if(delivery&&color&&!palette.has(compact(delivery)))palette.set(compact(delivery),color);
+ }
  for(const [name,path] of sheets){
-  if(!/^LK[AS]\s*\S/.test(name)||!files[path])continue;
-  let sheet=dec.decode(files[path]);const cells=values(sheet,strings),total=Number(cells.get('R6'));
-  if(!taxBills.has(compact(name))&&!tax(cells.get('A'+(total+2))))continue;
-  const tab='<tabColor rgb="FFBFBFBF"/>';
+  if((!/^LK[AS]\s*\S/.test(name)&&name!=='명세서 빠르게 확인')||!files[path])continue;
+  let sheet=dec.decode(files[path]);const cells=values(sheet,strings),total=Math.max(16,Number(cells.get('R6'))||16);
+  const bill=compact(cells.get('N2'))||compact(name),fee=compact(cells.get('W6'));
+  const manual=[...sheet.matchAll(/<c\b[^>]*\br="([B-N])(\d+)"[^>]*>([\s\S]*?)<\/c>/g)].some(m=>{
+   if(+m[2]<6||+m[2]>=total||/<f\b/.test(m[3]))return false;
+   const value=compact(cells.get(m[1]+m[2]));return value!==''&&value!=='0'&&!value.startsWith('#');
+  });
+  const hasContent=cargoBills.has(bill)||manual||(fee!==''&&fee!=='0'&&!fee.startsWith('#'));
+  const delivery=deliveries.get(bill)||'',existing=sheet.match(/<tabColor\b[^>]*\/>/)?.[0]||'';
+  let tab='';
+  if(hasContent){
+   tab='<tabColor rgb="FFFFFF00"/>';
+   if(/지방배송|시내배송/.test(delivery))tab=palette.has(delivery)?`<tabColor rgb="${palette.get(delivery)}"/>`:(existing||tab);
+   if(taxBills.has(bill)||tax(cells.get('A'+(total+2))))tab='<tabColor rgb="FFBFBFBF"/>';
+  }
   let next=sheet.replace(/<tabColor\b[^>]*\/>/,tab);
-  if(next===sheet&&!sheet.includes(tab)){
+  if(tab&&next===sheet&&!sheet.includes(tab)){
    if(/<sheetPr\b[^>]*\/>/.test(sheet))next=sheet.replace(/<sheetPr\b([^>]*)\/>/,`<sheetPr$1>${tab}</sheetPr>`);
    else if(/<sheetPr\b/.test(sheet))next=sheet.replace(/(<sheetPr\b[^>]*>)/,'$1'+tab);
    else next=sheet.replace(/(<worksheet\b[^>]*>)/,'$1<sheetPr>'+tab+'</sheetPr>');
