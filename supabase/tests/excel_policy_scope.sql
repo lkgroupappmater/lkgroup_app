@@ -28,6 +28,7 @@ begin
  assert public.compute_shipment_special_note_scoped(route,2098,'98','SCOPE QA 2098','02000009998') like '%지방배송(선결제)%','Scoped delivery missing';
  d:=public.get_excel_delivery_profile(route,2098,'98','SCOPE QA 2098','02000009998');
  assert d->>'destination_address'='Voyage only' and d->>'display_color'='ABCDEF','App/web profile must use voyage settings';
+ assert length(abs((d->>'id')::bigint)::text)<=15,'Scoped profile ID exceeds Excel precision';
  assert public.lk_excel_effective_policy(route,2098,'97')=baseline,'Other voyage changed';
  assert public.lk_excel_effective_policy(route,2097,'98')=baseline,'Other year changed';
  assert coalesce(public.resolve_customer_discount_context('kr_la_air',2098,'98','SCOPE QA 2098','02000009998')->>'discount_percent','0')='0','Other route changed';
