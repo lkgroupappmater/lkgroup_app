@@ -6,6 +6,7 @@ import {renameStatementButtons} from './statement-button-labels.mjs';
 import {addStatementTabColors} from './statement-tab-colors.mjs';
 import {addSpecialStatements,addSpecialStatementButtons} from './statement-special.mjs';
 import {applyTaxStatementColors} from './statement-tax-colors.mjs';
+import {fitStatementButtons,addStatementDefaultTabs} from './statement-presentation.mjs';
 const FREE=0xffffffff,END=0xfffffffe,FAT=0xfffffffd;
 const u16=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint16(p,true);
 const u32=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint32(p,true);
@@ -195,19 +196,19 @@ export function upgradeStatementMacros(files){
    }
   }
   if(indexOfBytes(src,marker)>=0){
-   present=true;const tabbed=addStatementTabColors(src),special=addSpecialStatements(tabbed||src);
-   if(tabbed||special){e.data=compressVba(special||tabbed);if(offset){if(offsetRecord<0)throw Error('Missing delivery-tab module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
+   present=true;const tabbed=addStatementTabColors(src),special=addSpecialStatements(tabbed||src),defaults=addStatementDefaultTabs(special||tabbed||src);
+   if(tabbed||special||defaults){e.data=compressVba(defaults||special||tabbed);if(offset){if(offsetRecord<0)throw Error('Missing delivery-tab module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
    continue;
   }
   const start=indexOfBytes(src,entry);if(start<0)continue;present=true;let finish=indexOfBytes(src,end,start);if(finish<0)throw Error('Invoice generator is incomplete');
   const old=new TextDecoder('windows-1252').decode(src.subarray(start,finish));
   if(old.includes('LK_CURRENT_VOYAGE_STATEMENTS_V1')){const next=indexOfBytes(src,ascii.encode('Public Sub CreateCurrentVoyageInvoiceSheets()'),finish);if(next<0)throw Error('Current-voyage generator is incomplete');finish=indexOfBytes(src,end,next);if(finish<0)throw Error('Current-voyage generator is incomplete');}
   else if(!/For i = 2 To 100\b/.test(old))throw Error('Invoice generator has another revision; review before updating');
-  const generated=join([src.subarray(0,start),ascii.encode(GENERATOR),src.subarray(finish+end.length)]),tabbed=addStatementTabColors(generated)||generated,next=addSpecialStatements(tabbed)||tabbed;e.data=compressVba(next);const roundtrip=decompressVba(e.data);if(indexOfBytes(roundtrip,marker)<0)throw Error('VBA roundtrip failed');if(offset){if(offsetRecord<0)throw Error('Missing VBA module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;
+  const generated=join([src.subarray(0,start),ascii.encode(GENERATOR),src.subarray(finish+end.length)]),tabbed=addStatementTabColors(generated)||generated,special=addSpecialStatements(tabbed)||tabbed,next=addStatementDefaultTabs(special)||special;e.data=compressVba(next);const roundtrip=decompressVba(e.data);if(indexOfBytes(roundtrip,marker)<0)throw Error('VBA roundtrip failed');if(offset){if(offsetRecord<0)throw Error('Missing VBA module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;
  }
  if(!present){if(Object.entries(files).some(([p,b])=>/\.(xml|vml)$/.test(p)&&/CreateInvoiceSheets02To100/.test(new TextDecoder().decode(b))))throw Error('Invoice macro source needs review');return {present:false,changed:false};}
  if(changed){if(dirChanged)dirEntry.data=compressVba(dir);const cache=c.entries.find(e=>e.name==='_VBA_PROJECT');if(cache)cache.data=new Uint8Array([0xcc,0x61,0xff,0xff,0,3,0]);for(const e of c.entries)if(e.name.startsWith('__SRP_'))e.data=new Uint8Array();files['xl/vbaProject.bin']=writeCompound(c);}
  const {buttons}=renameStatementButtons(files);
- const specialButtons=addSpecialStatementButtons(files),taxColors=applyTaxStatementColors(files);
- return {present:true,changed:!!(changed||buttons||specialButtons||taxColors),modules:changed,buttons,special_buttons:specialButtons,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-special-statements-gray-v6'};
+ const specialButtons=addSpecialStatementButtons(files),buttonLayouts=fitStatementButtons(files),taxColors=applyTaxStatementColors(files);
+ return {present:true,changed:!!(changed||buttons||specialButtons||buttonLayouts||taxColors),modules:changed,buttons,special_buttons:specialButtons,button_layout_parts:buttonLayouts,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'statements-36pt-yellow-tabs-v7'};
 }
