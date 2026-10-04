@@ -7,6 +7,7 @@ import { receiptOrderFormulas, fixedDiscountFormulas } from './receipt-order.mjs
 import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
 import { formatDeliveryNumbers } from './delivery-number-format.mjs';
+import { upgradeStatementMacros } from './statement-macros.mjs';
 import { zipWorkbook } from './workbook-zip.mjs';
 import { documentVatContext, documentVatFormula } from './document-vat.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -2500,6 +2501,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     restoreSharedFormulaMasters(files,originalSharedMasters);
     applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
     const integrity=validateWorkbookFormulas(files);
+    upgradeStatementMacros(files);
     console.log('[EXCEL200C] zip start');
     const encoded = await zipWorkbook(files, { Zip, ZipPassThrough });
     console.log('[EXCEL200C] zip done', encoded.byteLength);

@@ -3,6 +3,7 @@ import {unzipSync,Zip,ZipPassThrough} from 'npm:fflate@0.8.2';
 import {upgradeStatementMacros} from '../export-shipment-excel/statement-macros.mjs';
 import {zipWorkbook} from '../export-shipment-excel/workbook-zip.mjs';
 import {formatDeliveryNumbers} from '../export-shipment-excel/delivery-number-format.mjs';
+import {stripStatementPresentation} from '../export-shipment-excel/statement-tax-colors.mjs';
 
 // Private, one-file worker. Change macros, their button text and delivery styles.
 // Preserve every worksheet, issued number, formula, image and source backup.
@@ -29,7 +30,12 @@ Deno.serve(async(req)=>{
   }
   result.changed=result.changed||presentationChanges.length>0;
   const changed=Object.keys(files).filter(path=>files[path]!==before.get(path)&&!equalBytes(files[path],before.get(path)!));
-  if(changed.some(path=>path!=='xl/vbaProject.bin'&&!/^(xl\/(drawings|ctrlProps)\/|customUI\/)/.test(path)&&!presentationChanges.includes(path)))throw Error('Unexpected workbook part changed');
+  for(const path of changed){
+   if(path==='xl/vbaProject.bin'||path==='xl/styles.xml'||/^(xl\/(drawings|ctrlProps)\/|customUI\/)/.test(path)||presentationChanges.includes(path))continue;
+   if(!/^xl\/worksheets\/sheet[^/]*\.xml$/.test(path))throw Error('Unexpected workbook part changed');
+   const content=(b:Uint8Array)=>stripStatementPresentation(new TextDecoder().decode(b));
+   if(content(files[path])!==content(before.get(path)!))throw Error('Worksheet content changed during statement color update');
+  }
   const hash=async(bytes:Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(v=>v.toString(16).padStart(2,'0')).join('');
   const sourceHash=await hash(original);let targetHash=sourceHash;
   if(result.changed){
