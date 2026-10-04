@@ -129,6 +129,32 @@ class CargoTracking {
           schedule['eta'] ??
           schedule['estimated_arrival_date']);
 
+  // Date-only schedules are Laos calendar dates, independent of the device.
+  // Explicit timestamp offsets are converted to Laos before choosing the day.
+  static DateTime? _arrivalDay(Map<String, dynamic> schedule) {
+    final text = _text(schedule['arrival_date'] ??
+        schedule['eta'] ??
+        schedule['estimated_arrival_date']);
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])')
+        .firstMatch(text);
+    if (match == null) return null;
+    final year = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+    final date = DateTime.utc(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) return null;
+    if (text.length > 10) {
+      final hasOffset = RegExp(r'(?:[zZ]|[+-]\d{2}:?\d{2})$').hasMatch(text);
+      final parsed = DateTime.tryParse(hasOffset ? text : '${text}Z');
+      if (parsed == null) return null;
+      if (hasOffset) {
+        final laos = parsed.toUtc().add(const Duration(hours: 7));
+        return DateTime.utc(laos.year, laos.month, laos.day);
+      }
+    }
+    return date;
+  }
+
   static CargoTrackingPhase phase(
     Map<String, dynamic> schedule, {
     DateTime? now,
@@ -137,18 +163,19 @@ class CargoTracking {
     if (RegExp(r'출고|dispatch|out.?for.?delivery').hasMatch(status)) {
       return CargoTrackingPhase.dispatching;
     }
-    if (RegExp(r'도착완료|arrived|^도착$').hasMatch(status)) {
-      return CargoTrackingPhase.arrived;
+    final endDay = _arrivalDay(schedule);
+    if (endDay == null) {
+      return RegExp(r'도착완료|arrived|^도착$').hasMatch(status)
+          ? CargoTrackingPhase.arrived
+          : CargoTrackingPhase.moving;
     }
-    final end = endDate(schedule);
-    if (end == null) return CargoTrackingPhase.moving;
-    final current = (now ?? DateTime.now()).toLocal();
-    final localEnd = end.toLocal();
-    final today = DateTime(current.year, current.month, current.day);
-    final endDay = DateTime(localEnd.year, localEnd.month, localEnd.day);
-    final elapsedDays = today.difference(endDay).inDays;
-    if (elapsedDays >= 2) return CargoTrackingPhase.dispatching;
-    if (elapsedDays >= 0) return CargoTrackingPhase.arrived;
+    final arrival = endDay.subtract(const Duration(hours: 7));
+    final dispatch = arrival.add(modeOf(schedule) == CargoTrackingMode.air
+        ? const Duration(hours: 16)
+        : const Duration(days: 2));
+    final current = (now ?? DateTime.now()).toUtc();
+    if (!current.isBefore(dispatch)) return CargoTrackingPhase.dispatching;
+    if (!current.isBefore(arrival)) return CargoTrackingPhase.arrived;
     return CargoTrackingPhase.moving;
   }
 
@@ -159,7 +186,8 @@ class CargoTracking {
     final current = now ?? DateTime.now();
     if (phase(schedule, now: current) != CargoTrackingPhase.moving) return 1;
     final status = _text(schedule['tracking_status'] ?? schedule['status']).toLowerCase();
-    if (RegExp(r'arriv|deliver|complete|도착|완료').hasMatch(status)) return 1;
+    if (_arrivalDay(schedule) == null &&
+        RegExp(r'arriv|deliver|complete|도착|완료').hasMatch(status)) return 1;
     final start = startDate(schedule);
     final end = endDate(schedule);
     if (start == null || end == null || !end.isAfter(start)) return 0;
@@ -251,4 +279,3 @@ class CargoTracking {
     ));
   }
 }
-
