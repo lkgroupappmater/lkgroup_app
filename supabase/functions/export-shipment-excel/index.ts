@@ -675,6 +675,7 @@ function insertWorksheetExtensionBlock(
 function applyDeliveryColorConditionalFormatting(
   files: Record<string, Uint8Array>,
   routeKey: string,
+  appearance: Record<string,string> = {},
 ): void {
   if (routeKey !== 'kr_la_sea' && routeKey !== 'kr_la_air') return;
   const stylesPath = 'xl/styles.xml';
@@ -684,7 +685,7 @@ function applyDeliveryColorConditionalFormatting(
   // Medium-light fills: black text remains readable, but the delivery area
   // is visually clear enough on screen/print.
   // Order: province / province-prepaid / city / city-prepaid.
-  const fills = ['FFFFC000', 'FF9DC3E6', 'FFA9D18E', 'FFD6B18A'];
+  const fills = ['province','province_prepaid','city','city_prepaid'].map((key,index)=>/^[A-Fa-f0-9]{6}$/.test(appearance[key]||'')?'FF'+appearance[key]:['FFFFC000','FF9DC3E6','FFA9D18E','FFD6B18A'][index]);
 
   // Excel templates can have either <dxfs count="0"/> or <dxfs ...>...</dxfs>.
   // Handle both forms and append valid differential fills.  A broken dxfId is what
@@ -2136,7 +2137,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
         return json(200,{ok:true,file_name:baseTemplate.file_name,automation_version:ID_WORKBOOK_VERSION,integrity:baseTemplate.policy_summary.integrity,storage_path:exportPath,shipment_count:0,mode:'validated-current-base',template_source:'base'});
       }
     }
-    const useBase = baseTemplate && (isBaseRefresh || !voyageTemplate || baseTemplate.prefer_for_export);
+    const useBase = baseTemplate && (isBaseRefresh || !voyageTemplate);
     const template = useBase ? {...baseTemplate,shipment_year:shipmentYear,voyage} : voyageTemplate;
     const templateSource = useBase ? 'base' : 'voyage';
     if (!template) return json(404,{error:'해당 운송 경로의 기본 Excel 폼과 항차별 변경 폼이 모두 없습니다.'});
@@ -2203,12 +2204,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       global:{headers:{Authorization:authHeader}},
       auth:{persistSession:false,autoRefreshToken:false},
     });
-    const [rates,shares]=await Promise.all([
-      workerRequest?admin.rpc('lk_excel_discount_context',{p_route_key:routeKey}):policyReader.from('customer_rate_overrides').select('*').in('route_key',[routeKey,'all']),
-      admin.from('customer_statement_share_rules').select('*').eq('route_key',routeKey),
-    ]);
-    if(rates.error)throw rates.error;if(shares.error)throw shares.error;
-    identityContext.discounts=rates.data??[];identityContext.shares=shares.data??[];
+    const {data:workbookPolicy,error:workbookPolicyError}=await admin.rpc('get_excel_workbook_policy',{p_route_key:routeKey,p_year:shipmentYear,p_voyage:voyage});
+    if(workbookPolicyError)throw workbookPolicyError;
+    Object.assign(identityContext,workbookPolicy);
     if(enrichedShipments.length){
       const {data:pendingReceipts,error:pendingError}=await policyReader.from('shipment_change_requests').select('shipment_id,changes').eq('status','pending').in('shipment_id',enrichedShipments.map(s=>s.id));
       if(pendingError)throw pendingError;
@@ -2317,14 +2315,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
           })()
         : settlementSnapshot;
 
-    const { data: localDeliveryProfiles, error: localDeliveryError } = await admin
-      .from('local_delivery_profiles')
-      .select('source_no,original_source_no,customer_name,alternate_name,company_name,phone,phone_display,delivery_type,local_company,destination_address,paid_by,notes,preferred')
-      .eq('route_key', routeKey)
-      .eq('active', true)
-      .order('preferred', { ascending: false })
-      .order('source_no', { ascending: true });
-    if (localDeliveryError) throw localDeliveryError;
+    const localDeliveryProfiles = workbookPolicy.deliveries ?? [];
     const filePrefixes: Record<string, string> = {
       kr_la_sea: 'KR_LA_SEA',
       kr_la_air: 'KR_LA_AIR',
@@ -2399,7 +2390,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     wireStatementVatFormulas(files, routeKey);
     wireStatementPaymentAccounts(files);
     applyStatementWrapText(files, routeKey);
-    applyDeliveryColorConditionalFormatting(files, routeKey);
+    applyDeliveryColorConditionalFormatting(files, routeKey, workbookPolicy.appearance);
     // Patch132: SEA/AIR 언어 선택 기반 + TH-LA LAND 스팟 직접 명세서 자동입력.
     addStatementLanguageSelector(files, routeKey);
     populateSpotTransportStatement(

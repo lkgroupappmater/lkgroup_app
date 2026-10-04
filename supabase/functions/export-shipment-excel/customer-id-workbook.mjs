@@ -251,7 +251,7 @@ function refreshPolicyInputs(files,context,strings){
    let matches=candidates.filter(d=>phoneKey(d.phone)===phoneKey(phone));
    if(!phoneKey(phone)){const active=candidates.filter(d=>d.active&&(d.excel_source_row===n||candidates.filter(x=>x.active).length===1));if(active.length===1)matches=active;}
    matches.sort((a,b)=>Number(b.active)-Number(a.active)||String(b.updated_at).localeCompare(String(a.updated_at)));
-   const d=matches[0];if(!d)continue;used.add(d.id+'|'+Number(special));
+   const d=matches[0];if(!d){set(n,table.d,0);continue;}used.add(d.id+'|'+Number(special));
    const pct=special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0)):Number(d.discount_percent)-Number(d.special_discount_percent||0);
    if(!Number.isFinite(pct)||pct<0||pct>1)continue;
    set(n,table.c,d.customer_name);if(phoneKey(phone)!==phoneKey(d.phone))set(n,table.p,d.phone);

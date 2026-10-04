@@ -1,3 +1,4 @@
+import 'excel_workbook_appearance.dart';
 import '../core/customer_discounts.dart';
 import '../models/app_user.dart';
 import 'auth_service.dart';
@@ -120,8 +121,9 @@ class ExcelImportService {
     final year = meta.year;
     final voyage = meta.voyage;
     final isBaseUpdate = voyage == '00';
+    final policyRules = <String, dynamic>{'appearance': ExcelWorkbookAppearance.read(bytes)};
 
-    if (SupabaseConfig.isConfigured && AuthService.instance.currentUser?.role == UserRole.admin) {
+    if (isBaseUpdate && SupabaseConfig.isConfigured && AuthService.instance.currentUser?.role == UserRole.admin) {
       final customers = <Map<String, dynamic>>[];
       final deliveryRows = AutomationWorkbookRules.deliveries(workbook, routeKey);
       if (deliveryRows != null) { for (final row in deliveryRows) { customers.add({'name': row['customer_name'], 'phone': row['phone_display'] ?? row['phone']}); } }
@@ -138,12 +140,13 @@ class ExcelImportService {
     // contain reserved cargo numbers/formulas, V00 must not upsert shipments.
     if (isBaseUpdate) {
       onProgress?.call(0.30, 'V00 BASE 확인 · 실제 화물 데이터는 변경하지 않습니다');
-      await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
+      await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey, policyRules: policyRules);
 
       onProgress?.call(0.45, '시내·지방배송 BASE 반영 완료 · 할인 고객 갱신 중');
       final customerRuleResult =
-          await _importCustomerDiscountRules(workbook, routeKey: routeKey);
-      await _importStatementShareRules(workbook, routeKey: routeKey);
+          await _importCustomerDiscountRules(workbook, routeKey: routeKey, policyRules: policyRules);
+      await _importStatementShareRules(workbook, routeKey: routeKey, policyRules: policyRules);
+    await _saveWorkbookPolicy(routeKey, year, voyage, fileName, policyRules);
 
       await _importIdentityControls(workbook, routeKey, routeLabel, year, voyage);
       if (SupabaseConfig.isConfigured) {
@@ -275,18 +278,17 @@ class ExcelImportService {
     }
 
 
-    // Patch167: current BASE Excel delivery table is the source of truth.
-    // Import it before shipment upsert so normalize/finalize can see city/province
-    // delivery + prepaid + company/address for this very upload.
+    // Voyage policies are isolated from BASE defaults and other voyages.
     onProgress?.call(0.45, '항차 화물 비교 및 변경 승인 요청 등록 중');
     final importSummary = synchronize
         ? await ShipmentService.instance.synchronizeExcelRows(uniqueRows)
         : await ShipmentService.instance.importDifferencesFromRows(uniqueRows);
-    await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey);
+    await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey, policyRules: policyRules);
     onProgress?.call(0.72, '화물 비교 완료 · 고객 규칙 확인 중');
     final customerRuleResult =
-        await _importCustomerDiscountRules(workbook, routeKey: routeKey);
-    await _importStatementShareRules(workbook, routeKey: routeKey);
+        await _importCustomerDiscountRules(workbook, routeKey: routeKey, policyRules: policyRules);
+    await _importStatementShareRules(workbook, routeKey: routeKey, policyRules: policyRules);
+    await _saveWorkbookPolicy(routeKey, year, voyage, fileName, policyRules);
 
     if (SupabaseConfig.isConfigured && uniqueRows.isNotEmpty) {
       onProgress?.call(0.82, '승인된 명세서 번호 유지 · 고객 규칙 확인 중');
@@ -546,7 +548,7 @@ class ExcelImportService {
       final id = int.tryParse(cell(row, 5));
       final profile = profiles[id];
       if (id == null || profile == null || !cell(row, 8).contains('|$id|')) throw const FormatException('배송 매칭 확인: 후보 목록의 배송 번호를 선택하세요.');
-      await SupabaseService.client.rpc('admin_review_excel_delivery_match', params: {'p_route_key': routeKey, 'p_name': cell(row, 6), 'p_phone': cell(row, 7), 'p_profile_id': id, 'p_fingerprint': cell(profile, 17), 'p_approved': true});
+      await SupabaseService.client.rpc('admin_review_excel_delivery_match_scoped', params: {'p_route_key': routeKey, 'p_year': year, 'p_voyage': voyage, 'p_name': cell(row, 6), 'p_phone': cell(row, 7), 'p_profile_id': id, 'p_fingerprint': cell(profile, 17), 'p_approved': true});
     }
   }
 
@@ -594,7 +596,14 @@ class ExcelImportService {
       'storage_path': path,
       'uploaded_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'route_key,shipment_year,voyage');
-    await _syncQuoteWorkbook(routeKey);
+  }
+
+  Future<void> _saveWorkbookPolicy(String routeKey, int year, String voyage, String fileName, Map<String, dynamic> rules) async {
+    if (!SupabaseConfig.isConfigured) return;
+    await SupabaseService.client.rpc('import_excel_workbook_policy', params: {
+      'p_route_key': routeKey, 'p_year': year, 'p_voyage': voyage,
+      'p_file_name': fileName, 'p_rules': rules,
+    });
   }
 
   Future<void> _syncQuoteWorkbook(String routeKey) async {
@@ -651,6 +660,7 @@ class ExcelImportService {
     Uint8List bytes,
     Map<String, List<List<String>>> workbook, {
     required String routeKey,
+    required Map<String, dynamic> policyRules,
   }) async {
     if (!SupabaseConfig.isConfigured) return 0;
 
@@ -668,10 +678,7 @@ class ExcelImportService {
     final splitRules = AutomationWorkbookRules.deliveries(workbook, routeKey,
       colorPriority: (name, row) => (splitStyles[name] ??= _readLocalDeliveryStyles(bytes, name))[row]?.priorityFor(5, 6) ?? 1);
     if (splitRules != null) {
-      await SupabaseService.client.rpc('web_import_excel_rules', params: {
-        'p_route_key': routeKey, 'p_deliveries': splitRules,
-        'p_discounts': <Map<String, dynamic>>[], 'p_shares': null,
-      });
+      policyRules['deliveries'] = splitRules;
       return splitRules.length;
     }
 
@@ -1014,22 +1021,7 @@ class ExcelImportService {
 
     if (bySourceNo.isEmpty) return 0;
 
-    await SupabaseService.client
-        .from('local_delivery_profiles')
-        .delete()
-        .eq('route_key', routeKey);
-
-    // Defensive one-row UPSERT: even if a future BASE layout produces
-    // rows that normalize to the same DB key, PostgreSQL will never receive
-    // duplicate conflict targets in the same INSERT statement.
-    for (final profile in bySourceNo.values) {
-      await SupabaseService.client
-          .from('local_delivery_profiles')
-          .upsert(
-            profile,
-            onConflict: 'route_key,source_no',
-          );
-    }
+    policyRules['deliveries'] = bySourceNo.values.toList(growable: false);
 
     // Patch167: do not run a global shipment refresh here.
     // importBytes() runs one batch-scoped finalizer after shipment upsert.
@@ -1385,21 +1377,21 @@ class ExcelImportService {
   Future<({int applied, int waitingForPhone})> _importCustomerDiscountRules(
     Map<String, List<List<String>>> workbook, {
     required String routeKey,
+    required Map<String, dynamic> policyRules,
   }) async {
     if (!SupabaseConfig.isConfigured) {
       return (applied: 0, waitingForPhone: 0);
     }
     final fixedZones = AutomationWorkbookRules.zones(workbook);
     if (fixedZones != null) {
-      await SupabaseService.client.rpc('web_import_excel_zone_rules', params: {
-        'p_route_key': routeKey, 'p_zones': fixedZones,
-      });
+      policyRules['zones'] = fixedZones;
     }
     final sheet = workbook['Row data'];
     if (sheet == null || sheet.isEmpty) {
       return (applied: 0, waitingForPhone: 0);
     }
 
+    policyRules['discounts'] = <Map<String, dynamic>>[];
     final rules = <Map<String, dynamic>>[];
     var applied = 0;
     var waitingForPhone = 0;
@@ -1479,9 +1471,7 @@ class ExcelImportService {
 
     // Shared transactional importer preserves any discount category absent
     // from this workbook and validates the saved ordinary/special split.
-    await SupabaseService.client.rpc('web_import_excel_rules', params: {
-      'p_route_key': routeKey, 'p_discounts': uniqueRules,
-    });
+    policyRules['discounts'] = uniqueRules;
 
     return (applied: applied, waitingForPhone: waitingForPhone);
   }
@@ -1586,15 +1576,13 @@ class ExcelImportService {
   Future<int> _importStatementShareRules(
     Map<String, List<List<String>>> workbook, {
     required String routeKey,
+    required Map<String, dynamic> policyRules,
   }) async {
     if (!SupabaseConfig.isConfigured) return 0;
 
     final splitRules = AutomationWorkbookRules.shares(workbook);
     if (splitRules != null) {
-      await SupabaseService.client.rpc('web_import_excel_rules', params: {
-        'p_route_key': routeKey, 'p_deliveries': null,
-        'p_discounts': <Map<String, dynamic>>[], 'p_shares': splitRules,
-      });
+      policyRules['shares'] = splitRules;
       return splitRules.length;
     }
 
@@ -1720,16 +1708,7 @@ class ExcelImportService {
       });
     }
 
-    await SupabaseService.client
-        .from('customer_statement_share_rules')
-        .delete()
-        .eq('route_key', routeKey);
-
-    if (rows.isNotEmpty) {
-      await SupabaseService.client
-          .from('customer_statement_share_rules')
-          .upsert(rows, onConflict: 'route_key,source_no');
-    }
+    policyRules['shares'] = rows;
     return rows.length;
   }
 
