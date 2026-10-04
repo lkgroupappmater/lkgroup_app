@@ -43,7 +43,10 @@ function patchRow(row,n,values,existingCells){
  const ordered=[...cells].sort((a,b)=>columnIndex(a[0])-columnIndex(b[0])).map(x=>x[1]).join('');
  return row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'').replace('</row>',ordered+'</row>');
 }
-function readRow(row,c,strings){row.cells??=parsedCells(row.xml);return cellValue(row.cells.get(c)??'',strings);}
+function readRow(row,c,strings){
+ row.values??=new Map();if(row.values.has(c))return row.values.get(c);
+ row.cells??=parsedCells(row.xml);const value=cellValue(row.cells.get(c)??'',strings);row.values.set(c,value);return value;
+}
 function hideColumns(text,start,end){
  const cols=text.match(/<cols>([\s\S]*?)<\/cols>/)?.[1]??'';
  const pieces=[];for(const m of cols.matchAll(/<col\b[^>]*\/>/g)){const lo=Number(m[0].match(/min="(\d+)"/)[1]),hi=Number(m[0].match(/max="(\d+)"/)[1]);
@@ -290,7 +293,8 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
   for(const d of profiles){
    const number=d.original_source_no||((Number(d.source_no)>=10000&&Number(d.source_no)<20000)?Number(d.source_no)-10000:Number(d.source_no));
    const numbered=blocks.filter(b=>b.number===number);
-   let block=blocks.find(b=>matchKey(read(b.first,'B'),read(b.first,'E'))===matchKey(d.customer_name,d.phone_display||d.phone))||(numbered.length===1?numbered[0]:null);
+   const profileKey=matchKey(d.customer_name,d.phone_display||d.phone);
+   let block=blocks.find(b=>(b.matchKey??=matchKey(read(b.first,'B'),read(b.first,'E')))===profileKey)||(numbered.length===1?numbered[0]:null);
    if(!block){const row=physical.find(r=>r.n>lastInput&&r.n<=800);if(!row)throw new Error(`${name}: 배송 입력 공간이 부족합니다.`);lastInput=row.n;block={number:number||lastInput,first:row,rows:[row]};blocks.push(block);}
    // Preserve every other carrier/address alternative already in the BASE.
    const choices=block.rows.filter(r=>read(r,'F')||read(r,'G')||r.n===block.first.n);

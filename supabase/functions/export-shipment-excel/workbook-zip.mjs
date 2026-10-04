@@ -1,3 +1,53 @@
+// Keep DEFLATE outside JavaScript's small Edge CPU budget. fflate still parses
+// ZIP headers (including streamed entries), and the native runtime inflates bytes.
+export async function unzipWorkbook(data, { Unzip, filter = () => true }) {
+  const files = Object.create(null);
+  let sequence = Promise.resolve(), failure, pending = 0;
+  class NativeInflate {
+    static compression = 8;
+    chunks = [];
+    push(chunk, final) {
+      this.chunks.push(chunk);
+      if (!final) return;
+      sequence = sequence.then(async () => {
+        try {
+          const stream = new Blob(this.chunks).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+          this.chunks = [];
+          this.ondata(null, new Uint8Array(await new Response(stream).arrayBuffer()), true);
+        } catch (error) { this.ondata(error, null, true); }
+      });
+    }
+  }
+  const unzip = new Unzip(file => {
+    if (!filter(file)) return;
+    pending++;
+    const chunks = [];
+    let length = 0;
+    file.ondata = (error, chunk, final) => {
+      if (error) { failure ??= error; return; }
+      chunks.push(chunk); length += chunk.length;
+      if (!final) return;
+      const bytes = chunks.length === 1 ? chunks[0] : new Uint8Array(length);
+      if (chunks.length !== 1) {
+        let offset = 0;
+        for (const part of chunks) { bytes.set(part, offset); offset += part.length; }
+      }
+      if (file.originalSize !== undefined && length !== file.originalSize) {
+        failure ??= new Error(`Incomplete Excel ZIP entry: ${file.name}`);
+      }
+      files[file.name] = bytes;
+      pending--;
+    };
+    file.start();
+  });
+  unzip.register(NativeInflate);
+  unzip.push(data, true);
+  await sequence;
+  if (failure) throw failure;
+  if (pending) throw new Error('Incomplete Excel ZIP archive.');
+  return files;
+}
+
 // Standard ZIP method 8, using the runtime's native DEFLATE compressor.
 // fflate owns CRCs, local headers, data descriptors and the central directory.
 // Inject its constructors so the same writer is testable without a Deno import.

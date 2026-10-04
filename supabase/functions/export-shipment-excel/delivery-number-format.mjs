@@ -4,7 +4,11 @@ export function formatDeliveryNumbers(files, routeKey) {
   if (!['kr_la_sea', 'kr_la_air'].includes(routeKey)) return;
   const decode = data => new TextDecoder().decode(data);
   const encode = text => new TextEncoder().encode(text);
-  const attr = (tag, name) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`))?.[1];
+  const attrPatterns = new Map();
+  const attr = (tag, name) => {
+    if (!attrPatterns.has(name)) attrPatterns.set(name, new RegExp(`(?:^|\\s)${name}="([^"]*)"`));
+    return tag.match(attrPatterns.get(name))?.[1];
+  };
   const setAttr = (tag, name, value) => {
     const pattern = new RegExp(`(\\s${name}=")[^"]*(")`);
     return pattern.test(tag) ? tag.replace(pattern, (_, a, b) => a + value + b)
@@ -68,7 +72,8 @@ export function formatDeliveryNumbers(files, routeKey) {
     let xml = decode(files[path]);
     const headers = new Map();
     // Resolve columns from their visible No. header, not route-specific style IDs.
-    for (const match of xml.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)) {
+    const headerRows = [...xml.matchAll(/<row\b[^>]*\br="(?:1|2)"[^>]*>[\s\S]*?<\/row>/g)].map(m => m[0]).join('');
+    for (const match of headerRows.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)) {
       const cell = match[0], ref = attr(cell, 'r')?.match(/^([A-Z]+)(\d+)$/);
       if (!ref || Number(ref[2]) > 2) continue;
       const label = attr(cell, 't') === 's' ? strings[Number(cell.match(/<v>([^<]*)<\/v>/)?.[1])]
@@ -78,7 +83,7 @@ export function formatDeliveryNumbers(files, routeKey) {
     if (!headers.size) continue;
     // The two delivery-list titles share the damaged number style in older
     // BASEs. Other sheets and their deliberately larger headings stay intact.
-    xml = xml.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, cell => {
+    xml = xml.replace(/<c\b[^>]*\br="A1"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/, cell => {
       if (attr(cell, 'r') !== 'A1') return cell;
       const label = attr(cell, 't') === 's' ? strings[Number(cell.match(/<v>([^<]*)<\/v>/)?.[1])]
         : textOf(cell);
