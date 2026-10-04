@@ -1,7 +1,11 @@
-// Narrow MS-CFB / MS-OVBA edit: replace only the fixed-range generator.
-// Worksheet XML, formula cells, and the two row-fit procedures remain unchanged.
+// MS-CFB / MS-OVBA edits preserve issued numbers, formulas and row-fit procedures.
+// Workbook presentation changes are limited to buttons, conditional fills and tabs.
 // Format references: Microsoft [MS-CFB] and [MS-OVBA] 2.3.4 / 2.4.1.
 import {enhanceStatementFeatures} from './statement-features.mjs';
+import {renameStatementButtons} from './statement-button-labels.mjs';
+import {addStatementTabColors} from './statement-tab-colors.mjs';
+import {addSpecialStatements,addSpecialStatementButtons} from './statement-special.mjs';
+import {applyTaxStatementColors} from './statement-tax-colors.mjs';
 const FREE=0xffffffff,END=0xfffffffe,FAT=0xfffffffd;
 const u16=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint16(p,true);
 const u32=(a,p)=>new DataView(a.buffer,a.byteOffset,a.byteLength).getUint32(p,true);
@@ -190,24 +194,20 @@ export function upgradeStatementMacros(files){
     }
    }
   }
-  if(indexOfBytes(src,marker)>=0){present=true;continue;}
+  if(indexOfBytes(src,marker)>=0){
+   present=true;const tabbed=addStatementTabColors(src),special=addSpecialStatements(tabbed||src);
+   if(tabbed||special){e.data=compressVba(special||tabbed);if(offset){if(offsetRecord<0)throw Error('Missing delivery-tab module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
+   continue;
+  }
   const start=indexOfBytes(src,entry);if(start<0)continue;present=true;let finish=indexOfBytes(src,end,start);if(finish<0)throw Error('Invoice generator is incomplete');
   const old=new TextDecoder('windows-1252').decode(src.subarray(start,finish));
   if(old.includes('LK_CURRENT_VOYAGE_STATEMENTS_V1')){const next=indexOfBytes(src,ascii.encode('Public Sub CreateCurrentVoyageInvoiceSheets()'),finish);if(next<0)throw Error('Current-voyage generator is incomplete');finish=indexOfBytes(src,end,next);if(finish<0)throw Error('Current-voyage generator is incomplete');}
   else if(!/For i = 2 To 100\b/.test(old))throw Error('Invoice generator has another revision; review before updating');
-  const next=join([src.subarray(0,start),ascii.encode(GENERATOR),src.subarray(finish+end.length)]);e.data=compressVba(next);const roundtrip=decompressVba(e.data);if(indexOfBytes(roundtrip,marker)<0)throw Error('VBA roundtrip failed');if(offset){if(offsetRecord<0)throw Error('Missing VBA module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;
+  const generated=join([src.subarray(0,start),ascii.encode(GENERATOR),src.subarray(finish+end.length)]),tabbed=addStatementTabColors(generated)||generated,next=addSpecialStatements(tabbed)||tabbed;e.data=compressVba(next);const roundtrip=decompressVba(e.data);if(indexOfBytes(roundtrip,marker)<0)throw Error('VBA roundtrip failed');if(offset){if(offsetRecord<0)throw Error('Missing VBA module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;
  }
  if(!present){if(Object.entries(files).some(([p,b])=>/\.(xml|vml)$/.test(p)&&/CreateInvoiceSheets02To100/.test(new TextDecoder().decode(b))))throw Error('Invoice macro source needs review');return {present:false,changed:false};}
  if(changed){if(dirChanged)dirEntry.data=compressVba(dir);const cache=c.entries.find(e=>e.name==='_VBA_PROJECT');if(cache)cache.data=new Uint8Array([0xcc,0x61,0xff,0xff,0,3,0]);for(const e of c.entries)if(e.name.startsWith('__SRP_'))e.data=new Uint8Array();files['xl/vbaProject.bin']=writeCompound(c);}
- let buttons=0;
- for(const [path,data] of Object.entries(files)){
-  if(!/\.(?:vml|xml)$/.test(path)||!/(drawings|customUI|ctrlProps)/.test(path))continue;
-  const xml=new TextDecoder().decode(data);
-  const next=xml.replace(/<v:shape\b[\s\S]*?<\/v:shape>/g,shape=>{
-   if(!/CreateInvoiceSheets02To100|CreateCurrentVoyageInvoiceSheets/.test(shape))return shape;
-   return shape.replace(/(<v:textbox\b[^>]*>)[\s\S]*?(<\/v:textbox>)/,(m,a,b)=>{if(m.includes('모든 명세서 생성'))return m;buttons++;return a+'<div style="text-align:center"><font face="맑은 고딕" size="640" color="#000000">모든 명세서 생성</font></div>'+b;});
-  }).replace(/(label=")[^"]*(?:(?:LKA|LKS)\s*02\s*[~～–-]\s*100|현재 항차 고객 명세서 전체 생성)[^"]*(")/g,'$1모든 명세서 생성$2');
-  if(next!==xml)files[path]=new TextEncoder().encode(next);
- }
- return {present:true,changed:!!(changed||buttons),modules:changed,buttons,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-statements-features-v2'};
+ const {buttons}=renameStatementButtons(files);
+ const specialButtons=addSpecialStatementButtons(files),taxColors=applyTaxStatementColors(files);
+ return {present:true,changed:!!(changed||buttons||specialButtons||taxColors),modules:changed,buttons,special_buttons:specialButtons,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-special-statements-gray-v6'};
 }
