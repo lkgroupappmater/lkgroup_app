@@ -17,4 +17,11 @@ test('tax customers use gray before delivery fills, preserving every cell and fo
  assert.match(dec(files['xl/worksheets/sheet3.xml']),/<tabColor rgb="FFBFBFBF"\/>/);
  for(const p of ['xl/worksheets/sheet1.xml','xl/worksheets/sheet2.xml','xl/worksheets/sheet3.xml'])assert.equal(stripStatementPresentation(dec(files[p])),stripStatementPresentation(dec(before[p])));
  assert.equal(applyTaxStatementColors(files),0);
+ // Regenerating a larger BASE must grow both ranges without accumulating rules.
+ files['xl/worksheets/sheet2.xml']=enc(dec(files['xl/worksheets/sheet2.xml']).replace('</sheetData>','<row r="30"><c r="N30"><v>0</v></c></row></sheetData>'));
+ files['xl/worksheets/sheet1.xml']=enc(dec(files['xl/worksheets/sheet1.xml']).replace('</sheetData>','<row r="9"><c r="A9"><v>0</v></c></row></sheetData>'));
+ assert.equal(applyTaxStatementColors(files),1);
+ const expanded=dec(files['xl/worksheets/sheet1.xml']);assert.match(expanded,/sqref="A4:E9"/);assert.match(expanded,/\$P\$6:\$P\$30/);
+ assert.equal((expanded.match(/LK_TAX_CUSTOMER_GRAY_V1/g)||[]).length,1);assert.match(expanded,/priority="2" dxfId="0"/);
+ assert.equal(applyTaxStatementColors(files),0);
 });

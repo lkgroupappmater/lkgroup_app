@@ -1,5 +1,5 @@
-// Narrow MS-CFB / MS-OVBA edit: replace only the fixed-range generator.
-// Worksheet XML, formula cells, and the two row-fit procedures remain unchanged.
+// MS-CFB / MS-OVBA edits preserve issued numbers, formulas and row-fit procedures.
+// Workbook presentation changes are limited to buttons, conditional fills and tabs.
 // Format references: Microsoft [MS-CFB] and [MS-OVBA] 2.3.4 / 2.4.1.
 import {enhanceStatementFeatures} from './statement-features.mjs';
 import {renameStatementButtons} from './statement-button-labels.mjs';
@@ -209,5 +209,5 @@ export function upgradeStatementMacros(files){
  if(changed){if(dirChanged)dirEntry.data=compressVba(dir);const cache=c.entries.find(e=>e.name==='_VBA_PROJECT');if(cache)cache.data=new Uint8Array([0xcc,0x61,0xff,0xff,0,3,0]);for(const e of c.entries)if(e.name.startsWith('__SRP_'))e.data=new Uint8Array();files['xl/vbaProject.bin']=writeCompound(c);}
  const {buttons}=renameStatementButtons(files);
  const specialButtons=addSpecialStatementButtons(files),taxColors=applyTaxStatementColors(files);
- return {present:true,changed:!!(changed||buttons||specialButtons||taxColors),modules:changed,buttons,special_buttons:specialButtons,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-special-statements-gray-v4'};
+ return {present:true,changed:!!(changed||buttons||specialButtons||taxColors),modules:changed,buttons,special_buttons:specialButtons,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'all-special-statements-gray-v5'};
 }

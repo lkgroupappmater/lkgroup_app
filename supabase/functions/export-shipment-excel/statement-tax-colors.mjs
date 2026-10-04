@@ -19,9 +19,10 @@ export function applyTaxStatementColors(files){
  const sheets=sheetMap(files),customer=sheets.get('고객 리스트'),cargo=sheets.get('물품 입고 내역');
  if(!customer||!cargo)return 0;
  let changed=0,xml=dec.decode(files[customer]),styles=dec.decode(files['xl/styles.xml']);
- if(!xml.includes('LK_TAX_CUSTOMER_GRAY_V1')){
+ const originalCustomer=xml,hadRule=xml.includes('LK_TAX_CUSTOMER_GRAY_V1');
+ {
   const whole=styles.match(/<dxfs\b[^>]*>([\s\S]*?)<\/dxfs>/),empty=styles.match(/<dxfs\b[^>]*\/>/);
-  const dxfs=whole?[...whole[1].matchAll(/<dxf\b[^>]*(?:\/>|>[\s\S]*?<\/dxf>)/g)].map(m=>m[0]):[];
+  const dxfs=whole?[...whole[1].matchAll(/<dxf\b[^>]*?\/>|<dxf\b[^>]*>[\s\S]*?<\/dxf>/g)].map(m=>m[0]):[];
   let dxf=dxfs.findIndex(s=>s.includes('<fgColor rgb="FFBFBFBF"/>'));
   if(dxf<0){dxf=dxfs.length;dxfs.push('<dxf><fill><patternFill patternType="solid"><fgColor rgb="FFBFBFBF"/><bgColor rgb="FFBFBFBF"/></patternFill></fill></dxf>');
    const block=`<dxfs count="${dxfs.length}">${dxfs.join('')}</dxfs>`;
@@ -35,11 +36,12 @@ export function applyTaxStatementColors(files){
   const existing=`INDIRECT("'"&SUBSTITUTE($A4,"'","''")&"'!A"&(INDIRECT("'"&SUBSTITUTE($A4,"'","''")&"'!R6")+2))`;
   const taxFormula=s=>`(ISNUMBER(SEARCH("세금계산서",${clean(s)}))+ISNUMBER(SEARCH("영세율",${clean(s)}))>0)`;
   const formula=`AND($A4<>"",OR(IFERROR(SUMPRODUCT((${bills}=$A4)*${taxFormula(remarks)})>0,FALSE),IFERROR(${taxFormula(existing)},FALSE)))`;
-  xml=xml.replace(/(<cfRule\b[^>]*\bpriority=")(\d+)(")/g,(_,a,n,b)=>a+(+n+1)+b);
+  xml=xml.replace(/<!--LK_TAX_CUSTOMER_GRAY_V1--><conditionalFormatting\b[^>]*>[\s\S]*?<\/conditionalFormatting>/g,'');
+  if(!hadRule)xml=xml.replace(/(<cfRule\b[^>]*\bpriority=")(\d+)(")/g,(_,a,n,b)=>a+(+n+1)+b);
   const block=`<!--LK_TAX_CUSTOMER_GRAY_V1--><conditionalFormatting sqref="A4:E${rows}"><cfRule type="expression" dxfId="${dxf}" priority="1" stopIfTrue="1"><formula>${escape(formula)}</formula></cfRule></conditionalFormatting>`;
   const later=/<(?:dataValidations|hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b/;
   const at=xml.search(later);xml=at<0?xml.replace('</worksheet>',block+'</worksheet>'):xml.slice(0,at)+block+xml.slice(at);
-  files[customer]=enc.encode(xml);changed++;
+  if(xml!==originalCustomer){files[customer]=enc.encode(xml);changed++;}
  }
  // Set saved tab colors too; VBA refreshes them from displayed customer fills on generation.
  const strings=[...dec.decode(files['xl/sharedStrings.xml']||new Uint8Array()).matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map(m=>decode([...m[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(t=>t[1]).join('')));
