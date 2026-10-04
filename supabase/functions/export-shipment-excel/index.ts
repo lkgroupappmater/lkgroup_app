@@ -8,10 +8,10 @@ import { formatStatementAmounts } from './statement-amount-format.mjs';
 import { separateStatementDiscounts, separateCargoRowDiscounts, formatCargoDiscountColumns } from './statement-discounts.mjs';
 import { formatDeliveryNumbers } from './delivery-number-format.mjs';
 import { upgradeStatementMacros } from './statement-macros.mjs';
-import { zipWorkbook } from './workbook-zip.mjs';
+import { zipWorkbook, unzipWorkbook } from './workbook-zip.mjs';
 import { documentVatContext, documentVatFormula } from './document-vat.mjs';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { unzipSync, Zip, ZipPassThrough, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
+import { Unzip, Zip, ZipPassThrough, strFromU8, strToU8 } from 'npm:fflate@0.8.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2356,7 +2356,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     console.log('[EXCEL200C] unzip start', original.byteLength);
     // calcChain은 아래에서 어차피 제거됩니다. 압축 해제 단계부터 제외하면
     // 큰 BASE 파일에서 불필요한 inflate/메모리 사용을 피할 수 있습니다.
-    const files = unzipSync(original, {
+    const files = await unzipWorkbook(original, {
+      Unzip,
       filter: (entry) => entry.name !== 'xl/calcChain.xml',
     });
     console.log('[EXCEL200C] unzip done');
