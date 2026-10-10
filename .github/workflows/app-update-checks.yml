@@ -33,7 +33,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/customer_discounts.dart lib/services/freight_service.dart lib/services/excel_import_service.dart lib/services/excel_export_service.dart lib/screens/excel_export_screen.dart lib/screens/excel_statement_controls_screen.dart test/customer_discounts_test.dart
-      - run: flutter test test/customer_discounts_test.dart test/remark_automation_test.dart test/excel_upload_transport_test.dart test/excel_workbook_appearance_test.dart
+      - run: flutter test test/customer_discounts_test.dart test/remark_automation_test.dart test/excel_upload_transport_test.dart test/excel_workbook_appearance_test.dart test/freight_minimum_test.dart
       - run: flutter test --dart-define=SUPABASE_URL=https://company-search.invalid --dart-define=SUPABASE_PUBLISHABLE_KEY=test-key test/member_company_search_test.dart test/excel_snapshot_sync_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/services/shared_purchase_workspace.dart lib/screens/management_menu_screen.dart lib/screens/account_screen.dart test/shared_purchase_workspace_test.dart
       - run: flutter test test/shared_purchase_workspace_test.dart test/measurement_input_test.dart test/notification_alert_test.dart

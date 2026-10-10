@@ -104,10 +104,7 @@ class QuoteFreightCalculator {
       final volumeTotal = unitVolume * quantity;
       final chargeableTotal = unitChargeable * quantity;
 
-      var amount = chargeableTotal * rate;
-      if (amount > 0 && amount < policy.minimumCharge) {
-        amount = policy.minimumCharge;
-      }
+      var amount = policy.grossAmount(chargeableTotal, rate, quantity.toDouble());
 
       final movingCargoSurcharge =
           routeKey == 'la_kr_air_exp' && movingCargo

@@ -106,11 +106,7 @@ class FreightService {
       final chargeable = actual > volume ? actual : volume;
 
       double rate = policy.rateFor(chargeable);
-      final minimum = policy.minimumCharge;
-      double grossAmount = chargeable * rate;
-      if (grossAmount > 0 && grossAmount < minimum) {
-        grossAmount = minimum;
-      }
+      double grossAmount = policy.grossAmount(chargeable, rate, quantity);
 
       final name = '${row['consignee_name'] ?? ''}';
       final phone = '${row['consignee_phone'] ?? ''}';
@@ -146,10 +142,7 @@ class FreightService {
       final overrideRate = _nullableD(override?['rate_override']);
       if (overrideRate != null) {
         rate = overrideRate;
-        grossAmount = chargeable * rate;
-        if (grossAmount > 0 && grossAmount < minimum) {
-          grossAmount = minimum;
-        }
+        grossAmount = policy.grossAmount(chargeable, rate, quantity);
       }
 
       final parts = CustomerDiscounts.split(override);
