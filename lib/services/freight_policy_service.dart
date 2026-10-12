@@ -26,6 +26,13 @@ class FreightPolicy {
   final List<FreightRateTier> tiers;
   final String sourceNote;
 
+  /// Minimum freight applies to each cargo, before discounts and surcharges.
+  double grossAmount(double chargeableTotal, double rate, double quantity) {
+    final amount = chargeableTotal * rate;
+    final minimum = minimumCharge * quantity;
+    return amount > 0 && amount < minimum ? minimum : amount;
+  }
+
   double rateFor(double chargeableWeight) {
     if (tiers.isEmpty) return 0;
     var result = tiers.first.ratePerKg;
