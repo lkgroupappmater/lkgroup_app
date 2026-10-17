@@ -301,7 +301,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
         {
           'label': _m('항차별 총액 관리'),
           'icon': Icons.analytics_outlined,
-          'page': const VoyageTotalManagementScreen(),
+          'page': VoyageTotalManagementScreen(language: widget.language),
         },
       ]);
     }

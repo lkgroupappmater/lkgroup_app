@@ -57,7 +57,7 @@ class _SupportInboxState extends State<SupportInboxScreen>
   @override
   void initState() {
     super.initState();
-    if (!widget.manager) _load();
+    _load();
   }
 
   @override

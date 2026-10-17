@@ -48,7 +48,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   @override
   void initState() {
     super.initState();
-    _loadRegistrySummary();
+    _loadMembers();
   }
 
   @override
@@ -113,7 +113,6 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
   List<Map<String, dynamic>> get _filteredMembers {
     final query = _submittedSearch.trim().toLowerCase();
-    if (query.isEmpty) return const [];
     final myId = Supabase.instance.client.auth.currentUser?.id;
     return _members.where((m) {
       if ('${m['id']}' == myId && CustomerIdentityService.normalizeCode(query) == null) return false;
@@ -524,7 +523,6 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       appBar: AppBar(
         bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () { setState(() { _submittedSearch = _fieldFilter.query; _searched = true; }); _loadMembers(); }),
         title: const Text('회원 종합 관리'),
-        actions:[TextButton(onPressed:_openRegistry,child:Text(intakeText(widget.language,'customers'),style:const TextStyle(color:Colors.white)))],
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -540,6 +538,20 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                 children: [
+                  Card(
+                    key: const Key('member-customer-id-management'),
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(18),
+                      leading: const Icon(Icons.badge_outlined, size: 36),
+                      title: Text(intakeText(widget.language, 'customers'),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      subtitle: Text(intakeText(widget.language, 'conflict')),
+                      trailing: const Icon(Icons.arrow_forward),
+                      onTap: _openRegistry,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   CompanyVerificationButton(language: widget.language),
                   if(_registrySummary!=null) Card(color:Colors.orange.shade50,child:ListTile(title:Text('${intakeText(widget.language,'mismatches')} ${_registrySummary!['mismatch_customers']}'),subtitle:Text('${intakeText(widget.language,'duplicates')} ${_registrySummary!['duplicate_customers']} · ${intakeText(widget.language,'sourceRows')} ${_registrySummary!['mismatch_sources']}'),trailing:const Icon(Icons.chevron_right),onTap:()=>_openRegistry(mismatchesOnly:true))),
                   const Text(
@@ -590,7 +602,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                   const Divider(),
                   const SizedBox(height: 8),
                   const Text(
-                    '일반 회원 검색',
+                    '일반 회원 목록',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
