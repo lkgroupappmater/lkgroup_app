@@ -6,6 +6,22 @@ class SettlementSnapshotService {
   SettlementSnapshotService._();
   static final instance = SettlementSnapshotService._();
 
+  /// Read only the compact saved totals; opening the menu never recalculates cargo.
+  Future<List<Map<String, dynamic>>> listSummaries() async {
+    if (!SupabaseConfig.isConfigured) return const [];
+    final rows = <Map<String, dynamic>>[];
+    while (true) {
+      final page = await SupabaseService.client
+          .from('voyage_settlement_snapshots')
+          .select('id,route_key,route_label,shipment_year,voyage,total_quantity,gross_usd,discount_usd,net_usd,calculated_at')
+          .order('calculated_at', ascending: false)
+          .order('id')
+          .range(rows.length, rows.length + 499);
+      rows.addAll(List<Map<String, dynamic>>.from(page));
+      if (page.length < 500) return rows;
+    }
+  }
+
   Future<void> save({
     required String routeKey,
     required String routeLabel,

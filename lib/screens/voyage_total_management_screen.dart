@@ -1,12 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../core/money_format.dart';
+import '../core/app_language.dart';
+import '../services/supabase_service.dart';
 import '../services/excel_bulk_management_service.dart';
 import '../services/receipt_settlement_service.dart';
 import '../services/settlement_snapshot_service.dart';
 
 class VoyageTotalManagementScreen extends StatefulWidget {
-  const VoyageTotalManagementScreen({super.key});
+  const VoyageTotalManagementScreen({super.key, this.language = AppLanguage.korean});
+  final AppLanguage language;
 
   @override
   State<VoyageTotalManagementScreen> createState() =>
@@ -21,6 +24,41 @@ class _VoyageTotalManagementScreenState
   String? _voyage;
   VoyageSettlement? _settlement;
   bool _busy = true;
+  List<Map<String, dynamic>> _summaries = const [];
+  String? _loadError;
+  String _text(String ko, String en, String lo) => sharedText(widget.language, ko, en, lo);
+
+  List<ExcelBulkBatch> get _visibleBatches => _batches.where((b) =>
+      (_route == null || b.route == _route) &&
+      (_year == null || b.year == _year) &&
+      (_voyage == null || b.voyage == _voyage)).toList();
+
+  Widget _batchCard(ExcelBulkBatch batch) {
+    Map<String, dynamic>? saved;
+    for (final row in _summaries) {
+      if ((row['route_key'] == batch.route || row['route_label'] == batch.route) &&
+          row['shipment_year'] == batch.year && row['voyage'] == batch.voyage) {
+        saved = row;
+        break;
+      }
+    }
+    String amount(String key) => MoneyFormat.usd((saved?[key] as num?)?.toDouble() ?? 0);
+    return Card(child: ListTile(
+      title: Text('${batch.route} · ${batch.year} · ${batch.voyage}'),
+      subtitle: Text(saved == null
+        ? _text('미계산', 'Not calculated', 'ຍັງບໍ່ຄິດໄລ່')
+        : '${_text('할인 전', 'Gross', 'ຍອດລວມ')}: ${amount('gross_usd')} · '
+          '${_text('할인', 'Discount', 'ສ່ວນຫຼຸດ')}: ${amount('discount_usd')}\n'
+          '${_text('합계', 'Total', 'ລວມ')}: ${amount('net_usd')} · '
+          '${_text('계산일', 'Calculated', 'ວັນຄິດໄລ່')}: ${saved['calculated_at']}'),
+      isThreeLine: saved != null,
+      trailing: const Icon(Icons.chevron_right),
+      onTap: _busy ? null : () => setState(() {
+        _route = batch.route; _year = batch.year; _voyage = batch.voyage;
+        _settlement = null;
+      }),
+    ));
+  }
 
   List<String> get _routes =>
       _batches.map((e) => e.route).toSet().toList()..sort();
@@ -48,12 +86,20 @@ class _VoyageTotalManagementScreenState
   }
 
   Future<void> _loadBatches() async {
+    final owner = SupabaseService.isReady ? SupabaseService.client.auth.currentUser?.id : null;
+    setState(() { _busy = true; _loadError = null; });
     try {
-      final rows =
-          await ExcelBulkManagementService.instance.listBatches();
-      if (mounted) setState(() => _batches = rows);
+      final result = await Future.wait<Object>([
+        ExcelBulkManagementService.instance.listBatches(),
+        SettlementSnapshotService.instance.listSummaries(),
+      ]);
+      if (!mounted || (SupabaseService.isReady && owner != SupabaseService.client.auth.currentUser?.id)) return;
+      setState(() {
+        _batches = result[0] as List<ExcelBulkBatch>;
+        _summaries = result[1] as List<Map<String, dynamic>>;
+      });
     } catch (e) {
-      if (mounted) _msg('항차 목록 조회 실패: $e');
+      if (mounted) setState(() => _loadError = '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -82,6 +128,7 @@ class _VoyageTotalManagementScreenState
       );
       if (!mounted) return;
       setState(() => _settlement = result);
+      await _loadBatches();
     } catch (e) {
       _msg('항차별 총액 계산 실패: $e');
     } finally {
@@ -127,11 +174,14 @@ class _VoyageTotalManagementScreenState
   Widget build(BuildContext context) {
     final s = _settlement;
     return Scaffold(
-      appBar: AppBar(title: const Text('항차별 총액 관리')),
+      appBar: AppBar(title: const Text('항차별 총액 관리'), actions: [
+        IconButton(onPressed: _busy ? null : _loadBatches, icon: const Icon(Icons.refresh)),
+      ]),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
           DropdownButtonFormField<String>(
+            key: ValueKey('route:$_route'),
             initialValue: _route,
             isExpanded: true,
             decoration: const InputDecoration(
@@ -154,6 +204,7 @@ class _VoyageTotalManagementScreenState
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
+                  key: ValueKey('year:$_route:$_year'),
                   initialValue: _year,
                   decoration: const InputDecoration(
                     labelText: '년도',
@@ -177,6 +228,7 @@ class _VoyageTotalManagementScreenState
               const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  key: ValueKey('voyage:$_route:$_year:$_voyage'),
                   initialValue: _voyage,
                   decoration: const InputDecoration(
                     labelText: '항차',
@@ -211,6 +263,25 @@ class _VoyageTotalManagementScreenState
               padding: EdgeInsets.all(18),
               child: Center(child: CircularProgressIndicator()),
             ),
+          if (_loadError != null) Card(child: ListTile(
+            title: Text(_loadError!),
+            trailing: IconButton(onPressed: _loadBatches, icon: const Icon(Icons.refresh)),
+          )),
+          if (!_busy) ...[
+            Row(children: [
+              Expanded(child: Text(_text('항차별 합계', 'Voyage totals', 'ຍອດລວມຕາມຖ້ຽວ'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              TextButton(onPressed: () => setState(() {
+                _route = null; _year = null; _voyage = null; _settlement = null;
+              }), child: Text(_text('전체', 'All', 'ທັງໝົດ'))),
+            ]),
+            Text(_text('저장된 정산 기준입니다. 최신 금액은 총액 계산으로 갱신하세요.',
+              'Saved settlement totals. Use Calculate to update the amounts.',
+              'ຍອດລວມທີ່ບັນທຶກ. ກົດຄິດໄລ່ເພື່ອອັບເດດ.')),
+            if (_visibleBatches.isEmpty && _loadError == null)
+              Text(_text('등록된 항차가 없습니다.', 'No voyages found.', 'ບໍ່ພົບຖ້ຽວ.')),
+            ..._visibleBatches.map(_batchCard),
+          ],
           if (!_busy && s != null) ...[
             const SizedBox(height: 14),
             Card(
