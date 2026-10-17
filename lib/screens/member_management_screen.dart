@@ -543,11 +543,11 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                     color: Theme.of(context).colorScheme.primaryContainer,
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(18),
-                      leading: const Icon(Icons.badge_outlined, size: 36),
+                      leading: const Icon(Icons.person_outline, size: 36),
                       title: Text(intakeText(widget.language, 'customers'),
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       subtitle: Text(intakeText(widget.language, 'conflict')),
-                      trailing: const Icon(Icons.arrow_forward),
+                      trailing: const Icon(Icons.chevron_right),
                       onTap: _openRegistry,
                     ),
                   ),
