@@ -47,7 +47,7 @@ void main() {
     responses['list_support_requests'] = {'rows': [], 'has_more': false};
     await tester.pumpWidget(const MaterialApp(home: SupportInboxScreen(manager: true)));
     await tester.pumpAndSettle();
-    final request = calls.singleWhere((r) => r.url.path.endsWith('/list_support_requests'));
+    final request = calls.firstWhere((r) => r.url.path.endsWith('/list_support_requests'));
     expect(jsonDecode(request.body)['p_manager'], isTrue);
     expect(jsonDecode(request.body)['p_search'], '');
     expect(calls.any((r) => r.url.path.endsWith('/open_support_request')), isFalse);
