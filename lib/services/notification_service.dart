@@ -50,6 +50,10 @@ class NotificationService {
         .rpc('list_my_notification_feed', params: {'p_offset': offset}) as Map);
   }
 
+  Future<Map<String, dynamic>> readAll(int throughId, String throughAt) async =>
+      Map<String, dynamic>.from(await SupabaseService.client.rpc('read_my_notifications',
+        params: {'p_through_id': throughId, 'p_through_at': throughAt}) as Map);
+
   Future<void> read(int id) async => SupabaseService.client
       .rpc('read_my_notification', params: {'p_notification_id': id});
   Future<Map<String, dynamic>?> relatedRequest(int id) async {
@@ -58,3 +62,4 @@ class NotificationService {
     return data is Map ? Map<String, dynamic>.from(data) : null;
   }
 }
+
