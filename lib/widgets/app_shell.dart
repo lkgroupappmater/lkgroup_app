@@ -3,6 +3,7 @@ import '../screens/support_screen.dart';
 import '../services/notification_alert.dart';
 import '../services/code_update_service.dart';
 import 'code_update_panel.dart';
+import 'notification_list_dialog.dart';
 import '../services/app_update_service.dart';
 import 'app_update_banner.dart';
 import 'auto_refresh_state.dart';
@@ -176,7 +177,10 @@ class _AppShellState extends State<AppShell>
         _seenNotifications.addAll(fresh.map((r) => '${r['id']}'));
         await NotificationAlert.play();
         if (mounted && ModalRoute.of(context)?.isCurrent != false)
-          await _showUnreadPopup(fresh);
+          {
+          _notificationFetching = false;
+          await _showUnreadPopup(data);
+        }
       }
     } catch (_) {
       /* Notification failure must not interrupt navigation. */
@@ -185,203 +189,84 @@ class _AppShellState extends State<AppShell>
     }
   }
 
-  Widget _notificationTile(
-          Map<String, dynamic> row, BuildContext dialogContext) =>
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          Icons.notifications_outlined,
-          color: row['is_read'] == true
-              ? null
-              : Theme.of(context).colorScheme.primary,
-        ),
-        title: Text('${row['title'] ?? ''}'),
-        subtitle: Text('${row['message'] ?? ''}'),
-        onTap: () => Navigator.pop(dialogContext, row),
-      );
+  Future<void> _showUnreadPopup(Map<String, dynamic> data) async {
+    if (!mounted || _notificationPopupOpen || _updatePopupOpen) return;
+    await _showNotificationList(data);
+  }
 
-  Future<void> _showUnreadPopup(List<Map<String, dynamic>> rows) async {
-    if (!mounted || rows.isEmpty || _notificationPopupOpen || _updatePopupOpen)
-      return;
+  Future<void> _showNotificationList(Map<String, dynamic> data, {bool includeUpdates = false}) async {
+    final owner = _currentUser?.id;
     _notificationPopupOpen = true;
-    final selected = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (c) => AlertDialog(
-              title: Text(
-                  '${AppStrings.get(_language, 'notifications')} ($_notificationCount)'),
-              content: SizedBox(
-                  width: double.maxFinite,
-                  child: SingleChildScrollView(
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: rows
-                              .take(5)
-                              .map((r) => _notificationTile(r, c))
-                              .toList()))),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(c),
-                    child: Text(supportText(
-                        _language, '나중에 확인', 'Later', 'ກວດພາຍຫຼັງ')))
-              ],
-            ));
-    _notificationPopupOpen = false;
-    if (selected != null && mounted) await _openNotificationTarget(selected);
-    _scheduleUpdatePopup();
+    try {
+      await showDialog<void>(context: context, builder: (_) => NotificationListDialog(
+        language: _language, initial: data,
+        header: includeUpdates ? CodeUpdatePanel(language: _language, service: _codeUpdates) : null,
+        isCurrentOwner: () => mounted && _currentUser?.id == owner,
+        loadPage: (offset) async {
+          if (_currentUser?.id != owner) throw StateError('Account changed');
+          final result = await NotificationService.instance.feed(offset: offset);
+          if (mounted && _currentUser?.id == owner) setState(() => _notificationCount = (result['unread_count'] as num?)?.toInt() ?? 0);
+          return result;
+        },
+        onReadAll: (id, at) async {
+          if (_currentUser?.id != owner) throw StateError('Account changed');
+          final result = await NotificationService.instance.readAll(id, at);
+          if (mounted && _currentUser?.id == owner) setState(() => _notificationCount = (result['unread_count'] as num?)?.toInt() ?? 0);
+          return result;
+        },
+        onOpen: _openNotificationTarget,
+      ));
+      if (includeUpdates) await _codeUpdates.acknowledge();
+    } finally {
+      _notificationPopupOpen = false;
+      _scheduleUpdatePopup();
+    }
   }
 
   Future<void> _openNotificationTarget(Map<String, dynamic> row) async {
-    try {
-      if (row['related_quote_id'] != null) {
-        await Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-                builder: (_) => SupportDetailScreen(
-                    id: (row['related_quote_id'] as num).toInt(),
-                    language: _language,
-                    manager: const [UserRole.admin, UserRole.staff]
-                        .contains(_currentUser?.role))));
-      } else {
-        final related = row['related_request_id'] == null
-            ? null
-            : await NotificationService.instance
-                .relatedRequest((row['id'] as num).toInt());
-        if (!mounted) return;
-        await NotificationService.instance.read((row['id'] as num).toInt());
-        if (!mounted) return;
-        await showDialog<void>(
-            context: context,
-            builder: (c) => AlertDialog(
-                    title: Text('${row['title'] ?? ''}'),
-                    content: SingleChildScrollView(
-                        child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text('${row['message'] ?? ''}'),
-                          if (related != null) ...[
-                            const Divider(),
-                            Text(
-                                '${related['receipt_number'] ?? ''} · ${related['invoice_number'] ?? ''}'),
-                            Text(
-                                '${related['consignee_name'] ?? ''} · ${related['status'] ?? ''}'),
-                            for (final entry in Map<String, dynamic>.from(
-                                    related['admin_changes'] ??
-                                        related['changes'] ??
-                                        {})
-                                .entries)
-                              Text('${entry.key}: ${entry.value}')
-                          ]
-                        ])),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(c),
-                          child: Text(AppStrings.get(_language, 'close')))
-                    ]));
-      }
-      if (mounted) await _refreshNotifications(showPopup: false);
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+    final owner = _currentUser?.id;
+    if (owner == null) return;
+    if (row['related_quote_id'] != null) {
+      await showDialog<void>(context: context, builder: (c) => Dialog(
+        child: SizedBox(width: 860, height: MediaQuery.sizeOf(c).height * .82,
+          child: Column(children: [
+            Align(alignment: Alignment.centerRight, child: TextButton(
+              onPressed: () => Navigator.pop(c), child: Text(AppStrings.get(_language, 'close')))),
+            Expanded(child: SupportDetailScreen(
+              id: (row['related_quote_id'] as num).toInt(), language: _language,
+              manager: const [UserRole.admin, UserRole.staff].contains(_currentUser?.role))),
+          ])),
+      ));
+    } else {
+      final related = row['request_details'] ?? (row['related_request_id'] == null ? null :
+          await NotificationService.instance.relatedRequest((row['id'] as num).toInt()));
+      if (!mounted || _currentUser?.id != owner) return;
+      await NotificationService.instance.read((row['id'] as num).toInt());
+      if (!mounted || _currentUser?.id != owner) return;
+      row['is_read'] = true;
+      await showDialog<void>(context: context, builder: (c) => AlertDialog(
+        title: Text('${row['title'] ?? ''}'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${row['message'] ?? ''}'), const Divider(),
+            for (final line in notificationDetails({...row, 'request_details': related}, _language)) Text(line),
+          ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(c), child: Text(AppStrings.get(_language, 'close')))],
+      ));
     }
+    if (mounted && _currentUser?.id == owner) await _refreshNotifications(showPopup: false);
   }
 
   Future<void> _openNotifications() async {
     if (_notificationPopupOpen || _updatePopupOpen) return;
+    final owner = _currentUser?.id;
     _notificationPopupOpen = true;
-    final userId = _isLoggedIn ? _currentUser?.id : null;
-    var rows = <Map<String, dynamic>>[], offset = 0;
-    var more = false, loading = false;
-    String? error;
     try {
-      if (userId != null) {
-        try {
-          final data = await NotificationService.instance.feed();
-          rows = List<Map<String, dynamic>>.from(data['rows'] as List);
-          more = rows.length == 50;
-        } catch (e) {
-          error = '$e';
-        }
-      }
-      if (!mounted) return;
-      if (_currentUser?.id != userId) {
-        rows = [];
-        more = false;
-      }
-      final selected = await showDialog<Map<String, dynamic>>(
-          context: context,
-          builder: (c) => StatefulBuilder(
-              builder: (c, update) => AlertDialog(
-                    title: Text(AppStrings.get(_language, 'notifications')),
-                    content: SizedBox(
-                        width: double.maxFinite,
-                        child: SingleChildScrollView(
-                            child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                              CodeUpdatePanel(
-                                  language: _language, service: _codeUpdates),
-                              if (userId != null) ...[
-                                const Divider(),
-                                Text(supportText(
-                                    _language,
-                                    '미확인 알림은 계속 보관되며, 요청 내용을 확인한 뒤 24시간 동안 표시됩니다.',
-                                    'Unread alerts stay until reviewed, then for 24 hours.',
-                                    'ແຈ້ງເຕືອນຢູ່ຈົນກວດແລ້ວ ແລະ ອີກ 24 ຊົ່ວໂມງ.')),
-                                if (error != null) Text(error!),
-                                if (rows.isEmpty && error == null)
-                                  Text(AppStrings.get(
-                                      _language, 'no_notifications')),
-                                for (final row in rows)
-                                  _notificationTile(row, c),
-                                if (more)
-                                  TextButton(
-                                      onPressed: loading
-                                          ? null
-                                          : () async {
-                                              update(() => loading = true);
-                                              try {
-                                                final data =
-                                                    await NotificationService
-                                                        .instance
-                                                        .feed(
-                                                            offset:
-                                                                offset + 50);
-                                                if (!c.mounted ||
-                                                    _currentUser?.id != userId)
-                                                  return;
-                                                final page = List<
-                                                        Map<String,
-                                                            dynamic>>.from(
-                                                    data['rows'] as List);
-                                                update(() {
-                                                  offset += 50;
-                                                  rows.addAll(page);
-                                                  more = page.length == 50;
-                                                });
-                                              } catch (e) {
-                                                if (c.mounted)
-                                                  update(() => error = '$e');
-                                              } finally {
-                                                if (c.mounted)
-                                                  update(() => loading = false);
-                                              }
-                                            },
-                                      child: Text(supportText(_language, '더 보기',
-                                          'Load more', 'ເບິ່ງເພີ່ມ')))
-                              ]
-                            ]))),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(c),
-                          child: Text(AppStrings.get(_language, 'close')))
-                    ],
-                  )));
-      await _codeUpdates.acknowledge();
-      _notificationPopupOpen = false;
-      if (selected != null && mounted && _currentUser?.id == userId)
-        await _openNotificationTarget(selected);
+      final data = await NotificationService.instance.feed();
+      if (!mounted || _currentUser?.id != owner) return;
+      await _showNotificationList(data, includeUpdates: true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       _notificationPopupOpen = false;
       _scheduleUpdatePopup();
@@ -666,3 +551,4 @@ class _AppShellState extends State<AppShell>
 class TextSnackBar extends SnackBar {
   TextSnackBar(String message) : super(content: Text(message));
 }
+
