@@ -77,6 +77,10 @@ export function freightFromSheets(sheets) {
       if (m) factors.add(normalized(Number(m[1])));
     }
     if (!tiers && col === 'C' && Number(r) >= 6 && Number(r) <= 15 && /^(?:\d+(?:\.\d+)?|(?:'[^']+'|[A-Za-z][\w ]*)!\$?[A-Z]+\$?\d+)$/.test(f)) flatRates.add(normalized(resolve(f, sheet)));
+    if (!tiers && col === 'C') {
+      const guarded = new RegExp(`^IF\\(""=D${r},"",IF\\(0<D${r},(\\d+(?:\\.\\d+)?)\\)\\)$`).exec(f.replace(/\s/g,''));
+      if (guarded) flatRates.add(normalized(Number(guarded[1])));
+    }
   }
   if (!tiers && flatRates.size === 1) {tiers = [{min_weight_kg: 0, rate_per_kg: [...flatRates][0]}]; rateSource = 'statement C rate formula';}
   if (!tiers) throw Error('BASE 운임표/단가 수식을 인식하지 못했습니다. 기존 DB 운임은 유지됩니다.');

@@ -30,3 +30,7 @@ test('flat-rate route supports numeric rate, minimum formula and changed volume 
 test('mismatched form minima fail instead of picking the first form',()=>{
  const f=fixture();f.push({name:'LKA XX',cells:readCells(n('L6',null,'IF(F6="","",MAX(14*D6,C6*F6))'))});assert.throws(()=>freightFromSheets(f));
 });
+test('guarded air/sea rate formulas preserve blank rows while supplying the common rate',()=>{
+ const f=fixture();f[0].cells=new Map();f[1].cells.get('C6').formula='IF(" "=D6," ",IF(0<D6,3.2))';f[1].cells.get('L6').formula='IF(F6="","",MAX(3.2*D6,C6*F6))';
+ assert.deepEqual(freightFromSheets(f).tiers,[{min_weight_kg:0,rate_per_kg:3.2}]);
+});
