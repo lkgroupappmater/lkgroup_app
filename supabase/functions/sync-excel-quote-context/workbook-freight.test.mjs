@@ -33,4 +33,13 @@ test('mismatched form minima fail instead of picking the first form',()=>{
 test('guarded air/sea rate formulas preserve blank rows while supplying the common rate',()=>{
  const f=fixture();f[0].cells=new Map();f[1].cells.get('C6').formula='IF(" "=D6," ",IF(0<D6,3.2))';f[1].cells.get('L6').formula='IF(F6="","",MAX(3.2*D6,C6*F6))';
  assert.deepEqual(freightFromSheets(f).tiers,[{min_weight_kg:0,rate_per_kg:3.2}]);
+ f.push({name:'명세서 고객 ID 연결',cells:readCells(n('C6',456))},{name:'명세서 번호 관리',cells:readCells(n('C6',999))});
+ f[1].cells.get('J6').formula='IFERROR((G6*H6*I6)*0.00022," ")';
+ assert.deepEqual(freightFromSheets(f).tiers,[{min_weight_kg:0,rate_per_kg:3.2}]);
+ f[1].cells.get('C6').formula='IF(D6="","",3.2)';
+ f[1].cells.get('J6').formula='IF(G6="","",G6*H6*I6*0.00022)';
+ f[1].cells.set('M20',{ref:'M20',formula:'MAX(0,SUM(N6:N10)-L20)',value:''});
+ assert.equal(freightFromSheets(f).tiers[0].rate_per_kg,3.2);
+ f[1].cells.set('C7',{ref:'C7',formula:'IF(D7="","",12)',value:''});
+ assert.throws(()=>freightFromSheets(f),/C열 단가가 서로 다릅니다/);
 });

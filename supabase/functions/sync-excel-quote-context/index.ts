@@ -26,9 +26,10 @@ Deno.serve(async req=>{
   else query=query.or(`attempted_at.is.null,attempted_at.lt.${new Date(Date.now()-300000).toISOString()}`);
   const pending=await query.order('source_at').limit(body.route_key?1:3);if(pending.error)throw pending.error;
   if(!pending.data?.length)return new Response('{"ok":true,"pending":false}',{headers});
-  const completed=[];
+  const completed=[],failed=[];
   for(const item of pending.data){
   source=item;
+  try{
   const file=await admin.storage.from('shipment-excel-templates').download(source.storage_path);
   if(file.error||!file.data)throw file.error||Error('Excel source missing');
   const bytes=new Uint8Array(await file.data.arrayBuffer());
@@ -37,8 +38,14 @@ Deno.serve(async req=>{
   const saved=await admin.rpc('lk_commit_excel_base_freight',{p_route_key:source.route_key,p_path:source.storage_path,p_source_at:source.source_at,p_policy:policy,p_footer_lines:copy.footer_lines,p_sha256:sha256});
   if(saved.error)throw saved.error;if(!saved.data)throw Error('Excel source changed; retry latest upload');
   completed.push({route_key:source.route_key,footer_count:copy.footer_lines.length,tier_count:policy.tiers.length});
+  }catch(error){
+   if(body.route_key)throw error;
+   const message=error instanceof Error?error.message:String(error);
+   await admin.from('excel_quote_sources').update({last_error:message,attempted_at:new Date().toISOString()}).eq('route_key',source.route_key).eq('source_at',source.source_at);
+   failed.push({route_key:source.route_key,error:message});
   }
-  return new Response(JSON.stringify({ok:true,completed}),{headers});
+  }
+  return new Response(JSON.stringify({ok:!failed.length,completed,failed}),{headers});
  }catch(error){
   const message=error instanceof Error?error.message:String(error);
   if(source)await admin.from('excel_quote_sources').update({last_error:message,attempted_at:new Date().toISOString()}).eq('route_key',source.route_key).eq('source_at',source.source_at);

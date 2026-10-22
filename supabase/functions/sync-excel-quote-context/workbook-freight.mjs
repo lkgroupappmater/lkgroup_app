@@ -28,7 +28,10 @@ function number(cell, label) {
 export function freightFromSheets(sheets) {
   const row = sheets.find(s => key(s.name) === 'rowdata');
   if (!row) throw Error('BASE Row data 시트를 찾을 수 없습니다.');
-  const forms = sheets.filter(s => /^(LK[A-Z]*\s*(?:XX|\d+)|이름\(|.*명세서|product\s*data|물품 입고 내역)/i.test(s.name));
+  let forms = sheets.filter(s => /^(LK[A-Z]*\s*(?:XX|\d+)|이름\(|.*명세서|product\s*data|물품 입고 내역)/i.test(s.name))
+    .filter(s => [...s.cells.values()].some(c => /^[LM]\d+$/.test(c.ref) && /C\d+\*[FK]\d+|[FK]\d+\*C\d+/.test(c.formula || '')));
+  const masters = forms.filter(s => /^(LK[A-Z]*\s*XX|이름\()/i.test(s.name));
+  if (masters.length) forms = masters;
   let tiers = null, rateSource = null;
   // Locate the labelled table, rather than assuming B7:D19 on every route.
   for (const cell of row.cells.values()) {
@@ -68,21 +71,25 @@ export function freightFromSheets(sheets) {
     if (['L', 'M'].includes(col)) {
       const weight = col === 'L' ? 'F' : 'K';
       // Read the minimum actually referenced by the cargo formula, never footer prose.
-      const value = f.match(/MAX\(((?:'[^']+'|[A-Za-z][\w ]*)!\$?[A-Z]+\$?\d+|\d+(?:\.\d+)?)(?:\*D\d+)?,/)?.[1]
+      const value = f.match(new RegExp(`MAX\\(((?:'[^']+'|[A-Za-z][\\w ]*)!\\$?[A-Z]+\\$?\\d+|\\d+(?:\\.\\d+)?)(?:\\*D${r})?,(?:C${r}\\*${weight}${r}|${weight}${r}\\*C${r})\\)`))?.[1]
         || f.match(new RegExp(`IF\\(((?:'[^']+'|[A-Za-z][\\w ]*)!\\$?[A-Z]+\\$?\\d+|\\d+(?:\\.\\d+)?)(?:\\*D${r})?>=(?:C${r}\\*${weight}${r}|${weight}${r}\\*C${r}),`))?.[1];
       if (value) minima.add(normalized(resolve(value, sheet)));
     }
     if (col === 'J') {
-      const m = new RegExp(`^\\(?G${r}\\*H${r}\\*I${r}\\)?\\*(\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?)$`).exec(f);
+      const volumeFormula = f.replace(/^IFERROR\((.*),"\s*"\)$/, '$1').replace(new RegExp(`^IF\\(G${r}="","",(.*)\\)$`),'$1');
+      const m = new RegExp(`^\\(?G${r}\\*H${r}\\*I${r}\\)?\\*(\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?)$`).exec(volumeFormula);
       if (m) factors.add(normalized(Number(m[1])));
     }
     if (!tiers && col === 'C' && Number(r) >= 6 && Number(r) <= 15 && /^(?:\d+(?:\.\d+)?|(?:'[^']+'|[A-Za-z][\w ]*)!\$?[A-Z]+\$?\d+)$/.test(f)) flatRates.add(normalized(resolve(f, sheet)));
     if (!tiers && col === 'C') {
       const guarded = new RegExp(`^IF\\(""=D${r},"",IF\\(0<D${r},(\\d+(?:\\.\\d+)?)\\)\\)$`).exec(f.replace(/\s/g,''));
       if (guarded) flatRates.add(normalized(Number(guarded[1])));
+      const blankGuarded = new RegExp(`^IF\\(D${r}="","",(\\d+(?:\\.\\d+)?)\\)$`).exec(f.replace(/\s/g,''));
+      if (blankGuarded) flatRates.add(normalized(Number(blankGuarded[1])));
     }
   }
   if (!tiers && flatRates.size === 1) {tiers = [{min_weight_kg: 0, rate_per_kg: [...flatRates][0]}]; rateSource = 'statement C rate formula';}
+  if (!tiers && flatRates.size > 1) throw Error(`BASE 명세서 C열 단가가 서로 다릅니다 (${[...flatRates].join(', ')} USD/kg). 공통 단가를 확인해 주세요. 기존 DB 운임은 유지됩니다.`);
   if (!tiers) throw Error('BASE 운임표/단가 수식을 인식하지 못했습니다. 기존 DB 운임은 유지됩니다.');
   if (minima.size !== 1 || factors.size !== 1) throw Error('BASE 최소 운임 또는 용적 계수를 명세서 수식에서 일관되게 확인할 수 없습니다.');
   const minimum_charge = [...minima][0], volumetric_factor = factors.size ? [...factors][0] : null;
