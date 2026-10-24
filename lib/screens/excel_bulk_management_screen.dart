@@ -1,3 +1,7 @@
+import '../core/shipment_period_labels.dart';
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
@@ -7,14 +11,18 @@ import '../services/excel_bulk_management_service.dart';
 import '../services/shipment_service.dart';
 
 class ExcelBulkManagementScreen extends StatefulWidget {
-  const ExcelBulkManagementScreen({super.key});
+  const ExcelBulkManagementScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<ExcelBulkManagementScreen> createState() =>
       _ExcelBulkManagementScreenState();
 }
 
 class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> with AutoRefreshState {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   bool _automaticLoad = false;
   final _fieldFilter = ManagementFieldFilter();
   @override
@@ -252,19 +260,19 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
     final ok = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('화물 삭제'),
+            title: Text(_l('화물 삭제')),
             content: Text(
-              '선택한 ${_checked.length}개의 화물을 삭제 합니다.\n\n'
-              '30일 뒤에 자동으로 완전히 삭제 되며, 필요시 삭제 취소 혹은 바로 삭제가 가능 합니다.',
+              _l('선택한 ${_checked.length}개의 화물을 삭제 합니다.\n\n'
+              '30일 뒤에 자동으로 완전히 삭제 되며, 필요시 삭제 취소 혹은 바로 삭제가 가능 합니다.'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('삭제'),
+                child: Text(_l('삭제')),
               ),
             ],
           ),
@@ -303,7 +311,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
     final save = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('화물 데이터 편집 · ${row['box_number'] ?? ''}'),
+            title: Text(_l('화물 데이터 편집 · ${row['box_number'] ?? ''}')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -319,14 +327,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                   _field(zone, '구획'),
                   _field(notes, '비고', maxLines: 3),
                   if (row['data_locked'] == true)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: Row(
                         children: [
                           Icon(Icons.lock, size: 16, color: Colors.redAccent),
                           SizedBox(width: 5),
                           Text(
-                            '데이터 수정 잠금된 화물',
+                            _l('데이터 수정 잠금된 화물'),
                             style: TextStyle(
                               color: Colors.redAccent,
                               fontWeight: FontWeight.bold,
@@ -341,11 +349,11 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('저장'),
+                child: Text(_l('저장')),
               ),
             ],
           ),
@@ -392,7 +400,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
           controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(
-            labelText: label,
+            labelText: _l(label),
             border: const OutlineInputBorder(),
             isDense: true,
           ),
@@ -405,7 +413,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
           initialValue: value,
           readOnly: true,
           decoration: InputDecoration(
-            labelText: label,
+            labelText: _l(label),
             border: const OutlineInputBorder(),
             filled: true,
             isDense: true,
@@ -415,7 +423,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
 
   void _message(String value) {
     if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_l(value))));
   }
 
   @override
@@ -445,8 +453,8 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
 
     return Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','sender_name':'발송인','unloading_zone':'구획','special_note_auto':'배송 구분'}, onChanged: () => setState(() => _checked.clear())),
-        title: const Text('엑셀 데이타 일괄 관리'),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','sender_name':'발송인','unloading_zone':'구획','special_note_auto':'배송 구분'}, onChanged: () => setState(() => _checked.clear())),
+        title: Text(_l('엑셀 데이타 일괄 관리')),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -460,12 +468,12 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                 DropdownButtonFormField<String>(
                   value: _route,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '운송 경로',
+                  decoration: InputDecoration(
+                    labelText: _l('운송 경로'),
                     border: OutlineInputBorder(),
                   ),
                   items: _routes
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .map((e) => DropdownMenuItem(value: e, child: Text(_routeText(e))))
                       .toList(),
                   onChanged: _busy ? null : _routeChanged,
                 ),
@@ -475,14 +483,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                     Expanded(
                       child: DropdownButtonFormField<int>(
                         value: _year,
-                        decoration: const InputDecoration(
-                          labelText: '년도',
+                        decoration: InputDecoration(
+                          labelText: _l('년도'),
                           border: OutlineInputBorder(),
                         ),
                         items: _years
                             .map((e) => DropdownMenuItem(
                                   value: e,
-                                  child: Text('$e년'),
+                                  child: Text(ShipmentPeriodLabels.year(e, widget.language)),
                                 ))
                             .toList(),
                         onChanged: _busy || _route == null ? null : _yearChanged,
@@ -492,14 +500,14 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _voyage,
-                        decoration: const InputDecoration(
-                          labelText: '항차',
+                        decoration: InputDecoration(
+                          labelText: _l('항차'),
                           border: OutlineInputBorder(),
                         ),
                         items: _voyages
                             .map((e) => DropdownMenuItem(
                                   value: e,
-                                  child: Text('${e}항차'),
+                                  child: Text(ShipmentPeriodLabels.voyage(e, widget.language)),
                                 ))
                             .toList(),
                         onChanged: _busy || _route == null || _year == null
@@ -512,16 +520,16 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                 const SizedBox(height: 8),
                 Align(alignment: Alignment.centerRight, child: FilledButton.icon(
                   onPressed: _busy || _route == null || _year == null || _voyage == null ? null : _loadRows,
-                  icon: const Icon(Icons.search), label: const Text('검색'),
+                  icon: const Icon(Icons.search), label: Text(_l('검색')),
                 )),
                 if (_rows.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      _lockedOnly
+                      _l(_lockedOnly
                           ? '잠금만 보기 · ${_lockedCount}개'
-                          : '선택 ${_checked.length}개',
+                          : '선택 ${_checked.length}개'),
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -537,16 +545,16 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
             child: _busy && _rows.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : _voyage == null
-                    ? const Center(
-                        child: Text('운송 경로, 년도, 항차를 선택해 주세요.'),
+                    ? Center(
+                        child: Text(_l('운송 경로, 년도, 항차를 선택해 주세요.')),
                       )
                     : _rows.isEmpty
-                        ? const Center(
-                            child: Text('해당 항차 화물 데이터가 없습니다.'),
+                        ? Center(
+                            child: Text(_l('해당 항차 화물 데이터가 없습니다.')),
                           )
                         : visibleRows.isEmpty
-                            ? const Center(
-                                child: Text('현재 조건에 해당하는 화물이 없습니다.'),
+                            ? Center(
+                                child: Text(_l('현재 조건에 해당하는 화물이 없습니다.')),
                               )
                             : ListView(
                             padding:
@@ -730,7 +738,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
               ),
               const SizedBox(height: 2),
               Text(
-                label,
+                _l(label),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -786,7 +794,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                     if (notes.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '비고: $notes',
+                        _l('비고: $notes'),
                         style: const TextStyle(fontSize: 13),
                       ),
                     ],
@@ -795,7 +803,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
               ),
               if (locked)
                 IconButton(
-                  tooltip: '잠금 해제',
+                  tooltip: _l('잠금 해제'),
                   visualDensity: VisualDensity.compact,
                   onPressed: _busy ? null : () => _unlockSingle(row),
                   icon: const Icon(
@@ -805,7 +813,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                   ),
                 ),
               IconButton(
-                tooltip: '편집',
+                tooltip: _l('편집'),
                 visualDensity: VisualDensity.compact,
                 onPressed: _busy ? null : () => _edit(row),
                 icon: const Icon(Icons.edit_outlined, size: 19),
@@ -824,5 +832,3 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
         ),
       );
 }
-
-

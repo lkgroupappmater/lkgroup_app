@@ -747,7 +747,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       items.add({
         'label': _l('엑셀 화물 업로드'),
         'icon': Icons.upload_file_outlined,
-        'page': const ExcelUploadScreen(),
+        'page': ExcelUploadScreen(language: widget.language),
       });
     }
 
@@ -761,7 +761,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         {
           'label': _l('변경 승인 관리'),
           'icon': Icons.fact_check_outlined,
-          'page': const ChangeApprovalScreen(),
+          'page': ChangeApprovalScreen(language: widget.language),
         },
         {
           'label': _l('견적 요청 관리'),
@@ -771,7 +771,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         {
           'label': _l('기준 환율 입력'),
           'icon': Icons.currency_exchange,
-          'page': const ExchangeRateScreen(),
+          'page': ExchangeRateScreen(language: widget.language),
         },
       ]);
     }
@@ -3055,4 +3055,3 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         ),
       );
 }
-

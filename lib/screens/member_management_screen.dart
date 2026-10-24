@@ -1,3 +1,5 @@
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
 import '../widgets/company_verification.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
@@ -24,6 +26,8 @@ class MemberManagementScreen extends StatefulWidget {
 }
 
 class _MemberManagementScreenState extends State<MemberManagementScreen> with AutoRefreshState {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
   bool _automaticLoad = false;
   bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
@@ -153,22 +157,22 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       final selected = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('관리자 종류 선택'),
+          title: Text(_l('관리자 종류 선택')),
           content: Text(
-            '${member['name'] ?? member['email']}님의 관리자 권한을 선택해 주세요.',
+            _l('${member['name'] ?? member['email']}님의 관리자 권한을 선택해 주세요.'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
+              child: Text(_l('취소')),
             ),
             OutlinedButton(
               onPressed: () => Navigator.pop(context, 'staff'),
-              child: const Text('관리자(직원)'),
+              child: Text(_l('관리자(직원)')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, 'admin'),
-              child: const Text('관리자(총괄)'),
+              child: Text(_l('관리자(총괄)')),
             ),
           ],
         ),
@@ -194,15 +198,15 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('가입 권한 요청 거절'),
+        title: Text(_l('가입 권한 요청 거절')),
         content: Text(
-          '${member['name'] ?? member['email']}님의 '
+          _l('${member['name'] ?? member['email']}님의 '
           '${_roleLabel(member['requested_role'])} 요청을 거절할까요?\n'
-          '거절해도 계정은 일반회원으로 계속 사용할 수 있습니다.',
+          '거절해도 계정은 일반회원으로 계속 사용할 수 있습니다.'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('거절')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(_l('취소'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(_l('거절'))),
         ],
       ),
     );
@@ -224,7 +228,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     final data = await showDialog<_AdminMemberData>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const _AdminMemberRegistrationDialog(),
+      builder: (_) => _AdminMemberRegistrationDialog(language: widget.language),
     );
     if (data == null) return;
 
@@ -243,7 +247,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       if (response.status < 200 || response.status >= 300) {
         throw Exception(response.data);
       }
-      _message('${data.name} 회원을 ${data.role.label} 권한으로 등록했습니다.');
+      _message('${data.name} 회원을 ${data.role.localizedLabel(widget.language)} 권한으로 등록했습니다.');
       await _loadMembers();
     } catch (e) {
       _message('회원 등록 실패: $e', error: true);
@@ -273,37 +277,37 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('회원 정보 편집'),
+          title: Text(_l('회원 정보 편집')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(_identityLabel(member)),
-                TextField(controller: name, decoration: const InputDecoration(labelText: '이름')),
+                TextField(controller: name, decoration: InputDecoration(labelText: _l('이름'))),
                 TextFormField(
                   initialValue: '${member['email'] ?? ''}',
                   readOnly: true,
-                  decoration: const InputDecoration(labelText: '이메일 (수정 불가)'),
+                  decoration: InputDecoration(labelText: _l('이메일 (수정 불가)')),
                 ),
                 TextField(
                   controller: phone,
-                  decoration: const InputDecoration(
-                    labelText: '전화번호',
-                    hintText: '예: 020-5889-2547',
+                  decoration: InputDecoration(
+                    labelText: _l('전화번호'),
+                    hintText: _l('예: 020-5889-2547'),
                   ),
                 ),
                 TextField(
                   controller: company,
-                  decoration: const InputDecoration(labelText: '회사명'),
+                  decoration: InputDecoration(labelText: _l('회사명')),
                 ),
                 DropdownButtonFormField<UserRole>(
                   initialValue: role,
-                  decoration: const InputDecoration(labelText: '권한'),
-                  items: const [
-                    DropdownMenuItem(value: UserRole.member, child: Text('일반 회원')),
-                    DropdownMenuItem(value: UserRole.partner, child: Text('협력/파트너사')),
-                    DropdownMenuItem(value: UserRole.staff, child: Text('관리자(직원)')),
-                    DropdownMenuItem(value: UserRole.admin, child: Text('관리자(총괄)')),
+                  decoration: InputDecoration(labelText: _l('권한')),
+                  items: [
+                    DropdownMenuItem(value: UserRole.member, child: Text(_l('일반 회원'))),
+                    DropdownMenuItem(value: UserRole.partner, child: Text(_l('협력/파트너사'))),
+                    DropdownMenuItem(value: UserRole.staff, child: Text(_l('관리자(직원)'))),
+                    DropdownMenuItem(value: UserRole.admin, child: Text(_l('관리자(총괄)'))),
                   ],
                   onChanged: (v) => setDialogState(() => role = v ?? role),
                 ),
@@ -311,7 +315,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+            TextButton(onPressed: () => Navigator.pop(context), child: Text(_l('취소'))),
             FilledButton(
               onPressed: () => Navigator.pop(context, {
                 'name': name.text.trim(),
@@ -321,7 +325,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                 'requested_role': role.name,
                 'approval_status': 'approved',
               }),
-              child: const Text('저장'),
+              child: Text(_l('저장')),
             ),
           ],
         ),
@@ -343,19 +347,19 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('회원 삭제'),
+        title: Text(_l('회원 삭제')),
         content: Text(
-          '${member['name'] ?? member['email']} 회원을 삭제할까요?\n\n'
-          '삭제 즉시 로그인할 수 없으며, 관련 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.',
+          _l('${member['name'] ?? member['email']} 회원을 삭제할까요?\n\n'
+          '삭제 즉시 로그인할 수 없으며, 관련 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('삭제 확인'),
+            child: Text(_l('삭제 확인')),
           ),
         ],
       ),
@@ -374,18 +378,18 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('탈퇴 취소'),
+        title: Text(_l('탈퇴 취소')),
         content: Text(
-          '${member['name'] ?? member['email']} 회원의 탈퇴를 취소하고 정상 회원으로 복구할까요?',
+          _l('${member['name'] ?? member['email']} 회원의 탈퇴를 취소하고 정상 회원으로 복구할까요?'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('탈퇴 취소'),
+            child: Text(_l('탈퇴 취소')),
           ),
         ],
       ),
@@ -404,19 +408,19 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('탈퇴 확정'),
+        title: Text(_l('탈퇴 확정')),
         content: Text(
-          '${member['name'] ?? member['email']} 회원을 DB에서 완전히 삭제할까요?\n\n'
-          '이 작업은 되돌릴 수 없습니다. 탈퇴 확정 후 동일 이메일은 3일 제한 없이 즉시 신규 가입할 수 있습니다.',
+          _l('${member['name'] ?? member['email']} 회원을 DB에서 완전히 삭제할까요?\n\n'
+          '이 작업은 되돌릴 수 없습니다. 탈퇴 확정 후 동일 이메일은 3일 제한 없이 즉시 신규 가입할 수 있습니다.'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+            child: Text(_l('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('탈퇴 확정'),
+            child: Text(_l('탈퇴 확정')),
           ),
         ],
       ),
@@ -449,14 +453,14 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _cancelDeletion(member),
-                      child: const Text('탈퇴 취소'),
+                      child: Text(_l('탈퇴 취소')),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton(
                       onPressed: () => _confirmDeletion(member),
-                      child: const Text('탈퇴 확정'),
+                      child: Text(_l('탈퇴 확정')),
                     ),
                   ),
                 ],
@@ -470,7 +474,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(text),
+        content: Text(_l(text)),
         backgroundColor: error ? AppColors.error : AppColors.primary,
       ),
     );
@@ -502,7 +506,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                 height: 28,
                 child: IconButton(
                   padding: EdgeInsets.zero,
-                  tooltip: '회원 삭제',
+                  tooltip: _l('회원 삭제'),
                   onPressed: () => _deleteMember(member),
                   icon: const Icon(Icons.delete_outline, size: 20),
                 ),
@@ -521,15 +525,15 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
     return Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () { setState(() { _submittedSearch = _fieldFilter.query; _searched = true; }); _loadMembers(); }),
-        title: const Text('회원 종합 관리'),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'customer_code':'고객 ID','name':'이름','phone':'연락처','email':'이메일','company':'회사','role':'권한','approval_status':'승인 상태'}, onChanged: () { setState(() { _submittedSearch = _fieldFilter.query; _searched = true; }); _loadMembers(); }),
+        title: Text(_l('회원 종합 관리')),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _registerMember,
         icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('회원 등록'),
+        label: Text(_l('회원 등록')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -554,13 +558,13 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                   const SizedBox(height: 12),
                   CompanyVerificationButton(language: widget.language),
                   if(_registrySummary!=null) Card(color:Colors.orange.shade50,child:ListTile(title:Text('${intakeText(widget.language,'mismatches')} ${_registrySummary!['mismatch_customers']}'),subtitle:Text('${intakeText(widget.language,'duplicates')} ${_registrySummary!['duplicate_customers']} · ${intakeText(widget.language,'sourceRows')} ${_registrySummary!['mismatch_sources']}'),trailing:const Icon(Icons.chevron_right),onTap:()=>_openRegistry(mismatchesOnly:true))),
-                  const Text(
-                    '가입 권한 승인 요청',
+                  Text(
+                    _l('가입 권한 승인 요청'),
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
                   if (pending.isEmpty)
-                    const Card(child: ListTile(title: Text('대기 중인 요청이 없습니다.'))),
+                    Card(child: ListTile(title: Text(_l('대기 중인 요청이 없습니다.')))),
                   ...pending.map((member) => Card(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -575,12 +579,12 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                           Row(children: [
                             Expanded(child: OutlinedButton(
                               onPressed: () => _reject(member),
-                              child: const Text('거절'),
+                              child: Text(_l('거절')),
                             )),
                             const SizedBox(width: 8),
                             Expanded(child: FilledButton(
                               onPressed: () => _approve(member),
-                              child: const Text('승인'),
+                              child: Text(_l('승인')),
                             )),
                           ]),
                         ],
@@ -590,36 +594,36 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
                   const SizedBox(height: 18),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text(
-                    '관리자 / 협력·파트너사',
+                  Text(
+                    _l('관리자 / 협력·파트너사'),
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
                   if (fixed.isEmpty)
-                    const Card(child: ListTile(title: Text('등록된 관리자/파트너가 없습니다.'))),
+                    Card(child: ListTile(title: Text(_l('등록된 관리자/파트너가 없습니다.')))),
                   ...fixed.map(_memberCard),
                   const SizedBox(height: 18),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text(
-                    '일반 회원 목록',
+                  Text(
+                    _l('일반 회원 목록'),
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
                   const SizedBox(height: 8),
                   if (_submittedSearch.trim().isNotEmpty && list.isEmpty)
-                    const Card(child: ListTile(title: Text('검색된 회원이 없습니다.'))),
+                    Card(child: ListTile(title: Text(_l('검색된 회원이 없습니다.')))),
                   ...list.map(_memberCard),
                   const SizedBox(height: 18),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text(
-                    '탈퇴 회원',
+                  Text(
+                    _l('탈퇴 회원'),
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(height: 8),
                   if (deleted.isEmpty)
-                    const Card(child: ListTile(title: Text('탈퇴 처리 중인 회원이 없습니다.'))),
+                    Card(child: ListTile(title: Text(_l('탈퇴 처리 중인 회원이 없습니다.')))),
                   ...deleted.map(_deletedMemberCard),
                 ],
               ),
@@ -627,17 +631,18 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     );
   }
 
-  String _roleLabel(dynamic value) => switch (value?.toString()) {
+  String _roleLabel(dynamic value) => _l(switch (value?.toString()) {
         'admin' => '관리자(총괄)',
         'staff' => '관리자(직원)',
         'partner' => '협력/파트너사',
         _ => '일반 회원',
-      };
+      });
 }
 
 class _AdminMemberRegistrationDialog extends StatefulWidget {
-  const _AdminMemberRegistrationDialog();
+  const _AdminMemberRegistrationDialog({required this.language});
 
+  final AppLanguage language;
   @override
   State<_AdminMemberRegistrationDialog> createState() =>
       _AdminMemberRegistrationDialogState();
@@ -645,6 +650,8 @@ class _AdminMemberRegistrationDialog extends StatefulWidget {
 
 class _AdminMemberRegistrationDialogState
     extends State<_AdminMemberRegistrationDialog> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
   final _key = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
@@ -667,7 +674,7 @@ class _AdminMemberRegistrationDialogState
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('회원 등록'),
+        title: Text(_l('회원 등록')),
         content: Form(
           key: _key,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -677,47 +684,47 @@ class _AdminMemberRegistrationDialogState
               children: [
                 TextFormField(
                   controller: _name,
-                  decoration: const InputDecoration(labelText: '이름', hintText: '예: 홍길동'),
+                  decoration: InputDecoration(labelText: _l('이름'), hintText: _l('예: 홍길동')),
                   validator: (v) => FormValidators.requiredText(v, '이름'),
                 ),
                 TextFormField(
                   controller: _email,
-                  decoration: const InputDecoration(labelText: '이메일', hintText: '예: member@example.com'),
+                  decoration: InputDecoration(labelText: _l('이메일'), hintText: _l('예: member@example.com')),
                   validator: FormValidators.email,
                 ),
                 TextFormField(
                   controller: _password,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '암호',
-                    hintText: '예: Lkgroup2026',
-                    helperText: '대문자·소문자·숫자 포함 8자 이상',
+                  decoration: InputDecoration(
+                    labelText: _l('암호'),
+                    hintText: _l('예: Lkgroup2026'),
+                    helperText: _l('대문자·소문자·숫자 포함 8자 이상'),
                   ),
                   validator: FormValidators.password,
                 ),
                 TextFormField(
                   controller: _confirm,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: '암호 확인'),
+                  decoration: InputDecoration(labelText: _l('암호 확인')),
                   validator: (v) => v == _password.text ? null : '암호가 서로 일치하지 않습니다.',
                 ),
                 TextFormField(
                   controller: _phone,
-                  decoration: const InputDecoration(labelText: '전화번호', hintText: '예: 020-5889-2547'),
+                  decoration: InputDecoration(labelText: _l('전화번호'), hintText: _l('예: 020-5889-2547')),
                   validator: FormValidators.phone,
                 ),
                 TextFormField(
                   controller: _company,
-                  decoration: const InputDecoration(labelText: '회사명(선택)', hintText: '예: LK Trading'),
+                  decoration: InputDecoration(labelText: _l('회사명(선택)'), hintText: _l('예: LK Trading')),
                 ),
                 DropdownButtonFormField<UserRole>(
                   initialValue: _role,
-                  decoration: const InputDecoration(labelText: '권한'),
-                  items: const [
-                    DropdownMenuItem(value: UserRole.member, child: Text('일반 회원')),
-                    DropdownMenuItem(value: UserRole.partner, child: Text('협력/파트너사')),
-                    DropdownMenuItem(value: UserRole.staff, child: Text('관리자(직원)')),
-                    DropdownMenuItem(value: UserRole.admin, child: Text('관리자(총괄)')),
+                  decoration: InputDecoration(labelText: _l('권한')),
+                  items: [
+                    DropdownMenuItem(value: UserRole.member, child: Text(_l('일반 회원'))),
+                    DropdownMenuItem(value: UserRole.partner, child: Text(_l('협력/파트너사'))),
+                    DropdownMenuItem(value: UserRole.staff, child: Text(_l('관리자(직원)'))),
+                    DropdownMenuItem(value: UserRole.admin, child: Text(_l('관리자(총괄)'))),
                   ],
                   onChanged: (v) => setState(() => _role = v ?? _role),
                 ),
@@ -726,7 +733,7 @@ class _AdminMemberRegistrationDialogState
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(_l('취소'))),
           FilledButton(
             onPressed: () {
               if (!_key.currentState!.validate()) return;
@@ -742,7 +749,7 @@ class _AdminMemberRegistrationDialogState
                 ),
               );
             },
-            child: const Text('등록'),
+            child: Text(_l('등록')),
           ),
         ],
       );

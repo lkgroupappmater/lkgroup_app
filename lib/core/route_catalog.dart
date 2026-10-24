@@ -152,6 +152,14 @@ class RouteCatalog {
   static List<String> get routes => all.skip(1).toList(growable: false);
 
   static String localizedLabel(String displayName, AppLanguage language) {
+    if (displayName == 'all') return AppStrings.get(language, 'all');
+    // Display labels may receive either the stable route key or its stored name.
+    // Do not modify the canonical value used by searches and saves.
+    displayName = definitionForKey(displayName)?.displayName ?? displayName;
+    if (displayName == '라오스 현지배송') {
+      return language == AppLanguage.english ? 'Laos Local Delivery'
+          : language == AppLanguage.lao ? 'ຈັດສົ່ງພາຍໃນລາວ' : displayName;
+    }
     if (language == AppLanguage.korean || displayName == '전체') {
       return displayName == '전체'
           ? AppStrings.get(language, 'all')
@@ -209,6 +217,8 @@ class RouteCatalog {
     final normalized = displayName
         .trim()
         .replaceAll('→', '->')
+        .replaceAll('➜', '->')
+        .replaceAll('➝', '->')
         .replaceAll(RegExp(r'\s*->\s*'), '->')
         .replaceAll(RegExp(r'\s+'), ' ');
     final match = RegExp(

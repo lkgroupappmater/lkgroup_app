@@ -381,7 +381,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> wit
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'route':'운송 경로','shipment_year':'년도','voyage':'항차','status':'상태','departure_date':'출발일','arrival_date':'도착일','title':'제목'}, onChanged: () => setState(() {})),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'route':'운송 경로','shipment_year':'년도','voyage':'항차','status':'상태','departure_date':'출발일','arrival_date':'도착일','title':'제목'}, onChanged: () => setState(() {})),
           title: Text(_u('선적 일정 목록 관리')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,

@@ -1,3 +1,4 @@
+import '../core/operational_localizations.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -17,6 +18,8 @@ class BatchStatementPdfDialog extends StatefulWidget {
 }
 
 class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
   bool _saving = false;
 
   int? _year(dynamic value) {
@@ -70,13 +73,13 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
       if (path != null) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('총 ${requests.length}개의 명세서를 하나의 PDF로 저장했습니다.')),
+          SnackBar(content: Text(_l('총 ${requests.length}개의 명세서를 하나의 PDF로 저장했습니다.'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('전체 명세서 PDF 저장 실패: $e')),
+          SnackBar(content: Text(_l('전체 명세서 PDF 저장 실패: $e'))),
         );
       }
     } finally {
@@ -88,7 +91,7 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
   Widget build(BuildContext context) {
     final requests = _requests;
     return AlertDialog(
-      title: const Text('체크된 명세서 출력용 PDF'),
+      title: Text(_l('체크된 명세서 출력용 PDF')),
       content: SizedBox(
         width: 620,
         child: Column(
@@ -96,11 +99,11 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '총 ${requests.length}개의 명세서가 선택되었습니다.',
+              _l('총 ${requests.length}개의 명세서가 선택되었습니다.'),
               style: const TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            const Text('명세서 번호'),
+            Text(_l('명세서 번호')),
             const SizedBox(height: 6),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
@@ -116,7 +119,7 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
             ),
             const SizedBox(height: 14),
             Text(
-              '체크된 ${requests.length}개 명세서 전체를 하나의 출력용 PDF로 저장하시겠습니까?',
+              _l('체크된 ${requests.length}개 명세서 전체를 하나의 출력용 PDF로 저장하시겠습니까?'),
             ),
           ],
         ),
@@ -124,7 +127,7 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: Text(_l('취소')),
         ),
         FilledButton.icon(
           onPressed: _saving || requests.isEmpty ? null : _save,
@@ -135,7 +138,7 @@ class _BatchStatementPdfDialogState extends State<BatchStatementPdfDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.picture_as_pdf_outlined),
-          label: const Text('전체 명세서 출력용 PDF 다운로드'),
+          label: Text(_l('전체 명세서 출력용 PDF 다운로드')),
         ),
       ],
     );

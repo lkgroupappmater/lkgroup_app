@@ -1,3 +1,6 @@
+import '../core/shipment_period_labels.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import '../widgets/management_field_search.dart';
 import 'dart:typed_data';
 
@@ -12,8 +15,9 @@ import '../core/route_catalog.dart';
 import '../services/excel_bulk_management_service.dart';
 
 class UnloadingListManagementScreen extends StatefulWidget {
-  const UnloadingListManagementScreen({super.key});
+  const UnloadingListManagementScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<UnloadingListManagementScreen> createState() =>
       _UnloadingListManagementScreenState();
@@ -21,6 +25,9 @@ class UnloadingListManagementScreen extends StatefulWidget {
 
 class _UnloadingListManagementScreenState
     extends State<UnloadingListManagementScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   List<ExcelBulkBatch> _batches = const [];
   List<Map<String, dynamic>> _rows = const [];
   final _fieldFilter = ManagementFieldFilter();
@@ -325,15 +332,15 @@ class _UnloadingListManagementScreenState
   void _message(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
+      SnackBar(content: Text(_l(text))),
     );
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','unloading_zone':'구획'}, onChanged: () => setState(() {})),
-          title: const Text('하역 자료 관리'),
+          bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'consignee_name':'고객명','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','unloading_zone':'구획'}, onChanged: () => setState(() {})),
+          title: Text(_l('하역 자료 관리')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -344,12 +351,12 @@ class _UnloadingListManagementScreenState
             DropdownButtonFormField<String>(
               value: _route,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: '운송 경로',
+              decoration: InputDecoration(
+                labelText: _l('운송 경로'),
                 border: OutlineInputBorder(),
               ),
               items: _routes
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .map((e) => DropdownMenuItem(value: e, child: Text(_routeText(e))))
                   .toList(),
               onChanged: _busy
                   ? null
@@ -366,12 +373,12 @@ class _UnloadingListManagementScreenState
                 Expanded(
                   child: DropdownButtonFormField<int>(
                     value: _year,
-                    decoration: const InputDecoration(
-                      labelText: '년도',
+                    decoration: InputDecoration(
+                      labelText: _l('년도'),
                       border: OutlineInputBorder(),
                     ),
                     items: _years
-                        .map((e) => DropdownMenuItem(value: e, child: Text('$e년')))
+                        .map((e) => DropdownMenuItem(value: e, child: Text(ShipmentPeriodLabels.year(e, widget.language))))
                         .toList(),
                     onChanged: _route == null || _busy
                         ? null
@@ -386,12 +393,12 @@ class _UnloadingListManagementScreenState
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: _voyage,
-                    decoration: const InputDecoration(
-                      labelText: '항차',
+                    decoration: InputDecoration(
+                      labelText: _l('항차'),
                       border: OutlineInputBorder(),
                     ),
                     items: _voyages
-                        .map((e) => DropdownMenuItem(value: e, child: Text('${e}항차')))
+                        .map((e) => DropdownMenuItem(value: e, child: Text(ShipmentPeriodLabels.voyage(e, widget.language))))
                         .toList(),
                     onChanged: _year == null || _busy
                         ? null
@@ -409,30 +416,30 @@ class _UnloadingListManagementScreenState
             const SizedBox(height: 14),
             Align(alignment: Alignment.centerRight, child: FilledButton.icon(
               onPressed: _busy || _route == null || _year == null || _voyage == null ? null : _loadRows,
-              icon: const Icon(Icons.search), label: const Text('검색'),
+              icon: const Icon(Icons.search), label: Text(_l('검색')),
             )),
             if (_busy) const LinearProgressIndicator(),
             if (!_busy && _voyage != null) ...[
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                title: const Text(
-                  '잠금 물품 노란색 표시',
+                title: Text(
+                  _l('잠금 물품 노란색 표시'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
                 subtitle: Text(
-                  _highlightLocked ? 'Y · 잠금 화물도 노란색' : 'F · 잠금 화물은 노란색 제외',
+                  _l(_highlightLocked ? 'Y · 잠금 화물도 노란색' : 'F · 잠금 화물은 노란색 제외'),
                   style: const TextStyle(fontSize: 11),
                 ),
                 value: _highlightLocked,
                 onChanged: (v) => setState(() => _highlightLocked = v),
               ),
               Text(
-                '화물 ${_rows.length}건 · 노란색 확인 필요 ${_rows.where(_needsAttention).length}건',
+                _l('화물 ${_rows.length}건 · 노란색 확인 필요 ${_rows.where(_needsAttention).length}건'),
               ),
             ],
             if (_fieldFilter.query.trim().isNotEmpty) ...[
-              Text('검색 결과 ${_rows.where(_fieldFilter.matches).length}건'),
+              Text(_l('검색 결과 ${_rows.where(_fieldFilter.matches).length}건')),
               SizedBox(height: 240, child: ListView(children: [for (final row in _rows.where(_fieldFilter.matches)) ListTile(title: Text('${row['receipt_number'] ?? ''} · ${row['consignee_name'] ?? ''}'), subtitle: Text('${row['consignee_phone'] ?? ''} · ${row['box_number'] ?? ''} · ${row['unloading_zone'] ?? ''}'))])),
             ],
             const SizedBox(height: 10),
@@ -440,14 +447,14 @@ class _UnloadingListManagementScreenState
               onPressed: _rows.isEmpty || _saving ? null : _savePdf,
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: Text(
-                _saving ? 'PDF 생성 중...' : '하역 자료 PDF 출력 / 저장',
+                _l(_saving ? 'PDF 생성 중...' : '하역 자료 PDF 출력 / 저장'),
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              '정상 이름이 포함되어 있어도 **, ***, ?? 같은 확인표시가 섞여 있으면 '
+            Text(
+              _l('정상 이름이 포함되어 있어도 **, ***, ?? 같은 확인표시가 섞여 있으면 '
               '정상 영수번호는 유지하고 하역 자료에서만 노란색으로 표시합니다. '
-              '수동 ? 표시 화물은 노란색으로 표시되며, 잠금 화물의 노란색 표시는 위 F/Y 스위치로 선택할 수 있습니다.',
+              '수동 ? 표시 화물은 노란색으로 표시되며, 잠금 화물의 노란색 표시는 위 F/Y 스위치로 선택할 수 있습니다.'),
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -457,4 +464,3 @@ class _UnloadingListManagementScreenState
         ),
       );
 }
-

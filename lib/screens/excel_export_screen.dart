@@ -1,3 +1,6 @@
+import '../core/shipment_period_labels.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -11,13 +14,17 @@ import '../services/supabase_service.dart';
 import 'excel_statement_controls_screen.dart';
 
 class ExcelExportScreen extends StatefulWidget {
-  const ExcelExportScreen({super.key});
+  const ExcelExportScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<ExcelExportScreen> createState() => _ExcelExportScreenState();
 }
 
 class _ExcelExportScreenState extends State<ExcelExportScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   final _queue = ExcelImportQueueService.instance;
 
   bool _loading = true;
@@ -203,7 +210,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
         _recalcProgress = 1;
         _recalcText = '100% · 완료';
         _message =
-            '${selected.routeLabel} · ${selected.year}년 · ${selected.voyage}항차 재연산 및 Update 완료';
+            '${_routeText(selected.routeLabel)} · ${selected.year}년 · ${selected.voyage}항차 재연산 및 Update 완료';
       });
     } catch (e) {
       if (!mounted) return;
@@ -242,8 +249,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
 
   Future<void> _pickBase() async {
     final selected = await showModalBottomSheet<ExcelExportBatch>(context: context, builder: (context) => SafeArea(child: ListView(shrinkWrap: true, children: [
-      const ListTile(title: Text('최신 BASE Excel 다운로드')),
-      for (final base in _bases) ListTile(title: Text(base.routeLabel), onTap: () => Navigator.pop(context, base)),
+      ListTile(title: Text(_l('최신 BASE Excel 다운로드'))),
+      for (final base in _bases) ListTile(title: Text(_routeText(base.routeLabel)), onTap: () => Navigator.pop(context, base)),
     ])));
     if (selected != null && mounted) await _export(selected);
   }
@@ -318,14 +325,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       );
 
   InputDecoration _dec(String label) => InputDecoration(
-        labelText: label,
+        labelText: _l(label),
         border: const OutlineInputBorder(),
       );
 
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('화물 데이타 엑셀 파일 관리'),
+          title: Text(_l('화물 데이타 엑셀 파일 관리')),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
         ),
@@ -333,8 +340,8 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Text(
-              '관리자·직원·협력/파트너사 전용',
+            Text(
+              _l('관리자·직원·협력/파트너사 전용'),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -347,15 +354,15 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
             FilledButton.icon(
               onPressed: _recalculating ? null : _upload,
               icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Excel 파일 업로드'),
+              label: Text(_l('Excel 파일 업로드')),
             ),
 
-            OutlinedButton(onPressed: _bases.isEmpty || _exporting || _recalculating ? null : _pickBase, child: const Text('최신 BASE Excel 다운로드 · 고객 ID / 배송 정보')),
+            OutlinedButton(onPressed: _bases.isEmpty || _exporting || _recalculating ? null : _pickBase, child: Text(_l('최신 BASE Excel 다운로드 · 고객 ID / 배송 정보'))),
 
             if (_queue.jobs.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const Text(
-                '업로드 진행 현황',
+              Text(
+                _l('업로드 진행 현황'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -366,16 +373,16 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
 
             const Divider(height: 32),
 
-            const Text(
-              '항차 Excel 검색',
+            Text(
+              _l('항차 Excel 검색'),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 5),
-            const Text(
-              '실제 등록된 항차만 검색할 수 있습니다. 검색 후 재연산·다운로드 버튼이 표시됩니다.',
+            Text(
+              _l('실제 등록된 항차만 검색할 수 있습니다. 검색 후 재연산·다운로드 버튼이 표시됩니다.'),
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -392,7 +399,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                 isExpanded: true,
                 decoration: _dec('운송 경로'),
                 items: _routes
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map((v) => DropdownMenuItem(value: v, child: Text(_routeText(v))))
                     .toList(),
                 onChanged: _exporting || _recalculating
                     ? null
@@ -412,7 +419,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                       initialValue: _year,
                       decoration: _dec('년도'),
                       items: _years
-                          .map((v) => DropdownMenuItem(value: v, child: Text('$v년')))
+                          .map((v) => DropdownMenuItem(value: v, child: Text(ShipmentPeriodLabels.year(v, widget.language))))
                           .toList(),
                       onChanged: _route == null || _exporting || _recalculating
                           ? null
@@ -432,7 +439,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                       items: _voyages
                           .map((v) => DropdownMenuItem(
                                 value: v,
-                                child: Text(v.endsWith('항차') ? v : '$v항차'),
+                                child: Text(ShipmentPeriodLabels.voyage(v, widget.language)),
                               ))
                           .toList(),
                       onChanged: _year == null || _exporting || _recalculating
@@ -450,20 +457,20 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               onPressed: _voyage == null || _loading || _exporting || _recalculating
                   ? null : () => setState(() { _searched = true; _message = ''; }),
               icon: const Icon(Icons.search),
-              label: const Text('항차 검색'),
+              label: Text(_l('항차 검색')),
             ),
             if (_selected != null) ...[
             Text(_selected!.displayLabel),
             OutlinedButton(
-              onPressed: _selected == null || _recalculating || _exporting ? null : () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ExcelStatementControlsScreen(batch: _selected!))),
-              child: const Text('배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정'),
+              onPressed: _selected == null || _recalculating || _exporting ? null : () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ExcelStatementControlsScreen(language: widget.language, batch: _selected!))),
+              child: Text(_l('배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정')),
             ),
             OutlinedButton.icon(
               onPressed: _selected == null || _recalculating || _exporting
                   ? null
                   : _recalculate,
               icon: const Icon(Icons.sync),
-              label: const Text('선택 항차 재연산 및 Update'),
+              label: Text(_l('선택 항차 재연산 및 Update')),
             ),
 
             if (_recalculating || _recalcText.isNotEmpty) ...[
@@ -473,7 +480,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               ),
               const SizedBox(height: 5),
               Text(
-                _recalcText,
+                _l(_recalcText),
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -489,16 +496,16 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
                   : _export,
               icon: const Icon(Icons.download_outlined),
               label: Text(
-                _exporting
+                _l(_exporting
                     ? 'Excel 생성 중...'
-                    : 'Excel 다운로드 및 저장 위치 선택',
+                    : 'Excel 다운로드 및 저장 위치 선택'),
               ),
             ),
 
             ],
             const SizedBox(height: 18),
             Text(
-              _message,
+              _l(_message),
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],

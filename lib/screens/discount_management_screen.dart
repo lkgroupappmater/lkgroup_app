@@ -1,3 +1,5 @@
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
@@ -6,8 +8,9 @@ import '../core/route_catalog.dart';
 import '../services/customer_benefit_service.dart';
 
 class DiscountManagementScreen extends StatefulWidget {
-  const DiscountManagementScreen({super.key});
+  const DiscountManagementScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<DiscountManagementScreen> createState() =>
       _DiscountManagementScreenState();
@@ -15,6 +18,9 @@ class DiscountManagementScreen extends StatefulWidget {
 
 class _DiscountManagementScreenState
     extends State<DiscountManagementScreen> with AutoRefreshState {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   bool _automaticLoad = false;
   bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
@@ -44,17 +50,17 @@ class _DiscountManagementScreenState
           await CustomerBenefitService.instance.listDiscountRules();
       if (mounted) setState(() => _rules = rules);
     } catch (e) {
-      if (mounted) _msg('할인 목록 조회 실패: $e');
+      if (mounted) _msg(_l('할인 목록 조회 실패: $e'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   void _msg(String text) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(text)));
+      .showSnackBar(SnackBar(content: Text(_l(text))));
 
   String _routeLabel(String key) =>
-      key == 'all' ? '전체 운송 경로' : RouteCatalog.labelForKey(key);
+      key == 'all' ? _l('전체 운송 경로') : _routeText(key);
 
   Future<void> _edit([DiscountRule? rule]) async {
     final name =
@@ -100,7 +106,7 @@ class _DiscountManagementScreenState
           builder: (ctx) => StatefulBuilder(
             builder: (ctx, setLocal) => AlertDialog(
               title: Text(
-                rule == null ? '할인 고객 추가' : '할인 고객 편집',
+                _l(rule == null ? '할인 고객 추가' : '할인 고객 편집'),
               ),
               content: SizedBox(
                 width: 560,
@@ -112,16 +118,16 @@ class _DiscountManagementScreenState
                         initialValue: routeKey,
                         isExpanded: true,
                         decoration:
-                            const InputDecoration(labelText: '운송 경로'),
+                            InputDecoration(labelText: _l('운송 경로')),
                         items: [
-                          const DropdownMenuItem(
+                          DropdownMenuItem(
                             value: 'all',
-                            child: Text('전체 운송 경로'),
+                            child: Text(_l('전체 운송 경로')),
                           ),
                           ...RouteCatalog.routes.map(
                             (e) => DropdownMenuItem(
                               value: RouteCatalog.keyFor(e),
-                              child: Text(e),
+                              child: Text(_routeText(e)),
                             ),
                           ),
                         ],
@@ -132,30 +138,30 @@ class _DiscountManagementScreenState
                       TextField(
                         controller: group,
                         decoration:
-                            const InputDecoration(labelText: '소속/단체명'),
+                            InputDecoration(labelText: _l('소속/단체명')),
                       ),
                       TextField(
                         controller: name,
                         decoration:
-                            const InputDecoration(labelText: '고객 개인 이름'),
+                            InputDecoration(labelText: _l('고객 개인 이름')),
                       ),
                       TextField(
                         controller: company,
-                        decoration: const InputDecoration(
-                          labelText: '회사명 (회원가입 회사명과 자동 묶음)',
+                        decoration: InputDecoration(
+                          labelText: _l('회사명 (회원가입 회사명과 자동 묶음)'),
                         ),
                       ),
                       TextField(
                         controller: phone,
                         keyboardType: TextInputType.phone,
                         decoration:
-                            const InputDecoration(labelText: '전화번호'),
+                            InputDecoration(labelText: _l('전화번호')),
                       ),
                       const SizedBox(height: 10),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '할인율',
+                          _l('할인율'),
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -165,8 +171,8 @@ class _DiscountManagementScreenState
                             const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: '기본/소량 할인율 (%)',
+                        decoration: InputDecoration(
+                          labelText: _l('기본/소량 할인율 (%)'),
                         ),
                       ),
                       Row(
@@ -175,9 +181,9 @@ class _DiscountManagementScreenState
                             child: TextField(
                               controller: bulkThreshold,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '대량 기준 수량 (선택)',
-                                hintText: '예: 50',
+                              decoration: InputDecoration(
+                                labelText: _l('대량 기준 수량 (선택)'),
+                                hintText: _l('예: 50'),
                               ),
                             ),
                           ),
@@ -189,20 +195,20 @@ class _DiscountManagementScreenState
                                   const TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
-                              decoration: const InputDecoration(
-                                labelText: '대량 할인율 (%)',
-                                hintText: '예: 10',
+                              decoration: InputDecoration(
+                                labelText: _l('대량 할인율 (%)'),
+                                hintText: _l('예: 10'),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 4),
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            '대량 기준은 개인 이름 + 회사명으로 입고된 수량을 같은 항차에서 합산하여 판단합니다.',
+                            _l('대량 기준은 개인 이름 + 회사명으로 입고된 수량을 같은 항차에서 합산하여 판단합니다.'),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.black54,
@@ -216,33 +222,33 @@ class _DiscountManagementScreenState
                             const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: '고정 단가 Override (선택)',
+                        decoration: InputDecoration(
+                          labelText: _l('고정 단가 Override (선택)'),
                         ),
                       ),
                       TextField(
                         controller: notes,
                         maxLines: 2,
                         decoration:
-                            const InputDecoration(labelText: '비고'),
+                            InputDecoration(labelText: _l('비고')),
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         initialValue: statementMode,
-                        decoration: const InputDecoration(
-                          labelText: '개인/회사 명세서 방식',
+                        decoration: InputDecoration(
+                          labelText: _l('개인/회사 명세서 방식'),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: 'separate',
                             child: Text(
-                              '분리 - 개인 이름 / 회사명 명세서 각각',
+                              _l('분리 - 개인 이름 / 회사명 명세서 각각'),
                             ),
                           ),
                           DropdownMenuItem(
                             value: 'combined',
                             child: Text(
-                              '통합 - 개인 이름 + 회사명 한 명세서',
+                              _l('통합 - 개인 이름 + 회사명 한 명세서'),
                             ),
                           ),
                         ],
@@ -250,10 +256,10 @@ class _DiscountManagementScreenState
                           () => statementMode = v ?? 'separate',
                         ),
                       ),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          '※ 명세서 분리 여부와 관계없이 할인 대량 기준 수량은 개인+회사 물량을 합산합니다.',
+                          _l('※ 명세서 분리 여부와 관계없이 할인 대량 기준 수량은 개인+회사 물량을 합산합니다.'),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.black54,
@@ -262,11 +268,11 @@ class _DiscountManagementScreenState
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('할인 적용'),
+                        title: Text(_l('할인 적용')),
                         subtitle: Text(
-                          phone.text.trim().isEmpty
+                          _l(phone.text.trim().isEmpty
                               ? '전화번호가 없으면 자동 적용되지 않습니다.'
-                              : '개인 이름/회사명 + 전화번호 + 운송경로가 일치할 때 적용',
+                              : '개인 이름/회사명 + 전화번호 + 운송경로가 일치할 때 적용'),
                         ),
                         value: active,
                         onChanged: (v) =>
@@ -279,11 +285,11 @@ class _DiscountManagementScreenState
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('저장'),
+                  child: Text(_l('저장')),
                 ),
               ],
             ),
@@ -309,13 +315,13 @@ class _DiscountManagementScreenState
         pct == null ||
         pct < 0 ||
         pct > 100) {
-      _msg('고객 이름과 0~100 사이 기본 할인율을 확인해 주세요.');
+      _msg(_l('고객 이름과 0~100 사이 기본 할인율을 확인해 주세요.'));
       return;
     }
     if ((threshold == null) != (bulkPct == null) ||
         (threshold != null && threshold <= 0) ||
         (bulkPct != null && (bulkPct < 0 || bulkPct > 100))) {
-      _msg('대량 할인은 기준 수량과 할인율을 모두 입력해 주세요.');
+      _msg(_l('대량 할인은 기준 수량과 할인율을 모두 입력해 주세요.'));
       return;
     }
 
@@ -340,10 +346,10 @@ class _DiscountManagementScreenState
           statementMode: statementMode,
         ),
       );
-      _msg('고객 묶음/할인 적용 정보를 저장했습니다.');
+      _msg(_l('고객 묶음/할인 적용 정보를 저장했습니다.'));
       await _load();
     } catch (e) {
-      _msg('할인 정보 저장 실패: $e');
+      _msg(_l('할인 정보 저장 실패: $e'));
     }
   }
 
@@ -352,18 +358,18 @@ class _DiscountManagementScreenState
     final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('할인 고객 삭제'),
+            title: Text(_l('할인 고객 삭제')),
             content: Text(
-              '${rule.customerName} 할인 적용 정보를 삭제하시겠습니까?',
+              _l('${rule.customerName} 할인 적용 정보를 삭제하시겠습니까?'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('삭제'),
+                child: Text(_l('삭제')),
               ),
             ],
           ),
@@ -373,10 +379,10 @@ class _DiscountManagementScreenState
     try {
       await CustomerBenefitService.instance
           .deleteDiscountRule(rule.id!);
-      _msg('삭제했습니다.');
+      _msg(_l('삭제했습니다.'));
       await _load();
     } catch (e) {
-      _msg('삭제 실패: $e');
+      _msg(_l('삭제 실패: $e'));
     }
   }
 
@@ -390,11 +396,11 @@ class _DiscountManagementScreenState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('할인 적용 관리')),
+        appBar: AppBar(title: Text(_l('할인 적용 관리'))),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _edit(),
           icon: const Icon(Icons.add),
-          label: const Text('할인 고객 추가'),
+          label: Text(_l('할인 고객 추가')),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -406,19 +412,19 @@ class _DiscountManagementScreenState
                       children: [
                         DropdownButtonFormField<String>(
                           initialValue: _route,
-                          decoration: const InputDecoration(
-                            labelText: '운송 경로',
+                          decoration: InputDecoration(
+                            labelText: _l('운송 경로'),
                             border: OutlineInputBorder(),
                           ),
                           items: [
-                            const DropdownMenuItem(
+                            DropdownMenuItem(
                               value: 'all',
-                              child: Text('전체'),
+                              child: Text(_l('전체')),
                             ),
                             ...RouteCatalog.routes.map(
                               (e) => DropdownMenuItem(
                                 value: RouteCatalog.keyFor(e),
-                                child: Text(e),
+                                child: Text(_routeText(e)),
                               ),
                             ),
                           ],
@@ -427,14 +433,14 @@ class _DiscountManagementScreenState
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','company':'회사','phone':'연락처','group':'단체','route':'운송 경로'}, onChanged: () { _searched = true; _load(); }),
+                        ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','company':'회사','phone':'연락처','group':'단체','route':'운송 경로'}, onChanged: () { _searched = true; _load(); }),
                       ],
                     ),
                   ),
                   Expanded(
                     child: _visible.isEmpty
-                        ? const Center(
-                            child: Text('등록된 할인 고객이 없습니다.'),
+                        ? Center(
+                            child: Text(_l('등록된 할인 고객이 없습니다.')),
                           )
                         : ListView.builder(
                             padding: const EdgeInsets.fromLTRB(
@@ -458,12 +464,12 @@ class _DiscountManagementScreenState
                                     '${r.companyName.isEmpty ? '' : ' / ${r.companyName}'}',
                                   ),
                                   subtitle: Text(
-                                    '${_routeLabel(r.routeKey)} · '
+                                    _l('${_routeLabel(r.routeKey)} · '
                                     '${r.groupName.isEmpty ? '소속 미지정' : r.groupName}\n'
                                     '${r.phone.isEmpty ? '전화번호 입력 필요 · 적용 대기' : r.phone}'
                                     '${r.sourceDetail.isEmpty ? '' : ' · ${r.sourceDetail}'}\n'
                                     '할인: ${_discountLabel(r)} · '
-                                    '명세서: ${r.statementMode == 'combined' ? '개인+회사 통합' : '개인/회사 분리'}',
+                                    '명세서: ${r.statementMode == 'combined' ? '개인+회사 통합' : '개인/회사 분리'}'),
                                   ),
                                   isThreeLine: true,
                                   trailing: Row(

@@ -1,11 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
+import 'package:flutter/material.dart';
 
 import '../core/route_catalog.dart';
 import '../services/route_development_service.dart';
 
 class AdditionalFeatureDevelopmentScreen extends StatefulWidget {
-  const AdditionalFeatureDevelopmentScreen({super.key});
+  const AdditionalFeatureDevelopmentScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<AdditionalFeatureDevelopmentScreen> createState() =>
       _AdditionalFeatureDevelopmentScreenState();
@@ -13,6 +16,9 @@ class AdditionalFeatureDevelopmentScreen extends StatefulWidget {
 
 class _AdditionalFeatureDevelopmentScreenState
     extends State<AdditionalFeatureDevelopmentScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   List<Map<String, dynamic>> _routes = const [];
   String? _selectedRouteKey;
   bool _loading = true;
@@ -68,7 +74,7 @@ class _AdditionalFeatureDevelopmentScreenState
 
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
+      SnackBar(content: Text(_l(text))),
     );
   }
 
@@ -80,19 +86,19 @@ class _AdditionalFeatureDevelopmentScreenState
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('운송 경로 삭제 취소'),
+            title: Text(_l('운송 경로 삭제 취소')),
             content: Text(
-              '${name.isEmpty ? key : name}\n\n'
-              '이 운송 경로의 삭제 대기를 취소하고 이전 상태로 복구합니다.',
+              _l('${name.isEmpty ? key : name}\n\n'
+              '이 운송 경로의 삭제 대기를 취소하고 이전 상태로 복구합니다.'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('아니오'),
+                child: Text(_l('아니오')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('삭제 취소'),
+                child: Text(_l('삭제 취소')),
               ),
             ],
           ),
@@ -119,22 +125,22 @@ class _AdditionalFeatureDevelopmentScreenState
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('운송 경로 삭제'),
+            title: Text(_l('운송 경로 삭제')),
             content: Text(
-              '${name.isEmpty ? key : name}\n\n'
+              _l('${name.isEmpty ? key : name}\n\n'
               '삭제하면 즉시 운송 경로 선택 목록과 기존 메뉴/기능에서 사라집니다.\n'
               '30일 동안 삭제 대기 상태로 보관된 뒤 자동으로 완전히 삭제됩니다.\n\n'
-              '즉시 완전 삭제 기능은 없습니다.',
+              '즉시 완전 삭제 기능은 없습니다.'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('삭제'),
+                child: Text(_l('삭제')),
               ),
             ],
           ),
@@ -158,6 +164,7 @@ class _AdditionalFeatureDevelopmentScreenState
       context,
       MaterialPageRoute(
         builder: (_) => RouteDefinitionEditorScreen(
+          language: widget.language,
           route: route,
           allRoutes: _routes,
           existingDraft: true,
@@ -181,6 +188,7 @@ class _AdditionalFeatureDevelopmentScreenState
       context,
       MaterialPageRoute(
         builder: (_) => RouteDefinitionEditorScreen(
+          language: widget.language,
           route: route,
           allRoutes: _routes,
         ),
@@ -192,14 +200,14 @@ class _AdditionalFeatureDevelopmentScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('추가 기능 개발')),
+      appBar: AppBar(title: Text(_l('추가 기능 개발'))),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
-                  '운송 경로 BASE / 공통 운임 관리',
+                Text(
+                  _l('운송 경로 BASE / 공통 운임 관리'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -209,15 +217,15 @@ class _AdditionalFeatureDevelopmentScreenState
                 DropdownButtonFormField<String>(
                   initialValue: _selectedRouteKey,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '운송 경로 선택',
+                  decoration: InputDecoration(
+                    labelText: _l('운송 경로 선택'),
                     border: OutlineInputBorder(),
                   ),
                   items: _activeRoutes
                       .map(
                         (row) => DropdownMenuItem<String>(
                           value: '${row['route_key']}',
-                          child: Text('${row['display_name']}'),
+                          child: Text(_routeText('${row['display_name']}')),
                         ),
                       )
                       .toList(),
@@ -234,7 +242,7 @@ class _AdditionalFeatureDevelopmentScreenState
                             ? null
                             : () => _openEditor(create: false),
                         icon: const Icon(Icons.edit),
-                        label: const Text('편집'),
+                        label: Text(_l('편집')),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -242,7 +250,7 @@ class _AdditionalFeatureDevelopmentScreenState
                       child: OutlinedButton.icon(
                         onPressed: () => _openEditor(create: true),
                         icon: const Icon(Icons.add),
-                        label: const Text('신규 운송 경로 추가'),
+                        label: Text(_l('신규 운송 경로 추가')),
                       ),
                     ),
                   ],
@@ -263,23 +271,23 @@ class _AdditionalFeatureDevelopmentScreenState
                               ),
                             ),
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('선택한 운송 경로 삭제'),
+                    label: Text(_l('선택한 운송 경로 삭제')),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Card(
+                Card(
                   child: Padding(
                     padding: EdgeInsets.all(12),
                     child: Text(
-                      '여기서 저장한 운임은 DB freight_rate_tiers가 원본이 되며 '
-                      '가견적·명세서·화물 운임 계산이 같은 기준을 사용합니다.',
+                      _l('여기서 저장한 운임은 DB freight_rate_tiers가 원본이 되며 '
+                      '가견적·명세서·화물 운임 계산이 같은 기준을 사용합니다.'),
                     ),
                   ),
                 ),
                 if (_draftRoutes.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text(
-                    '신규 운송 경로 적용 대기',
+                  Text(
+                    _l('신규 운송 경로 적용 대기'),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -303,9 +311,9 @@ class _AdditionalFeatureDevelopmentScreenState
                           ),
                         ),
                         subtitle: Text(
-                          base.isEmpty
+                          _l(base.isEmpty
                               ? '내용 저장 완료 · 아직 미적용'
-                              : '내용 저장 완료 · 아직 미적용\nBASE: $base',
+                              : '내용 저장 완료 · 아직 미적용\nBASE: $base'),
                         ),
                         isThreeLine: base.isNotEmpty,
                         trailing: SizedBox(
@@ -325,8 +333,8 @@ class _AdditionalFeatureDevelopmentScreenState
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   onPressed: () => _openDraft(route),
-                                  child: const Text(
-                                    '계속 작업',
+                                  child: Text(
+                                    _l('계속 작업'),
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -344,8 +352,8 @@ class _AdditionalFeatureDevelopmentScreenState
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   onPressed: () => _deleteRouteFromList(route),
-                                  child: const Text(
-                                    '삭제',
+                                  child: Text(
+                                    _l('삭제'),
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -359,16 +367,16 @@ class _AdditionalFeatureDevelopmentScreenState
                 ],
                 if (_deletedRoutes.isNotEmpty) ...[
                   const SizedBox(height: 18),
-                  const Text(
-                    '삭제 대기중',
+                  Text(
+                    _l('삭제 대기중'),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    '삭제된 운송 경로는 30일 동안 보관되며, 기간 내 삭제 취소가 가능합니다.',
+                  Text(
+                    _l('삭제된 운송 경로는 30일 동안 보관되며, 기간 내 삭제 취소가 가능합니다.'),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.black54,
@@ -392,15 +400,15 @@ class _AdditionalFeatureDevelopmentScreenState
                           ),
                         ),
                         subtitle: Text(
-                          days <= 0
+                          _l(days <= 0
                               ? '완전 삭제 처리 대기중'
-                              : '완전 삭제까지 $days일 남음',
+                              : '완전 삭제까지 $days일 남음'),
                         ),
                         trailing: SizedBox(
                           width: 118,
                           child: OutlinedButton(
                             onPressed: () => _restoreDeletedRoute(route),
-                            child: const Text('삭제 취소'),
+                            child: Text(_l('삭제 취소')),
                           ),
                         ),
                       ),
@@ -415,7 +423,7 @@ class _AdditionalFeatureDevelopmentScreenState
 
 class RouteDefinitionEditorScreen extends StatefulWidget {
   const RouteDefinitionEditorScreen({
-    super.key,
+    super.key, this.language = AppLanguage.korean,
     this.route,
     required this.allRoutes,
     this.existingDraft = false,
@@ -425,6 +433,7 @@ class RouteDefinitionEditorScreen extends StatefulWidget {
   final List<Map<String, dynamic>> allRoutes;
   final bool existingDraft;
 
+  final AppLanguage language;
   @override
   State<RouteDefinitionEditorScreen> createState() =>
       _RouteDefinitionEditorScreenState();
@@ -432,6 +441,9 @@ class RouteDefinitionEditorScreen extends StatefulWidget {
 
 class _RouteDefinitionEditorScreenState
     extends State<RouteDefinitionEditorScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   late final TextEditingController _titleController;
   late final TextEditingController _documentTitleController;
   late final TextEditingController _remarkController;
@@ -551,7 +563,7 @@ class _RouteDefinitionEditorScreenState
 
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
+      SnackBar(content: Text(_l(text))),
     );
   }
 
@@ -612,7 +624,7 @@ class _RouteDefinitionEditorScreenState
       keyboardType: keyboardType,
       onChanged: livePreview ? (_) => setState(() {}) : null,
       decoration: InputDecoration(
-        labelText: label,
+        labelText: _l(label),
         border: const OutlineInputBorder(),
       ),
     );
@@ -627,17 +639,17 @@ class _RouteDefinitionEditorScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '문서 타이틀 미리보기',
+            Text(
+              _l('문서 타이틀 미리보기'),
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
-            Text('$base xxth 거래 명세서'),
+            Text(_l('$base xxth 거래 명세서')),
             const SizedBox(height: 3),
-            Text('$base xxth 견적서'),
+            Text(_l('$base xxth 견적서')),
             const SizedBox(height: 4),
-            const Text(
-              '※ xxth / 거래 명세서 / 견적서 문구는 고정이며 수정되지 않습니다.',
+            Text(
+              _l('※ xxth / 거래 명세서 / 견적서 문구는 고정이며 수정되지 않습니다.'),
               style: TextStyle(fontSize: 11, color: Colors.black54),
             ),
           ],
@@ -667,8 +679,8 @@ class _RouteDefinitionEditorScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '명세서 BASE 전체 미리보기',
+            Text(
+              _l('명세서 BASE 전체 미리보기'),
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -686,11 +698,11 @@ class _RouteDefinitionEditorScreenState
                           'assets/statement_forms/$formKey.png',
                           fit: BoxFit.cover,
                           alignment: Alignment.bottomCenter,
-                          errorBuilder: (_, __, ___) => const Center(
+                          errorBuilder: (_, __, ___) => Center(
                             child: Padding(
                               padding: EdgeInsets.all(16),
                               child: Text(
-                                '선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.',
+                                _l('선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.'),
                               ),
                             ),
                           ),
@@ -710,9 +722,9 @@ class _RouteDefinitionEditorScreenState
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                documentTitle.isEmpty
+                                _l(documentTitle.isEmpty
                                     ? '운송 경로 타이틀 xxth 거래 명세서'
-                                    : '$documentTitle xxth 거래 명세서',
+                                    : '$documentTitle xxth 거래 명세서'),
                                 style: const TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.w800,
@@ -791,9 +803,9 @@ class _RouteDefinitionEditorScreenState
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'BASE Excel 셀 직접 수정 (고급)',
+                    _l('BASE Excel 셀 직접 수정 (고급)'),
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -810,13 +822,13 @@ class _RouteDefinitionEditorScreenState
                           });
                         },
                   icon: const Icon(Icons.add),
-                  label: const Text('셀 추가'),
+                  label: Text(_l('셀 추가')),
                 ),
               ],
             ),
-            const Text(
-              '명세서 전체 미리보기와 별도로, 원본 XLSX의 특정 시트/셀 값을 직접 지정할 수 있습니다. '
-              '예: 시트 이름(LTxx-xx), C1, 표시할 값',
+            Text(
+              _l('명세서 전체 미리보기와 별도로, 원본 XLSX의 특정 시트/셀 값을 직접 지정할 수 있습니다. '
+              '예: 시트 이름(LTxx-xx), C1, 표시할 값'),
               style: TextStyle(fontSize: 11, color: Colors.black54),
             ),
             const SizedBox(height: 6),
@@ -831,8 +843,8 @@ class _RouteDefinitionEditorScreenState
                       flex: 3,
                       child: TextFormField(
                         initialValue: item['sheet_name'],
-                        decoration: const InputDecoration(
-                          labelText: '시트 이름',
+                        decoration: InputDecoration(
+                          labelText: _l('시트 이름'),
                           isDense: true,
                         ),
                         onChanged: (v) => item['sheet_name'] = v,
@@ -844,8 +856,8 @@ class _RouteDefinitionEditorScreenState
                       child: TextFormField(
                         initialValue: item['cell_ref'],
                         textCapitalization: TextCapitalization.characters,
-                        decoration: const InputDecoration(
-                          labelText: '셀',
+                        decoration: InputDecoration(
+                          labelText: _l('셀'),
                           hintText: 'C1',
                           isDense: true,
                         ),
@@ -857,15 +869,15 @@ class _RouteDefinitionEditorScreenState
                       flex: 5,
                       child: TextFormField(
                         initialValue: item['value'],
-                        decoration: const InputDecoration(
-                          labelText: '값',
+                        decoration: InputDecoration(
+                          labelText: _l('값'),
                           isDense: true,
                         ),
                         onChanged: (v) => item['value'] = v,
                       ),
                     ),
                     IconButton(
-                      tooltip: '삭제',
+                      tooltip: _l('삭제'),
                       onPressed: _busy
                           ? null
                           : () {
@@ -889,7 +901,7 @@ class _RouteDefinitionEditorScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isDraft ? '신규 운송 경로 적용 대기' : (_isCreate ? '신규 운송 경로' : '운송 경로 편집')),
+        title: Text(_l(_isDraft ? '신규 운송 경로 적용 대기' : (_isCreate ? '신규 운송 경로' : '운송 경로 편집'))),
       ),
       body: ListView(
         padding: const EdgeInsets.all(14),
@@ -898,15 +910,15 @@ class _RouteDefinitionEditorScreenState
             DropdownButtonFormField<String>(
               initialValue: _baseRouteKey,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: '기반 BASE 운송 경로',
+              decoration: InputDecoration(
+                labelText: _l('기반 BASE 운송 경로'),
                 border: OutlineInputBorder(),
               ),
               items: _activeRoutes
                   .map(
                     (row) => DropdownMenuItem<String>(
                       value: '${row['route_key']}',
-                      child: Text('${row['display_name']}'),
+                      child: Text(_routeText('${row['display_name']}')),
                     ),
                   )
                   .toList(),
@@ -919,8 +931,8 @@ class _RouteDefinitionEditorScreenState
           TextField(
             controller: _documentTitleController,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: '운송 경로 타이틀 (예: Kor-Lao Sea)',
+            decoration: InputDecoration(
+              labelText: _l('운송 경로 타이틀 (예: Kor-Lao Sea)'),
               border: OutlineInputBorder(),
             ),
           ),
@@ -956,16 +968,16 @@ class _RouteDefinitionEditorScreenState
           const SizedBox(height: 16),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  '단가 구조',
+                  _l('단가 구조'),
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
               TextButton.icon(
                 onPressed: _busy ? null : _addTier,
                 icon: const Icon(Icons.add),
-                label: const Text('구간 추가'),
+                label: Text(_l('구간 추가')),
               ),
             ],
           ),
@@ -985,8 +997,8 @@ class _RouteDefinitionEditorScreenState
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: '이상 kg',
+                        decoration: InputDecoration(
+                          labelText: _l('이상 kg'),
                         ),
                         onChanged: (value) {
                           row['min_weight_kg'] =
@@ -1011,7 +1023,7 @@ class _RouteDefinitionEditorScreenState
                       ),
                     ),
                     IconButton(
-                      tooltip: '구간 삭제',
+                      tooltip: _l('구간 삭제'),
                       onPressed: _busy
                           ? null
                           : () {
@@ -1031,7 +1043,7 @@ class _RouteDefinitionEditorScreenState
                 child: OutlinedButton(
                   onPressed:
                       _busy ? null : () => Navigator.pop(context),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1044,11 +1056,11 @@ class _RouteDefinitionEditorScreenState
                       : null,
                   onPressed: _busy ? null : _save,
                   child: Text(
-                    _savedDraft
+                    _l(_savedDraft
                         ? '신규 경로 적용'
                         : _isCreate
                             ? '내용 저장 (아직 적용 안됨)'
-                            : '내용 저장',
+                            : '내용 저장'),
                   ),
                 ),
               ),
@@ -1059,7 +1071,7 @@ class _RouteDefinitionEditorScreenState
             OutlinedButton.icon(
               onPressed: _busy ? null : _saveDraftChanges,
               icon: const Icon(Icons.save_outlined),
-              label: const Text('내용 수정 저장'),
+              label: Text(_l('내용 수정 저장')),
             ),
           ],
           if (!_isCreate || _savedDraft) ...[
@@ -1070,7 +1082,7 @@ class _RouteDefinitionEditorScreenState
               ),
               onPressed: _busy ? null : _deleteRoute,
               icon: const Icon(Icons.delete_outline),
-              label: const Text('운송 경로 삭제'),
+              label: Text(_l('운송 경로 삭제')),
             ),
           ],
         ],
@@ -1127,24 +1139,24 @@ class _RouteDefinitionEditorScreenState
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('운송 경로 삭제'),
-            content: const Text(
-              '삭제하면 해당 운송 경로는 즉시 기존 메뉴 및 신규 업무 선택 목록에서 사라집니다.\n\n'
+            title: Text(_l('운송 경로 삭제')),
+            content: Text(
+              _l('삭제하면 해당 운송 경로는 즉시 기존 메뉴 및 신규 업무 선택 목록에서 사라집니다.\n\n'
               '운송 경로 설정, BASE Excel 및 운임 정책은 30일 동안 삭제 대기 상태로 보관된 후 '
               '자동으로 완전히 삭제됩니다.\n\n'
-              '즉시 완전 삭제 기능은 제공되지 않습니다.',
+              '즉시 완전 삭제 기능은 제공되지 않습니다.'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.red,
                 ),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('삭제'),
+                child: Text(_l('삭제')),
               ),
             ],
           ),
@@ -1179,18 +1191,18 @@ class _RouteDefinitionEditorScreenState
       final confirmed = await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
-              title: const Text('신규 운송 경로 적용'),
-              content: const Text(
-                '작성하신 데이터를 기반으로 신규 운송 경로가 추가 됩니다.',
+              title: Text(_l('신규 운송 경로 적용')),
+              content: Text(
+                _l('작성하신 데이터를 기반으로 신규 운송 경로가 추가 됩니다.'),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('확인'),
+                  child: Text(_l('확인')),
                 ),
               ],
             ),
@@ -1281,7 +1293,3 @@ class _RouteDefinitionEditorScreenState
     }
   }
 }
-
-
-
-

@@ -1,3 +1,4 @@
+import '../core/route_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_language.dart';
@@ -181,7 +182,7 @@ class _SupportInboxState extends State<SupportInboxScreen>
                               title: Text(
                                   '${r['unread'] == true ? '● ' : ''}${r['subject'] ?? r['customer_name'] ?? ''}'),
                               subtitle: Text(
-                                  '#${r['id']} · ${r['customer_name'] ?? ''}\n${r['contact_phone'] ?? ''} · ${r['route'] ?? ''}\n${r['content'] ?? ''}',
+                                  '#${r['id']} · ${r['customer_name'] ?? ''}\n${r['contact_phone'] ?? ''} · ${RouteCatalog.localizedLabel('${r['route'] ?? ''}', widget.language)}\n${r['content'] ?? ''}',
                                   maxLines: 4,
                                   overflow: TextOverflow.ellipsis),
                               trailing: TextButton(
@@ -374,7 +375,7 @@ class _SupportDetailState extends State<SupportDetailScreen> {
                 Text(
                     '#${r['id']} · ${r['subject'] ?? r['customer_name'] ?? ''}',
                     style: Theme.of(context).textTheme.titleLarge),
-                Text('${r['route'] ?? ''} · ${r['status'] ?? ''}'),
+                Text('${RouteCatalog.localizedLabel('${r['route'] ?? ''}', widget.language)} · ${r['status'] ?? ''}'),
                 Text(
                     '${r['customer_name'] ?? ''} · ${r['contact_phone'] ?? ''} · ${r['contact_email'] ?? ''}'),
                 const SizedBox(height: 12),
@@ -446,7 +447,7 @@ class _SupportDetailState extends State<SupportDetailScreen> {
                           onPressed: () => startStaffConsultation(
                               context, widget.language,
                               quoteId: widget.id,
-                              route: '${r['route'] ?? ''}',
+                              route: '${RouteCatalog.localizedLabel('${r['route'] ?? ''}', widget.language)}',
                               content: '${r['subject'] ?? ''}'),
                           child: Text(staffTitle(widget.language)))
                   ],

@@ -1085,7 +1085,7 @@ class _QuoteRequestBodyState extends State<QuoteRequestBody> {
   Widget _specialQuoteCard(Map<String,dynamic> quote) => Card(
     child:ListTile(
       title:Text('${quote['subject']??''}'),
-      subtitle:Text('#${quote['id']} · ${quote['route']??''}\n${quote['content']??''}',maxLines:3,overflow:TextOverflow.ellipsis),
+      subtitle:Text('#${quote['id']} · ${RouteCatalog.localizedLabel('${quote['route']??''}', widget.language)}\n${quote['content']??''}',maxLines:3,overflow:TextOverflow.ellipsis),
       trailing:const Icon(Icons.chevron_right),
       onTap:() async {
         await Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>SupportDetailScreen(
