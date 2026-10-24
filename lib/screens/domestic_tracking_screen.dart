@@ -1,3 +1,4 @@
+import '../core/shipment_period_labels.dart';
 import 'waybill_intake_screen.dart';
 import '../services/waybill_intake_service.dart';
 import '../core/waybill_intake_text.dart';
@@ -340,7 +341,7 @@ class _DomesticTrackingScreenState extends State<DomesticTrackingScreen> with Sh
           isExpanded: true, decoration: InputDecoration(labelText: t(key)),
           items: [DropdownMenuItem(value: '', child: Text(t('any'))),
             ...values.map((v) => DropdownMenuItem(value: v,
-              child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : v)))],
+              child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : key == 'voyage' ? ShipmentPeriodLabels.voyage(v, widget.language) : ShipmentPeriodLabels.year(v, widget.language))))],
           onChanged: _busy || _filtersLoading || values.isEmpty ? null : (v) => setState(() { onChanged(v ?? ''); _resolvedLink = null; }),
         ));
     return Column(children: [
@@ -763,7 +764,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
       padding: const EdgeInsets.only(bottom: 12), child: DropdownButtonFormField<String>(
         key: ValueKey('link-$key-$value-${values.join(',')}'), initialValue: values.contains(value) ? value : '', isExpanded: true,
         decoration: InputDecoration(labelText: t(key)),
-        items: [DropdownMenuItem(value: '', child: Text(t('any'))), ...values.map((v) => DropdownMenuItem(value: v, child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : v)))],
+        items: [DropdownMenuItem(value: '', child: Text(t('any'))), ...values.map((v) => DropdownMenuItem(value: v, child: Text(key == 'route' ? RouteCatalog.localizedLabel(v, widget.language) : key == 'voyage' ? ShipmentPeriodLabels.voyage(v, widget.language) : ShipmentPeriodLabels.year(v, widget.language))))],
         onChanged: _busy || _filtersLoading || values.isEmpty ? null : (v) => setState(() { changed(v ?? ''); _invalidate(); }),
       ));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -955,3 +956,6 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> with SharedUi
     ),
   );
 }
+
+
+
