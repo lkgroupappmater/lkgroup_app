@@ -7,6 +7,19 @@ import 'ui_localizations.dart';
 class OperationalLocalizations {
   OperationalLocalizations._();
 
+  /// API status codes remain unchanged; only the visible label is localized.
+  static String status(AppLanguage language, String value) {
+    const labels = <String, List<String>>{
+      'pending': ['대기', 'Pending', 'ລໍຖ້າ'],
+      'reviewing': ['검토 중', 'Under review', 'ກຳລັງກວດສອບ'],
+      'approved': ['승인됨', 'Approved', 'ອະນຸມັດແລ້ວ'],
+      'rejected': ['거절됨', 'Rejected', 'ປະຕິເສດແລ້ວ'],
+      'completed': ['완료', 'Completed', 'ສຳເລັດ'],
+    };
+    final label = labels[value];
+    return label == null ? value : label[language == AppLanguage.english ? 1 : language == AppLanguage.lao ? 2 : 0];
+  }
+
   static final _templates = sharedKoreanTextKeys.keys
       .where((source) => RegExp(r'\{p\d+\}').hasMatch(source))
       .map((source) {

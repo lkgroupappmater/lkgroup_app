@@ -1,3 +1,4 @@
+import '../core/operational_localizations.dart';
 import '../core/route_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -318,7 +319,7 @@ class _SupportDetailState extends State<SupportDetailScreen> {
                           value: status,
                           items: statuses
                               .map((v) =>
-                                  DropdownMenuItem(value: v, child: Text(v)))
+                                  DropdownMenuItem(value: v, child: Text(OperationalLocalizations.status(widget.language, v))))
                               .toList(),
                           onChanged: (v) => set(() => status = v!)),
                       TextField(
@@ -375,7 +376,7 @@ class _SupportDetailState extends State<SupportDetailScreen> {
                 Text(
                     '#${r['id']} · ${r['subject'] ?? r['customer_name'] ?? ''}',
                     style: Theme.of(context).textTheme.titleLarge),
-                Text('${RouteCatalog.localizedLabel('${r['route'] ?? ''}', widget.language)} · ${r['status'] ?? ''}'),
+                Text('${RouteCatalog.localizedLabel('${r['route'] ?? ''}', widget.language)} · ${OperationalLocalizations.status(widget.language, '${r['status'] ?? ''}')}'),
                 Text(
                     '${r['customer_name'] ?? ''} · ${r['contact_phone'] ?? ''} · ${r['contact_email'] ?? ''}'),
                 const SizedBox(height: 12),
@@ -712,3 +713,4 @@ class _StaffConsultationState extends State<StaffConsultationScreen> {
                   if (_error != null) Text(_error!)
                 ])));
 }
+

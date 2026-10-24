@@ -3,11 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lkgroup_app/core/app_language.dart';
 import 'package:lkgroup_app/core/operational_localizations.dart';
 import 'package:lkgroup_app/core/route_catalog.dart';
+import 'package:lkgroup_app/core/shipment_period_labels.dart';
 import 'package:lkgroup_app/core/shared_ui_text_catalog.dart';
 import 'package:lkgroup_app/widgets/management_field_search.dart';
 import 'package:lkgroup_app/services/shared_ui_text_service.dart';
 
 void main() {
+  test('status and period dropdown labels follow the selected language', () {
+    for (final language in AppLanguage.values) {
+      for (final status in ['pending', 'reviewing', 'approved', 'rejected', 'completed']) {
+        expect(OperationalLocalizations.status(language, status), isNot(status));
+      }
+    }
+    expect(OperationalLocalizations.status(AppLanguage.english, 'custom'), 'custom');
+    expect(ShipmentPeriodLabels.voyage('전체', AppLanguage.english), 'All');
+    expect(ShipmentPeriodLabels.voyage('09항차', AppLanguage.english), 'Voyage 09');
+    expect(ShipmentPeriodLabels.year('2026년', AppLanguage.lao), 'ປີ 2026');
+  });
   tearDown(() => SharedUiTextService.instance.applyRows([]));
   test('route names and stable keys display in all three languages', () {
     for (final route in RouteCatalog.definitions) {

@@ -246,7 +246,7 @@ class _VoyageTotalManagementScreenState
                       .map((e) => DropdownMenuItem(
                             value: e,
                             child: Text(
-                              _l(e.endsWith('항차') ? e : '${e}항차'),
+                              ShipmentPeriodLabels.voyage(e, widget.language),
                             ),
                           ))
                       .toList(),
@@ -390,3 +390,5 @@ class _VoyageTotalManagementScreenState
     );
   }
 }
+
+
