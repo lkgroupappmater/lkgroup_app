@@ -33,7 +33,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
-  bool get autoRefreshAllowed => !_saving && !_loading;
+  bool get autoRefreshAllowed => false;
   @override
   Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _rows.where(_fieldFilter.matches).toList(growable: false);
@@ -407,7 +407,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     final totalQty=_rows.fold<num>(0,(a,r)=>a+_num(r['quantity']));
     return Scaffold(
       appBar:AppBar(
-        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () => setState(() {})),title:Text(_l('고객 리스트'))),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () { setState(() {}); if (_searched) _loadRows(); }),title:Text(_l('고객 리스트'))),
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
         const CompanyVerificationButton(),
         Row(children:[

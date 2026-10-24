@@ -31,6 +31,8 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> wit
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
+  bool get autoRefreshAllowed => false;
+  @override
   Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _items.where(_fieldFilter.matches).toList(growable: false);
 
@@ -381,7 +383,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> wit
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'route':'운송 경로','shipment_year':'년도','voyage':'항차','status':'상태','departure_date':'출발일','arrival_date':'도착일','title':'제목'}, onChanged: () => setState(() {})),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'route':'운송 경로','shipment_year':'년도','voyage':'항차','status':'상태','departure_date':'출발일','arrival_date':'도착일','title':'제목'}, onChanged: () { setState(() {}); _load(); }),
           title: Text(_u('선적 일정 목록 관리')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,

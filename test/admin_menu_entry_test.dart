@@ -1,5 +1,8 @@
 // ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 import 'dart:convert';
+import 'package:lkgroup_app/models/app_user.dart';
+import 'package:lkgroup_app/screens/notice_management_screen.dart';
+import 'package:lkgroup_app/screens/schedule_management_screen.dart';
 import 'package:lkgroup_app/services/live_data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +53,22 @@ void main() {
     expect(calls.length, before);
     await tester.pumpWidget(const SizedBox());
   });
+
+  for (final menu in ['notices', 'schedules']) {
+    testWidgets('$menu loads once and refreshes only when Search is pressed', (tester) async {
+      const admin = AppUser(id: 'manager', role: UserRole.admin);
+      final screen = menu == 'notices' ? const NoticeManagementScreen(user: admin) : const ScheduleManagementScreen(user: admin);
+      await tester.pumpWidget(MaterialApp(home: screen)); await tester.pumpAndSettle();
+      final before = calls.length;
+      expect(before, greaterThan(0));
+      LiveDataService.instance.topics = {'*'}; LiveDataService.instance.notifyListeners();
+      await tester.pump(const Duration(seconds: 31)); await tester.pumpAndSettle();
+      expect(calls.length, before);
+      await tester.tap(find.text('검색').first); await tester.pumpAndSettle();
+      expect(calls.length, greaterThan(before)); expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
   testWidgets('manager inbox loads on entry without acknowledging requests', (tester) async {
     responses['list_support_requests'] = {'rows': [], 'has_more': false};
