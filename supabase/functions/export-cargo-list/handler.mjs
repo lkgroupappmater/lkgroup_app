@@ -18,8 +18,12 @@ export function createCargoListHandler({createClient,url,anonKey,serviceKey,zip,
    if(!routeKey||!Number.isInteger(year)||year<1900||year>2199||!voyage||voyage==='00'||voyage==='all'||voyage.length>40)return json(400,{error:'운송 경로와 항차를 선택해 주세요.'});
    // All cargo reads use the caller's JWT and normal RLS, including partner scope.
    const reader=createClient(url,anonKey,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
-   const {data:route,error:routeError}=await reader.from('route_definitions').select('route_key,display_name,file_prefix').eq('route_key',routeKey).is('deleted_at',null).maybeSingle();
-   if(routeError)throw routeError;if(!route)return json(404,{error:'운송 경로를 찾을 수 없습니다.'});
+   // route_definitions deliberately denies direct authenticated SELECT.
+   // Use the same role-aware catalog RPC as the existing app and web menus.
+   const {data:catalog,error:routeError}=await reader.rpc(profile.role==='admin'?'admin_route_definitions':'list_route_catalog_definitions');
+   if(routeError)throw routeError;
+   const route=(catalog||[]).find(r=>r.route_key===routeKey&&!r.deleted_at&&r.status!=='deleted');
+   if(!route)return json(404,{error:'운송 경로를 찾을 수 없습니다.'});
    const rows=[];let lastId=null;
    for(;;){
     let query=reader.from('shipments').select(cargoFields.join(',')).eq('route',route.display_name).eq('shipment_year',year).eq('voyage',voyage).is('deleted_at',null).is('deletion_requested_at',null).order('id',{ascending:true}).limit(1000);
