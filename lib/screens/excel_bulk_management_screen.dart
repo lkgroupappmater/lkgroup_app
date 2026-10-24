@@ -1,3 +1,4 @@
+import '../widgets/delivery_note_highlight.dart';
 import '../core/shipment_period_labels.dart';
 import '../core/route_catalog.dart';
 import '../core/operational_localizations.dart';
@@ -325,7 +326,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                   _field(phone, '전화번호'),
                   _field(receipt, '영수번호'),
                   _field(zone, '구획'),
-                  _field(notes, '비고', maxLines: 3),
+                  Padding(padding: const EdgeInsets.only(bottom: 8), child: DeliveryNoteHighlight.field(row: row, controller: notes, decoration: InputDecoration(labelText: _l('비고'), border: const OutlineInputBorder(), isDense: true), maxLines: 3)),
                   if (row['data_locked'] == true)
                     Padding(
                       padding: EdgeInsets.only(top: 4),
@@ -755,7 +756,7 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
     final locked = row['data_locked'] == true;
     final name = '${row['consignee_name'] ?? ''}'.trim();
     final phone = '${row['consignee_phone'] ?? ''}'.trim();
-    final notes = '${row['notes'] ?? ''}'.trim();
+    final notes = '${row['notes'] ?? ''}'.trim().isNotEmpty ? '${row['notes']}'.trim() : '${row['special_note_auto'] ?? ''}'.trim();
 
     return Card(
       margin: const EdgeInsets.only(top: 5),
@@ -793,10 +794,10 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
                     ),
                     if (notes.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(
+                      DeliveryNoteHighlight(row: row, child: Text(
                         _l('비고: $notes'),
                         style: const TextStyle(fontSize: 13),
-                      ),
+                      )),
                     ],
                   ],
                 ),
@@ -832,3 +833,6 @@ class _ExcelBulkManagementScreenState extends State<ExcelBulkManagementScreen> w
         ),
       );
 }
+
+
+
