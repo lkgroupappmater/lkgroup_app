@@ -4,7 +4,8 @@ const sharedTextAliases = <String, String>{
   "domesticManage": "domesticTracking",
   "adminMenu.domesticTracking": "domesticTracking",
   "adminMenu.localDeliveries": "localDeliveries",
-  "domestic.manage": "domesticTracking"
+  "domestic.manage": "domesticTracking",
+  "purchaseAgency": "purchase.title"
 };
 const sharedAppTextKeys = <String, String>{
   "add_box": "quote.addBox",
@@ -735,7 +736,9 @@ const sharedKoreanTextKeys = <String, String>{
   "최종 실제 금액": "operations.75d65641eefa",
   "제목": "quote.subject",
   "작성일": "purchase.date",
-  "상단 고정": "operations.23ecab2714e3"
+  "상단 고정": "operations.23ecab2714e3",
+  "구매대행": "purchase.title",
+  "내 외부 사이트 계정": "memberSites.title"
 };
 const sharedTextDefaults = <String, Map<String, String>>{
   "account": {
@@ -4962,5 +4965,15 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "ko": "상단 고정",
   "en": "Pin to Top",
   "lo": "ປັກໄວ້ເທິງ"
+},
+  "purchase.title": {
+  "ko": "구매대행",
+  "en": "Purchase agency",
+  "lo": "ບໍລິການຮັບຊື້"
+},
+  "memberSites.title": {
+  "ko": "내 외부 사이트 계정",
+  "en": "My external site accounts",
+  "lo": "ບັນຊີເວັບໄຊຂອງຂ້ອຍ"
 }
 };
