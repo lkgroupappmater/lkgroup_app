@@ -1,3 +1,6 @@
+import '../core/cargo_number_input.dart';
+import '../core/cargo_entry_text.dart';
+import '../core/shipment_customer_prefill.dart';
 import '../core/shipment_period_labels.dart';
 import '../core/operational_localizations.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +54,10 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
   final _width = TextEditingController();
   final _height = TextEditingController();
   final _notes = TextEditingController();
+  final _zone = TextEditingController();
+  late final ShipmentCustomerPrefill _prefill;
+  bool _boxEdited = false;
+  int _numberRevision = 0;
 
   String? _route;
   int? _year;
@@ -71,11 +78,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
   bool get _routeReady => _route != null && _year != null && _voyage != null;
   String get _prefix => _route == null ? '' : RouteCatalog.boxPrefixFor(_route!);
 
-  String get _fullBox {
-    final raw = _box.text.trim();
-    if (raw.isEmpty) return '';
-    return _prefix.isEmpty || raw.startsWith(_prefix) ? raw : '$_prefix$raw';
-  }
+  String get _fullBox => CargoNumberInput.complete(_box.text, _prefix);
 
   @override
   void initState() {
@@ -87,7 +90,12 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     _invoice.text = widget.initialInvoice;
     _name.text = widget.initialName;
     _phone.text = widget.initialPhone;
+    _boxEdited = widget.initialBoxNumber.isNotEmpty;
+    _prefill = ShipmentCustomerPrefill(name: _name, phone: _phone, zone: _zone, notes: _notes,
+      scope: () => _routeReady ? '$_route|$_year|$_voyage' : '',
+      lookup: (name, phone) => ShipmentService.instance.customerDefaults(route: _route!, year: _year!, voyage: _voyage!, name: name, phone: phone));
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefill.refresh();
       if (!_routeReady) return;
       if (_box.text.trim().isNotEmpty) {
         _checkDuplicates();
@@ -99,6 +107,8 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
 
   @override
   void dispose() {
+    _prefill.dispose();
+    _zone.dispose();
     _box.dispose();
     _invoice.dispose();
     _name.dispose();
@@ -113,6 +123,9 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
   }
 
   Future<void> _loadNextBoxNumber() async {
+    final revision = ++_numberRevision;
+    _boxEdited = false;
+    _prefill.refresh();
     if (!_routeReady) {
       if (mounted) {
         setState(() {
@@ -132,7 +145,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
         voyage: _voyage!,
         prefix: _prefix,
       );
-      if (!mounted) return;
+      if (!mounted || revision != _numberRevision || _boxEdited) return;
       setState(() {
         _box.text = nextBox.startsWith(_prefix)
             ? nextBox.substring(_prefix.length)
@@ -143,7 +156,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
     } catch (error) {
       _message('다음 박스번호 확인 실패: $error');
     } finally {
-      if (mounted) setState(() => _loadingNextBox = false);
+      if (mounted && revision == _numberRevision) setState(() => _loadingNextBox = false);
     }
   }
 
@@ -230,25 +243,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
 
     setState(() => _busy = true);
     try {
-      await SupabaseService.client.rpc(
-        'manager_add_manual_shipment',
-        params: {
-          'p_route': _route,
-          'p_year': _year,
-          'p_voyage': _voyage!.replaceAll('항차', '').trim(),
-          'p_box_number': _fullBox,
-          'p_invoice_number': _invoice.text.trim(),
-          'p_consignee_name': _name.text.trim(),
-          'p_consignee_phone': _phone.text.trim(),
-          'p_received_at': _receivedAt?.toIso8601String(),
-          'p_notes': _notes.text.trim(),
-          'p_quantity': quantity,
-          'p_weight_kg': weight,
-          'p_length_cm': length,
-          'p_width_cm': width,
-          'p_height_cm': height,
-        },
-      );
+      await _prefill.runNow();
+      await ShipmentService.instance.createShipment(route: _route!, year: _year!, voyage: _voyage!,
+        boxNumber: _boxEdited ? _fullBox : null, invoiceNumber: _invoice.text, consigneeName: _name.text,
+        consigneePhone: _phone.text, receivedAt: _receivedAt, notes: _notes.text, unloadingZone: _zone.text,
+        quantity: quantity, weightKg: weight, lengthCm: length, widthCm: width, heightCm: height);
       if (!mounted) return;
       _message('화물 데이터를 추가했습니다.');
       Navigator.pop(context, true);
@@ -351,16 +350,11 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
             TextField(
               controller: _box,
               enabled: _routeReady && !_loadingNextBox,
-              keyboardType:
-                  _prefix.isEmpty ? TextInputType.text : TextInputType.number,
-              inputFormatters: _prefix.isEmpty
-                  ? null
-                  : <TextInputFormatter>[
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
-                    ],
-              onChanged: (_) => _checkDuplicates(),
+              keyboardType: TextInputType.text,
+              inputFormatters: [CargoNumberInput.formatter(_prefix)],
+              onChanged: (_) { _boxEdited = true; _checkDuplicates(); },
               decoration: _decoration(
-                '박스번호',
+                CargoEntryText.value(widget.language, 'number'),
                 Icons.inventory_2_outlined,
                 errorText: _boxDuplicate
                     ? '중복 박스번호입니다. 저장할 수 없습니다.'
@@ -396,6 +390,12 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               decoration: _decoration('연락처', Icons.phone_outlined),
             ),
             const SizedBox(height: 10),
+            TextField(controller: _zone, decoration: _decoration('구획', Icons.location_on_outlined)),
+            const SizedBox(height: 10),
+            AnimatedBuilder(animation: _prefill, builder: (context, child) {
+              final text = CargoEntryText.value(widget.language, _prefill.status);
+              return text.isEmpty ? const SizedBox.shrink() : Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(text));
+            }),
             TextField(
               controller: _quantity,
               keyboardType: TextInputType.number,
@@ -481,3 +481,5 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
         ),
       );
 }
+
+
