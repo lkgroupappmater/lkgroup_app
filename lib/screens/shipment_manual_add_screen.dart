@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import '../core/shipment_period_labels.dart';
+import '../core/operational_localizations.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_colors.dart';
@@ -36,6 +38,9 @@ class ShipmentManualAddScreen extends StatefulWidget {
 }
 
 class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   final _box = TextEditingController();
   final _invoice = TextEditingController();
   final _name = TextEditingController();
@@ -256,12 +261,12 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
 
   void _message(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_l(text))));
   }
 
   InputDecoration _decoration(String label, IconData icon, {String? errorText}) =>
       InputDecoration(
-        labelText: label,
+        labelText: _l(label),
         prefixIcon: Icon(icon),
         errorText: errorText,
         filled: true,
@@ -275,7 +280,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('화물 추가 입력'),
+          title: Text(_l('화물 추가 입력')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -287,7 +292,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               initialValue: _route,
               decoration: _decoration('운송 경로', Icons.route),
               items: routeLabels
-                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                  .map((v) => DropdownMenuItem(value: v, child: Text(_routeText(v))))
                   .toList(),
               onChanged: _busy
                   ? null
@@ -307,7 +312,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
                     initialValue: _year,
                     decoration: _decoration('년도', Icons.calendar_today),
                     items: _years
-                        .map((v) => DropdownMenuItem(value: v, child: Text('$v년')))
+                        .map((v) => DropdownMenuItem(value: v, child: Text(ShipmentPeriodLabels.year(v, widget.language))))
                         .toList(),
                     onChanged: _busy
                         ? null
@@ -327,7 +332,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
                     decoration:
                         _decoration('항차', Icons.confirmation_number_outlined),
                     items: _voyages
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .map((v) => DropdownMenuItem(value: v, child: Text(OperationalLocalizations.text(widget.language, v))))
                         .toList(),
                     onChanged: _busy
                         ? null
@@ -366,7 +371,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
-                helperText: _loadingNextBox ? '다음 박스번호 확인 중...' : null,
+                helperText: _loadingNextBox ? _l('다음 박스번호 확인 중...') : null,
               ),
             ),
             const SizedBox(height: 10),
@@ -449,9 +454,9 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               child: InputDecorator(
                 decoration: _decoration('입고 날짜', Icons.calendar_today),
                 child: Text(
-                  _receivedAt == null
+                  _l(_receivedAt == null
                       ? '선택'
-                      : '${_receivedAt!.year}-${_receivedAt!.month.toString().padLeft(2, '0')}-${_receivedAt!.day.toString().padLeft(2, '0')}',
+                      : '${_receivedAt!.year}-${_receivedAt!.month.toString().padLeft(2, '0')}-${_receivedAt!.day.toString().padLeft(2, '0')}'),
                 ),
               ),
             ),
@@ -470,10 +475,9 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               onPressed:
                   _busy || !_routeReady || _boxDuplicate ? null : _save,
               icon: const Icon(Icons.save_outlined),
-              label: Text(_busy ? '저장 중...' : '화물 데이터 저장'),
+              label: Text(_l(_busy ? '저장 중...' : '화물 데이터 저장')),
             ),
           ],
         ),
       );
 }
-

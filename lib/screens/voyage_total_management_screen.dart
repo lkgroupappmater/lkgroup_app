@@ -1,3 +1,6 @@
+import '../core/shipment_period_labels.dart';
+import '../core/operational_localizations.dart';
+import '../core/route_catalog.dart';
 import 'package:flutter/material.dart';
 
 import '../core/money_format.dart';
@@ -19,6 +22,10 @@ class VoyageTotalManagementScreen extends StatefulWidget {
 
 class _VoyageTotalManagementScreenState
     extends State<VoyageTotalManagementScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   List<ExcelBulkBatch> _batches = const [];
   String? _route;
   int? _year;
@@ -45,13 +52,13 @@ class _VoyageTotalManagementScreenState
     }
     String amount(String key) => MoneyFormat.usd((saved?[key] as num?)?.toDouble() ?? 0);
     return Card(child: ListTile(
-      title: Text('${batch.route} · ${batch.year} · ${batch.voyage}'),
-      subtitle: Text(saved == null
+      title: Text('${_routeText(batch.route)} · ${batch.year} · ${batch.voyage}'),
+      subtitle: Text(_l(saved == null
         ? _text('미계산', 'Not calculated', 'ຍັງບໍ່ຄິດໄລ່')
         : '${_text('할인 전', 'Gross', 'ຍອດລວມ')}: ${amount('gross_usd')} · '
           '${_text('할인', 'Discount', 'ສ່ວນຫຼຸດ')}: ${amount('discount_usd')}\n'
           '${_text('합계', 'Total', 'ລວມ')}: ${amount('net_usd')} · '
-          '${_text('계산일', 'Calculated', 'ວັນຄິດໄລ່')}: ${saved['calculated_at']}'),
+          '${_text('계산일', 'Calculated', 'ວັນຄິດໄລ່')}: ${saved['calculated_at']}')),
       isThreeLine: saved != null,
       trailing: const Icon(Icons.chevron_right),
       onTap: _busy ? null : () => setState(() {
@@ -108,7 +115,7 @@ class _VoyageTotalManagementScreenState
 
   Future<void> _calculate() async {
     if (_route == null || _year == null || _voyage == null) {
-      _msg('운송 경로, 년도, 항차를 모두 선택해 주세요.');
+      _msg(_l('운송 경로, 년도, 항차를 모두 선택해 주세요.'));
       return;
     }
     setState(() => _busy = true);
@@ -131,14 +138,14 @@ class _VoyageTotalManagementScreenState
       setState(() => _settlement = result);
       await _loadBatches();
     } catch (e) {
-      _msg('항차별 총액 계산 실패: $e');
+      _msg(_l('항차별 총액 계산 실패: $e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   void _msg(String text) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(text)));
+      .showSnackBar(SnackBar(content: Text(_l(text))));
 
   Widget _moneyCard(
     String label,
@@ -152,7 +159,7 @@ class _VoyageTotalManagementScreenState
             children: [
               Expanded(
                 child: Text(
-                  label,
+                  _l(label),
                   style: TextStyle(
                     fontWeight:
                         emphasize ? FontWeight.w800 : FontWeight.w600,
@@ -175,7 +182,7 @@ class _VoyageTotalManagementScreenState
   Widget build(BuildContext context) {
     final s = _settlement;
     return Scaffold(
-      appBar: AppBar(title: const Text('항차별 총액 관리'), actions: [
+      appBar: AppBar(title: Text(_l('항차별 총액 관리')), actions: [
         IconButton(onPressed: _busy ? null : _loadBatches, icon: const Icon(Icons.refresh)),
       ]),
       body: ListView(
@@ -185,13 +192,13 @@ class _VoyageTotalManagementScreenState
             key: ValueKey('route:$_route'),
             initialValue: _route,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: '운송 경로',
+            decoration: InputDecoration(
+              labelText: _l('운송 경로'),
               border: OutlineInputBorder(),
             ),
             items: _routes
                 .map((e) =>
-                    DropdownMenuItem(value: e, child: Text(e)))
+                    DropdownMenuItem(value: e, child: Text(_routeText(e))))
                 .toList(),
             onChanged: (v) => setState(() {
               _route = v;
@@ -207,14 +214,14 @@ class _VoyageTotalManagementScreenState
                 child: DropdownButtonFormField<int>(
                   key: ValueKey('year:$_route:$_year'),
                   initialValue: _year,
-                  decoration: const InputDecoration(
-                    labelText: '년도',
+                  decoration: InputDecoration(
+                    labelText: _l('년도'),
                     border: OutlineInputBorder(),
                   ),
                   items: _years
                       .map((e) => DropdownMenuItem(
                             value: e,
-                            child: Text('$e년'),
+                            child: Text(ShipmentPeriodLabels.year(e, widget.language)),
                           ))
                       .toList(),
                   onChanged: _route == null
@@ -231,15 +238,15 @@ class _VoyageTotalManagementScreenState
                 child: DropdownButtonFormField<String>(
                   key: ValueKey('voyage:$_route:$_year:$_voyage'),
                   initialValue: _voyage,
-                  decoration: const InputDecoration(
-                    labelText: '항차',
+                  decoration: InputDecoration(
+                    labelText: _l('항차'),
                     border: OutlineInputBorder(),
                   ),
                   items: _voyages
                       .map((e) => DropdownMenuItem(
                             value: e,
                             child: Text(
-                              e.endsWith('항차') ? e : '${e}항차',
+                              _l(e.endsWith('항차') ? e : '${e}항차'),
                             ),
                           ))
                       .toList(),
@@ -257,7 +264,7 @@ class _VoyageTotalManagementScreenState
           FilledButton.icon(
             onPressed: _busy ? null : _calculate,
             icon: const Icon(Icons.calculate_outlined),
-            label: const Text('실제 데이타 기준 총액 계산'),
+            label: Text(_l('실제 데이타 기준 총액 계산')),
           ),
           if (_busy)
             const Padding(
@@ -270,24 +277,24 @@ class _VoyageTotalManagementScreenState
           )),
           if (!_busy) ...[
             Row(children: [
-              Expanded(child: Text(_text('항차별 합계', 'Voyage totals', 'ຍອດລວມຕາມຖ້ຽວ'),
+              Expanded(child: Text(_l(_text('항차별 합계', 'Voyage totals', 'ຍອດລວມຕາມຖ້ຽວ')),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
               TextButton(onPressed: () => setState(() {
                 _route = null; _year = null; _voyage = null; _settlement = null;
-              }), child: Text(_text('전체', 'All', 'ທັງໝົດ'))),
+              }), child: Text(_l(_text('전체', 'All', 'ທັງໝົດ')))),
             ]),
-            Text(_text('저장된 정산 기준입니다. 최신 금액은 총액 계산으로 갱신하세요.',
+            Text(_l(_text('저장된 정산 기준입니다. 최신 금액은 총액 계산으로 갱신하세요.',
               'Saved settlement totals. Use Calculate to update the amounts.',
-              'ຍອດລວມທີ່ບັນທຶກ. ກົດຄິດໄລ່ເພື່ອອັບເດດ.')),
+              'ຍອດລວມທີ່ບັນທຶກ. ກົດຄິດໄລ່ເພື່ອອັບເດດ.'))),
             if (_visibleBatches.isEmpty && _loadError == null)
-              Text(_text('등록된 항차가 없습니다.', 'No voyages found.', 'ບໍ່ພົບຖ້ຽວ.')),
+              Text(_l(_text('등록된 항차가 없습니다.', 'No voyages found.', 'ບໍ່ພົບຖ້ຽວ.'))),
             ..._visibleBatches.map(_batchCard),
           ],
           if (!_busy && s != null) ...[
             const SizedBox(height: 14),
             Card(
               child: ListTile(
-                title: const Text('실제 총 물품 개수'),
+                title: Text(_l('실제 총 물품 개수')),
                 trailing: Text(
                   '${s.totalQuantity}',
                   style: const TextStyle(
@@ -306,8 +313,8 @@ class _VoyageTotalManagementScreenState
             ),
             if (s.discountByGroup.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text(
-                '단체별 할인 금액',
+              Text(
+                _l('단체별 할인 금액'),
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -329,7 +336,7 @@ class _VoyageTotalManagementScreenState
             ],
             const SizedBox(height: 14),
             Text(
-              '영수번호별 정산 (${s.receipts.length}건)',
+              _l('영수번호별 정산 (${s.receipts.length}건)'),
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -344,26 +351,26 @@ class _VoyageTotalManagementScreenState
                     '${r.customerName.isEmpty ? '수취인 미확인' : r.customerName}',
                   ),
                   subtitle: Text(
-                    '${r.totalQuantity}개 · '
-                    '실제 ${MoneyFormat.usd(r.netUsd)}',
+                    _l('${r.totalQuantity}개 · '
+                    '실제 ${MoneyFormat.usd(r.netUsd)}'),
                   ),
                   children: [
                     ListTile(
                       dense: true,
-                      title: const Text('할인 전'),
+                      title: Text(_l('할인 전')),
                       trailing: Text(MoneyFormat.usd(r.grossUsd)),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text('할인'),
+                      title: Text(_l('할인')),
                       trailing: Text(
                         '-${MoneyFormat.usd(r.discountUsd)}',
                       ),
                     ),
                     ListTile(
                       dense: true,
-                      title: const Text(
-                        '최종 실제 금액',
+                      title: Text(
+                        _l('최종 실제 금액'),
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       trailing: Text(
@@ -383,4 +390,3 @@ class _VoyageTotalManagementScreenState
     );
   }
 }
-

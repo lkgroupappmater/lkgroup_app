@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../core/approval_batch.dart';
+import '../core/app_language.dart';
+import '../core/operational_localizations.dart';
 import '../core/measurement_input.dart';
 
 class ApprovalBatchEditor extends StatefulWidget {
   const ApprovalBatchEditor({
     super.key,
+    this.language = AppLanguage.korean,
     required this.items,
     required this.savedDrafts,
   });
+  final AppLanguage language;
   final List<ApprovalItem> items;
   final Map<String, Map<String, dynamic>> savedDrafts;
   @override
@@ -16,6 +20,7 @@ class ApprovalBatchEditor extends StatefulWidget {
 }
 
 class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
   late final drafts = [
     for (final item in widget.items)
       ApprovalDraft(item, saved: widget.savedDrafts[item.key]),
@@ -23,16 +28,16 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
   String? error;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text('선택 ${drafts.length}건 수정'),
+    title: Text(_l('선택 ${drafts.length}건 수정')),
     content: SizedBox(
       width: 680,
       height: MediaQuery.sizeOf(context).height * .6,
       child: Column(
         children: [
-          const Text('각 화물의 값을 확인·수정한 뒤 아래 버튼으로 한 번에 처리합니다.'),
+          Text(_l('각 화물의 값을 확인·수정한 뒤 아래 버튼으로 한 번에 처리합니다.')),
           if (error != null)
             Text(
-              error!,
+              _l(error!),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           Expanded(
@@ -58,21 +63,21 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
                                 )
                               : TextInputType.text,
                           decoration: InputDecoration(
-                            labelText: approvalFieldLabels[field],
+                            labelText: _l(approvalFieldLabels[field] ?? field),
                             border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
                       ),
                     if (draft.item.kind == ApprovalKind.changes && !MeasurementInput.valid(draft.values))
-                      Text(MeasurementInput.message(),style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      Text(MeasurementInput.message(widget.language),style: TextStyle(color: Theme.of(context).colorScheme.error)),
                     if (draft.item.kind == ApprovalKind.incomplete)
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         value: draft.lock,
                         onChanged: (value) =>
                             setState(() => draft.lock = value == true),
-                        title: const Text('수정 후 데이터 잠금'),
+                        title: Text(_l('수정 후 데이터 잠금')),
                       ),
                   ],
                 );
@@ -85,7 +90,7 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('취소'),
+        child: Text(_l('취소')),
       ),
       FilledButton(
         onPressed: () {
@@ -99,9 +104,9 @@ class _ApprovalBatchEditorState extends State<ApprovalBatchEditor> {
           }
         },
         child: Text(
-          widget.items.first.kind == ApprovalKind.incomplete
+          _l(widget.items.first.kind == ApprovalKind.incomplete
               ? '선택 수정 저장'
-              : '수정 후 일괄 승인',
+              : '수정 후 일괄 승인'),
         ),
       ),
     ],

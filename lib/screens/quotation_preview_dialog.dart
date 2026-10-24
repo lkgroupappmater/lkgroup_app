@@ -1,3 +1,4 @@
+import '../core/operational_localizations.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -81,6 +82,8 @@ class QuotationPreviewDialog extends StatefulWidget {
 }
 
 class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
   ui.Image? _logo;
   ui.Image? _qrUsd;
   ui.Image? _qrKip;
@@ -144,7 +147,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('견적서 리소스 로딩 실패: $e')));
+          .showSnackBar(SnackBar(content: Text(_l('견적서 리소스 로딩 실패: $e'))));
     }
   }
 
@@ -205,12 +208,12 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '가견적서 이미지를 저장했습니다.')),
+        SnackBar(content: Text(_l(path == null ? '저장을 취소했습니다.' : '가견적서 이미지를 저장했습니다.'))),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('이미지 저장 실패: $e')));
+            .showSnackBar(SnackBar(content: Text(_l('이미지 저장 실패: $e'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -239,12 +242,12 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.')),
+        SnackBar(content: Text(_l(path == null ? '저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.'))),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('PDF 저장 실패: $e')));
+            .showSnackBar(SnackBar(content: Text(_l('PDF 저장 실패: $e'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -268,7 +271,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${widget.routeLabel} · 가견적서',
+                      _l('${RouteCatalog.localizedLabel('${widget.routeLabel}', widget.language)} · 가견적서'),
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -286,8 +289,8 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : !ready
-                        ? const Center(
-                            child: Text('가견적서를 불러오지 못했습니다.',
+                        ? Center(
+                            child: Text(_l('가견적서를 불러오지 못했습니다.'),
                                 style: TextStyle(color: Colors.white)),
                           )
                         : LayoutBuilder(
@@ -327,7 +330,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('닫기'),
+                      child: Text(_l('닫기')),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -335,7 +338,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                     child: FilledButton.tonalIcon(
                       onPressed: !ready || _saving ? null : _saveImage,
                       icon: const Icon(Icons.image_outlined, size: 18),
-                      label: const Text('이미지 저장'),
+                      label: Text(_l('이미지 저장')),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -349,7 +352,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      label: const Text('출력용 PDF'),
+                      label: Text(_l('출력용 PDF')),
                     ),
                   ),
                 ],
@@ -611,7 +614,3 @@ class DigitalQuotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DigitalQuotationPainter oldDelegate) => true;
 }
-
-
-
-

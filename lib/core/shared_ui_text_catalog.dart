@@ -4,8 +4,7 @@ const sharedTextAliases = <String, String>{
   "domesticManage": "domesticTracking",
   "adminMenu.domesticTracking": "domesticTracking",
   "adminMenu.localDeliveries": "localDeliveries",
-  "domestic.manage": "domesticTracking",
-  "purchaseAgency": "purchase.title"
+  "domestic.manage": "domesticTracking"
 };
 const sharedAppTextKeys = <String, String>{
   "add_box": "quote.addBox",
@@ -173,9 +172,570 @@ const sharedKoreanTextKeys = <String, String>{
   "기업 할인": "statement.corporateDiscount",
   "대표 고정 할인": "statement.representativeDiscount",
   "기타 할인": "statement.otherDiscount",
-  "구매대행": "purchase.title",
-  "내 외부 사이트 계정": "memberSites.title",
-  "견적 요청 및 상담 관리": "adminMenu.quoteRequests"
+  "견적 요청 및 상담 관리": "adminMenu.quoteRequests",
+  "운송 경로 목록 조회 실패: {p0}": "operations.3dc908e14ec5",
+  "운송 경로 삭제 취소": "operations.bef8422f08b7",
+  "{p0}\n\n이 운송 경로의 삭제 대기를 취소하고 이전 상태로 복구합니다.": "operations.bb6d80b087a0",
+  "아니오": "operations.4c490f1ca1d7",
+  "삭제 취소": "parity.restoreRoute",
+  "삭제 대기를 취소하고 운송 경로를 복구했습니다.": "operations.377cdc6ae300",
+  "운송 경로 복구 실패: {p0}": "operations.8876572c465a",
+  "운송 경로 삭제": "parity.deleteRoute",
+  "{p0}\n\n삭제하면 즉시 운송 경로 선택 목록과 기존 메뉴/기능에서 사라집니다.\n30일 동안 삭제 대기 상태로 보관된 뒤 자동으로 완전히 삭제됩니다.\n\n즉시 완전 삭제 기능은 없습니다.": "operations.3e1b194d1cf1",
+  "삭제 요청이 완료되었습니다. 30일 후 자동으로 완전히 삭제됩니다.": "operations.9df15982bb3e",
+  "운송 경로 삭제 실패: {p0}": "operations.9f253187f4b2",
+  "추가 기능 개발": "routeDevelopment",
+  "운송 경로 BASE / 공통 운임 관리": "parity.routeBaseRates",
+  "운송 경로 선택": "operations.5ca7faa2fe1f",
+  "편집": "operations.87b0acef85a7",
+  "신규 운송 경로 추가": "parity.addRoute",
+  "선택한 운송 경로 삭제": "operations.b4aea1152d92",
+  "여기서 저장한 운임은 DB freight_rate_tiers가 원본이 되며 가견적·명세서·화물 운임 계산이 같은 기준을 사용합니다.": "operations.520c8d0767fc",
+  "신규 운송 경로 적용 대기": "parity.draftRoutes",
+  "내용 저장 완료 · 아직 미적용": "operations.bcc7d200821d",
+  "내용 저장 완료 · 아직 미적용\nBASE: {p0}": "operations.ae7251f13fcc",
+  "계속 작업": "parity.continueWork",
+  "삭제된 운송 경로는 30일 동안 보관되며, 기간 내 삭제 취소가 가능합니다.": "operations.bbeb99f59f4d",
+  "완전 삭제 처리 대기중": "admin-parity.routeListSection.routePurgePending",
+  "완전 삭제까지 {p0} 남음": "operations.1cbb5fc9dbdb",
+  "Draft 단가 조회 실패: {p0}": "operations.c9edec34aba6",
+  "단가 조회 실패: {p0}": "operations.9040933d8ded",
+  "운송 경로 타이틀": "parity.documentTitle",
+  "문서 타이틀 미리보기": "admin-parity.renderRouteDevelopmentEditor.documentTitlePreview",
+  "{p0} xxth 거래 명세서": "operations.58ff63273445",
+  "{p0} xxth 견적서": "operations.65964414432e",
+  "※ xxth / 거래 명세서 / 견적서 문구는 고정이며 수정되지 않습니다.": "operations.005435199e7f",
+  "명세서 BASE 전체 미리보기": "operations.45b9e96b3579",
+  "선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.": "operations.a994701558a6",
+  "운송 경로 타이틀 xxth 거래 명세서": "operations.5dbb9eb5c639",
+  "BASE Excel 셀 직접 수정 (고급)": "parity.overrides",
+  "셀 추가": "parity.addOverride",
+  "명세서 전체 미리보기와 별도로, 원본 XLSX의 특정 시트/셀 값을 직접 지정할 수 있습니다. 예: 시트 이름(LTxx-xx), C1, 표시할 값": "operations.162cebc2cb30",
+  "시트 이름": "admin-parity.renderRouteDevelopmentEditor.sheetName",
+  "셀": "parity.cell",
+  "값": "parity.value",
+  "신규 운송 경로": "operations.06362509a5e0",
+  "운송 경로 편집": "operations.5157e41166d0",
+  "기반 BASE 운송 경로": "parity.baseRoute",
+  "운송 경로명 (메뉴 표시)": "parity.routeName",
+  "운송 경로 타이틀 (예: Kor-Lao Sea)": "operations.e85e9d42a398",
+  "박스 번호 Prefix": "parity.boxPrefix",
+  "영수번호 Prefix": "parity.receiptPrefix",
+  "Excel 파일 Prefix (예: LA_MY_LAND)": "operations.1f2aab22615f",
+  "최소 운임 USD": "parity.minimumCharge",
+  "단가 구조": "parity.tiers",
+  "구간 추가": "parity.addTier",
+  "이상 kg": "admin-parity.renderRouteDevelopmentEditor.minimumWeight",
+  "구간 삭제": "operations.01d8e4caa1af",
+  "신규 경로 적용": "parity.applyRoute",
+  "내용 저장 (아직 적용 안됨)": "parity.saveDraft",
+  "내용 저장": "operations.dc2050a024c8",
+  "내용 수정 저장": "parity.saveChanges",
+  "운송 경로와 단가를 확인해 주세요.": "operations.63ec201d1222",
+  "적용 대기 내용을 수정 저장했습니다.": "operations.ae82cb778bf3",
+  "Draft 수정 저장 실패: {p0}": "operations.d38a294c8dd2",
+  "삭제하면 해당 운송 경로는 즉시 기존 메뉴 및 신규 업무 선택 목록에서 사라집니다.\n\n운송 경로 설정, BASE Excel 및 운임 정책은 30일 동안 삭제 대기 상태로 보관된 후 자동으로 완전히 삭제됩니다.\n\n즉시 완전 삭제 기능은 제공되지 않습니다.": "operations.9952c22f087c",
+  "운송 경로명, 운송 경로 타이틀, 기반 BASE, 단가를 확인해 주세요.": "operations.057cc3219d62",
+  "신규 운송 경로 적용": "operations.dd8c76bf5d82",
+  "작성하신 데이터를 기반으로 신규 운송 경로가 추가 됩니다.": "operations.79389bcc09a0",
+  "확인": "operations.1aacb54c4992",
+  "저장된 신규 경로 Draft를 찾을 수 없습니다.": "operations.a1e525d3e9df",
+  "신규 운송 경로 적용 실패: {p0}": "operations.3aaeee553300",
+  "내용을 저장했습니다. 아직 실제 신규 경로에는 적용되지 않았습니다.": "operations.208e1deaee14",
+  "내용 저장 실패: {p0}": "operations.0932bcdc8b67",
+  "전체 선택": "fulfillment.all",
+  "{p0} / {p1}건 선택": "operations.b34dc9fc8aa7",
+  "선택 수정 후 승인": "operations.688074e7326c",
+  "선택 승인": "approval.selectedApprove",
+  "선택 거절": "approval.selectedReject",
+  "선택 수정 후 정상화": "operations.a22c27ffaaf1",
+  "선택 불명 유지": "approval.selectedKeep",
+  "선택 수정": "approval.selectedEdit",
+  "선택 확정/잠금": "approval.selectedComplete",
+  "총괄 관리자 권한이 필요합니다.": "operations.a7f1581674b3",
+  "선택 {p0}건 일괄 처리": "operations.02315738575c",
+  "요청 내용과 실제 화물·송장 정보를 확인하셨습니까?\n선택한 {p0}건만 처리합니다.\n{p1}": "operations.88a695f878f6",
+  "확인 후 처리": "operations.842de2dd0a34",
+  "선택한 {p0}건을 함께 처리했습니다.": "operations.2bf6ba82012f",
+  "같은 화물에 여러 소유 확인 요청이 선택되어 있습니다. 한 요청만 선택해 주세요.": "admin-approvals.runApprovalBatch.multipleClaimsForThisCargoAre",
+  "일괄 처리 완료 · 성공 {p0}건 · 실패 {p1}건": "operations.b888c78e21c7",
+  "관리자 수동 불확실 표시": "operations.8cfe6598ade7",
+  "승인 요청 조회 실패: {p0}": "operations.74e95abe25ff",
+  "거절되었습니다.": "operations.eed38950dd8d",
+  "수정 후 승인되었습니다.": "operations.eee2eae853f6",
+  "승인되었습니다.": "operations.0b9b1dc8130e",
+  "처리 실패: {p0}": "operations.0b53b7a7d9e7",
+  "수취인 불명 데이터 정상화": "operations.6eb925d8ad7b",
+  "수취인 이름 / 회사명": "operations.f184cbdc4a70",
+  "비고": "operations.cb8c6b238f80",
+  "수정 후 정상화": "admin.normalize",
+  "수취인 데이터를 정상화했습니다. 영수번호와 구획도 다시 자동 계산됩니다.": "operations.2f70e89e4d66",
+  "수취인 데이터 정상화 실패: {p0}": "operations.746edba35121",
+  "수취인 불명 상태로 확인 완료했습니다. 화물은 XX / 구획 F로 유지됩니다.": "operations.ba44df5d448a",
+  "확인 완료 / 데이터 잠금": "operations.3934bf4d47c4",
+  "불확실 데이터 확인 / 수정": "operations.7b75b52c1bb3",
+  "전화번호 (없으면 비워도 됨)": "operations.79af19e8bd95",
+  "이미 사용 중인 영수번호입니다.": "operations.f05021e587a2",
+  "이미 사용 중인 영수번호입니다. 추천: {p0}": "operations.d0538ba97f89",
+  "확정 및 잠금": "operations.4f21632ec28a",
+  "수정 저장": "operations.b824080c00f1",
+  "불확실 데이터를 확인 완료하고 잠금했습니다.": "operations.e421d23dc092",
+  "불확실 데이터를 수정했습니다.": "operations.7ae1122dcb5a",
+  "불확실 데이터 처리 실패: {p0}": "operations.959de6961422",
+  "확인/수정": "operations.cfbe38381f25",
+  "확정/잠금": "operations.b28d50a4909a",
+  "{p0} · {p1}년 · {p2}항차": "operations.bb7ecbd8d38a",
+  "수취인/회사명: {p0}": "operations.88c7b1e06100",
+  "전화번호: {p0}": "operations.5a3550787e28",
+  "영수번호: {p0} · 구획: {p1}": "operations.7a2bc60d391b",
+  "현재 수취인/회사명: {p0}": "operations.0890af930b5f",
+  "현재 전화번호: {p0}": "operations.43f721f59659",
+  "임시 영수번호: {p0} · 구획: {p1}": "operations.64d6937b3059",
+  "데이터 수정 잠금 상태": "operations.5c60eeb6758b",
+  "불명 유지": "operations.bba7daf13312",
+  "확인 / 수정": "operations.83bbfa8dbba0",
+  "수취인 불명 화물 확인 승인": "operations.a6988194cc66",
+  "이 요청을 승인하면:\n이름: 수취인 불명 / {p0}\n연락처: {p1}\n영수번호: 해당 항차 마지막 영수번호 다음 번호\n\n으로 반영됩니다.{p2}": "operations.908ac448e6f2",
+  "확인 및 승인": "operations.e19ca0710e5e",
+  "수취인 불명 화물을 본인 화물로 확인 승인했습니다.": "operations.ec56c8bff66d",
+  "수취인 불명 화물 확인 요청을 거절했습니다.": "operations.15fb7c2271d3",
+  "수취인 불명 화물 요청 처리 실패: {p0}": "operations.bc69b14f22dd",
+  "송장 뒷자리 화물 정보 정정 승인": "operations.4c5f93ef01be",
+  "요청 회원의 정보로 화물 수취인을 변경합니다.\n\n이름: {p0}\n연락처: {p1}\n송장번호: {p2}\n\n실물 송장 및 회원 정보를 확인한 후 승인해 주세요.": "operations.b1ff3c19a113",
+  "확인 후 승인": "operations.328c92b4a8aa",
+  "화물 수취인 정보를 정정했습니다.": "operations.0f11e7b2b7c0",
+  "정정 요청을 거절했습니다.": "operations.debfe484f964",
+  "송장 뒷자리 정정 요청 처리 실패: {p0}": "operations.3095ad4fb4ee",
+  "수령인": "operations.36325ad172db",
+  "명세서 번호": "operations.33d99db21242",
+  "박스 번호": "admin-parity.customerOutputHtml.boxNumber",
+  "상태": "status",
+  "요청 경로": "operations.0f356740d563",
+  "요청일": "operations.e470d24b05f1",
+  "일괄 처리 중 {p0}": "operations.17bcff69e770",
+  "불확실 / 확인 필요 데이터": "operations.0e733bc28e7a",
+  "이름은 확인되지만 연락처가 없는 화물입니다. 일반 영수번호/구획으로 정리되며, 확인 후 잠금하면 이 목록에서 완료 처리됩니다.": "operations.5e56f152caa2",
+  "신규 업로드 · 수취인 불명 자동분류": "operations.886647094ff8",
+  "수취인 이름이 없거나 명시적으로 수취인 불명으로 표시된 화물입니다. 확인 전에는 임시 영수번호 XX / 구획 F로 유지됩니다.": "operations.4fd8d2562b43",
+  "수취인 불명 화물 확인 요청": "operations.7f59cbb26ec8",
+  "송장 뒷자리 일치 · 회원 화물 정정 요청": "operations.7aff6d61124f",
+  "수취인 오류로 일반 조회가 안 된 화물입니다. 송장 뒷자리와 회원 본인 정보를 확인한 후 처리하세요.": "operations.5937e1ae0ceb",
+  "대기 중인 화물 내용 변경 승인 요청이 없습니다.": "operations.9abcfb1bc0a1",
+  "수취인 불명 · 본인 화물 확인 요청": "operations.77f18a0a72ce",
+  "현재 이름: {p0}": "operations.f283025dfdc3",
+  "현재 연락처: {p0}": "operations.4a3c0fb0f8f5",
+  "요청 회원: {p0} ({p1})": "operations.32b20f5f3d73",
+  "요청 연락처: {p0}": "operations.4ed0f8a16805",
+  "확인 참고 내용: {p0}": "operations.6380a3fbf333",
+  "🔒 현재 잠금 상태": "operations.76b8e82ed8c0",
+  "거절": "reject",
+  "본인 화물 확인 승인": "operations.ee1876e41604",
+  "수취인 정보 오류 정정 요청": "operations.278996c5bbf1",
+  "현재 수취인: {p0}": "operations.28be6e16bafd",
+  "확인 메모: {p0}": "operations.716864d77372",
+  "확인 후 정정 승인": "operations.5b91e04f6cfc",
+  "잠금": "admin.locked",
+  "{p0} · {p1}년 · {p2}항차\n요청인: {p3} ({p4})": "operations.8deba62fe9b7",
+  "요청 내용": "operations.c165c36d6d1f",
+  "관리자 수정": "operations.540dcffc12db",
+  "수정 후 승인": "admin.modifiedApprove",
+  "승인": "approve",
+  "발신인": "operations.cebecb031382",
+  "이름/라오스 수령인": "operations.6de31470c284",
+  "내용물": "operations.c81d7e253641",
+  "포장형태": "operations.ce1df5bb8b6b",
+  "기타 내용": "operations.ed08c8d82539",
+  "무게(kg)": "operations.10aed4ae6142",
+  "가로(cm)": "operations.f4d67618b725",
+  "세로(cm)": "operations.77cc43a2efe0",
+  "높이(cm)": "operations.60bc9c3d893b",
+  "구획": "operations.32e9301f74fc",
+  "접수일 (YYYY-MM-DD)": "operations.24147e7a6e46",
+  "변경 내용 없음": "operations.ba2b2bbafe77",
+  "Excel 화물 처리": "excel.review.action",
+  "이름/수령인": "operations.8508baed993e",
+  "무게": "operations.35f538545773",
+  "가로": "operations.79b03b4207ca",
+  "세로": "operations.abaa893444db",
+  "높이": "operations.c2c8f0007728",
+  "접수일": "operations.ebc9b96eb63c",
+  "실제 화물 데이터가 등록된 운송 경로/년도/항차가 없습니다.": "operations.d1ef5e06d83b",
+  "등록된 운송 경로·년도·항차를 선택하고 검색해 주세요. BASE는 바로 다운로드할 수 있습니다.": "operations.46314b6cf430",
+  "목록 불러오기 실패: {p0}": "operations.e8aad1af97fb",
+  "업로드 접수 완료. 아래 업로드 진행 현황을 확인하세요.": "operations.a279d212b7a3",
+  "파일 선택 취소 또는 파일명 확인 필요.": "operations.4dbbbd96c75f",
+  "업로드 접수 실패: {p0}": "operations.27b23bf8871f",
+  "10% · 선택 항차 확인": "operations.3a6dd481901b",
+  "20% · 영수번호 / Zone / 고객 규칙 재연산": "operations.f136703c2811",
+  "72% · 최신 화물 데이터 다시 읽는 중": "operations.b7859a002688",
+  "84% · 할인 / 운임 재계산": "operations.90a52be97e6f",
+  "94% · 정산 snapshot 갱신": "operations.9213f0c27aa9",
+  "100% · 완료": "operations.fc105660f5f1",
+  "{p0} · {p1}년 · {p2}항차 재연산 및 Update 완료": "operations.70e07e2036ea",
+  "실패": "excel.status.failed",
+  "재연산 및 Update 실패: {p0}": "operations.12f177cd65d4",
+  "원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...": "operations.5acdd4f1d743",
+  "{p0}\n파일: {p1}{p2}": "operations.c3f4db270dae",
+  "다운로드 실패: {p0}": "operations.ef9cf87a1071",
+  "최신 BASE Excel 다운로드": "operations.5dfda23b0b18",
+  "완료": "excel.status.done",
+  "완료 · 확인 필요": "operations.9ca583383713",
+  "작업 중": "operations.038502b654e1",
+  "대기": "operations.2a73ed53178a",
+  "관리자·직원·협력/파트너사 전용": "operations.141365569406",
+  "Excel 파일 업로드": "operations.1d5cdc749f6e",
+  "최신 BASE Excel 다운로드 · 고객 ID / 배송 정보": "operations.dd113518dc10",
+  "업로드 진행 현황": "operations.ddadf7adc02e",
+  "항차 Excel 검색": "operations.72f376684bbb",
+  "실제 등록된 항차만 검색할 수 있습니다. 검색 후 재연산·다운로드 버튼이 표시됩니다.": "operations.f7f6510306e2",
+  "항차 검색": "operations.f3495e0a191f",
+  "배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정": "operations.ba64a279db75",
+  "선택 항차 재연산 및 Update": "operations.36deee6d26d2",
+  "Excel 생성 중...": "operations.c850c9c6edf6",
+  "Excel 다운로드 및 저장 위치 선택": "operations.fe344f178ec7",
+  "파일명에 포함된 운송 경로·년도·항차를 확인해 즉시 접수합니다. 접수 후에는 이 화면에서 나가 다른 업무를 해도 앱이 켜져 있는 동안 순차 처리됩니다.": "operations.577cff4e8460",
+  "현재 데이터 목록 조회 실패: {p0}": "operations.5198037992d6",
+  "파일 접수 완료. 바로 다른 화면으로 이동하거나, 아래 버튼을 다시 눌러 다음 파일도 계속 추가할 수 있습니다.": "operations.49a58b538606",
+  "파일을 선택하지 않았거나 기본 파일명 검사를 통과하지 못했습니다.": "operations.5f5fa1f620d2",
+  "파일 접수 실패: {p0}": "operations.502822819d79",
+  "% 진행중": "operations.e7ea28b3609a",
+  "화물 데이타 엑셀 업로드 및 Update": "operations.a8c824be3f81",
+  "기초 접수 검사: XLSX/XLSM · 운송 경로 · 년도 · 항차\n예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n또는: 2026년 LKS 08항차 최종본.xlsm\n경로·년도·항차만 포함하면 앞뒤 파일명은 자유롭게 사용할 수 있습니다.\n\n총괄 관리자 업로드는 해당 항차의 전체 Excel을 기준으로 수정·삭제·복원 요청을 변경·정정 승인에 등록합니다. 명세서 번호를 포함한 기존 화물의 모든 변경은 승인 후 반영됩니다. 삭제 승인 후 30일 동안 복구할 수 있습니다.\n직원·협력사 업로드는 기존 변경 승인 절차를 따릅니다.": "operations.571ef2a225d9",
+  "Excel 파일 추가 / 업로드 접수": "operations.9ff64c388435",
+  "현재 데이터 재연산 및 Update": "operations.48b36cc90959",
+  "직접 데이터 수정 또는 고객/배송/할인 규칙 변경 후 반영이 의심될 때 선택 항차의 영수번호·구획·자동 특이사항·할인/정산을 다시 계산합니다.": "operations.357af9903adf",
+  "{p0}항차": "operations.fe4b111ee721",
+  "재연산 및 Update": "operations.cc97fbea5247",
+  "업로드 / 처리 작업 현황": "operations.0c6fce3d31e1",
+  "완료 목록 지우기": "operations.9a036ddee3b2",
+  "항차 목록 조회 실패: {p0}": "operations.00c899de4ee4",
+  "화물 데이터 조회 실패: {p0}": "operations.10a03ed6338d",
+  "현재 잠금된 화물이 없습니다.": "operations.ff67874dd934",
+  "해당 화물 잠금을 해제했습니다.": "operations.2a63e4fe3587",
+  "잠금 해제 실패: {p0}": "operations.09cba404ecc2",
+  "선택한 화물 데이터를 잠금했습니다.": "operations.765127ac992c",
+  "선택한 화물 데이터 잠금을 해제했습니다.": "operations.b8b4207c85d0",
+  "잠금 처리 실패: {p0}": "operations.502d0fd48932",
+  "화물 삭제": "operations.fb505f4e3b27",
+  "선택한 {p0}개의 화물을 삭제 합니다.\n\n30일 뒤에 자동으로 완전히 삭제 되며, 필요시 삭제 취소 혹은 바로 삭제가 가능 합니다.": "operations.88e05e6fe9fc",
+  "선택한 화물을 삭제 처리했습니다. 30일 동안 복구할 수 있습니다.": "operations.6535635c5748",
+  "화물 삭제 처리 실패: {p0}": "operations.cbcb1a5ff52c",
+  "화물 데이터 편집 · {p0}": "operations.892833f31645",
+  "특이사항": "operations.56f140f555fc",
+  "자동 매칭 특이사항": "operations.b51a0a090b20",
+  "데이터 수정 잠금된 화물": "operations.fd079c62688c",
+  "화물 데이터를 수정했습니다.": "operations.fe95b084f72d",
+  "수정 실패: {p0}": "operations.e13e4522d924",
+  "(영수번호 없음)": "admin-parity.renderExcelBulkRows.noReceipt",
+  "고객명": "purchase.customer",
+  "발송인": "admin.sender",
+  "배송 구분": "domestic.kind",
+  "엑셀 데이타 일괄 관리": "operations.e74772e584d3",
+  "잠금만 보기 · {p0}개": "operations.b6a0fd390059",
+  "선택 {p0}개": "operations.d2ea09b0d5e2",
+  "운송 경로, 년도, 항차를 선택해 주세요.": "operations.72f80b75762c",
+  "해당 항차 화물 데이터가 없습니다.": "operations.6107556fbfe7",
+  "현재 조건에 해당하는 화물이 없습니다.": "operations.f7dc8378bf4e",
+  "영수번호: ": "operations.6c438b36dbbc",
+  " / 구획: ": "operations.46029a6619ad",
+  " · 총 ": "operations.b9f6f2c248c6",
+  "{p0}개": "operations.f62174360f85",
+  "전체": "support.all",
+  "잠금만": "operations.8282758899ab",
+  "해체": "operations.7b2e176a794b",
+  "비고: {p0}": "operations.a1cb7e57f57a",
+  "명세서 번호 수동 지정": "operations.24bdf7603265",
+  "배송 확인 · 명세서 번호": "operations.57cb6e3691a6",
+  "새로고침": "notifications.refresh",
+  "기존 발행 번호 유지 · 고객 ID는 별도 표시": "operations.71b1ef0822e7",
+  "배송 매칭 확인 필요 {p0}건": "operations.1bec29c13739",
+  "이름·전화번호 중 하나만 비슷하면 직접 확인합니다. 인쇄 전 번호를 잠그면 재연산에도 해당 번호가 유지됩니다.": "operations.c4a6cd8e2a76",
+  "고객명 · 고객 ID · 명세서 번호": "operations.551563c86651",
+  "표시된 명세서 전체 선택": "operations.a786847ed3c4",
+  "선택 번호 잠금": "operations.e756ba416c60",
+  "선택 잠금 해제": "parity.unlock",
+  "배송 확인 필요 · {p0}": "operations.1ddc614d46ea",
+  "이 배송지로 확인": "operations.df487522b262",
+  "다른 고객 / 제외": "operations.6f06fed75cdc",
+  "{p0} · 화물 {p1}건": "operations.53207e14c6d6",
+  "수동 번호 지정": "operations.d6fdd05d88a2",
+  "번호 잠금 해제": "operations.7853e4022f8d",
+  "번호 잠금": "operations.2632da8a699e",
+  "기존 발행 번호 유지": "operations.284e33ca0a1f",
+  "고객 ID 자동 번호 ({p0})": "operations.c48cc3ed43ca",
+  "할인 목록 조회 실패: {p0}": "operations.da2922f60afc",
+  "전체 운송 경로": "operations.0c405d31b8d7",
+  "할인 고객 추가": "operations.81d00e9593ae",
+  "할인 고객 편집": "operations.65235fb52142",
+  "소속/단체명": "operations.dcb1d3042e38",
+  "고객 개인 이름": "operations.f5fa74072afc",
+  "회사명 (회원가입 회사명과 자동 묶음)": "operations.ac53227ac71f",
+  "기본/소량 할인율 (%)": "operations.9819491c35bd",
+  "대량 기준 수량 (선택)": "operations.5dc4ac7084ea",
+  "예: 50": "operations.69b7d7d5dee4",
+  "대량 할인율 (%)": "operations.66dfc7852913",
+  "예: 10": "operations.3b5dbdfc3620",
+  "대량 기준은 개인 이름 + 회사명으로 입고된 수량을 같은 항차에서 합산하여 판단합니다.": "operations.7989531dbc60",
+  "고정 단가 Override (선택)": "operations.9ee71dbdb630",
+  "개인/회사 명세서 방식": "operations.4e0e397d9c75",
+  "분리 - 개인 이름 / 회사명 명세서 각각": "operations.bf0310520311",
+  "통합 - 개인 이름 + 회사명 한 명세서": "operations.e7c254aadee0",
+  "※ 명세서 분리 여부와 관계없이 할인 대량 기준 수량은 개인+회사 물량을 합산합니다.": "operations.19d83d7e4399",
+  "할인 적용": "receipt.applies",
+  "전화번호가 없으면 자동 적용되지 않습니다.": "operations.3ab103527f1b",
+  "개인 이름/회사명 + 전화번호 + 운송경로가 일치할 때 적용": "operations.a5084e712d64",
+  "고객 이름과 0~100 사이 기본 할인율을 확인해 주세요.": "operations.be9680f426dd",
+  "대량 할인은 기준 수량과 할인율을 모두 입력해 주세요.": "operations.0ea8f3e8ec2a",
+  "고객 묶음/할인 적용 정보를 저장했습니다.": "operations.d74e13004217",
+  "할인 정보 저장 실패: {p0}": "operations.648e412ba79d",
+  "할인 고객 삭제": "operations.596b8b1bb775",
+  "{p0} 할인 적용 정보를 삭제하시겠습니까?": "operations.2ba629ee8f48",
+  "삭제했습니다.": "domestic.deleted",
+  "삭제 실패: {p0}": "operations.33042661829b",
+  "회사": "operations.a109dcd7f6f1",
+  "단체": "operations.e1d6f0acf31a",
+  "등록된 할인 고객이 없습니다.": "operations.cac132d3c430",
+  "{p0} · {p1}\n{p2}{p3}\n할인: {p4} · 명세서: {p5}": "operations.ddb232b65a69",
+  "하역 자료 조회 실패: {p0}": "operations.89fc950ebe71",
+  "수취인 불명": "operations.dac7a687587b",
+  "수취인불명": "operations.446f3874faf8",
+  "하역 자료 PDF 저장": "operations.373b3a2f814f",
+  "하역 자료 PDF 저장 완료": "operations.aaebbab5be03",
+  "하역 자료 PDF 저장 실패: {p0}": "operations.84f2481db9cc",
+  "잠금 물품 노란색 표시": "parity.lockedHighlight",
+  "Y · 잠금 화물도 노란색": "operations.7110e3c77bfe",
+  "F · 잠금 화물은 노란색 제외": "operations.914b0c22520e",
+  "화물 {p0}건 · 노란색 확인 필요 {p1}건": "operations.3c8bc68f68a7",
+  "검색 결과 {p0}건": "operations.aab6d67aeabb",
+  "PDF 생성 중...": "operations.d677757ca154",
+  "하역 자료 PDF 출력 / 저장": "operations.cf90eb812652",
+  "정상 이름이 포함되어 있어도 **, ***, ?? 같은 확인표시가 섞여 있으면 정상 영수번호는 유지하고 하역 자료에서만 노란색으로 표시합니다. 수동 ? 표시 화물은 노란색으로 표시되며, 잠금 화물의 노란색 표시는 위 F/Y 스위치로 선택할 수 있습니다.": "operations.837d75540d61",
+  "고객 리스트 조회 실패: {p0}": "operations.bf3ee4cfbdba",
+  "미확인": "unverified",
+  "{p0} 수정": "operations.76bc72a293f0",
+  "영수증 번호": "operations.f631ff043d2f",
+  "현재 영수증 번호에 묶인 화물 전체에 동일하게 적용됩니다.": "operations.f305ccf90084",
+  "영수증 번호 / Zone 수정 완료": "operations.26406d0686ec",
+  "지방배송(선결제)": "operations.cc1be14f2eb2",
+  "시내배송(선결제)": "operations.f3132201a164",
+  "{p0} {p1} {p2}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)": "operations.47405a8b479d",
+  "{p0}명  ·  {p1}/{p2}": "operations.8f97964222fb",
+  "서명(Sign)": "admin-parity.customerOutputHtml.signature",
+  "PNG 생성 실패": "operations.6dacc2452927",
+  "고객 리스트 이미지 저장": "operations.7ee31d0878a4",
+  "고객 리스트 이미지 저장 완료": "operations.e0158070fd12",
+  "이미지 저장 실패: {p0}": "operations.6674bfe5e8d2",
+  "고객 리스트 PDF 저장": "operations.4126979f8874",
+  "고객 리스트 PDF 저장 완료": "operations.a067cda4c449",
+  "PDF 저장 실패: {p0}": "operations.686d02df8e4e",
+  "배송 유형": "operations.1ea145098ed9",
+  "검색 {p0} / 고객 {p1}명": "operations.448cf843a49f",
+  "수량 {p0}": "operations.6124bf003003",
+  "영수증 번호 / Zone 수정": "operations.fac81ffa553f",
+  "현재 항차 · 고객 {p0}명 · 총 수량 {p1}": "operations.c9f3c266037d",
+  "이미지 저장": "parity.saveImage",
+  "생성 중...": "operations.ba734fceeaac",
+  "PDF 저장 / 프린트": "parity.printPdf",
+  "기준 환율과 운임 확인 적용 환율 보정을 모두 숫자로 입력해 주세요.": "operations.cbd8f8aeaf6c",
+  "기준 환율 및 운임 확인 적용 환율 보정을 저장했습니다.": "operations.c23d5aa515ab",
+  "환율 보정": "admin.adjustment",
+  "현찰 살 때 기준 환율과 운임 확인 적용 환율 보정을 입력합니다.": "operations.40c0d55d83fa",
+  "운임 확인 적용 환율 = 기준 환율 + 운임 확인 적용 환율 보정": "operations.7d5ac4358600",
+  "기준 킵": "operations.620be311d8b0",
+  "기준 바트": "operations.3e9abc678b65",
+  "기준 원화": "operations.ad3bad0a37d7",
+  "처리 중...": "operations.b51dc16ee21c",
+  "기준 환율 저장": "operations.42c8e8de7752",
+  "시내·지방 배송 목록 조회 실패: {p0}": "operations.4ab164add32b",
+  "시내·지방 배송 고객 추가": "operations.01ff1e7617d0",
+  "시내·지방 배송 고객 편집": "operations.3e1b42a2257c",
+  "배송 종류": "operations.982caf4a16d2",
+  "지방배송 (원본 흰색)": "operations.8da1feaceb0d",
+  "시내 배송 (원본 녹색)": "operations.58a4e1c4d6f1",
+  "회사명 매칭용 (선택)": "operations.3f83f03e205b",
+  "적용": "operations.6a1c963d5bc5",
+  "고객 이름 또는 회사명을 입력해 주세요.": "operations.c79591baa203",
+  "배송 정보를 저장했습니다.": "operations.819999f023d7",
+  "배송 정보 저장 실패: {p0}": "operations.8d1cf9be0e15",
+  "배송 고객 삭제": "operations.dd2941993869",
+  "{p0} 배송 정보를 삭제하시겠습니까?": "operations.1b027ddb42d4",
+  "배송 고객 추가": "operations.9d3a6fb20742",
+  "전체 경로": "operations.b6d4a16f5184",
+  "전체 유형": "operations.52f8bd3b3ebf",
+  "시내 배송": "operations.3dea562935e9",
+  "현지 업체": "operations.e00f2889af34",
+  "전체 업체": "operations.c64edfddf0ed",
+  "고객 ID": "operations.40af4fc6e879",
+  "배송 주소": "operations.af2ed2556c42",
+  "결제 구분": "operations.0a80c2c02a03",
+  "등록된 배송 고객이 없습니다.": "operations.f39fcb8de9e4",
+  "다음 박스번호 확인 실패: {p0}": "operations.04f94d234fd3",
+  "운송 경로, 년도, 항차를 모두 선택해 주세요.": "operations.cb872d1275c5",
+  "박스번호를 입력해 주세요.": "operations.8098135ce749",
+  "같은 운송 경로/년도/항차에 이미 존재하는 박스번호입니다.": "operations.8faa8a5512f9",
+  "박스 개수(수량)는 1 이상의 숫자로 입력해 주세요.": "operations.fa549c9d207e",
+  "중량과 크기(L/W/H)는 숫자로 입력해 주세요.": "operations.d0f86059f790",
+  "화물 데이터를 추가했습니다.": "operations.92a4a7738c39",
+  "화물 추가 실패: {p0}": "operations.ca4043cb23c2",
+  "화물 추가 입력": "operations.6e3f1f9ff0fe",
+  "중복 박스번호입니다. 저장할 수 없습니다.": "operations.14260d1bcf6a",
+  "다음 박스번호 확인 중...": "operations.170225cfd128",
+  "중복 송장번호가 있습니다.": "operations.cda38ee84d66",
+  "박스 개수/수량": "operations.72dea961beb2",
+  "중량": "operations.d519f74eef66",
+  "입고 날짜": "operations.982ff4219608",
+  "선택": "selected",
+  "기타 추가 내용": "operations.c974e6575279",
+  "저장 중...": "operations.92c4796cf195",
+  "화물 데이터 저장": "operations.22e7adf9eef9",
+  "조건을 선택한 뒤 검색해 주세요. ‘전체’로 검색하면 해당 범위의 모든 화물을 조회합니다.": "operations.443bdfeafe2f",
+  "검색어를 입력하거나, 빈칸으로 검색하면 전체 목록을 조회합니다.": "operations.9011ceb4fdd9",
+  "관리 메뉴에서 조건을 선택해 필요한 자료를 검색해 주세요.": "operations.dc7ca12cbbd1",
+  "배송 확인 · 번호 잠금": "operations.1f5b8e6fee40",
+  "최신 BASE · 고객 ID 반영": "operations.bcdba243403d",
+  "배송 매칭 확인 · 명세서 번호": "operations.4e97aa797abd",
+  "연락처나 이름만 비슷한 자료는 자동 확정하지 않습니다.": "operations.a8e77ed91f19",
+  "인쇄 전 번호를 잠그면 자동 정렬·재연산에도 해당 번호를 유지합니다. 수동 번호는 자동 번호로 복귀하기 전까지 유지됩니다.": "operations.294b0a65f5c4",
+  "자료 수정 잠금": "operations.ac173e7d2e01",
+  "변경할 명세서 번호": "operations.1b0e8391371d",
+  "수동 번호 저장": "operations.cdd1e3c0c022",
+  "반영했습니다.": "operations.de529bf8452f",
+  "명세서를 선택하세요.": "operations.0a30c4d2e251",
+  "확인 순서는 양의 정수로 입력하세요.": "operations.6f52c6f795f9",
+  "배송 매칭 확인: 후보 목록의 배송 번호를 선택하세요.": "operations.5e3be8c9ba23",
+  "명세서 번호 관리의 저장 상태가 손상되었습니다. 최신 Excel을 다시 다운로드하세요.": "operations.24b87d948621",
+  "선택 번호 잠금 해제": "operations.de82bc9dc707",
+  "전체 항목": "operations.1fbb46de7f1a",
+  "항목별 검색": "operations.7b4cd28faa28",
+  "선택 {p0}건 수정": "operations.080606c033fd",
+  "각 화물의 값을 확인·수정한 뒤 아래 버튼으로 한 번에 처리합니다.": "operations.bd4afa00ebcf",
+  "수정 후 데이터 잠금": "operations.49604b7bcafd",
+  "선택 수정 저장": "operations.0daa7cb22227",
+  "수정 후 일괄 승인": "operations.d50b14c7649a",
+  "수동 지정": "operations.389561b39b68",
+  "기존 발행 번호": "operations.634279c694ea",
+  "자동 번호": "operations.e0fb2f9c8830",
+  "연결 확인 필요": "operations.5c80641e7dbe",
+  "개인+회사 통합": "operations.ec0b7e21f206",
+  "개인/회사 분리": "operations.805b6e0889c7",
+  "(없음)": "operations.2c5539adbf82",
+  "\n\n데이터 잠금은 승인 후에도 유지됩니다.": "operations.5480eadaaefd",
+  "Name": "operations.dcd1d5223f73",
+  "Name(2)": "operations.46cba5630e5e",
+  "Tel": "operations.0a81d36266e5",
+  "Local Company": "operations.5fa8de2307ca",
+  "Destination Address": "operations.fff9f1124e1c",
+  "Paid by": "operations.a891cbbe1e48",
+  "Type": "operations.baaddf70fb5d",
+  "중량 (kg)": "operations.a36dde6f8fa5",
+  "가로 (cm)": "operations.c2452916dffd",
+  "세로 (cm)": "operations.cd513ffb22e8",
+  "높이 (cm)": "operations.39644df02315",
+  "수취인 이름/회사명": "operations.80a4aef9337e",
+  "관리자(직원)": "operations.139975bd748a",
+  "관리자(총괄)": "operations.4f0490b978ba",
+  "일반 회원": "operations.f21fd733ef0c",
+  "협력/파트너사": "operations.77327a9174ab",
+  "회원 등록": "operations.91d8e14e71c8",
+  "가입 권한 승인 요청": "operations.447f3b406a42",
+  "탈퇴 회원": "operations.4aac01746f15",
+  "예: 홍길동": "operations.3dae36d4d3a8",
+  "예: member@example.com": "operations.a81e6efb609f",
+  "예: Lkgroup2026": "operations.e8947458631c",
+  "대문자·소문자·숫자 포함 8자 이상": "operations.52905d3ef2c9",
+  "암호가 서로 일치하지 않습니다.": "operations.27474e1018c7",
+  "회사명(선택)": "operations.1ed32aa57efc",
+  "회원 관리": "operations.1cf201084c58",
+  "검색 결과가 없습니다.": "operations.58726bf27e70",
+  "입고일": "operations.1b6183360668",
+  "명세서에 표시할 화물 데이터가 없습니다.": "operations.90eff8344a95",
+  "미계산": "operations.167c9cf630f8",
+  "항차별 합계": "operations.edfa345b5f8f",
+  "저장된 정산 기준입니다. 최신 금액은 총액 계산으로 갱신하세요.": "operations.2f356267c51c",
+  "등록된 항차가 없습니다.": "operations.b7e8072799f3",
+  "할인 전": "operations.90bf6b97ed6a",
+  "회원 목록 조회 실패: {p0}": "operations.c750866a4faf",
+  "승인 가능한 요청 권한이 아닙니다.": "operations.3ea91b1a7520",
+  "관리자 종류 선택": "operations.d4a86540658c",
+  "{p0}님의 관리자 권한을 선택해 주세요.": "operations.0b227d1e121c",
+  "{p0} 권한으로 승인했습니다.": "operations.f903a7b9a9b1",
+  "승인 실패: {p0}": "operations.c8c692b3b8a5",
+  "가입 권한 요청 거절": "operations.2abd342f929a",
+  "{p0}님의 {p1} 요청을 거절할까요?\n거절해도 계정은 일반회원으로 계속 사용할 수 있습니다.": "operations.625e731736c3",
+  "권한 요청을 거절했습니다. 계정은 일반회원으로 유지됩니다.": "operations.b81b58b003d5",
+  "거절 처리 실패: {p0}": "operations.156e9bb44804",
+  "{p0} 회원을 {p1} 권한으로 등록했습니다.": "operations.c0ebcfb62f8f",
+  "회원 등록 실패: {p0}": "operations.31a3511a6cdf",
+  "회원 정보가 저장되었습니다.": "operations.e2684c0536ae",
+  "저장 실패: {p0}": "operations.23234d16cdfa",
+  "회원 정보 편집": "operations.4ef638526dfa",
+  "이메일 (수정 불가)": "operations.a31aef968cb0",
+  "예: 020-5889-2547": "operations.b22a1f1c8277",
+  "권한": "operations.a9fa0dfa453c",
+  "회원 삭제": "operations.a170fa4a11c5",
+  "{p0} 회원을 삭제할까요?\n\n삭제 즉시 로그인할 수 없으며, 관련 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.": "operations.d4d1b6f6b3ae",
+  "삭제 확인": "operations.e856b9bd3615",
+  "회원이 삭제 대기 처리되었습니다.": "operations.73bb4ac92182",
+  "회원 삭제 실패: {p0}": "operations.d97fbc56d099",
+  "탈퇴 취소": "operations.eadca283d504",
+  "{p0} 회원의 탈퇴를 취소하고 정상 회원으로 복구할까요?": "operations.435933fd025b",
+  "탈퇴를 취소하고 정상 회원으로 복구했습니다.": "operations.554c17e5dcc1",
+  "탈퇴 취소 실패: {p0}": "operations.b2f9bb526879",
+  "탈퇴 확정": "operations.f046139a26ea",
+  "{p0} 회원을 DB에서 완전히 삭제할까요?\n\n이 작업은 되돌릴 수 없습니다. 탈퇴 확정 후 동일 이메일은 3일 제한 없이 즉시 신규 가입할 수 있습니다.": "operations.8bcf5c8d93b6",
+  "탈퇴를 확정하고 회원 계정 데이터를 완전히 삭제했습니다.": "operations.1a2b4ea69b0b",
+  "탈퇴 확정 실패: {p0}": "operations.3257bc26677d",
+  "승인 상태": "operations.c077c3748ab0",
+  "대기 중인 요청이 없습니다.": "operations.6351efe80190",
+  "관리자 / 협력·파트너사": "operations.3d9c96b265e5",
+  "등록된 관리자/파트너가 없습니다.": "operations.5b513409258b",
+  "일반 회원 목록": "operations.54f1eca2afb7",
+  "검색된 회원이 없습니다.": "operations.2778e5ba9023",
+  "탈퇴 처리 중인 회원이 없습니다.": "operations.8845d36ebae6",
+  "암호 확인": "operations.01662c98b771",
+  "예: LK Trading": "operations.4d24360a5125",
+  "등록": "operations.bb216f104fde",
+  "명세서 이미지 변환에 실패했습니다.": "operations.b3011d206473",
+  "명세서 로딩 실패: {p0}": "operations.3a5bcc47d56e",
+  "명세서 데이터가 준비되지 않았습니다.": "operations.6a7703c1a3c3",
+  "PNG 변환에 실패했습니다.": "operations.ae65e0b3f108",
+  "명세서 이미지 저장": "operations.4b282313de7e",
+  "저장을 취소했습니다.": "operations.bdddc1c152da",
+  "명세서 이미지를 저장했습니다.": "operations.80caaf9ccbc1",
+  "명세서 출력용 PDF 저장": "operations.97382eb14ef8",
+  "출력용 PDF를 저장했습니다.": "operations.ee37e76623fd",
+  "{p0} · 명세서": "operations.f4ceabecc04f",
+  "명세서를 불러오지 못했습니다.": "operations.ee4c005653ce",
+  "출력용 PDF": "operations.67ac207be718",
+  "{p0}: 명세서 데이터가 없습니다.": "operations.3b74a3df53f3",
+  "출력할 명세서가 없습니다.": "operations.edc4d1ccadaa",
+  "견적서 리소스 로딩 실패: {p0}": "operations.f667b3ed8272",
+  "견적서 리소스가 준비되지 않았습니다.": "operations.2e52d71add46",
+  "가견적서 이미지 저장": "operations.a8d53084e74a",
+  "가견적서 이미지를 저장했습니다.": "operations.683deb81a0ff",
+  "가견적서 출력용 PDF 저장": "operations.3cbeac8c4e8d",
+  "{p0} · 가견적서": "operations.bb1952f67fdc",
+  "가견적서를 불러오지 못했습니다.": "operations.e5a0c18b2022",
+  "체크된 전체 명세서 출력용 PDF 저장": "operations.f14749da3f03",
+  "총 {p0}개의 명세서를 하나의 PDF로 저장했습니다.": "operations.a8354f9ae9f6",
+  "전체 명세서 PDF 저장 실패: {p0}": "operations.cfd79ed49e01",
+  "체크된 명세서 출력용 PDF": "operations.8fa8734d0c23",
+  "총 {p0}개의 명세서가 선택되었습니다.": "operations.377fca6afa72",
+  "체크된 {p0}개 명세서 전체를 하나의 출력용 PDF로 저장하시겠습니까?": "operations.1aba6b299d7c",
+  "전체 명세서 출력용 PDF 다운로드": "operations.f580d823974d",
+  "항차별 총액 계산 실패: {p0}": "operations.2494cb105594",
+  "실제 데이타 기준 총액 계산": "operations.f57ee19fdf5b",
+  "실제 총 물품 개수": "operations.d43593e6e558",
+  "할인 전 총액": "operations.ccc6d4809e70",
+  "총 할인 금액": "operations.fc334d621f6a",
+  "실제 총액 (총액 - 할인)": "operations.0e7825d91d91",
+  "단체별 할인 금액": "operations.0db46ed1acc5",
+  "영수번호별 정산 ({p0}건)": "operations.b534f9e77ce2",
+  "{p0}개 · 실제 {p1}": "operations.54020bc12298",
+  "최종 실제 금액": "operations.75d65641eefa",
+  "제목": "quote.subject",
+  "작성일": "purchase.date",
+  "상단 고정": "operations.23ecab2714e3"
 };
 const sharedTextDefaults = <String, Map<String, String>>{
   "account": {
@@ -1593,14 +2153,2814 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "en": "Other discount",
   "lo": "ສ່ວນຫຼຸດອື່ນ"
 },
-  "purchase.title": {
-  "ko": "구매대행",
-  "en": "Purchase agency",
-  "lo": "ບໍລິການຮັບຊື້"
+  "operations.3dc908e14ec5": {
+  "ko": "운송 경로 목록 조회 실패: {p0}",
+  "en": "Could not load routes: {p0}",
+  "lo": "ໂຫຼດເສັ້ນທາງບໍ່ສຳເລັດ: {p0}"
 },
-  "memberSites.title": {
-  "ko": "내 외부 사이트 계정",
-  "en": "My external site accounts",
-  "lo": "ບັນຊີເວັບໄຊຂອງຂ້ອຍ"
+  "operations.bef8422f08b7": {
+  "ko": "운송 경로 삭제 취소",
+  "en": "Restore deleted route",
+  "lo": "ກູ້ຄືນເສັ້ນທາງທີ່ລຶບ"
+},
+  "operations.bb6d80b087a0": {
+  "ko": "{p0}\n\n이 운송 경로의 삭제 대기를 취소하고 이전 상태로 복구합니다.",
+  "en": "{p0}\n\nCancel the pending deletion and restore this route to its previous state.",
+  "lo": "{p0}\n\nຍົກເລີກການລຶບທີ່ລໍຖ້າ ແລະ ກູ້ຄືນເສັ້ນທາງສູ່ສະຖານະເດີມ."
+},
+  "operations.4c490f1ca1d7": {
+  "ko": "아니오",
+  "en": "No",
+  "lo": "ບໍ່"
+},
+  "parity.restoreRoute": {
+  "ko": "삭제 취소",
+  "en": "Restore route",
+  "lo": "ຍົກເລີກການລົບ"
+},
+  "operations.377cdc6ae300": {
+  "ko": "삭제 대기를 취소하고 운송 경로를 복구했습니다.",
+  "en": "Pending deletion cancelled and route restored.",
+  "lo": "ຍົກເລີກການລຶບທີ່ລໍຖ້າ ແລະ ກູ້ຄືນເສັ້ນທາງແລ້ວ."
+},
+  "operations.8876572c465a": {
+  "ko": "운송 경로 복구 실패: {p0}",
+  "en": "Could not restore route: {p0}",
+  "lo": "ກູ້ຄືນເສັ້ນທາງບໍ່ສຳເລັດ: {p0}"
+},
+  "parity.deleteRoute": {
+  "ko": "운송 경로 삭제",
+  "en": "Delete route",
+  "lo": "ລົບເສັ້ນທາງ"
+},
+  "operations.3e1b194d1cf1": {
+  "ko": "{p0}\n\n삭제하면 즉시 운송 경로 선택 목록과 기존 메뉴/기능에서 사라집니다.\n30일 동안 삭제 대기 상태로 보관된 뒤 자동으로 완전히 삭제됩니다.\n\n즉시 완전 삭제 기능은 없습니다.",
+  "en": "{p0}\n\nThe route will disappear from route selectors and existing menus immediately. It will be retained for 30 days before permanent deletion.\n\nImmediate permanent deletion is unavailable.",
+  "lo": "{p0}\n\nເສັ້ນທາງຈະຫາຍຈາກລາຍການເລືອກ ແລະ ເມນູທັນທີ. ຂໍ້ມູນຈະເກັບໄວ້ 30 ມື້ກ່ອນລຶບຖາວອນ.\n\nບໍ່ມີຟັງຊັນລຶບຖາວອນທັນທີ."
+},
+  "operations.9df15982bb3e": {
+  "ko": "삭제 요청이 완료되었습니다. 30일 후 자동으로 완전히 삭제됩니다.",
+  "en": "Deletion requested. Permanent deletion occurs automatically after 30 days.",
+  "lo": "ສົ່ງຄຳຂໍລຶບແລ້ວ. ຈະລຶບຖາວອນອັດຕະໂນມັດຫຼັງ 30 ມື້."
+},
+  "operations.9f253187f4b2": {
+  "ko": "운송 경로 삭제 실패: {p0}",
+  "en": "Could not delete route: {p0}",
+  "lo": "ລຶບເສັ້ນທາງບໍ່ສຳເລັດ: {p0}"
+},
+  "routeDevelopment": {
+  "ko": "추가 기능 개발",
+  "en": "Additional Features",
+  "lo": "ຟັງຊັນເພີ່ມເຕີມ"
+},
+  "parity.routeBaseRates": {
+  "ko": "운송 경로 BASE / 공통 운임 관리",
+  "en": "Route BASE / shared freight rates",
+  "lo": "ຈັດການ BASE / ຄ່າຂົນສົ່ງ"
+},
+  "operations.5ca7faa2fe1f": {
+  "ko": "운송 경로 선택",
+  "en": "Select route",
+  "lo": "ເລືອກເສັ້ນທາງ"
+},
+  "operations.87b0acef85a7": {
+  "ko": "편집",
+  "en": "Edit",
+  "lo": "ແກ້ໄຂ"
+},
+  "parity.addRoute": {
+  "ko": "신규 운송 경로 추가",
+  "en": "Add route",
+  "lo": "ເພີ່ມເສັ້ນທາງ"
+},
+  "operations.b4aea1152d92": {
+  "ko": "선택한 운송 경로 삭제",
+  "en": "Delete selected route",
+  "lo": "ລຶບເສັ້ນທາງທີ່ເລືອກ"
+},
+  "operations.520c8d0767fc": {
+  "ko": "여기서 저장한 운임은 DB freight_rate_tiers가 원본이 되며 가견적·명세서·화물 운임 계산이 같은 기준을 사용합니다.",
+  "en": "Saved rates in freight_rate_tiers are shared by estimates, statements and cargo freight calculations.",
+  "lo": "ລາຄາທີ່ບັນທຶກໃນ freight_rate_tiers ໃຊ້ຮ່ວມກັນສຳລັບໃບປະເມີນ, ໃບແຈ້ງລາຍການ ແລະ ການຄິດໄລ່ຄ່າຂົນສົ່ງ."
+},
+  "parity.draftRoutes": {
+  "ko": "신규 운송 경로 적용 대기",
+  "en": "Route drafts",
+  "lo": "ເສັ້ນທາງລໍຖ້ານຳໃຊ້"
+},
+  "operations.bcc7d200821d": {
+  "ko": "내용 저장 완료 · 아직 미적용",
+  "en": "Saved · Not yet applied",
+  "lo": "ບັນທຶກແລ້ວ · ຍັງບໍ່ໄດ້ນຳໃຊ້"
+},
+  "operations.ae7251f13fcc": {
+  "ko": "내용 저장 완료 · 아직 미적용\nBASE: {p0}",
+  "en": "Saved · Not yet applied\nBASE: {p0}",
+  "lo": "ບັນທຶກແລ້ວ · ຍັງບໍ່ໄດ້ນຳໃຊ້\nBASE: {p0}"
+},
+  "parity.continueWork": {
+  "ko": "계속 작업",
+  "en": "Continue editing",
+  "lo": "ສືບຕໍ່ແກ້ໄຂ"
+},
+  "operations.bbeb99f59f4d": {
+  "ko": "삭제된 운송 경로는 30일 동안 보관되며, 기간 내 삭제 취소가 가능합니다.",
+  "en": "Deleted routes are retained for 30 days and can be restored during that period.",
+  "lo": "ເສັ້ນທາງທີ່ລຶບຈະເກັບໄວ້ 30 ມື້ ແລະ ກູ້ຄືນໄດ້ພາຍໃນເວລານັ້ນ."
+},
+  "admin-parity.routeListSection.routePurgePending": {
+  "ko": "완전 삭제 처리 대기중",
+  "en": "Permanent deletion pending",
+  "lo": "ລໍຖ້າລົບຖາວອນ"
+},
+  "operations.1cbb5fc9dbdb": {
+  "ko": "완전 삭제까지 {p0} 남음",
+  "en": "{p0} until permanent deletion",
+  "lo": "ເຫຼືອ {p0} ກ່ອນລຶບຖາວອນ"
+},
+  "operations.c9edec34aba6": {
+  "ko": "Draft 단가 조회 실패: {p0}",
+  "en": "Could not load draft rates: {p0}",
+  "lo": "ໂຫຼດລາຄາຮ່າງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.9040933d8ded": {
+  "ko": "단가 조회 실패: {p0}",
+  "en": "Could not load rates: {p0}",
+  "lo": "ໂຫຼດລາຄາບໍ່ສຳເລັດ: {p0}"
+},
+  "parity.documentTitle": {
+  "ko": "운송 경로 타이틀",
+  "en": "Document title",
+  "lo": "ຊື່ເອກະສານ"
+},
+  "admin-parity.renderRouteDevelopmentEditor.documentTitlePreview": {
+  "ko": "문서 타이틀 미리보기",
+  "en": "Document title preview",
+  "lo": "ເບິ່ງຫົວຂໍ້ເອກະສານກ່ອນ"
+},
+  "operations.58ff63273445": {
+  "ko": "{p0} xxth 거래 명세서",
+  "en": "{p0} xxth Statement",
+  "lo": "{p0} xxth ໃບແຈ້ງລາຍການ"
+},
+  "operations.65964414432e": {
+  "ko": "{p0} xxth 견적서",
+  "en": "{p0} xxth Quotation",
+  "lo": "{p0} xxth ໃບສະເໜີລາຄາ"
+},
+  "operations.005435199e7f": {
+  "ko": "※ xxth / 거래 명세서 / 견적서 문구는 고정이며 수정되지 않습니다.",
+  "en": "The voyage marker and statement/quotation labels are fixed.",
+  "lo": "ຂໍ້ຄວາມລະບຸຖ້ຽວ ແລະ ຊື່ໃບແຈ້ງລາຍການ/ໃບສະເໜີລາຄາແມ່ນຄົງທີ່."
+},
+  "operations.45b9e96b3579": {
+  "ko": "명세서 BASE 전체 미리보기",
+  "en": "Preview full BASE statement",
+  "lo": "ເບິ່ງໃບແຈ້ງລາຍການ BASE ທັງໝົດ"
+},
+  "operations.a994701558a6": {
+  "ko": "선택한 BASE의 앱 미리보기 이미지를 찾지 못했습니다.",
+  "en": "No app preview image was found for the selected BASE.",
+  "lo": "ບໍ່ພົບຮູບຕົວຢ່າງໃນແອັບຂອງ BASE ທີ່ເລືອກ."
+},
+  "operations.5dbb9eb5c639": {
+  "ko": "운송 경로 타이틀 xxth 거래 명세서",
+  "en": "Route title xxth Statement",
+  "lo": "ຫົວຂໍ້ເສັ້ນທາງ xxth ໃບແຈ້ງລາຍການ"
+},
+  "parity.overrides": {
+  "ko": "BASE Excel 셀 직접 수정 (고급)",
+  "en": "BASE Excel cell overrides",
+  "lo": "ແກ້ໄຂເຊວ BASE Excel"
+},
+  "parity.addOverride": {
+  "ko": "셀 추가",
+  "en": "Add cell",
+  "lo": "ເພີ່ມເຊວ"
+},
+  "operations.162cebc2cb30": {
+  "ko": "명세서 전체 미리보기와 별도로, 원본 XLSX의 특정 시트/셀 값을 직접 지정할 수 있습니다. 예: 시트 이름(LTxx-xx), C1, 표시할 값",
+  "en": "You can also override individual cells in the original XLSX, for example sheet LTxx-xx, cell C1 and its display value.",
+  "lo": "ທ່ານສາມາດກຳນົດຄ່າແຕ່ລະເຊວໃນ XLSX ຕົ້ນສະບັບ ເຊັ່ນ ຊີດ LTxx-xx, ເຊວ C1 ແລະ ຄ່າທີ່ຈະສະແດງ."
+},
+  "admin-parity.renderRouteDevelopmentEditor.sheetName": {
+  "ko": "시트 이름",
+  "en": "Sheet name",
+  "lo": "ຊື່ຊີດ"
+},
+  "parity.cell": {
+  "ko": "셀",
+  "en": "Cell",
+  "lo": "ເຊວ"
+},
+  "parity.value": {
+  "ko": "값",
+  "en": "Value",
+  "lo": "ຄ່າ"
+},
+  "operations.06362509a5e0": {
+  "ko": "신규 운송 경로",
+  "en": "New route",
+  "lo": "ເສັ້ນທາງໃໝ່"
+},
+  "operations.5157e41166d0": {
+  "ko": "운송 경로 편집",
+  "en": "Edit route",
+  "lo": "ແກ້ໄຂເສັ້ນທາງ"
+},
+  "parity.baseRoute": {
+  "ko": "기반 BASE 운송 경로",
+  "en": "Base route",
+  "lo": "ເສັ້ນທາງ BASE"
+},
+  "parity.routeName": {
+  "ko": "운송 경로명 (메뉴 표시)",
+  "en": "Route name (menu)",
+  "lo": "ຊື່ເສັ້ນທາງ"
+},
+  "operations.e85e9d42a398": {
+  "ko": "운송 경로 타이틀 (예: Kor-Lao Sea)",
+  "en": "Route title (e.g. Kor-Lao Sea)",
+  "lo": "ຫົວຂໍ້ເສັ້ນທາງ (ເຊັ່ນ Kor-Lao Sea)"
+},
+  "parity.boxPrefix": {
+  "ko": "박스 번호 Prefix",
+  "en": "Cargo number prefix",
+  "lo": "Prefix ເລກສິນຄ້າ"
+},
+  "parity.receiptPrefix": {
+  "ko": "영수번호 Prefix",
+  "en": "Receipt prefix",
+  "lo": "Prefix ເລກໃບຮັບ"
+},
+  "operations.1f2aab22615f": {
+  "ko": "Excel 파일 Prefix (예: LA_MY_LAND)",
+  "en": "Excel filename prefix (e.g. LA_MY_LAND)",
+  "lo": "ຄຳນຳໜ້າຊື່ໄຟລ໌ Excel (ເຊັ່ນ LA_MY_LAND)"
+},
+  "parity.minimumCharge": {
+  "ko": "최소 운임 USD",
+  "en": "Minimum charge USD",
+  "lo": "ຄ່າຂົນສົ່ງຕ່ຳສຸດ USD"
+},
+  "parity.tiers": {
+  "ko": "단가 구조",
+  "en": "Rate tiers",
+  "lo": "ຂັ້ນອັດຕາ"
+},
+  "parity.addTier": {
+  "ko": "구간 추가",
+  "en": "Add tier",
+  "lo": "ເພີ່ມຂັ້ນ"
+},
+  "admin-parity.renderRouteDevelopmentEditor.minimumWeight": {
+  "ko": "이상 kg",
+  "en": "Minimum kg",
+  "lo": "ນ້ຳໜັກຂັ້ນຕ່ຳ kg"
+},
+  "operations.01d8e4caa1af": {
+  "ko": "구간 삭제",
+  "en": "Delete tier",
+  "lo": "ລຶບຂັ້ນລາຄາ"
+},
+  "parity.applyRoute": {
+  "ko": "신규 경로 적용",
+  "en": "Apply new route",
+  "lo": "ນຳໃຊ້ເສັ້ນທາງໃໝ່"
+},
+  "parity.saveDraft": {
+  "ko": "내용 저장 (아직 적용 안됨)",
+  "en": "Save draft (not applied)",
+  "lo": "ບັນທຶກຮ່າງ"
+},
+  "operations.dc2050a024c8": {
+  "ko": "내용 저장",
+  "en": "Save details",
+  "lo": "ບັນທຶກລາຍລະອຽດ"
+},
+  "parity.saveChanges": {
+  "ko": "내용 수정 저장",
+  "en": "Save changes",
+  "lo": "ບັນທຶກການແກ້ໄຂ"
+},
+  "operations.63ec201d1222": {
+  "ko": "운송 경로와 단가를 확인해 주세요.",
+  "en": "Check the route and rate.",
+  "lo": "ກວດເສັ້ນທາງ ແລະ ລາຄາ."
+},
+  "operations.ae82cb778bf3": {
+  "ko": "적용 대기 내용을 수정 저장했습니다.",
+  "en": "Pending draft changes saved.",
+  "lo": "ບັນທຶກການແກ້ໄຂຮ່າງທີ່ລໍຖ້າແລ້ວ."
+},
+  "operations.d38a294c8dd2": {
+  "ko": "Draft 수정 저장 실패: {p0}",
+  "en": "Could not save draft changes: {p0}",
+  "lo": "ບັນທຶກການແກ້ໄຂຮ່າງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.9952c22f087c": {
+  "ko": "삭제하면 해당 운송 경로는 즉시 기존 메뉴 및 신규 업무 선택 목록에서 사라집니다.\n\n운송 경로 설정, BASE Excel 및 운임 정책은 30일 동안 삭제 대기 상태로 보관된 후 자동으로 완전히 삭제됩니다.\n\n즉시 완전 삭제 기능은 제공되지 않습니다.",
+  "en": "Deleting removes the route from menus and new-work selectors immediately.\n\nRoute settings, BASE Excel and freight policies are retained for 30 days before automatic permanent deletion.\n\nImmediate permanent deletion is unavailable.",
+  "lo": "ການລຶບຈະເອົາເສັ້ນທາງອອກຈາກເມນູ ແລະ ລາຍການເລືອກວຽກໃໝ່ທັນທີ.\n\nການຕັ້ງຄ່າເສັ້ນທາງ, BASE Excel ແລະ ລາຄາຂົນສົ່ງຈະເກັບໄວ້ 30 ມື້ກ່ອນລຶບຖາວອນອັດຕະໂນມັດ.\n\nບໍ່ມີການລຶບຖາວອນທັນທີ."
+},
+  "operations.057cc3219d62": {
+  "ko": "운송 경로명, 운송 경로 타이틀, 기반 BASE, 단가를 확인해 주세요.",
+  "en": "Check the route name, title, source BASE and rate.",
+  "lo": "ກວດຊື່ເສັ້ນທາງ, ຫົວຂໍ້, BASE ຕົ້ນທາງ ແລະ ລາຄາ."
+},
+  "operations.dd8c76bf5d82": {
+  "ko": "신규 운송 경로 적용",
+  "en": "Apply new route",
+  "lo": "ນຳໃຊ້ເສັ້ນທາງໃໝ່"
+},
+  "operations.79389bcc09a0": {
+  "ko": "작성하신 데이터를 기반으로 신규 운송 경로가 추가 됩니다.",
+  "en": "A new route will be created from the entered data.",
+  "lo": "ຈະສ້າງເສັ້ນທາງໃໝ່ຈາກຂໍ້ມູນທີ່ປ້ອນ."
+},
+  "operations.1aacb54c4992": {
+  "ko": "확인",
+  "en": "OK",
+  "lo": "ຕົກລົງ"
+},
+  "operations.a1e525d3e9df": {
+  "ko": "저장된 신규 경로 Draft를 찾을 수 없습니다.",
+  "en": "Saved new-route draft not found.",
+  "lo": "ບໍ່ພົບຮ່າງເສັ້ນທາງໃໝ່ທີ່ບັນທຶກ."
+},
+  "operations.3aaeee553300": {
+  "ko": "신규 운송 경로 적용 실패: {p0}",
+  "en": "Could not apply new route: {p0}",
+  "lo": "ນຳໃຊ້ເສັ້ນທາງໃໝ່ບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.208e1deaee14": {
+  "ko": "내용을 저장했습니다. 아직 실제 신규 경로에는 적용되지 않았습니다.",
+  "en": "Details saved. They have not yet been applied to the new route.",
+  "lo": "ບັນທຶກລາຍລະອຽດແລ້ວ. ຍັງບໍ່ໄດ້ນຳໃຊ້ກັບເສັ້ນທາງໃໝ່."
+},
+  "operations.0932bcdc8b67": {
+  "ko": "내용 저장 실패: {p0}",
+  "en": "Could not save details: {p0}",
+  "lo": "ບັນທຶກລາຍລະອຽດບໍ່ສຳເລັດ: {p0}"
+},
+  "fulfillment.all": {
+  "ko": "전체 선택",
+  "en": "Select all",
+  "lo": "ເລືອກທັງໝົດ"
+},
+  "operations.b34dc9fc8aa7": {
+  "ko": "{p0} / {p1}건 선택",
+  "en": "{p0} / {p1} selected",
+  "lo": "ເລືອກ {p0} / {p1} ລາຍການ"
+},
+  "operations.688074e7326c": {
+  "ko": "선택 수정 후 승인",
+  "en": "Edit selected and approve",
+  "lo": "ແກ້ໄຂລາຍການທີ່ເລືອກແລ້ວອະນຸມັດ"
+},
+  "approval.selectedApprove": {
+  "ko": "선택 승인",
+  "en": "Approve selected",
+  "lo": "ອະນຸມັດລາຍການທີ່ເລືອກ"
+},
+  "approval.selectedReject": {
+  "ko": "선택 거절",
+  "en": "Reject selected",
+  "lo": "ປະຕິເສດລາຍການທີ່ເລືອກ"
+},
+  "operations.a22c27ffaaf1": {
+  "ko": "선택 수정 후 정상화",
+  "en": "Edit selected and resolve",
+  "lo": "ແກ້ໄຂລາຍການທີ່ເລືອກແລ້ວຢືນຢັນຂໍ້ມູນ"
+},
+  "approval.selectedKeep": {
+  "ko": "선택 불명 유지",
+  "en": "Keep selected as unknown",
+  "lo": "ຮັກສາສະຖານະບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "approval.selectedEdit": {
+  "ko": "선택 수정",
+  "en": "Edit selected",
+  "lo": "ແກ້ໄຂລາຍການທີ່ເລືອກ"
+},
+  "approval.selectedComplete": {
+  "ko": "선택 확정/잠금",
+  "en": "Confirm / lock selected",
+  "lo": "ຢືນຢັນ / ລັອກລາຍການທີ່ເລືອກ"
+},
+  "operations.a7f1581674b3": {
+  "ko": "총괄 관리자 권한이 필요합니다.",
+  "en": "Super administrator access is required.",
+  "lo": "ຕ້ອງມີສິດຜູ້ບໍລິຫານສູງສຸດ."
+},
+  "operations.02315738575c": {
+  "ko": "선택 {p0}건 일괄 처리",
+  "en": "Process {p0} selected requests",
+  "lo": "ປະມວນ {p0} ຄຳຂໍທີ່ເລືອກ"
+},
+  "operations.88a695f878f6": {
+  "ko": "요청 내용과 실제 화물·송장 정보를 확인하셨습니까?\n선택한 {p0}건만 처리합니다.\n{p1}",
+  "en": "Have you checked the request against the actual cargo and invoice?\nOnly {p0} selected requests will be processed.\n{p1}",
+  "lo": "ໄດ້ກວດຄຳຂໍກັບສິນຄ້າ ແລະ ໃບຂົນສົ່ງຈິງແລ້ວບໍ?\nຈະປະມວນສະເພາະ {p0} ຄຳຂໍທີ່ເລືອກ.\n{p1}"
+},
+  "operations.842de2dd0a34": {
+  "ko": "확인 후 처리",
+  "en": "Review and process",
+  "lo": "ກວດແລ້ວດຳເນີນການ"
+},
+  "operations.2bf6ba82012f": {
+  "ko": "선택한 {p0}건을 함께 처리했습니다.",
+  "en": "Processed {p0} selected requests.",
+  "lo": "ປະມວນ {p0} ຄຳຂໍທີ່ເລືອກແລ້ວ."
+},
+  "admin-approvals.runApprovalBatch.multipleClaimsForThisCargoAre": {
+  "ko": "같은 화물에 여러 소유 확인 요청이 선택되어 있습니다. 한 요청만 선택해 주세요.",
+  "en": "Multiple claims for this cargo are selected. Select one claim.",
+  "lo": "ເລືອກຫຼາຍຄຳຮ້ອງຢືນຢັນສິດຂອງສິນຄ້າດຽວກັນ. ກະລຸນາເລືອກພຽງໜຶ່ງຄຳຮ້ອງ."
+},
+  "operations.b888c78e21c7": {
+  "ko": "일괄 처리 완료 · 성공 {p0}건 · 실패 {p1}건",
+  "en": "Batch complete · {p0} succeeded · {p1} failed",
+  "lo": "ປະມວນເປັນຊຸດແລ້ວ · ສຳເລັດ {p0} · ບໍ່ສຳເລັດ {p1}"
+},
+  "operations.8cfe6598ade7": {
+  "ko": "관리자 수동 불확실 표시",
+  "en": "Manually flag as uncertain",
+  "lo": "ໝາຍວ່າບໍ່ແນ່ນອນດ້ວຍຕົນເອງ"
+},
+  "operations.74e95abe25ff": {
+  "ko": "승인 요청 조회 실패: {p0}",
+  "en": "Could not load approval requests: {p0}",
+  "lo": "ໂຫຼດຄຳຂໍອະນຸມັດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.eed38950dd8d": {
+  "ko": "거절되었습니다.",
+  "en": "Rejected.",
+  "lo": "ປະຕິເສດແລ້ວ."
+},
+  "operations.eee2eae853f6": {
+  "ko": "수정 후 승인되었습니다.",
+  "en": "Updated and approved.",
+  "lo": "ແກ້ໄຂ ແລະ ອະນຸມັດແລ້ວ."
+},
+  "operations.0b9b1dc8130e": {
+  "ko": "승인되었습니다.",
+  "en": "Approved.",
+  "lo": "ອະນຸມັດແລ້ວ."
+},
+  "operations.0b53b7a7d9e7": {
+  "ko": "처리 실패: {p0}",
+  "en": "Processing failed: {p0}",
+  "lo": "ປະມວນຜົນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.6eb925d8ad7b": {
+  "ko": "수취인 불명 데이터 정상화",
+  "en": "Resolve unknown recipient",
+  "lo": "ຢືນຢັນຂໍ້ມູນສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.f184cbdc4a70": {
+  "ko": "수취인 이름 / 회사명",
+  "en": "Recipient / Company",
+  "lo": "ຜູ້ຮັບ / ບໍລິສັດ"
+},
+  "operations.cb8c6b238f80": {
+  "ko": "비고",
+  "en": "Notes",
+  "lo": "ໝາຍເຫດ"
+},
+  "admin.normalize": {
+  "ko": "수정 후 정상화",
+  "en": "Correct and resolve",
+  "lo": "ແກ້ໄຂໃຫ້ຖືກຕ້ອງ"
+},
+  "operations.2f70e89e4d66": {
+  "ko": "수취인 데이터를 정상화했습니다. 영수번호와 구획도 다시 자동 계산됩니다.",
+  "en": "Recipient data resolved. Receipt numbers and zones are recalculated automatically.",
+  "lo": "ຢືນຢັນຂໍ້ມູນຜູ້ຮັບແລ້ວ. ເລກໃບຮັບ ແລະ ເຂດຈະຄິດໄລ່ຄືນອັດຕະໂນມັດ."
+},
+  "operations.746edba35121": {
+  "ko": "수취인 데이터 정상화 실패: {p0}",
+  "en": "Could not resolve recipient data: {p0}",
+  "lo": "ຢືນຢັນຂໍ້ມູນຜູ້ຮັບບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.ba44df5d448a": {
+  "ko": "수취인 불명 상태로 확인 완료했습니다. 화물은 XX / 구획 F로 유지됩니다.",
+  "en": "Reviewed as unknown recipient. Cargo remains under XX / Zone F.",
+  "lo": "ກວດແລ້ວເປັນສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບ. ຍັງໃຊ້ XX / ເຂດ F."
+},
+  "operations.3934bf4d47c4": {
+  "ko": "확인 완료 / 데이터 잠금",
+  "en": "Mark reviewed / lock data",
+  "lo": "ໝາຍວ່າກວດແລ້ວ / ລັອກຂໍ້ມູນ"
+},
+  "operations.7b75b52c1bb3": {
+  "ko": "불확실 데이터 확인 / 수정",
+  "en": "Review / edit uncertain data",
+  "lo": "ກວດ / ແກ້ໄຂຂໍ້ມູນບໍ່ແນ່ນອນ"
+},
+  "operations.79af19e8bd95": {
+  "ko": "전화번호 (없으면 비워도 됨)",
+  "en": "Phone (may be left blank)",
+  "lo": "ເບີໂທ (ປ່ອຍວ່າງໄດ້)"
+},
+  "operations.f05021e587a2": {
+  "ko": "이미 사용 중인 영수번호입니다.",
+  "en": "This receipt number is already in use.",
+  "lo": "ເລກໃບຮັບນີ້ຖືກໃຊ້ແລ້ວ."
+},
+  "operations.d0538ba97f89": {
+  "ko": "이미 사용 중인 영수번호입니다. 추천: {p0}",
+  "en": "This receipt number is already in use. Suggested: {p0}",
+  "lo": "ເລກໃບຮັບນີ້ຖືກໃຊ້ແລ້ວ. ແນະນຳ: {p0}"
+},
+  "operations.4f21632ec28a": {
+  "ko": "확정 및 잠금",
+  "en": "Confirm and lock",
+  "lo": "ຢືນຢັນ ແລະ ລັອກ"
+},
+  "operations.b824080c00f1": {
+  "ko": "수정 저장",
+  "en": "Save Changes",
+  "lo": "ບັນທຶກການແກ້ໄຂ"
+},
+  "operations.e421d23dc092": {
+  "ko": "불확실 데이터를 확인 완료하고 잠금했습니다.",
+  "en": "Uncertain data reviewed and locked.",
+  "lo": "ກວດ ແລະ ລັອກຂໍ້ມູນບໍ່ແນ່ນອນແລ້ວ."
+},
+  "operations.7ae1122dcb5a": {
+  "ko": "불확실 데이터를 수정했습니다.",
+  "en": "Uncertain data updated.",
+  "lo": "ແກ້ໄຂຂໍ້ມູນບໍ່ແນ່ນອນແລ້ວ."
+},
+  "operations.959de6961422": {
+  "ko": "불확실 데이터 처리 실패: {p0}",
+  "en": "Could not process uncertain data: {p0}",
+  "lo": "ປະມວນຂໍ້ມູນບໍ່ແນ່ນອນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.cfbe38381f25": {
+  "ko": "확인/수정",
+  "en": "Review / edit",
+  "lo": "ກວດ / ແກ້ໄຂ"
+},
+  "operations.b28d50a4909a": {
+  "ko": "확정/잠금",
+  "en": "Confirm / lock",
+  "lo": "ຢືນຢັນ / ລັອກ"
+},
+  "operations.bb7ecbd8d38a": {
+  "ko": "{p0} · {p1}년 · {p2}항차",
+  "en": "{p0} · {p1} · Voyage {p2}",
+  "lo": "{p0} · {p1} · ຖ້ຽວ {p2}"
+},
+  "operations.88c7b1e06100": {
+  "ko": "수취인/회사명: {p0}",
+  "en": "Recipient / company: {p0}",
+  "lo": "ຜູ້ຮັບ / ບໍລິສັດ: {p0}"
+},
+  "operations.5a3550787e28": {
+  "ko": "전화번호: {p0}",
+  "en": "Phone: {p0}",
+  "lo": "ເບີໂທ: {p0}"
+},
+  "operations.7a2bc60d391b": {
+  "ko": "영수번호: {p0} · 구획: {p1}",
+  "en": "Receipt: {p0} · Zone: {p1}",
+  "lo": "ໃບຮັບ: {p0} · ເຂດ: {p1}"
+},
+  "operations.0890af930b5f": {
+  "ko": "현재 수취인/회사명: {p0}",
+  "en": "Current recipient / company: {p0}",
+  "lo": "ຜູ້ຮັບ / ບໍລິສັດປັດຈຸບັນ: {p0}"
+},
+  "operations.43f721f59659": {
+  "ko": "현재 전화번호: {p0}",
+  "en": "Current phone: {p0}",
+  "lo": "ເບີໂທປັດຈຸບັນ: {p0}"
+},
+  "operations.64d6937b3059": {
+  "ko": "임시 영수번호: {p0} · 구획: {p1}",
+  "en": "Temporary receipt: {p0} · Zone: {p1}",
+  "lo": "ໃບຮັບຊົ່ວຄາວ: {p0} · ເຂດ: {p1}"
+},
+  "operations.5c60eeb6758b": {
+  "ko": "데이터 수정 잠금 상태",
+  "en": "Editing locked",
+  "lo": "ລັອກການແກ້ໄຂ"
+},
+  "operations.bba7daf13312": {
+  "ko": "불명 유지",
+  "en": "Keep recipient unknown",
+  "lo": "ຮັກສາສະຖານະບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.83bbfa8dbba0": {
+  "ko": "확인 / 수정",
+  "en": "Review / edit",
+  "lo": "ກວດ / ແກ້ໄຂ"
+},
+  "operations.a6988194cc66": {
+  "ko": "수취인 불명 화물 확인 승인",
+  "en": "Approve unknown-recipient cargo claim",
+  "lo": "ອະນຸມັດຄຳຂໍສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.908ac448e6f2": {
+  "ko": "이 요청을 승인하면:\n이름: 수취인 불명 / {p0}\n연락처: {p1}\n영수번호: 해당 항차 마지막 영수번호 다음 번호\n\n으로 반영됩니다.{p2}",
+  "en": "Approving this request will apply:\nName: Unknown recipient / {p0}\nPhone: {p1}\nReceipt: the next number after the voyage's last receipt\n\n{p2}",
+  "lo": "ການອະນຸມັດຄຳຂໍນີ້ຈະນຳໃຊ້:\nຊື່: ບໍ່ຮູ້ຜູ້ຮັບ / {p0}\nເບີໂທ: {p1}\nໃບຮັບ: ເລກຖັດໄປຈາກໃບຮັບສຸດທ້າຍຂອງຖ້ຽວ\n\n{p2}"
+},
+  "operations.e19ca0710e5e": {
+  "ko": "확인 및 승인",
+  "en": "Confirm and approve",
+  "lo": "ຢືນຢັນ ແລະ ອະນຸມັດ"
+},
+  "operations.ec56c8bff66d": {
+  "ko": "수취인 불명 화물을 본인 화물로 확인 승인했습니다.",
+  "en": "Unknown-recipient cargo ownership approved.",
+  "lo": "ອະນຸມັດເຈົ້າຂອງສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບແລ້ວ."
+},
+  "operations.15fb7c2271d3": {
+  "ko": "수취인 불명 화물 확인 요청을 거절했습니다.",
+  "en": "Unknown-recipient cargo claim rejected.",
+  "lo": "ປະຕິເສດຄຳຂໍສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບແລ້ວ."
+},
+  "operations.bc69b14f22dd": {
+  "ko": "수취인 불명 화물 요청 처리 실패: {p0}",
+  "en": "Could not process unknown-recipient claim: {p0}",
+  "lo": "ປະມວນຄຳຂໍສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.4c5f93ef01be": {
+  "ko": "송장 뒷자리 화물 정보 정정 승인",
+  "en": "Approve invoice suffix cargo correction",
+  "lo": "ອະນຸມັດແກ້ໄຂສິນຄ້າຕາມເລກທ້າຍໃບຂົນສົ່ງ"
+},
+  "operations.b1ff3c19a113": {
+  "ko": "요청 회원의 정보로 화물 수취인을 변경합니다.\n\n이름: {p0}\n연락처: {p1}\n송장번호: {p2}\n\n실물 송장 및 회원 정보를 확인한 후 승인해 주세요.",
+  "en": "Update the cargo recipient using the requesting member's details.\n\nName: {p0}\nPhone: {p1}\nInvoice: {p2}\n\nVerify the physical invoice and member details before approval.",
+  "lo": "ປ່ຽນຜູ້ຮັບສິນຄ້າຕາມຂໍ້ມູນສະມາຊິກຜູ້ຮ້ອງຂໍ.\n\nຊື່: {p0}\nເບີໂທ: {p1}\nໃບຂົນສົ່ງ: {p2}\n\nກວດໃບຂົນສົ່ງຈິງ ແລະ ຂໍ້ມູນສະມາຊິກກ່ອນອະນຸມັດ."
+},
+  "operations.328c92b4a8aa": {
+  "ko": "확인 후 승인",
+  "en": "Review and approve",
+  "lo": "ກວດແລ້ວອະນຸມັດ"
+},
+  "operations.0f11e7b2b7c0": {
+  "ko": "화물 수취인 정보를 정정했습니다.",
+  "en": "Cargo recipient information corrected.",
+  "lo": "ແກ້ໄຂຂໍ້ມູນຜູ້ຮັບສິນຄ້າແລ້ວ."
+},
+  "operations.debfe484f964": {
+  "ko": "정정 요청을 거절했습니다.",
+  "en": "Correction request rejected.",
+  "lo": "ປະຕິເສດຄຳຂໍແກ້ໄຂແລ້ວ."
+},
+  "operations.3095ad4fb4ee": {
+  "ko": "송장 뒷자리 정정 요청 처리 실패: {p0}",
+  "en": "Could not process invoice suffix correction: {p0}",
+  "lo": "ປະມວນການແກ້ໄຂຕາມເລກທ້າຍໃບຂົນສົ່ງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.36325ad172db": {
+  "ko": "수령인",
+  "en": "Recipient",
+  "lo": "ຜູ້ຮັບ"
+},
+  "operations.33d99db21242": {
+  "ko": "명세서 번호",
+  "en": "Statement number",
+  "lo": "ເລກໃບແຈ້ງລາຍການ"
+},
+  "admin-parity.customerOutputHtml.boxNumber": {
+  "ko": "박스 번호",
+  "en": "Box number",
+  "lo": "ເລກກ່ອງ"
+},
+  "status": {
+  "ko": "상태",
+  "en": "Status",
+  "lo": "ສະຖານະ"
+},
+  "operations.0f356740d563": {
+  "ko": "요청 경로",
+  "en": "Request source",
+  "lo": "ແຫຼ່ງຄຳຂໍ"
+},
+  "operations.e470d24b05f1": {
+  "ko": "요청일",
+  "en": "Requested on",
+  "lo": "ວັນຮ້ອງຂໍ"
+},
+  "operations.17bcff69e770": {
+  "ko": "일괄 처리 중 {p0}",
+  "en": "Processing batch {p0}",
+  "lo": "ກຳລັງປະມວນເປັນຊຸດ {p0}"
+},
+  "operations.0e733bc28e7a": {
+  "ko": "불확실 / 확인 필요 데이터",
+  "en": "Uncertain / needs review",
+  "lo": "ບໍ່ແນ່ນອນ / ຕ້ອງກວດສອບ"
+},
+  "operations.5e56f152caa2": {
+  "ko": "이름은 확인되지만 연락처가 없는 화물입니다. 일반 영수번호/구획으로 정리되며, 확인 후 잠금하면 이 목록에서 완료 처리됩니다.",
+  "en": "The name is known but no phone is recorded. Normal receipt numbers and zones apply; review and lock to complete this item.",
+  "lo": "ຮູ້ຊື່ແຕ່ບໍ່ມີເບີໂທ. ໃຊ້ເລກໃບຮັບ ແລະ ເຂດປົກກະຕິ; ກວດ ແລະ ລັອກເພື່ອສຳເລັດລາຍການນີ້."
+},
+  "operations.886647094ff8": {
+  "ko": "신규 업로드 · 수취인 불명 자동분류",
+  "en": "New uploads · Automatic unknown-recipient classification",
+  "lo": "ອັບໂຫຼດໃໝ່ · ຈັດປະເພດສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບອັດຕະໂນມັດ"
+},
+  "operations.4fd8d2562b43": {
+  "ko": "수취인 이름이 없거나 명시적으로 수취인 불명으로 표시된 화물입니다. 확인 전에는 임시 영수번호 XX / 구획 F로 유지됩니다.",
+  "en": "The recipient name is missing or explicitly unknown. Temporary receipt XX / Zone F is retained until reviewed.",
+  "lo": "ບໍ່ມີຊື່ຜູ້ຮັບ ຫຼື ລະບຸວ່າບໍ່ຮູ້ຜູ້ຮັບ. ໃຊ້ເລກໃບຮັບຊົ່ວຄາວ XX / ເຂດ F ຈົນກວ່າຈະກວດສອບ."
+},
+  "operations.7f59cbb26ec8": {
+  "ko": "수취인 불명 화물 확인 요청",
+  "en": "Unknown-recipient cargo claim",
+  "lo": "ຄຳຂໍສິນຄ້າບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.7aff6d61124f": {
+  "ko": "송장 뒷자리 일치 · 회원 화물 정정 요청",
+  "en": "Invoice suffix match · Member cargo correction",
+  "lo": "ເລກທ້າຍໃບຂົນສົ່ງກົງກັນ · ແກ້ໄຂສິນຄ້າສະມາຊິກ"
+},
+  "operations.5937e1ae0ceb": {
+  "ko": "수취인 오류로 일반 조회가 안 된 화물입니다. 송장 뒷자리와 회원 본인 정보를 확인한 후 처리하세요.",
+  "en": "Recipient errors prevented normal lookup. Verify the invoice suffix and member identity before processing.",
+  "lo": "ຂໍ້ມູນຜູ້ຮັບຜິດເຮັດໃຫ້ຄົ້ນຫາປົກກະຕິບໍ່ໄດ້. ກວດເລກທ້າຍໃບຂົນສົ່ງ ແລະ ຕົວຕົນສະມາຊິກກ່ອນດຳເນີນການ."
+},
+  "operations.9abcfb1bc0a1": {
+  "ko": "대기 중인 화물 내용 변경 승인 요청이 없습니다.",
+  "en": "No cargo change requests are awaiting approval.",
+  "lo": "ບໍ່ມີຄຳຂໍປ່ຽນຂໍ້ມູນສິນຄ້າລໍຖ້າອະນຸມັດ."
+},
+  "operations.77f18a0a72ce": {
+  "ko": "수취인 불명 · 본인 화물 확인 요청",
+  "en": "Unknown recipient · Cargo ownership claim",
+  "lo": "ບໍ່ຮູ້ຜູ້ຮັບ · ຄຳຂໍຢືນຢັນເຈົ້າຂອງສິນຄ້າ"
+},
+  "operations.f283025dfdc3": {
+  "ko": "현재 이름: {p0}",
+  "en": "Current name: {p0}",
+  "lo": "ຊື່ປັດຈຸບັນ: {p0}"
+},
+  "operations.4a3c0fb0f8f5": {
+  "ko": "현재 연락처: {p0}",
+  "en": "Current phone: {p0}",
+  "lo": "ເບີໂທປັດຈຸບັນ: {p0}"
+},
+  "operations.32b20f5f3d73": {
+  "ko": "요청 회원: {p0} ({p1})",
+  "en": "Requesting member: {p0} ({p1})",
+  "lo": "ສະມາຊິກຜູ້ຮ້ອງຂໍ: {p0} ({p1})"
+},
+  "operations.4ed0f8a16805": {
+  "ko": "요청 연락처: {p0}",
+  "en": "Requested phone: {p0}",
+  "lo": "ເບີໂທທີ່ຮ້ອງຂໍ: {p0}"
+},
+  "operations.6380a3fbf333": {
+  "ko": "확인 참고 내용: {p0}",
+  "en": "Review details: {p0}",
+  "lo": "ລາຍລະອຽດກວດສອບ: {p0}"
+},
+  "operations.76b8e82ed8c0": {
+  "ko": "🔒 현재 잠금 상태",
+  "en": "🔒 Currently locked",
+  "lo": "🔒 ປັດຈຸບັນລັອກແລ້ວ"
+},
+  "reject": {
+  "ko": "거절",
+  "en": "Reject",
+  "lo": "ປະຕິເສດ"
+},
+  "operations.ee1876e41604": {
+  "ko": "본인 화물 확인 승인",
+  "en": "Approve cargo ownership",
+  "lo": "ອະນຸມັດການຢືນຢັນເຈົ້າຂອງສິນຄ້າ"
+},
+  "operations.278996c5bbf1": {
+  "ko": "수취인 정보 오류 정정 요청",
+  "en": "Recipient information correction request",
+  "lo": "ຄຳຂໍແກ້ໄຂຂໍ້ມູນຜູ້ຮັບ"
+},
+  "operations.28be6e16bafd": {
+  "ko": "현재 수취인: {p0}",
+  "en": "Current recipient: {p0}",
+  "lo": "ຜູ້ຮັບປັດຈຸບັນ: {p0}"
+},
+  "operations.716864d77372": {
+  "ko": "확인 메모: {p0}",
+  "en": "Review note: {p0}",
+  "lo": "ໝາຍເຫດກວດສອບ: {p0}"
+},
+  "operations.5b91e04f6cfc": {
+  "ko": "확인 후 정정 승인",
+  "en": "Review and approve correction",
+  "lo": "ກວດແລ້ວອະນຸມັດການແກ້ໄຂ"
+},
+  "admin.locked": {
+  "ko": "잠금",
+  "en": "Locked",
+  "lo": "ລັອກ"
+},
+  "operations.8deba62fe9b7": {
+  "ko": "{p0} · {p1}년 · {p2}항차\n요청인: {p3} ({p4})",
+  "en": "{p0} · {p1} · Voyage {p2}\nRequested by: {p3} ({p4})",
+  "lo": "{p0} · {p1} · ຖ້ຽວ {p2}\nຜູ້ຮ້ອງຂໍ: {p3} ({p4})"
+},
+  "operations.c165c36d6d1f": {
+  "ko": "요청 내용",
+  "en": "Requested changes",
+  "lo": "ລາຍລະອຽດຄຳຂໍ"
+},
+  "operations.540dcffc12db": {
+  "ko": "관리자 수정",
+  "en": "Administrator edit",
+  "lo": "ຜູ້ບໍລິຫານແກ້ໄຂ"
+},
+  "admin.modifiedApprove": {
+  "ko": "수정 후 승인",
+  "en": "Edit and approve",
+  "lo": "ແກ້ໄຂແລ້ວອະນຸມັດ"
+},
+  "approve": {
+  "ko": "승인",
+  "en": "Approve",
+  "lo": "ອະນຸມັດ"
+},
+  "operations.cebecb031382": {
+  "ko": "발신인",
+  "en": "Sender",
+  "lo": "ຜູ້ສົ່ງ"
+},
+  "operations.6de31470c284": {
+  "ko": "이름/라오스 수령인",
+  "en": "Name / Laos Recipient",
+  "lo": "ຊື່ / ຜູ້ຮັບໃນລາວ"
+},
+  "operations.c81d7e253641": {
+  "ko": "내용물",
+  "en": "Contents",
+  "lo": "ເນື້ອໃນ"
+},
+  "operations.ce1df5bb8b6b": {
+  "ko": "포장형태",
+  "en": "Package type",
+  "lo": "ປະເພດຫຸ້ມຫໍ່"
+},
+  "operations.ed08c8d82539": {
+  "ko": "기타 내용",
+  "en": "Notes",
+  "lo": "ໝາຍເຫດ"
+},
+  "operations.10aed4ae6142": {
+  "ko": "무게(kg)",
+  "en": "Weight (kg)",
+  "lo": "ນ້ຳໜັກ (kg)"
+},
+  "operations.f4d67618b725": {
+  "ko": "가로(cm)",
+  "en": "Length (cm)",
+  "lo": "ຍາວ (cm)"
+},
+  "operations.77cc43a2efe0": {
+  "ko": "세로(cm)",
+  "en": "Width (cm)",
+  "lo": "ກວ້າງ (cm)"
+},
+  "operations.60bc9c3d893b": {
+  "ko": "높이(cm)",
+  "en": "Height (cm)",
+  "lo": "ສູງ (cm)"
+},
+  "operations.32e9301f74fc": {
+  "ko": "구획",
+  "en": "Zone",
+  "lo": "ໂຊນ"
+},
+  "operations.24147e7a6e46": {
+  "ko": "접수일 (YYYY-MM-DD)",
+  "en": "Received date (YYYY-MM-DD)",
+  "lo": "ວັນຮັບ (YYYY-MM-DD)"
+},
+  "operations.ba2b2bbafe77": {
+  "ko": "변경 내용 없음",
+  "en": "No changes",
+  "lo": "ບໍ່ມີການປ່ຽນແປງ"
+},
+  "excel.review.action": {
+  "ko": "Excel 화물 처리",
+  "en": "Excel cargo action",
+  "lo": "ການດຳເນີນສິນຄ້າ Excel"
+},
+  "operations.8508baed993e": {
+  "ko": "이름/수령인",
+  "en": "Name / Recipient",
+  "lo": "ຊື່ / ຜູ້ຮັບ"
+},
+  "operations.35f538545773": {
+  "ko": "무게",
+  "en": "Weight",
+  "lo": "ນ້ຳໜັກ"
+},
+  "operations.79b03b4207ca": {
+  "ko": "가로",
+  "en": "Length",
+  "lo": "ຍາວ"
+},
+  "operations.abaa893444db": {
+  "ko": "세로",
+  "en": "Width",
+  "lo": "ກວ້າງ"
+},
+  "operations.c2c8f0007728": {
+  "ko": "높이",
+  "en": "Height",
+  "lo": "ສູງ"
+},
+  "operations.ebc9b96eb63c": {
+  "ko": "접수일",
+  "en": "Received date",
+  "lo": "ວັນຮັບ"
+},
+  "operations.d1ef5e06d83b": {
+  "ko": "실제 화물 데이터가 등록된 운송 경로/년도/항차가 없습니다.",
+  "en": "No route, year and voyage with registered cargo was found.",
+  "lo": "ບໍ່ພົບເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວທີ່ມີຂໍ້ມູນສິນຄ້າ."
+},
+  "operations.46314b6cf430": {
+  "ko": "등록된 운송 경로·년도·항차를 선택하고 검색해 주세요. BASE는 바로 다운로드할 수 있습니다.",
+  "en": "Select a registered route, year and voyage, then search. BASE files are available immediately.",
+  "lo": "ເລືອກເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວທີ່ລົງທະບຽນ ແລ້ວຄົ້ນຫາ. ໄຟລ໌ BASE ດາວໂຫຼດໄດ້ທັນທີ."
+},
+  "operations.e8aad1af97fb": {
+  "ko": "목록 불러오기 실패: {p0}",
+  "en": "Could not load list: {p0}",
+  "lo": "ໂຫຼດລາຍການບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.a279d212b7a3": {
+  "ko": "업로드 접수 완료. 아래 업로드 진행 현황을 확인하세요.",
+  "en": "Upload accepted. Check progress below.",
+  "lo": "ຮັບອັບໂຫຼດແລ້ວ. ກວດຄວາມຄືບໜ້າດ້ານລຸ່ມ."
+},
+  "operations.4dbbbd96c75f": {
+  "ko": "파일 선택 취소 또는 파일명 확인 필요.",
+  "en": "File selection cancelled or filename needs review.",
+  "lo": "ຍົກເລີກການເລືອກໄຟລ໌ ຫຼື ຕ້ອງກວດຊື່ໄຟລ໌."
+},
+  "operations.27b23bf8871f": {
+  "ko": "업로드 접수 실패: {p0}",
+  "en": "Could not submit upload: {p0}",
+  "lo": "ສົ່ງອັບໂຫຼດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.3a6dd481901b": {
+  "ko": "10% · 선택 항차 확인",
+  "en": "10% · Checking selected voyage",
+  "lo": "10% · ກຳລັງກວດຖ້ຽວທີ່ເລືອກ"
+},
+  "operations.f136703c2811": {
+  "ko": "20% · 영수번호 / Zone / 고객 규칙 재연산",
+  "en": "20% · Recalculating receipt numbers, zones and customer rules",
+  "lo": "20% · ຄິດໄລ່ເລກໃບຮັບ, ເຂດ ແລະ ກົດລູກຄ້າຄືນ"
+},
+  "operations.b7859a002688": {
+  "ko": "72% · 최신 화물 데이터 다시 읽는 중",
+  "en": "72% · Reading current cargo data",
+  "lo": "72% · ອ່ານຂໍ້ມູນສິນຄ້າລ່າສຸດ"
+},
+  "operations.90a52be97e6f": {
+  "ko": "84% · 할인 / 운임 재계산",
+  "en": "84% · Recalculating discounts and freight",
+  "lo": "84% · ຄິດໄລ່ສ່ວນຫຼຸດ ແລະ ຄ່າຂົນສົ່ງຄືນ"
+},
+  "operations.9213f0c27aa9": {
+  "ko": "94% · 정산 snapshot 갱신",
+  "en": "94% · Updating settlement snapshot",
+  "lo": "94% · ປັບປຸງຂໍ້ມູນສະຫຼຸບການຊຳລະ"
+},
+  "operations.fc105660f5f1": {
+  "ko": "100% · 완료",
+  "en": "100% · Complete",
+  "lo": "100% · ສຳເລັດ"
+},
+  "operations.70e07e2036ea": {
+  "ko": "{p0} · {p1}년 · {p2}항차 재연산 및 Update 완료",
+  "en": "{p0} · {p1} · Voyage {p2} recalculated and updated",
+  "lo": "{p0} · {p1} · ຖ້ຽວ {p2} ຄິດໄລ່ຄືນ ແລະ ປັບປຸງແລ້ວ"
+},
+  "excel.status.failed": {
+  "ko": "실패",
+  "en": "Failed",
+  "lo": "ລົ້ມເຫຼວ"
+},
+  "operations.12f177cd65d4": {
+  "ko": "재연산 및 Update 실패: {p0}",
+  "en": "Recalculation and update failed: {p0}",
+  "lo": "ຄິດໄລ່ຄືນ ແລະ ປັບປຸງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.5acdd4f1d743": {
+  "ko": "원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...",
+  "en": "Updating data while preserving the original Excel layout...",
+  "lo": "ກຳລັງປັບປຸງຂໍ້ມູນໂດຍຮັກສາຮູບແບບ Excel ຕົ້ນສະບັບ..."
+},
+  "operations.c3f4db270dae": {
+  "ko": "{p0}\n파일: {p1}{p2}",
+  "en": "{p0}\nFile: {p1}{p2}",
+  "lo": "{p0}\nໄຟລ໌: {p1}{p2}"
+},
+  "operations.ef9cf87a1071": {
+  "ko": "다운로드 실패: {p0}",
+  "en": "Download failed: {p0}",
+  "lo": "ດາວໂຫຼດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.5dfda23b0b18": {
+  "ko": "최신 BASE Excel 다운로드",
+  "en": "Download latest BASE Excel",
+  "lo": "ດາວໂຫຼດ BASE Excel ລ່າສຸດ"
+},
+  "excel.status.done": {
+  "ko": "완료",
+  "en": "Completed",
+  "lo": "ສຳເລັດ"
+},
+  "operations.9ca583383713": {
+  "ko": "완료 · 확인 필요",
+  "en": "Complete · Review needed",
+  "lo": "ສຳເລັດ · ຕ້ອງກວດສອບ"
+},
+  "operations.038502b654e1": {
+  "ko": "작업 중",
+  "en": "Working",
+  "lo": "ກຳລັງດຳເນີນງານ"
+},
+  "operations.2a73ed53178a": {
+  "ko": "대기",
+  "en": "Waiting",
+  "lo": "ລໍຖ້າ"
+},
+  "operations.141365569406": {
+  "ko": "관리자·직원·협력/파트너사 전용",
+  "en": "Administrators, staff and partners only",
+  "lo": "ສຳລັບຜູ້ບໍລິຫານ, ພະນັກງານ ແລະ ຄູ່ຮ່ວມງານ"
+},
+  "operations.1d5cdc749f6e": {
+  "ko": "Excel 파일 업로드",
+  "en": "Upload Excel file",
+  "lo": "ອັບໂຫຼດໄຟລ໌ Excel"
+},
+  "operations.dd113518dc10": {
+  "ko": "최신 BASE Excel 다운로드 · 고객 ID / 배송 정보",
+  "en": "Download latest BASE Excel · Customer IDs / delivery data",
+  "lo": "ດາວໂຫຼດ BASE Excel ລ່າສຸດ · ລະຫັດລູກຄ້າ / ຂໍ້ມູນຈັດສົ່ງ"
+},
+  "operations.ddadf7adc02e": {
+  "ko": "업로드 진행 현황",
+  "en": "Upload progress",
+  "lo": "ຄວາມຄືບໜ້າອັບໂຫຼດ"
+},
+  "operations.72f376684bbb": {
+  "ko": "항차 Excel 검색",
+  "en": "Search voyage Excel",
+  "lo": "ຄົ້ນຫາ Excel ຂອງຖ້ຽວ"
+},
+  "operations.f7f6510306e2": {
+  "ko": "실제 등록된 항차만 검색할 수 있습니다. 검색 후 재연산·다운로드 버튼이 표시됩니다.",
+  "en": "Only registered voyages can be searched. Recalculation and download buttons appear after searching.",
+  "lo": "ຄົ້ນຫາໄດ້ສະເພາະຖ້ຽວທີ່ລົງທະບຽນ. ປຸ່ມຄິດໄລ່ຄືນ ແລະ ດາວໂຫຼດຈະສະແດງຫຼັງຄົ້ນຫາ."
+},
+  "operations.f3495e0a191f": {
+  "ko": "항차 검색",
+  "en": "Search voyages",
+  "lo": "ຄົ້ນຫາຖ້ຽວ"
+},
+  "operations.ba64a279db75": {
+  "ko": "배송 매칭 확인 · 명세서 번호 잠금 / 수동 지정",
+  "en": "Review delivery matches · Lock / set statement numbers",
+  "lo": "ກວດການຈັບຄູ່ຈັດສົ່ງ · ລັອກ / ກຳນົດເລກໃບແຈ້ງລາຍການ"
+},
+  "operations.36deee6d26d2": {
+  "ko": "선택 항차 재연산 및 Update",
+  "en": "Recalculate and update selected voyage",
+  "lo": "ຄິດໄລ່ຄືນ ແລະ ປັບປຸງຖ້ຽວທີ່ເລືອກ"
+},
+  "operations.c850c9c6edf6": {
+  "ko": "Excel 생성 중...",
+  "en": "Creating Excel...",
+  "lo": "ກຳລັງສ້າງ Excel..."
+},
+  "operations.fe344f178ec7": {
+  "ko": "Excel 다운로드 및 저장 위치 선택",
+  "en": "Download Excel and choose save location",
+  "lo": "ດາວໂຫຼດ Excel ແລະ ເລືອກບ່ອນບັນທຶກ"
+},
+  "operations.577cff4e8460": {
+  "ko": "파일명에 포함된 운송 경로·년도·항차를 확인해 즉시 접수합니다. 접수 후에는 이 화면에서 나가 다른 업무를 해도 앱이 켜져 있는 동안 순차 처리됩니다.",
+  "en": "The route, year and voyage in the filename are checked on submission. Processing continues in order while the app is open, even if you use other screens.",
+  "lo": "ກວດເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວໃນຊື່ໄຟລ໌ເມື່ອສົ່ງ. ຈະປະມວນຕາມລຳດັບຂະນະແອັບເປີດ ເຖິງຈະໃຊ້ໜ້າອື່ນ."
+},
+  "operations.5198037992d6": {
+  "ko": "현재 데이터 목록 조회 실패: {p0}",
+  "en": "Could not load current data: {p0}",
+  "lo": "ໂຫຼດຂໍ້ມູນປັດຈຸບັນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.49a58b538606": {
+  "ko": "파일 접수 완료. 바로 다른 화면으로 이동하거나, 아래 버튼을 다시 눌러 다음 파일도 계속 추가할 수 있습니다.",
+  "en": "File accepted. You may open another screen or use the button again to add more files.",
+  "lo": "ຮັບໄຟລ໌ແລ້ວ. ສາມາດໄປໜ້າອື່ນ ຫຼື ກົດປຸ່ມອີກເພື່ອເພີ່ມໄຟລ໌."
+},
+  "operations.5f5fa1f620d2": {
+  "ko": "파일을 선택하지 않았거나 기본 파일명 검사를 통과하지 못했습니다.",
+  "en": "No file selected or the initial filename check failed.",
+  "lo": "ບໍ່ໄດ້ເລືອກໄຟລ໌ ຫຼື ການກວດຊື່ໄຟລ໌ເບື້ອງຕົ້ນບໍ່ຜ່ານ."
+},
+  "operations.502822819d79": {
+  "ko": "파일 접수 실패: {p0}",
+  "en": "Could not accept file: {p0}",
+  "lo": "ຮັບໄຟລ໌ບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.e7ea28b3609a": {
+  "ko": "% 진행중",
+  "en": "% in progress",
+  "lo": "% ກຳລັງດຳເນີນ"
+},
+  "operations.a8c824be3f81": {
+  "ko": "화물 데이타 엑셀 업로드 및 Update",
+  "en": "Upload and update cargo Excel",
+  "lo": "ອັບໂຫຼດ ແລະ ປັບປຸງ Excel ສິນຄ້າ"
+},
+  "operations.571ef2a225d9": {
+  "ko": "기초 접수 검사: XLSX/XLSM · 운송 경로 · 년도 · 항차\n예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n또는: 2026년 LKS 08항차 최종본.xlsm\n경로·년도·항차만 포함하면 앞뒤 파일명은 자유롭게 사용할 수 있습니다.\n\n총괄 관리자 업로드는 해당 항차의 전체 Excel을 기준으로 수정·삭제·복원 요청을 변경·정정 승인에 등록합니다. 명세서 번호를 포함한 기존 화물의 모든 변경은 승인 후 반영됩니다. 삭제 승인 후 30일 동안 복구할 수 있습니다.\n직원·협력사 업로드는 기존 변경 승인 절차를 따릅니다.",
+  "en": "Initial checks: XLSX/XLSM · route · year · voyage\nExample: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\nOr: 2026 LKS Voyage 08 final.xlsm\nOther filename text is flexible when route, year and voyage are included.\n\nSuper administrator uploads submit changes, deletions and restores for approval based on the complete voyage workbook. Existing cargo changes, including statement numbers, apply after approval. Approved deletions can be restored for 30 days.\nStaff and partner uploads follow the existing approval process.",
+  "lo": "ກວດເບື້ອງຕົ້ນ: XLSX/XLSM · ເສັ້ນທາງ · ປີ · ຖ້ຽວ\nຕົວຢ່າງ: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\nຫຼື: 2026 LKS ຖ້ຽວ 08 ສະບັບສຸດທ້າຍ.xlsm\nຊື່ໄຟລ໌ສ່ວນອື່ນປ່ຽນໄດ້ ແຕ່ຕ້ອງມີເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວ.\n\nການອັບໂຫຼດຂອງຜູ້ບໍລິຫານສູງສຸດຈະສົ່ງຄຳຂໍແກ້ໄຂ, ລຶບ ແລະ ກູ້ຄືນຕາມ Excel ທັງໝົດຂອງຖ້ຽວ. ການປ່ຽນຂໍ້ມູນສິນຄ້າເດີມ ລວມທັງເລກໃບແຈ້ງລາຍການ ມີຜົນຫຼັງອະນຸມັດ. ກູ້ຄືນລາຍການທີ່ລຶບໄດ້ພາຍໃນ 30 ມື້.\nພະນັກງານ ແລະ ຄູ່ຮ່ວມງານໃຊ້ຂັ້ນຕອນອະນຸມັດເດີມ."
+},
+  "operations.9ff64c388435": {
+  "ko": "Excel 파일 추가 / 업로드 접수",
+  "en": "Add Excel files / submit uploads",
+  "lo": "ເພີ່ມໄຟລ໌ Excel / ສົ່ງອັບໂຫຼດ"
+},
+  "operations.48b36cc90959": {
+  "ko": "현재 데이터 재연산 및 Update",
+  "en": "Recalculate and update current data",
+  "lo": "ຄິດໄລ່ຄືນ ແລະ ປັບປຸງຂໍ້ມູນປັດຈຸບັນ"
+},
+  "operations.357af9903adf": {
+  "ko": "직접 데이터 수정 또는 고객/배송/할인 규칙 변경 후 반영이 의심될 때 선택 항차의 영수번호·구획·자동 특이사항·할인/정산을 다시 계산합니다.",
+  "en": "Recalculate receipt numbers, zones, automatic notes, discounts and settlement for the selected voyage after cargo or customer/delivery/discount rules change.",
+  "lo": "ຄິດໄລ່ເລກໃບຮັບ, ເຂດ, ໝາຍເຫດອັດຕະໂນມັດ, ສ່ວນຫຼຸດ ແລະ ການຊຳລະຂອງຖ້ຽວທີ່ເລືອກຄືນ ຫຼັງປ່ຽນຂໍ້ມູນສິນຄ້າ ຫຼື ກົດລູກຄ້າ/ຈັດສົ່ງ/ສ່ວນຫຼຸດ."
+},
+  "operations.fe4b111ee721": {
+  "ko": "{p0}항차",
+  "en": "Voyage {p0}",
+  "lo": "ຖ້ຽວ {p0}"
+},
+  "operations.cc97fbea5247": {
+  "ko": "재연산 및 Update",
+  "en": "Recalculate and update",
+  "lo": "ຄິດໄລ່ຄືນ ແລະ ປັບປຸງ"
+},
+  "operations.0c6fce3d31e1": {
+  "ko": "업로드 / 처리 작업 현황",
+  "en": "Upload / processing jobs",
+  "lo": "ວຽກອັບໂຫຼດ / ປະມວນຜົນ"
+},
+  "operations.9a036ddee3b2": {
+  "ko": "완료 목록 지우기",
+  "en": "Clear completed jobs",
+  "lo": "ລ້າງວຽກທີ່ສຳເລັດ"
+},
+  "operations.00c899de4ee4": {
+  "ko": "항차 목록 조회 실패: {p0}",
+  "en": "Could not load voyages: {p0}",
+  "lo": "ໂຫຼດຖ້ຽວບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.10a03ed6338d": {
+  "ko": "화물 데이터 조회 실패: {p0}",
+  "en": "Could not load cargo data: {p0}",
+  "lo": "ໂຫຼດຂໍ້ມູນສິນຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.ff67874dd934": {
+  "ko": "현재 잠금된 화물이 없습니다.",
+  "en": "No cargo is currently locked.",
+  "lo": "ປັດຈຸບັນບໍ່ມີສິນຄ້າທີ່ລັອກ."
+},
+  "operations.2a63e4fe3587": {
+  "ko": "해당 화물 잠금을 해제했습니다.",
+  "en": "Cargo unlocked.",
+  "lo": "ປົດລັອກສິນຄ້າແລ້ວ."
+},
+  "operations.09cba404ecc2": {
+  "ko": "잠금 해제 실패: {p0}",
+  "en": "Could not unlock data: {p0}",
+  "lo": "ປົດລັອກຂໍ້ມູນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.765127ac992c": {
+  "ko": "선택한 화물 데이터를 잠금했습니다.",
+  "en": "Selected cargo data locked.",
+  "lo": "ລັອກຂໍ້ມູນສິນຄ້າທີ່ເລືອກແລ້ວ."
+},
+  "operations.b8b4207c85d0": {
+  "ko": "선택한 화물 데이터 잠금을 해제했습니다.",
+  "en": "Selected cargo data unlocked.",
+  "lo": "ປົດລັອກຂໍ້ມູນສິນຄ້າທີ່ເລືອກແລ້ວ."
+},
+  "operations.502d0fd48932": {
+  "ko": "잠금 처리 실패: {p0}",
+  "en": "Could not lock data: {p0}",
+  "lo": "ລັອກຂໍ້ມູນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.fb505f4e3b27": {
+  "ko": "화물 삭제",
+  "en": "Delete Cargo",
+  "lo": "ລົບສິນຄ້າ"
+},
+  "operations.88e05e6fe9fc": {
+  "ko": "선택한 {p0}개의 화물을 삭제 합니다.\n\n30일 뒤에 자동으로 완전히 삭제 되며, 필요시 삭제 취소 혹은 바로 삭제가 가능 합니다.",
+  "en": "Delete {p0} selected cargo records?\n\nThey will be permanently deleted after 30 days. You can cancel deletion or delete permanently sooner when needed.",
+  "lo": "ລຶບສິນຄ້າ {p0} ລາຍການທີ່ເລືອກບໍ?\n\nຈະລຶບຖາວອນຫຼັງ 30 ມື້. ສາມາດຍົກເລີກການລຶບ ຫຼື ລຶບຖາວອນກ່ອນໄດ້ຖ້າຈຳເປັນ."
+},
+  "operations.6535635c5748": {
+  "ko": "선택한 화물을 삭제 처리했습니다. 30일 동안 복구할 수 있습니다.",
+  "en": "Selected cargo deleted. It can be restored for 30 days.",
+  "lo": "ລຶບສິນຄ້າທີ່ເລືອກແລ້ວ. ກູ້ຄືນໄດ້ພາຍໃນ 30 ມື້."
+},
+  "operations.cbcb1a5ff52c": {
+  "ko": "화물 삭제 처리 실패: {p0}",
+  "en": "Could not delete cargo: {p0}",
+  "lo": "ລຶບສິນຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.892833f31645": {
+  "ko": "화물 데이터 편집 · {p0}",
+  "en": "Edit cargo data · {p0}",
+  "lo": "ແກ້ໄຂຂໍ້ມູນສິນຄ້າ · {p0}"
+},
+  "operations.56f140f555fc": {
+  "ko": "특이사항",
+  "en": "Special notes",
+  "lo": "ໝາຍເຫດພິເສດ"
+},
+  "operations.b51a0a090b20": {
+  "ko": "자동 매칭 특이사항",
+  "en": "Automatically matched notes",
+  "lo": "ໝາຍເຫດທີ່ຈັບຄູ່ອັດຕະໂນມັດ"
+},
+  "operations.fd079c62688c": {
+  "ko": "데이터 수정 잠금된 화물",
+  "en": "Cargo with editing locked",
+  "lo": "ສິນຄ້າທີ່ລັອກການແກ້ໄຂ"
+},
+  "operations.fe95b084f72d": {
+  "ko": "화물 데이터를 수정했습니다.",
+  "en": "Cargo data updated.",
+  "lo": "ແກ້ໄຂຂໍ້ມູນສິນຄ້າແລ້ວ."
+},
+  "operations.e13e4522d924": {
+  "ko": "수정 실패: {p0}",
+  "en": "Update failed: {p0}",
+  "lo": "ແກ້ໄຂບໍ່ສຳເລັດ: {p0}"
+},
+  "admin-parity.renderExcelBulkRows.noReceipt": {
+  "ko": "(영수번호 없음)",
+  "en": "(No receipt number)",
+  "lo": "(ບໍ່ມີເລກໃບຮັບ)"
+},
+  "purchase.customer": {
+  "ko": "고객명",
+  "en": "Customer",
+  "lo": "ລູກຄ້າ"
+},
+  "admin.sender": {
+  "ko": "발송인",
+  "en": "Sender",
+  "lo": "ຜູ້ສົ່ງ"
+},
+  "operations.e74772e584d3": {
+  "ko": "엑셀 데이타 일괄 관리",
+  "en": "Bulk Excel data management",
+  "lo": "ຈັດການຂໍ້ມູນ Excel ຈຳນວນຫຼາຍ"
+},
+  "operations.b6a0fd390059": {
+  "ko": "잠금만 보기 · {p0}개",
+  "en": "Locked only · {p0} items",
+  "lo": "ສະເພາະທີ່ລັອກ · {p0} ລາຍການ"
+},
+  "operations.d2ea09b0d5e2": {
+  "ko": "선택 {p0}개",
+  "en": "{p0} selected",
+  "lo": "ເລືອກ {p0} ລາຍການ"
+},
+  "operations.72f80b75762c": {
+  "ko": "운송 경로, 년도, 항차를 선택해 주세요.",
+  "en": "Select a route, year and voyage.",
+  "lo": "ກະລຸນາເລືອກເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວ."
+},
+  "operations.6107556fbfe7": {
+  "ko": "해당 항차 화물 데이터가 없습니다.",
+  "en": "No cargo data for this voyage.",
+  "lo": "ບໍ່ມີຂໍ້ມູນສິນຄ້າຂອງຖ້ຽວນີ້."
+},
+  "operations.f7dc8378bf4e": {
+  "ko": "현재 조건에 해당하는 화물이 없습니다.",
+  "en": "No cargo matches the current filters.",
+  "lo": "ບໍ່ມີສິນຄ້າກົງກັບເງື່ອນໄຂປັດຈຸບັນ."
+},
+  "operations.6c438b36dbbc": {
+  "ko": "영수번호: ",
+  "en": "Receipt: ",
+  "lo": "ໃບຮັບ: "
+},
+  "operations.46029a6619ad": {
+  "ko": " / 구획: ",
+  "en": " / Zone: ",
+  "lo": " / ເຂດ: "
+},
+  "operations.b9f6f2c248c6": {
+  "ko": " · 총 ",
+  "en": " · Total ",
+  "lo": " · ລວມ "
+},
+  "operations.f62174360f85": {
+  "ko": "{p0}개",
+  "en": "{p0} items",
+  "lo": "{p0} ລາຍການ"
+},
+  "support.all": {
+  "ko": "전체",
+  "en": "All",
+  "lo": "ທັງໝົດ"
+},
+  "operations.8282758899ab": {
+  "ko": "잠금만",
+  "en": "Locked only",
+  "lo": "ສະເພາະທີ່ລັອກ"
+},
+  "operations.7b2e176a794b": {
+  "ko": "해체",
+  "en": "Ungroup",
+  "lo": "ແຍກກຸ່ມ"
+},
+  "operations.a1cb7e57f57a": {
+  "ko": "비고: {p0}",
+  "en": "Notes: {p0}",
+  "lo": "ໝາຍເຫດ: {p0}"
+},
+  "operations.24bdf7603265": {
+  "ko": "명세서 번호 수동 지정",
+  "en": "Set statement number manually",
+  "lo": "ກຳນົດເລກໃບແຈ້ງລາຍການເອງ"
+},
+  "operations.57cb6e3691a6": {
+  "ko": "배송 확인 · 명세서 번호",
+  "en": "Delivery review · Statement numbers",
+  "lo": "ກວດການຈັດສົ່ງ · ເລກໃບແຈ້ງລາຍການ"
+},
+  "notifications.refresh": {
+  "ko": "새로고침",
+  "en": "Refresh",
+  "lo": "ໂຫຼດໃໝ່"
+},
+  "operations.71b1ef0822e7": {
+  "ko": "기존 발행 번호 유지 · 고객 ID는 별도 표시",
+  "en": "Keep issued numbers · Show customer IDs separately",
+  "lo": "ຮັກສາເລກທີ່ອອກແລ້ວ · ສະແດງລະຫັດລູກຄ້າແຍກຕ່າງຫາກ"
+},
+  "operations.1bec29c13739": {
+  "ko": "배송 매칭 확인 필요 {p0}건",
+  "en": "{p0} delivery matches need review",
+  "lo": "ການຈັບຄູ່ຈັດສົ່ງ {p0} ລາຍການຕ້ອງກວດສອບ"
+},
+  "operations.c4a6cd8e2a76": {
+  "ko": "이름·전화번호 중 하나만 비슷하면 직접 확인합니다. 인쇄 전 번호를 잠그면 재연산에도 해당 번호가 유지됩니다.",
+  "en": "Review matches when only the name or phone is similar. Lock numbers before printing to retain them during recalculation.",
+  "lo": "ກວດດ້ວຍຕົນເອງເມື່ອພຽງຊື່ ຫຼື ເບີໂທຄ້າຍກັນ. ລັອກເລກກ່ອນພິມເພື່ອຮັກສາໄວ້ເວລາຄິດໄລ່ຄືນ."
+},
+  "operations.551563c86651": {
+  "ko": "고객명 · 고객 ID · 명세서 번호",
+  "en": "Customer name · Customer ID · Statement number",
+  "lo": "ຊື່ລູກຄ້າ · ລະຫັດລູກຄ້າ · ເລກໃບແຈ້ງລາຍການ"
+},
+  "operations.a786847ed3c4": {
+  "ko": "표시된 명세서 전체 선택",
+  "en": "Select all displayed statements",
+  "lo": "ເລືອກໃບແຈ້ງລາຍການທັງໝົດທີ່ສະແດງ"
+},
+  "operations.e756ba416c60": {
+  "ko": "선택 번호 잠금",
+  "en": "Lock selected numbers",
+  "lo": "ລັອກເລກທີ່ເລືອກ"
+},
+  "parity.unlock": {
+  "ko": "선택 잠금 해제",
+  "en": "Unlock selected",
+  "lo": "ປົດລັອກທີ່ເລືອກ"
+},
+  "operations.1ddc614d46ea": {
+  "ko": "배송 확인 필요 · {p0}",
+  "en": "Delivery review needed · {p0}",
+  "lo": "ຕ້ອງກວດການຈັດສົ່ງ · {p0}"
+},
+  "operations.df487522b262": {
+  "ko": "이 배송지로 확인",
+  "en": "Confirm this delivery address",
+  "lo": "ຢືນຢັນທີ່ຢູ່ຈັດສົ່ງນີ້"
+},
+  "operations.6f06fed75cdc": {
+  "ko": "다른 고객 / 제외",
+  "en": "Different customer / exclude",
+  "lo": "ລູກຄ້າຄົນອື່ນ / ຍົກເວັ້ນ"
+},
+  "operations.53207e14c6d6": {
+  "ko": "{p0} · 화물 {p1}건",
+  "en": "{p0} · {p1} cargo records",
+  "lo": "{p0} · ສິນຄ້າ {p1} ລາຍການ"
+},
+  "operations.d6fdd05d88a2": {
+  "ko": "수동 번호 지정",
+  "en": "Set number manually",
+  "lo": "ກຳນົດເລກເອງ"
+},
+  "operations.7853e4022f8d": {
+  "ko": "번호 잠금 해제",
+  "en": "Unlock number",
+  "lo": "ປົດລັອກເລກ"
+},
+  "operations.2632da8a699e": {
+  "ko": "번호 잠금",
+  "en": "Number locked",
+  "lo": "ລັອກເລກແລ້ວ"
+},
+  "operations.284e33ca0a1f": {
+  "ko": "기존 발행 번호 유지",
+  "en": "Keep issued number",
+  "lo": "ຮັກສາເລກທີ່ອອກແລ້ວ"
+},
+  "operations.c48cc3ed43ca": {
+  "ko": "고객 ID 자동 번호 ({p0})",
+  "en": "Automatic customer ID number ({p0})",
+  "lo": "ເລກອັດຕະໂນມັດຕາມລະຫັດລູກຄ້າ ({p0})"
+},
+  "operations.da2922f60afc": {
+  "ko": "할인 목록 조회 실패: {p0}",
+  "en": "Could not load discounts: {p0}",
+  "lo": "ໂຫຼດສ່ວນຫຼຸດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.0c405d31b8d7": {
+  "ko": "전체 운송 경로",
+  "en": "All routes",
+  "lo": "ທຸກເສັ້ນທາງ"
+},
+  "operations.81d00e9593ae": {
+  "ko": "할인 고객 추가",
+  "en": "Add discount customer",
+  "lo": "ເພີ່ມລູກຄ້າສ່ວນຫຼຸດ"
+},
+  "operations.65235fb52142": {
+  "ko": "할인 고객 편집",
+  "en": "Edit discount customer",
+  "lo": "ແກ້ໄຂລູກຄ້າສ່ວນຫຼຸດ"
+},
+  "operations.dcb1d3042e38": {
+  "ko": "소속/단체명",
+  "en": "Affiliation / organization",
+  "lo": "ສັງກັດ / ອົງການ"
+},
+  "operations.f5fa74072afc": {
+  "ko": "고객 개인 이름",
+  "en": "Customer personal name",
+  "lo": "ຊື່ສ່ວນບຸກຄົນຂອງລູກຄ້າ"
+},
+  "operations.ac53227ac71f": {
+  "ko": "회사명 (회원가입 회사명과 자동 묶음)",
+  "en": "Company name (linked to member registration)",
+  "lo": "ຊື່ບໍລິສັດ (ເຊື່ອມກັບການລົງທະບຽນສະມາຊິກ)"
+},
+  "operations.9819491c35bd": {
+  "ko": "기본/소량 할인율 (%)",
+  "en": "Base / small-quantity discount (%)",
+  "lo": "ສ່ວນຫຼຸດພື້ນຖານ / ຈຳນວນໜ້ອຍ (%)"
+},
+  "operations.5dc4ac7084ea": {
+  "ko": "대량 기준 수량 (선택)",
+  "en": "Bulk quantity threshold (optional)",
+  "lo": "ຈຳນວນຂັ້ນຕ່ຳສຳລັບສ່ວນຫຼຸດຈຳນວນຫຼາຍ (ບໍ່ບັງຄັບ)"
+},
+  "operations.69b7d7d5dee4": {
+  "ko": "예: 50",
+  "en": "e.g. 50",
+  "lo": "ເຊັ່ນ 50"
+},
+  "operations.66dfc7852913": {
+  "ko": "대량 할인율 (%)",
+  "en": "Bulk discount (%)",
+  "lo": "ສ່ວນຫຼຸດຈຳນວນຫຼາຍ (%)"
+},
+  "operations.3b5dbdfc3620": {
+  "ko": "예: 10",
+  "en": "e.g. 10",
+  "lo": "ເຊັ່ນ 10"
+},
+  "operations.7989531dbc60": {
+  "ko": "대량 기준은 개인 이름 + 회사명으로 입고된 수량을 같은 항차에서 합산하여 판단합니다.",
+  "en": "Bulk quantities combine cargo under the personal and company names in the same voyage.",
+  "lo": "ຈຳນວນຫຼາຍຄິດຈາກສິນຄ້າໃນຊື່ບຸກຄົນ ແລະ ບໍລິສັດລວມກັນໃນຖ້ຽວດຽວກັນ."
+},
+  "operations.9ee71dbdb630": {
+  "ko": "고정 단가 Override (선택)",
+  "en": "Fixed rate override (optional)",
+  "lo": "ກຳນົດລາຄາຄົງທີ່ (ບໍ່ບັງຄັບ)"
+},
+  "operations.4e0e397d9c75": {
+  "ko": "개인/회사 명세서 방식",
+  "en": "Personal / company statements",
+  "lo": "ໃບແຈ້ງລາຍການບຸກຄົນ / ບໍລິສັດ"
+},
+  "operations.bf0310520311": {
+  "ko": "분리 - 개인 이름 / 회사명 명세서 각각",
+  "en": "Separate · Personal and company statements",
+  "lo": "ແຍກ · ໃບແຈ້ງລາຍການບຸກຄົນ ແລະ ບໍລິສັດ"
+},
+  "operations.e7c254aadee0": {
+  "ko": "통합 - 개인 이름 + 회사명 한 명세서",
+  "en": "Combined · Personal and company on one statement",
+  "lo": "ລວມ · ບຸກຄົນ ແລະ ບໍລິສັດໃນໃບແຈ້ງລາຍການດຽວ"
+},
+  "operations.19d83d7e4399": {
+  "ko": "※ 명세서 분리 여부와 관계없이 할인 대량 기준 수량은 개인+회사 물량을 합산합니다.",
+  "en": "Bulk discount quantities combine personal and company cargo, even when their statements are separate.",
+  "lo": "ຈຳນວນສຳລັບສ່ວນຫຼຸດຈຳນວນຫຼາຍລວມສິນຄ້າສ່ວນບຸກຄົນ ແລະ ບໍລິສັດ ເຖິງຈະແຍກໃບແຈ້ງລາຍການ."
+},
+  "receipt.applies": {
+  "ko": "할인 적용",
+  "en": "Apply discount",
+  "lo": "ນຳໃຊ້ສ່ວນຫຼຸດ"
+},
+  "operations.3ab103527f1b": {
+  "ko": "전화번호가 없으면 자동 적용되지 않습니다.",
+  "en": "A phone number is required for automatic application.",
+  "lo": "ຕ້ອງມີເບີໂທເພື່ອນຳໃຊ້ອັດຕະໂນມັດ."
+},
+  "operations.a5084e712d64": {
+  "ko": "개인 이름/회사명 + 전화번호 + 운송경로가 일치할 때 적용",
+  "en": "Applies when personal/company name, phone and route match",
+  "lo": "ນຳໃຊ້ເມື່ອຊື່ບຸກຄົນ/ບໍລິສັດ, ເບີໂທ ແລະ ເສັ້ນທາງກົງກັນ"
+},
+  "operations.be9680f426dd": {
+  "ko": "고객 이름과 0~100 사이 기본 할인율을 확인해 주세요.",
+  "en": "Check the customer name and a base discount from 0 to 100.",
+  "lo": "ກວດຊື່ລູກຄ້າ ແລະ ສ່ວນຫຼຸດພື້ນຖານລະຫວ່າງ 0 ຫາ 100."
+},
+  "operations.0ea8f3e8ec2a": {
+  "ko": "대량 할인은 기준 수량과 할인율을 모두 입력해 주세요.",
+  "en": "Enter both the bulk quantity threshold and discount rate.",
+  "lo": "ກະລຸນາປ້ອນທັງຈຳນວນຂັ້ນຕ່ຳ ແລະ ອັດຕາສ່ວນຫຼຸດຈຳນວນຫຼາຍ."
+},
+  "operations.d74e13004217": {
+  "ko": "고객 묶음/할인 적용 정보를 저장했습니다.",
+  "en": "Customer grouping and discount settings saved.",
+  "lo": "ບັນທຶກການຈັດກຸ່ມລູກຄ້າ ແລະ ສ່ວນຫຼຸດແລ້ວ."
+},
+  "operations.648e412ba79d": {
+  "ko": "할인 정보 저장 실패: {p0}",
+  "en": "Could not save discount information: {p0}",
+  "lo": "ບັນທຶກຂໍ້ມູນສ່ວນຫຼຸດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.596b8b1bb775": {
+  "ko": "할인 고객 삭제",
+  "en": "Delete discount customer",
+  "lo": "ລຶບລູກຄ້າສ່ວນຫຼຸດ"
+},
+  "operations.2ba629ee8f48": {
+  "ko": "{p0} 할인 적용 정보를 삭제하시겠습니까?",
+  "en": "Delete discount information for {p0}?",
+  "lo": "ລຶບຂໍ້ມູນສ່ວນຫຼຸດຂອງ {p0} ບໍ?"
+},
+  "domestic.deleted": {
+  "ko": "삭제했습니다.",
+  "en": "Deleted.",
+  "lo": "ລຶບແລ້ວ."
+},
+  "operations.33042661829b": {
+  "ko": "삭제 실패: {p0}",
+  "en": "Deletion failed: {p0}",
+  "lo": "ລຶບບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.a109dcd7f6f1": {
+  "ko": "회사",
+  "en": "Company",
+  "lo": "ບໍລິສັດ"
+},
+  "operations.e1d6f0acf31a": {
+  "ko": "단체",
+  "en": "Organization",
+  "lo": "ອົງການ"
+},
+  "operations.cac132d3c430": {
+  "ko": "등록된 할인 고객이 없습니다.",
+  "en": "No discount customers registered.",
+  "lo": "ຍັງບໍ່ມີລູກຄ້າສ່ວນຫຼຸດ."
+},
+  "operations.ddb232b65a69": {
+  "ko": "{p0} · {p1}\n{p2}{p3}\n할인: {p4} · 명세서: {p5}",
+  "en": "{p0} · {p1}\n{p2}{p3}\nDiscount: {p4} · Statement: {p5}",
+  "lo": "{p0} · {p1}\n{p2}{p3}\nສ່ວນຫຼຸດ: {p4} · ໃບແຈ້ງລາຍການ: {p5}"
+},
+  "operations.89fc950ebe71": {
+  "ko": "하역 자료 조회 실패: {p0}",
+  "en": "Could not load unloading data: {p0}",
+  "lo": "ໂຫຼດຂໍ້ມູນລົງສິນຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.dac7a687587b": {
+  "ko": "수취인 불명",
+  "en": "Unknown Recipient",
+  "lo": "ບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.446f3874faf8": {
+  "ko": "수취인불명",
+  "en": "Unknown recipient",
+  "lo": "ບໍ່ຮູ້ຜູ້ຮັບ"
+},
+  "operations.373b3a2f814f": {
+  "ko": "하역 자료 PDF 저장",
+  "en": "Save unloading data as PDF",
+  "lo": "ບັນທຶກຂໍ້ມູນລົງສິນຄ້າເປັນ PDF"
+},
+  "operations.aaebbab5be03": {
+  "ko": "하역 자료 PDF 저장 완료",
+  "en": "Unloading PDF saved",
+  "lo": "ບັນທຶກ PDF ຂໍ້ມູນລົງສິນຄ້າແລ້ວ"
+},
+  "operations.84f2481db9cc": {
+  "ko": "하역 자료 PDF 저장 실패: {p0}",
+  "en": "Could not save unloading PDF: {p0}",
+  "lo": "ບັນທຶກ PDF ຂໍ້ມູນລົງສິນຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "parity.lockedHighlight": {
+  "ko": "잠금 물품 노란색 표시",
+  "en": "Highlight locked cargo",
+  "lo": "ເນັ້ນສິນຄ້າທີ່ລັອກ"
+},
+  "operations.7110e3c77bfe": {
+  "ko": "Y · 잠금 화물도 노란색",
+  "en": "Y · Highlight locked cargo in yellow too",
+  "lo": "Y · ເນັ້ນສີເຫຼືອງໃຫ້ສິນຄ້າທີ່ລັອກດ້ວຍ"
+},
+  "operations.914b0c22520e": {
+  "ko": "F · 잠금 화물은 노란색 제외",
+  "en": "F · Exclude locked cargo from yellow highlighting",
+  "lo": "F · ບໍ່ເນັ້ນສີເຫຼືອງໃຫ້ສິນຄ້າທີ່ລັອກ"
+},
+  "operations.3c8bc68f68a7": {
+  "ko": "화물 {p0}건 · 노란색 확인 필요 {p1}건",
+  "en": "{p0} cargo records · {p1} highlighted for review",
+  "lo": "ສິນຄ້າ {p0} ລາຍການ · {p1} ລາຍການເນັ້ນສີເຫຼືອງຕ້ອງກວດ"
+},
+  "operations.aab6d67aeabb": {
+  "ko": "검색 결과 {p0}건",
+  "en": "{p0} results",
+  "lo": "ພົບ {p0} ລາຍການ"
+},
+  "operations.d677757ca154": {
+  "ko": "PDF 생성 중...",
+  "en": "Creating PDF...",
+  "lo": "ກຳລັງສ້າງ PDF..."
+},
+  "operations.cf90eb812652": {
+  "ko": "하역 자료 PDF 출력 / 저장",
+  "en": "Print / save unloading PDF",
+  "lo": "ພິມ / ບັນທຶກ PDF ຂໍ້ມູນລົງສິນຄ້າ"
+},
+  "operations.837d75540d61": {
+  "ko": "정상 이름이 포함되어 있어도 **, ***, ?? 같은 확인표시가 섞여 있으면 정상 영수번호는 유지하고 하역 자료에서만 노란색으로 표시합니다. 수동 ? 표시 화물은 노란색으로 표시되며, 잠금 화물의 노란색 표시는 위 F/Y 스위치로 선택할 수 있습니다.",
+  "en": "Names with review marks such as **, *** or ?? keep their normal receipt number and appear yellow in unloading data. Manually flagged ? cargo is yellow. The F/Y switch controls yellow highlighting for locked cargo.",
+  "lo": "ຊື່ທີ່ມີເຄື່ອງໝາຍ **, *** ຫຼື ?? ຍັງຮັກສາເລກໃບຮັບປົກກະຕິ ແລະ ເນັ້ນສີເຫຼືອງໃນຂໍ້ມູນລົງສິນຄ້າ. ສິນຄ້າທີ່ໝາຍ ? ດ້ວຍຕົນເອງຈະເປັນສີເຫຼືອງ. ສະວິດ F/Y ກຳນົດການເນັ້ນສີເຫຼືອງຂອງສິນຄ້າທີ່ລັອກ."
+},
+  "operations.bf3ee4cfbdba": {
+  "ko": "고객 리스트 조회 실패: {p0}",
+  "en": "Could not load customer list: {p0}",
+  "lo": "ໂຫຼດລາຍຊື່ລູກຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "unverified": {
+  "ko": "미확인",
+  "en": "Not verified",
+  "lo": "ຍັງບໍ່ກວດສອບ"
+},
+  "operations.76bc72a293f0": {
+  "ko": "{p0} 수정",
+  "en": "Edit {p0}",
+  "lo": "ແກ້ໄຂ {p0}"
+},
+  "operations.f631ff043d2f": {
+  "ko": "영수증 번호",
+  "en": "Receipt number",
+  "lo": "ເລກໃບຮັບ"
+},
+  "operations.f305ccf90084": {
+  "ko": "현재 영수증 번호에 묶인 화물 전체에 동일하게 적용됩니다.",
+  "en": "Applies equally to all cargo under the current receipt number.",
+  "lo": "ນຳໃຊ້ຄືກັນກັບສິນຄ້າທັງໝົດໃນເລກໃບຮັບປັດຈຸບັນ."
+},
+  "operations.26406d0686ec": {
+  "ko": "영수증 번호 / Zone 수정 완료",
+  "en": "Receipt number / zone updated",
+  "lo": "ແກ້ໄຂເລກໃບຮັບ / ເຂດແລ້ວ"
+},
+  "operations.cc1be14f2eb2": {
+  "ko": "지방배송(선결제)",
+  "en": "Provincial Delivery (Prepaid)",
+  "lo": "ສົ່ງຕ່າງແຂວງ (ຈ່າຍລ່ວງໜ້າ)"
+},
+  "operations.f3132201a164": {
+  "ko": "시내배송(선결제)",
+  "en": "City Delivery (Prepaid)",
+  "lo": "ສົ່ງໃນເມືອງ (ຈ່າຍລ່ວງໜ້າ)"
+},
+  "operations.47405a8b479d": {
+  "ko": "{p0} {p1} {p2}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)",
+  "en": "{p0} {p1} Voyage {p2} Customer List",
+  "lo": "{p0} {p1} ຖ້ຽວ {p2} ລາຍຊື່ລູກຄ້າ"
+},
+  "operations.8f97964222fb": {
+  "ko": "{p0}명  ·  {p1}/{p2}",
+  "en": "{p0} customers · {p1}/{p2}",
+  "lo": "ລູກຄ້າ {p0} ລາຍ · {p1}/{p2}"
+},
+  "admin-parity.customerOutputHtml.signature": {
+  "ko": "서명(Sign)",
+  "en": "Signature",
+  "lo": "ລາຍເຊັນ"
+},
+  "operations.6dacc2452927": {
+  "ko": "PNG 생성 실패",
+  "en": "Could not create PNG",
+  "lo": "ສ້າງ PNG ບໍ່ສຳເລັດ"
+},
+  "operations.7ee31d0878a4": {
+  "ko": "고객 리스트 이미지 저장",
+  "en": "Save customer list as image",
+  "lo": "ບັນທຶກລາຍຊື່ລູກຄ້າເປັນຮູບ"
+},
+  "operations.e0158070fd12": {
+  "ko": "고객 리스트 이미지 저장 완료",
+  "en": "Customer list image saved",
+  "lo": "ບັນທຶກຮູບລາຍຊື່ລູກຄ້າແລ້ວ"
+},
+  "operations.6674bfe5e8d2": {
+  "ko": "이미지 저장 실패: {p0}",
+  "en": "Could not save image: {p0}",
+  "lo": "ບັນທຶກຮູບບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.4126979f8874": {
+  "ko": "고객 리스트 PDF 저장",
+  "en": "Save customer list as PDF",
+  "lo": "ບັນທຶກລາຍຊື່ລູກຄ້າເປັນ PDF"
+},
+  "operations.a067cda4c449": {
+  "ko": "고객 리스트 PDF 저장 완료",
+  "en": "Customer list PDF saved",
+  "lo": "ບັນທຶກ PDF ລາຍຊື່ລູກຄ້າແລ້ວ"
+},
+  "operations.686d02df8e4e": {
+  "ko": "PDF 저장 실패: {p0}",
+  "en": "Could not save PDF: {p0}",
+  "lo": "ບັນທຶກ PDF ບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.1ea145098ed9": {
+  "ko": "배송 유형",
+  "en": "Delivery type",
+  "lo": "ປະເພດຈັດສົ່ງ"
+},
+  "operations.448cf843a49f": {
+  "ko": "검색 {p0} / 고객 {p1}명",
+  "en": "{p0} results / {p1} customers",
+  "lo": "ພົບ {p0} ລາຍການ / ລູກຄ້າ {p1} ລາຍ"
+},
+  "operations.6124bf003003": {
+  "ko": "수량 {p0}",
+  "en": "Quantity {p0}",
+  "lo": "ຈຳນວນ {p0}"
+},
+  "operations.fac81ffa553f": {
+  "ko": "영수증 번호 / Zone 수정",
+  "en": "Edit receipt number / zone",
+  "lo": "ແກ້ໄຂເລກໃບຮັບ / ເຂດ"
+},
+  "operations.c9f3c266037d": {
+  "ko": "현재 항차 · 고객 {p0}명 · 총 수량 {p1}",
+  "en": "Current voyage · {p0} customers · Total quantity {p1}",
+  "lo": "ຖ້ຽວປັດຈຸບັນ · ລູກຄ້າ {p0} ລາຍ · ຈຳນວນລວມ {p1}"
+},
+  "parity.saveImage": {
+  "ko": "이미지 저장",
+  "en": "Save image",
+  "lo": "ບັນທຶກຮູບ"
+},
+  "operations.ba734fceeaac": {
+  "ko": "생성 중...",
+  "en": "Creating...",
+  "lo": "ກຳລັງສ້າງ..."
+},
+  "parity.printPdf": {
+  "ko": "PDF 저장 / 프린트",
+  "en": "Save PDF / Print",
+  "lo": "ບັນທຶກ PDF / ພິມ"
+},
+  "operations.cbd8f8aeaf6c": {
+  "ko": "기준 환율과 운임 확인 적용 환율 보정을 모두 숫자로 입력해 주세요.",
+  "en": "Enter numeric base exchange rates and freight exchange-rate adjustments.",
+  "lo": "ກະລຸນາປ້ອນອັດຕາແລກປ່ຽນພື້ນຖານ ແລະ ຄ່າປັບອັດຕາສຳລັບຄ່າຂົນສົ່ງເປັນຕົວເລກ."
+},
+  "operations.c23d5aa515ab": {
+  "ko": "기준 환율 및 운임 확인 적용 환율 보정을 저장했습니다.",
+  "en": "Base exchange rates and freight exchange-rate adjustments saved.",
+  "lo": "ບັນທຶກອັດຕາແລກປ່ຽນພື້ນຖານ ແລະ ຄ່າປັບອັດຕາສຳລັບຄ່າຂົນສົ່ງແລ້ວ."
+},
+  "admin.adjustment": {
+  "ko": "환율 보정",
+  "en": "Adjustment",
+  "lo": "ຄ່າປັບອັດຕາ"
+},
+  "operations.40c0d55d83fa": {
+  "ko": "현찰 살 때 기준 환율과 운임 확인 적용 환율 보정을 입력합니다.",
+  "en": "Enter cash-selling base exchange rates and freight exchange-rate adjustments.",
+  "lo": "ປ້ອນອັດຕາແລກປ່ຽນພື້ນຖານຕາມລາຄາຂາຍເງິນສົດ ແລະ ຄ່າປັບອັດຕາສຳລັບຄ່າຂົນສົ່ງ."
+},
+  "operations.7d5ac4358600": {
+  "ko": "운임 확인 적용 환율 = 기준 환율 + 운임 확인 적용 환율 보정",
+  "en": "Freight exchange rate = base rate + freight rate adjustment",
+  "lo": "ອັດຕາແລກປ່ຽນຄ່າຂົນສົ່ງ = ອັດຕາພື້ນຖານ + ຄ່າປັບອັດຕາ"
+},
+  "operations.620be311d8b0": {
+  "ko": "기준 킵",
+  "en": "Base LAK rate",
+  "lo": "ອັດຕາກີບພື້ນຖານ"
+},
+  "operations.3e9abc678b65": {
+  "ko": "기준 바트",
+  "en": "Base THB rate",
+  "lo": "ອັດຕາບາດພື້ນຖານ"
+},
+  "operations.ad3bad0a37d7": {
+  "ko": "기준 원화",
+  "en": "Base KRW rate",
+  "lo": "ອັດຕາວອນພື້ນຖານ"
+},
+  "operations.b51dc16ee21c": {
+  "ko": "처리 중...",
+  "en": "Processing...",
+  "lo": "ກຳລັງປະມວນຜົນ..."
+},
+  "operations.42c8e8de7752": {
+  "ko": "기준 환율 저장",
+  "en": "Save base exchange rates",
+  "lo": "ບັນທຶກອັດຕາແລກປ່ຽນພື້ນຖານ"
+},
+  "operations.4ab164add32b": {
+  "ko": "시내·지방 배송 목록 조회 실패: {p0}",
+  "en": "Could not load city / provincial deliveries: {p0}",
+  "lo": "ໂຫຼດການຈັດສົ່ງໃນເມືອງ / ຕ່າງແຂວງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.01ff1e7617d0": {
+  "ko": "시내·지방 배송 고객 추가",
+  "en": "Add city / provincial delivery customer",
+  "lo": "ເພີ່ມລູກຄ້າຈັດສົ່ງໃນເມືອງ / ຕ່າງແຂວງ"
+},
+  "operations.3e1b42a2257c": {
+  "ko": "시내·지방 배송 고객 편집",
+  "en": "Edit city / provincial delivery customer",
+  "lo": "ແກ້ໄຂລູກຄ້າຈັດສົ່ງໃນເມືອງ / ຕ່າງແຂວງ"
+},
+  "operations.982caf4a16d2": {
+  "ko": "배송 종류",
+  "en": "Delivery type",
+  "lo": "ປະເພດຈັດສົ່ງ"
+},
+  "operations.8da1feaceb0d": {
+  "ko": "지방배송 (원본 흰색)",
+  "en": "Provincial delivery (white in original)",
+  "lo": "ຈັດສົ່ງຕ່າງແຂວງ (ສີຂາວໃນຕົ້ນສະບັບ)"
+},
+  "operations.58a4e1c4d6f1": {
+  "ko": "시내 배송 (원본 녹색)",
+  "en": "City delivery (green in original)",
+  "lo": "ຈັດສົ່ງໃນເມືອງ (ສີຂຽວໃນຕົ້ນສະບັບ)"
+},
+  "operations.3f83f03e205b": {
+  "ko": "회사명 매칭용 (선택)",
+  "en": "Company name for matching (optional)",
+  "lo": "ຊື່ບໍລິສັດສຳລັບຈັບຄູ່ (ບໍ່ບັງຄັບ)"
+},
+  "operations.6a1c963d5bc5": {
+  "ko": "적용",
+  "en": "Apply",
+  "lo": "ນຳໃຊ້"
+},
+  "operations.c79591baa203": {
+  "ko": "고객 이름 또는 회사명을 입력해 주세요.",
+  "en": "Enter a customer or company name.",
+  "lo": "ກະລຸນາປ້ອນຊື່ລູກຄ້າ ຫຼື ບໍລິສັດ."
+},
+  "operations.819999f023d7": {
+  "ko": "배송 정보를 저장했습니다.",
+  "en": "Delivery information saved.",
+  "lo": "ບັນທຶກຂໍ້ມູນຈັດສົ່ງແລ້ວ."
+},
+  "operations.8d1cf9be0e15": {
+  "ko": "배송 정보 저장 실패: {p0}",
+  "en": "Could not save delivery information: {p0}",
+  "lo": "ບັນທຶກຂໍ້ມູນຈັດສົ່ງບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.dd2941993869": {
+  "ko": "배송 고객 삭제",
+  "en": "Delete delivery customer",
+  "lo": "ລຶບລູກຄ້າຈັດສົ່ງ"
+},
+  "operations.1b027ddb42d4": {
+  "ko": "{p0} 배송 정보를 삭제하시겠습니까?",
+  "en": "Delete delivery information for {p0}?",
+  "lo": "ລຶບຂໍ້ມູນຈັດສົ່ງຂອງ {p0} ບໍ?"
+},
+  "operations.9d3a6fb20742": {
+  "ko": "배송 고객 추가",
+  "en": "Add delivery customer",
+  "lo": "ເພີ່ມລູກຄ້າຈັດສົ່ງ"
+},
+  "operations.b6d4a16f5184": {
+  "ko": "전체 경로",
+  "en": "All routes",
+  "lo": "ທຸກເສັ້ນທາງ"
+},
+  "operations.52f8bd3b3ebf": {
+  "ko": "전체 유형",
+  "en": "All types",
+  "lo": "ທຸກປະເພດ"
+},
+  "operations.3dea562935e9": {
+  "ko": "시내 배송",
+  "en": "City delivery",
+  "lo": "ຈັດສົ່ງໃນເມືອງ"
+},
+  "operations.e00f2889af34": {
+  "ko": "현지 업체",
+  "en": "Local provider",
+  "lo": "ຜູ້ໃຫ້ບໍລິການທ້ອງຖິ່ນ"
+},
+  "operations.c64edfddf0ed": {
+  "ko": "전체 업체",
+  "en": "All providers",
+  "lo": "ທຸກຜູ້ໃຫ້ບໍລິການ"
+},
+  "operations.40af4fc6e879": {
+  "ko": "고객 ID",
+  "en": "Customer ID",
+  "lo": "ລະຫັດລູກຄ້າ"
+},
+  "operations.af2ed2556c42": {
+  "ko": "배송 주소",
+  "en": "Delivery address",
+  "lo": "ທີ່ຢູ່ຈັດສົ່ງ"
+},
+  "operations.0a80c2c02a03": {
+  "ko": "결제 구분",
+  "en": "Payment type",
+  "lo": "ປະເພດການຊຳລະ"
+},
+  "operations.f39fcb8de9e4": {
+  "ko": "등록된 배송 고객이 없습니다.",
+  "en": "No delivery customers registered.",
+  "lo": "ຍັງບໍ່ມີລູກຄ້າຈັດສົ່ງ."
+},
+  "operations.04f94d234fd3": {
+  "ko": "다음 박스번호 확인 실패: {p0}",
+  "en": "Could not check the next box number: {p0}",
+  "lo": "ກວດເລກກ່ອງຖັດໄປບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.cb872d1275c5": {
+  "ko": "운송 경로, 년도, 항차를 모두 선택해 주세요.",
+  "en": "Select a route, year and voyage.",
+  "lo": "ກະລຸນາເລືອກເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວ."
+},
+  "operations.8098135ce749": {
+  "ko": "박스번호를 입력해 주세요.",
+  "en": "Enter a box number.",
+  "lo": "ກະລຸນາປ້ອນເລກກ່ອງ."
+},
+  "operations.8faa8a5512f9": {
+  "ko": "같은 운송 경로/년도/항차에 이미 존재하는 박스번호입니다.",
+  "en": "This box number already exists for the same route, year and voyage.",
+  "lo": "ເລກກ່ອງນີ້ມີແລ້ວໃນເສັ້ນທາງ, ປີ ແລະ ຖ້ຽວດຽວກັນ."
+},
+  "operations.fa549c9d207e": {
+  "ko": "박스 개수(수량)는 1 이상의 숫자로 입력해 주세요.",
+  "en": "Box quantity must be at least 1.",
+  "lo": "ຈຳນວນກ່ອງຕ້ອງເປັນຕົວເລກຢ່າງໜ້ອຍ 1."
+},
+  "operations.d0f86059f790": {
+  "ko": "중량과 크기(L/W/H)는 숫자로 입력해 주세요.",
+  "en": "Enter numeric weight and dimensions (L/W/H).",
+  "lo": "ປ້ອນນ້ຳໜັກ ແລະ ຂະໜາດ (L/W/H) ເປັນຕົວເລກ."
+},
+  "operations.92a4a7738c39": {
+  "ko": "화물 데이터를 추가했습니다.",
+  "en": "Cargo data added.",
+  "lo": "ເພີ່ມຂໍ້ມູນສິນຄ້າແລ້ວ."
+},
+  "operations.ca4043cb23c2": {
+  "ko": "화물 추가 실패: {p0}",
+  "en": "Could not add cargo: {p0}",
+  "lo": "ເພີ່ມສິນຄ້າບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.6e3f1f9ff0fe": {
+  "ko": "화물 추가 입력",
+  "en": "Add Cargo",
+  "lo": "ເພີ່ມສິນຄ້າ"
+},
+  "operations.14260d1bcf6a": {
+  "ko": "중복 박스번호입니다. 저장할 수 없습니다.",
+  "en": "Duplicate box number. Cannot save.",
+  "lo": "ເລກກ່ອງຊ້ຳ. ບັນທຶກບໍ່ໄດ້."
+},
+  "operations.170225cfd128": {
+  "ko": "다음 박스번호 확인 중...",
+  "en": "Checking next box number...",
+  "lo": "ກຳລັງກວດເລກກ່ອງຖັດໄປ..."
+},
+  "operations.cda38ee84d66": {
+  "ko": "중복 송장번호가 있습니다.",
+  "en": "A duplicate invoice number exists.",
+  "lo": "ມີເລກໃບຂົນສົ່ງຊ້ຳ."
+},
+  "operations.72dea961beb2": {
+  "ko": "박스 개수/수량",
+  "en": "Box quantity",
+  "lo": "ຈຳນວນກ່ອງ"
+},
+  "operations.d519f74eef66": {
+  "ko": "중량",
+  "en": "Weight",
+  "lo": "ນ້ຳໜັກ"
+},
+  "operations.982ff4219608": {
+  "ko": "입고 날짜",
+  "en": "Received date",
+  "lo": "ວັນຮັບເຂົ້າ"
+},
+  "selected": {
+  "ko": "선택",
+  "en": "Selected",
+  "lo": "ເລືອກ"
+},
+  "operations.c974e6575279": {
+  "ko": "기타 추가 내용",
+  "en": "Additional details",
+  "lo": "ລາຍລະອຽດເພີ່ມເຕີມ"
+},
+  "operations.92c4796cf195": {
+  "ko": "저장 중...",
+  "en": "Saving...",
+  "lo": "ກຳລັງບັນທຶກ..."
+},
+  "operations.22e7adf9eef9": {
+  "ko": "화물 데이터 저장",
+  "en": "Save cargo data",
+  "lo": "ບັນທຶກຂໍ້ມູນສິນຄ້າ"
+},
+  "operations.443bdfeafe2f": {
+  "ko": "조건을 선택한 뒤 검색해 주세요. ‘전체’로 검색하면 해당 범위의 모든 화물을 조회합니다.",
+  "en": "Choose filters, then search. Select All to retrieve every cargo record in that scope.",
+  "lo": "ເລືອກເງື່ອນໄຂແລ້ວຄົ້ນຫາ. ເລືອກທັງໝົດເພື່ອເບິ່ງສິນຄ້າທຸກລາຍການໃນຂອບເຂດນັ້ນ."
+},
+  "operations.9011ceb4fdd9": {
+  "ko": "검색어를 입력하거나, 빈칸으로 검색하면 전체 목록을 조회합니다.",
+  "en": "Enter a search term, or search with the field blank to see the full list.",
+  "lo": "ປ້ອນຄຳຄົ້ນຫາ ຫຼື ຄົ້ນຫາໂດຍປ່ອຍວ່າງເພື່ອເບິ່ງທຸກລາຍການ."
+},
+  "operations.dc7ca12cbbd1": {
+  "ko": "관리 메뉴에서 조건을 선택해 필요한 자료를 검색해 주세요.",
+  "en": "Choose filters in the management menu to find the data you need.",
+  "lo": "ເລືອກເງື່ອນໄຂໃນເມນູຈັດການເພື່ອຄົ້ນຫາຂໍ້ມູນທີ່ຕ້ອງການ."
+},
+  "operations.1f5b8e6fee40": {
+  "ko": "배송 확인 · 번호 잠금",
+  "en": "Delivery review · Number lock",
+  "lo": "ກວດຈັດສົ່ງ · ລັອກເລກ"
+},
+  "operations.bcdba243403d": {
+  "ko": "최신 BASE · 고객 ID 반영",
+  "en": "Latest BASE · Customer IDs included",
+  "lo": "BASE ລ່າສຸດ · ລວມລະຫັດລູກຄ້າ"
+},
+  "operations.4e97aa797abd": {
+  "ko": "배송 매칭 확인 · 명세서 번호",
+  "en": "Delivery match review · Statement numbers",
+  "lo": "ກວດການຈັບຄູ່ຈັດສົ່ງ · ເລກໃບແຈ້ງລາຍການ"
+},
+  "operations.a8e77ed91f19": {
+  "ko": "연락처나 이름만 비슷한 자료는 자동 확정하지 않습니다.",
+  "en": "A similar phone or name alone does not confirm a match automatically.",
+  "lo": "ພຽງເບີໂທ ຫຼື ຊື່ຄ້າຍກັນ ຈະບໍ່ຢືນຢັນການຈັບຄູ່ອັດຕະໂນມັດ."
+},
+  "operations.294b0a65f5c4": {
+  "ko": "인쇄 전 번호를 잠그면 자동 정렬·재연산에도 해당 번호를 유지합니다. 수동 번호는 자동 번호로 복귀하기 전까지 유지됩니다.",
+  "en": "Lock numbers before printing to preserve them through sorting and recalculation. Manual numbers remain until you return to automatic numbering.",
+  "lo": "ລັອກເລກກ່ອນພິມເພື່ອຮັກສາໄວ້ເມື່ອຈັດລຽງ ແລະ ຄິດໄລ່ຄືນ. ເລກກຳນົດເອງຈະຄົງຢູ່ຈົນກັບໄປໃຊ້ເລກອັດຕະໂນມັດ."
+},
+  "operations.ac173e7d2e01": {
+  "ko": "자료 수정 잠금",
+  "en": "Data editing locked",
+  "lo": "ລັອກການແກ້ໄຂຂໍ້ມູນ"
+},
+  "operations.1b0e8391371d": {
+  "ko": "변경할 명세서 번호",
+  "en": "New statement number",
+  "lo": "ເລກໃບແຈ້ງລາຍການໃໝ່"
+},
+  "operations.cdd1e3c0c022": {
+  "ko": "수동 번호 저장",
+  "en": "Save manual number",
+  "lo": "ບັນທຶກເລກກຳນົດເອງ"
+},
+  "operations.de529bf8452f": {
+  "ko": "반영했습니다.",
+  "en": "Applied.",
+  "lo": "ນຳໃຊ້ແລ້ວ."
+},
+  "operations.0a30c4d2e251": {
+  "ko": "명세서를 선택하세요.",
+  "en": "Select statements.",
+  "lo": "ກະລຸນາເລືອກໃບແຈ້ງລາຍການ."
+},
+  "operations.6f52c6f795f9": {
+  "ko": "확인 순서는 양의 정수로 입력하세요.",
+  "en": "Enter a positive whole number for confirmation order.",
+  "lo": "ປ້ອນລຳດັບຢືນຢັນເປັນຈຳນວນເຕັມບວກ."
+},
+  "operations.5e3be8c9ba23": {
+  "ko": "배송 매칭 확인: 후보 목록의 배송 번호를 선택하세요.",
+  "en": "Delivery matching: select a delivery number from the candidate list.",
+  "lo": "ການຈັບຄູ່ຈັດສົ່ງ: ເລືອກເລກຈັດສົ່ງຈາກລາຍການທີ່ແນະນຳ."
+},
+  "operations.24b87d948621": {
+  "ko": "명세서 번호 관리의 저장 상태가 손상되었습니다. 최신 Excel을 다시 다운로드하세요.",
+  "en": "The saved statement-number control data is invalid. Download the latest Excel file again.",
+  "lo": "ຂໍ້ມູນຄວບຄຸມເລກໃບແຈ້ງລາຍການທີ່ບັນທຶກບໍ່ຖືກຕ້ອງ. ດາວໂຫຼດ Excel ລ່າສຸດອີກຄັ້ງ."
+},
+  "operations.de82bc9dc707": {
+  "ko": "선택 번호 잠금 해제",
+  "en": "Unlock selected numbers",
+  "lo": "ປົດລັອກເລກທີ່ເລືອກ"
+},
+  "operations.1fbb46de7f1a": {
+  "ko": "전체 항목",
+  "en": "All fields",
+  "lo": "ທຸກລາຍການ"
+},
+  "operations.7b4cd28faa28": {
+  "ko": "항목별 검색",
+  "en": "Search by field",
+  "lo": "ຄົ້ນຫາຕາມລາຍການ"
+},
+  "operations.080606c033fd": {
+  "ko": "선택 {p0}건 수정",
+  "en": "Edit {p0} selected requests",
+  "lo": "ແກ້ໄຂ {p0} ຄຳຂໍທີ່ເລືອກ"
+},
+  "operations.bd4afa00ebcf": {
+  "ko": "각 화물의 값을 확인·수정한 뒤 아래 버튼으로 한 번에 처리합니다.",
+  "en": "Review and edit each cargo record, then process them together using the button below.",
+  "lo": "ກວດ ແລະ ແກ້ໄຂສິນຄ້າແຕ່ລະລາຍການ ແລ້ວກົດປຸ່ມດ້ານລຸ່ມເພື່ອປະມວນພ້ອມກັນ."
+},
+  "operations.49604b7bcafd": {
+  "ko": "수정 후 데이터 잠금",
+  "en": "Lock data after editing",
+  "lo": "ລັອກຂໍ້ມູນຫຼັງແກ້ໄຂ"
+},
+  "operations.0daa7cb22227": {
+  "ko": "선택 수정 저장",
+  "en": "Save selected changes",
+  "lo": "ບັນທຶກການແກ້ໄຂທີ່ເລືອກ"
+},
+  "operations.d50b14c7649a": {
+  "ko": "수정 후 일괄 승인",
+  "en": "Edit and approve selected",
+  "lo": "ແກ້ໄຂແລ້ວອະນຸມັດທີ່ເລືອກພ້ອມກັນ"
+},
+  "operations.389561b39b68": {
+  "ko": "수동 지정",
+  "en": "Manual number",
+  "lo": "ເລກກຳນົດເອງ"
+},
+  "operations.634279c694ea": {
+  "ko": "기존 발행 번호",
+  "en": "Previously issued number",
+  "lo": "ເລກທີ່ອອກແລ້ວ"
+},
+  "operations.e0fb2f9c8830": {
+  "ko": "자동 번호",
+  "en": "Automatic number",
+  "lo": "ເລກອັດຕະໂນມັດ"
+},
+  "operations.5c80641e7dbe": {
+  "ko": "연결 확인 필요",
+  "en": "Link needs review",
+  "lo": "ຕ້ອງກວດການເຊື່ອມໂຍງ"
+},
+  "operations.ec0b7e21f206": {
+  "ko": "개인+회사 통합",
+  "en": "Personal + company combined",
+  "lo": "ລວມບຸກຄົນ + ບໍລິສັດ"
+},
+  "operations.805b6e0889c7": {
+  "ko": "개인/회사 분리",
+  "en": "Personal / company separate",
+  "lo": "ແຍກບຸກຄົນ / ບໍລິສັດ"
+},
+  "operations.2c5539adbf82": {
+  "ko": "(없음)",
+  "en": "(None)",
+  "lo": "(ບໍ່ມີ)"
+},
+  "operations.5480eadaaefd": {
+  "ko": "\n\n데이터 잠금은 승인 후에도 유지됩니다.",
+  "en": "\n\nData remains locked after approval.",
+  "lo": "\n\nຂໍ້ມູນຍັງລັອກຫຼັງອະນຸມັດ."
+},
+  "operations.dcd1d5223f73": {
+  "ko": "Name",
+  "en": "Name",
+  "lo": "ຊື່"
+},
+  "operations.46cba5630e5e": {
+  "ko": "Name(2)",
+  "en": "Alternate name",
+  "lo": "ຊື່ອື່ນ"
+},
+  "operations.0a81d36266e5": {
+  "ko": "Tel",
+  "en": "Phone",
+  "lo": "ເບີໂທ"
+},
+  "operations.5fa8de2307ca": {
+  "ko": "Local Company",
+  "en": "Local provider",
+  "lo": "ຜູ້ໃຫ້ບໍລິການທ້ອງຖິ່ນ"
+},
+  "operations.fff9f1124e1c": {
+  "ko": "Destination Address",
+  "en": "Delivery address",
+  "lo": "ທີ່ຢູ່ຈັດສົ່ງ"
+},
+  "operations.a891cbbe1e48": {
+  "ko": "Paid by",
+  "en": "Paid by",
+  "lo": "ຜູ້ຊຳລະ"
+},
+  "operations.baaddf70fb5d": {
+  "ko": "Type",
+  "en": "Type",
+  "lo": "ປະເພດ"
+},
+  "operations.a36dde6f8fa5": {
+  "ko": "중량 (kg)",
+  "en": "Weight (kg)",
+  "lo": "ນ້ຳໜັກ (kg)"
+},
+  "operations.c2452916dffd": {
+  "ko": "가로 (cm)",
+  "en": "Length (cm)",
+  "lo": "ຍາວ (cm)"
+},
+  "operations.cd513ffb22e8": {
+  "ko": "세로 (cm)",
+  "en": "Width (cm)",
+  "lo": "ກວ້າງ (cm)"
+},
+  "operations.39644df02315": {
+  "ko": "높이 (cm)",
+  "en": "Height (cm)",
+  "lo": "ຄວາມສູງ (cm)"
+},
+  "operations.80a4aef9337e": {
+  "ko": "수취인 이름/회사명",
+  "en": "Recipient name / company",
+  "lo": "ຊື່ຜູ້ຮັບ / ບໍລິສັດ"
+},
+  "operations.139975bd748a": {
+  "ko": "관리자(직원)",
+  "en": "Manager (Staff)",
+  "lo": "ຜູ້ບໍລິຫານ (ພະນັກງານ)"
+},
+  "operations.4f0490b978ba": {
+  "ko": "관리자(총괄)",
+  "en": "Manager (Admin)",
+  "lo": "ຜູ້ບໍລິຫານ (ຫົວໜ້າ)"
+},
+  "operations.f21fd733ef0c": {
+  "ko": "일반 회원",
+  "en": "Member",
+  "lo": "ສະມາຊິກ"
+},
+  "operations.77327a9174ab": {
+  "ko": "협력/파트너사",
+  "en": "Partner",
+  "lo": "ຄູ່ຮ່ວມງານ"
+},
+  "operations.91d8e14e71c8": {
+  "ko": "회원 등록",
+  "en": "Create Member",
+  "lo": "ສ້າງສະມາຊິກ"
+},
+  "operations.447f3b406a42": {
+  "ko": "가입 권한 승인 요청",
+  "en": "Role Approval Requests",
+  "lo": "ຄຳຂໍອະນຸມັດສິດ"
+},
+  "operations.4aac01746f15": {
+  "ko": "탈퇴 회원",
+  "en": "Deleted Members",
+  "lo": "ສະມາຊິກທີ່ລົບ"
+},
+  "operations.3dae36d4d3a8": {
+  "ko": "예: 홍길동",
+  "en": "e.g. Hong Gildong",
+  "lo": "ຕົວຢ່າງ: Hong Gildong"
+},
+  "operations.a81e6efb609f": {
+  "ko": "예: member@example.com",
+  "en": "e.g. member@example.com",
+  "lo": "ຕົວຢ່າງ: member@example.com"
+},
+  "operations.e8947458631c": {
+  "ko": "예: Lkgroup2026",
+  "en": "e.g. Lkgroup2026",
+  "lo": "ຕົວຢ່າງ: Lkgroup2026"
+},
+  "operations.52905d3ef2c9": {
+  "ko": "대문자·소문자·숫자 포함 8자 이상",
+  "en": "At least 8 characters with uppercase, lowercase and a number",
+  "lo": "ຢ່າງໜ້ອຍ 8 ຕົວ ມີຕົວພິມໃຫຍ່, ຕົວພິມນ້ອຍ ແລະ ຕົວເລກ"
+},
+  "operations.27474e1018c7": {
+  "ko": "암호가 서로 일치하지 않습니다.",
+  "en": "Passwords do not match.",
+  "lo": "ລະຫັດຜ່ານບໍ່ກົງກັນ."
+},
+  "operations.1ed32aa57efc": {
+  "ko": "회사명(선택)",
+  "en": "Company (Optional)",
+  "lo": "ບໍລິສັດ (ບໍ່ບັງຄັບ)"
+},
+  "operations.1cf201084c58": {
+  "ko": "회원 관리",
+  "en": "Member Management",
+  "lo": "ຈັດການສະມາຊິກ"
+},
+  "operations.58726bf27e70": {
+  "ko": "검색 결과가 없습니다.",
+  "en": "No matching text.",
+  "lo": "ບໍ່ພົບຂໍ້ຄວາມ."
+},
+  "operations.1b6183360668": {
+  "ko": "입고일",
+  "en": "Received",
+  "lo": "ວັນຮັບ"
+},
+  "operations.90eff8344a95": {
+  "ko": "명세서에 표시할 화물 데이터가 없습니다.",
+  "en": "There is no cargo data for this statement.",
+  "lo": "ບໍ່ມີຂໍ້ມູນສິນຄ້າສຳລັບໃບລາຍການນີ້."
+},
+  "operations.167c9cf630f8": {
+  "ko": "미계산",
+  "en": "Not calculated",
+  "lo": "ຍັງບໍ່ຄິດໄລ່"
+},
+  "operations.edfa345b5f8f": {
+  "ko": "항차별 합계",
+  "en": "Voyage Totals",
+  "lo": "ຍອດລວມຕາມຖ້ຽວ"
+},
+  "operations.2f356267c51c": {
+  "ko": "저장된 정산 기준입니다. 최신 금액은 총액 계산으로 갱신하세요.",
+  "en": "Saved settlement totals. Use Calculate to update the amounts.",
+  "lo": "ຍອດລວມທີ່ບັນທຶກ. ກົດຄິດໄລ່ເພື່ອອັບເດດ."
+},
+  "operations.b7e8072799f3": {
+  "ko": "등록된 항차가 없습니다.",
+  "en": "No voyages found.",
+  "lo": "ບໍ່ພົບຖ້ຽວ."
+},
+  "operations.90bf6b97ed6a": {
+  "ko": "할인 전",
+  "en": "Gross",
+  "lo": "ຍອດລວມ"
+},
+  "operations.c750866a4faf": {
+  "ko": "회원 목록 조회 실패: {p0}",
+  "en": "Could not load members: {p0}",
+  "lo": "ໂຫຼດສະມາຊິກບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.3ea91b1a7520": {
+  "ko": "승인 가능한 요청 권한이 아닙니다.",
+  "en": "This requested role cannot be approved.",
+  "lo": "ບໍ່ສາມາດອະນຸມັດສິດທີ່ຮ້ອງຂໍນີ້ໄດ້."
+},
+  "operations.d4a86540658c": {
+  "ko": "관리자 종류 선택",
+  "en": "Select administrator role",
+  "lo": "ເລືອກສິດຜູ້ດູແລ"
+},
+  "operations.0b227d1e121c": {
+  "ko": "{p0}님의 관리자 권한을 선택해 주세요.",
+  "en": "Select an administrator role for {p0}.",
+  "lo": "ເລືອກສິດຜູ້ດູແລໃຫ້ {p0}."
+},
+  "operations.f903a7b9a9b1": {
+  "ko": "{p0} 권한으로 승인했습니다.",
+  "en": "Approved as {p0}.",
+  "lo": "ອະນຸມັດເປັນ {p0} ແລ້ວ."
+},
+  "operations.c8c692b3b8a5": {
+  "ko": "승인 실패: {p0}",
+  "en": "Approval failed: {p0}",
+  "lo": "ອະນຸມັດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.2abd342f929a": {
+  "ko": "가입 권한 요청 거절",
+  "en": "Reject role request",
+  "lo": "ປະຕິເສດຄຳຂໍສິດ"
+},
+  "operations.625e731736c3": {
+  "ko": "{p0}님의 {p1} 요청을 거절할까요?\n거절해도 계정은 일반회원으로 계속 사용할 수 있습니다.",
+  "en": "Reject {p0}'s request for {p1}?\nThe account will remain usable as a regular member.",
+  "lo": "ປະຕິເສດຄຳຂໍ {p1} ຂອງ {p0} ຫຼືບໍ່?\nບັນຊີຍັງໃຊ້ໄດ້ໃນຖານະສະມາຊິກທົ່ວໄປ."
+},
+  "operations.b81b58b003d5": {
+  "ko": "권한 요청을 거절했습니다. 계정은 일반회원으로 유지됩니다.",
+  "en": "Role request rejected. The account remains a regular member.",
+  "lo": "ປະຕິເສດຄຳຂໍສິດແລ້ວ. ບັນຊີຍັງເປັນສະມາຊິກທົ່ວໄປ."
+},
+  "operations.156e9bb44804": {
+  "ko": "거절 처리 실패: {p0}",
+  "en": "Rejection failed: {p0}",
+  "lo": "ປະຕິເສດບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.c0ebcfb62f8f": {
+  "ko": "{p0} 회원을 {p1} 권한으로 등록했습니다.",
+  "en": "Registered {p0} as {p1}.",
+  "lo": "ລົງທະບຽນ {p0} ເປັນ {p1} ແລ້ວ."
+},
+  "operations.31a3511a6cdf": {
+  "ko": "회원 등록 실패: {p0}",
+  "en": "Member registration failed: {p0}",
+  "lo": "ລົງທະບຽນສະມາຊິກບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.e2684c0536ae": {
+  "ko": "회원 정보가 저장되었습니다.",
+  "en": "Member information saved.",
+  "lo": "ບັນທຶກຂໍ້ມູນສະມາຊິກແລ້ວ."
+},
+  "operations.23234d16cdfa": {
+  "ko": "저장 실패: {p0}",
+  "en": "Save failed: {p0}",
+  "lo": "ບັນທຶກບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.4ef638526dfa": {
+  "ko": "회원 정보 편집",
+  "en": "Edit member information",
+  "lo": "ແກ້ໄຂຂໍ້ມູນສະມາຊິກ"
+},
+  "operations.a31aef968cb0": {
+  "ko": "이메일 (수정 불가)",
+  "en": "Email (cannot be changed)",
+  "lo": "ອີເມວ (ປ່ຽນບໍ່ໄດ້)"
+},
+  "operations.b22a1f1c8277": {
+  "ko": "예: 020-5889-2547",
+  "en": "Example: 020-5889-2547",
+  "lo": "ຕົວຢ່າງ: 020-5889-2547"
+},
+  "operations.a9fa0dfa453c": {
+  "ko": "권한",
+  "en": "Role",
+  "lo": "ສິດ"
+},
+  "operations.a170fa4a11c5": {
+  "ko": "회원 삭제",
+  "en": "Delete member",
+  "lo": "ລຶບສະມາຊິກ"
+},
+  "operations.d4d1b6f6b3ae": {
+  "ko": "{p0} 회원을 삭제할까요?\n\n삭제 즉시 로그인할 수 없으며, 관련 계정 데이터는 약 30일간 보관된 후 DB에서 완전히 삭제됩니다.",
+  "en": "Delete member {p0}?\n\nLogin will be disabled immediately. Account data is kept for about 30 days before permanent deletion.",
+  "lo": "ລຶບສະມາຊິກ {p0} ຫຼືບໍ່?\n\nຈະປິດການເຂົ້າລະບົບທັນທີ. ຂໍ້ມູນບັນຊີຈະເກັບໄວ້ປະມານ 30 ວັນກ່ອນລຶບຖາວອນ."
+},
+  "operations.e856b9bd3615": {
+  "ko": "삭제 확인",
+  "en": "Confirm deletion",
+  "lo": "ຢືນຢັນການລຶບ"
+},
+  "operations.73bb4ac92182": {
+  "ko": "회원이 삭제 대기 처리되었습니다.",
+  "en": "Member scheduled for deletion.",
+  "lo": "ກຳນົດລຶບສະມາຊິກແລ້ວ."
+},
+  "operations.d97fbc56d099": {
+  "ko": "회원 삭제 실패: {p0}",
+  "en": "Member deletion failed: {p0}",
+  "lo": "ລຶບສະມາຊິກບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.eadca283d504": {
+  "ko": "탈퇴 취소",
+  "en": "Cancel withdrawal",
+  "lo": "ຍົກເລີກການອອກຈາກສະມາຊິກ"
+},
+  "operations.435933fd025b": {
+  "ko": "{p0} 회원의 탈퇴를 취소하고 정상 회원으로 복구할까요?",
+  "en": "Cancel withdrawal and restore member {p0}?",
+  "lo": "ຍົກເລີກການອອກ ແລະ ກູ້ຄືນສະມາຊິກ {p0} ຫຼືບໍ່?"
+},
+  "operations.554c17e5dcc1": {
+  "ko": "탈퇴를 취소하고 정상 회원으로 복구했습니다.",
+  "en": "Withdrawal cancelled and membership restored.",
+  "lo": "ຍົກເລີກການອອກ ແລະ ກູ້ຄືນສະມາຊິກແລ້ວ."
+},
+  "operations.b2f9bb526879": {
+  "ko": "탈퇴 취소 실패: {p0}",
+  "en": "Could not cancel withdrawal: {p0}",
+  "lo": "ຍົກເລີກການອອກບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.f046139a26ea": {
+  "ko": "탈퇴 확정",
+  "en": "Finalize withdrawal",
+  "lo": "ຢືນຢັນການອອກຖາວອນ"
+},
+  "operations.8bcf5c8d93b6": {
+  "ko": "{p0} 회원을 DB에서 완전히 삭제할까요?\n\n이 작업은 되돌릴 수 없습니다. 탈퇴 확정 후 동일 이메일은 3일 제한 없이 즉시 신규 가입할 수 있습니다.",
+  "en": "Permanently delete member {p0} from the database?\n\nThis cannot be undone. The same email can register again immediately without the 3-day restriction.",
+  "lo": "ລຶບສະມາຊິກ {p0} ອອກຈາກຖານຂໍ້ມູນຖາວອນຫຼືບໍ່?\n\nບໍ່ສາມາດຍ້ອນກັບໄດ້. ອີເມວເດີມສາມາດລົງທະບຽນໃໝ່ທັນທີໂດຍບໍ່ຕ້ອງລໍຖ້າ 3 ວັນ."
+},
+  "operations.1a2b4ea69b0b": {
+  "ko": "탈퇴를 확정하고 회원 계정 데이터를 완전히 삭제했습니다.",
+  "en": "Withdrawal finalized and account data permanently deleted.",
+  "lo": "ຢືນຢັນການອອກ ແລະ ລຶບຂໍ້ມູນບັນຊີຖາວອນແລ້ວ."
+},
+  "operations.3257bc26677d": {
+  "ko": "탈퇴 확정 실패: {p0}",
+  "en": "Could not finalize withdrawal: {p0}",
+  "lo": "ຢືນຢັນການອອກຖາວອນບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.c077c3748ab0": {
+  "ko": "승인 상태",
+  "en": "Approval status",
+  "lo": "ສະຖານະອະນຸມັດ"
+},
+  "operations.6351efe80190": {
+  "ko": "대기 중인 요청이 없습니다.",
+  "en": "No pending requests.",
+  "lo": "ບໍ່ມີຄຳຂໍລໍຖ້າ."
+},
+  "operations.3d9c96b265e5": {
+  "ko": "관리자 / 협력·파트너사",
+  "en": "Administrators / partners",
+  "lo": "ຜູ້ດູແລ / ຄູ່ຮ່ວມງານ"
+},
+  "operations.5b513409258b": {
+  "ko": "등록된 관리자/파트너가 없습니다.",
+  "en": "No administrators or partners registered.",
+  "lo": "ບໍ່ມີຜູ້ດູແລ ຫຼື ຄູ່ຮ່ວມງານລົງທະບຽນ."
+},
+  "operations.54f1eca2afb7": {
+  "ko": "일반 회원 목록",
+  "en": "Regular members",
+  "lo": "ສະມາຊິກທົ່ວໄປ"
+},
+  "operations.2778e5ba9023": {
+  "ko": "검색된 회원이 없습니다.",
+  "en": "No matching members.",
+  "lo": "ບໍ່ພົບສະມາຊິກ."
+},
+  "operations.8845d36ebae6": {
+  "ko": "탈퇴 처리 중인 회원이 없습니다.",
+  "en": "No members pending withdrawal.",
+  "lo": "ບໍ່ມີສະມາຊິກລໍຖ້າອອກ."
+},
+  "operations.01662c98b771": {
+  "ko": "암호 확인",
+  "en": "Confirm password",
+  "lo": "ຢືນຢັນລະຫັດຜ່ານ"
+},
+  "operations.4d24360a5125": {
+  "ko": "예: LK Trading",
+  "en": "Example: LK Trading",
+  "lo": "ຕົວຢ່າງ: LK Trading"
+},
+  "operations.bb216f104fde": {
+  "ko": "등록",
+  "en": "Register",
+  "lo": "ລົງທະບຽນ"
+},
+  "operations.b3011d206473": {
+  "ko": "명세서 이미지 변환에 실패했습니다.",
+  "en": "Could not convert the statement to an image.",
+  "lo": "ແປງໃບແຈ້ງລາຍການເປັນຮູບບໍ່ສຳເລັດ."
+},
+  "operations.3a5bcc47d56e": {
+  "ko": "명세서 로딩 실패: {p0}",
+  "en": "Could not load statement: {p0}",
+  "lo": "ໂຫຼດໃບແຈ້ງລາຍການບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.6a7703c1a3c3": {
+  "ko": "명세서 데이터가 준비되지 않았습니다.",
+  "en": "Statement data is not ready.",
+  "lo": "ຂໍ້ມູນໃບແຈ້ງລາຍການຍັງບໍ່ພ້ອມ."
+},
+  "operations.ae65e0b3f108": {
+  "ko": "PNG 변환에 실패했습니다.",
+  "en": "PNG conversion failed.",
+  "lo": "ແປງເປັນ PNG ບໍ່ສຳເລັດ."
+},
+  "operations.4b282313de7e": {
+  "ko": "명세서 이미지 저장",
+  "en": "Save statement image",
+  "lo": "ບັນທຶກຮູບໃບແຈ້ງລາຍການ"
+},
+  "operations.bdddc1c152da": {
+  "ko": "저장을 취소했습니다.",
+  "en": "Save cancelled.",
+  "lo": "ຍົກເລີກການບັນທຶກແລ້ວ."
+},
+  "operations.80caaf9ccbc1": {
+  "ko": "명세서 이미지를 저장했습니다.",
+  "en": "Statement image saved.",
+  "lo": "ບັນທຶກຮູບໃບແຈ້ງລາຍການແລ້ວ."
+},
+  "operations.97382eb14ef8": {
+  "ko": "명세서 출력용 PDF 저장",
+  "en": "Save printable statement PDF",
+  "lo": "ບັນທຶກ PDF ໃບແຈ້ງລາຍການສຳລັບພິມ"
+},
+  "operations.ee37e76623fd": {
+  "ko": "출력용 PDF를 저장했습니다.",
+  "en": "Printable PDF saved.",
+  "lo": "ບັນທຶກ PDF ສຳລັບພິມແລ້ວ."
+},
+  "operations.f4ceabecc04f": {
+  "ko": "{p0} · 명세서",
+  "en": "{p0} · Statement",
+  "lo": "{p0} · ໃບແຈ້ງລາຍການ"
+},
+  "operations.ee4c005653ce": {
+  "ko": "명세서를 불러오지 못했습니다.",
+  "en": "Could not load the statement.",
+  "lo": "ໂຫຼດໃບແຈ້ງລາຍການບໍ່ສຳເລັດ."
+},
+  "operations.67ac207be718": {
+  "ko": "출력용 PDF",
+  "en": "Printable PDF",
+  "lo": "PDF ສຳລັບພິມ"
+},
+  "operations.3b74a3df53f3": {
+  "ko": "{p0}: 명세서 데이터가 없습니다.",
+  "en": "{p0}: No statement data.",
+  "lo": "{p0}: ບໍ່ມີຂໍ້ມູນໃບແຈ້ງລາຍການ."
+},
+  "operations.edc4d1ccadaa": {
+  "ko": "출력할 명세서가 없습니다.",
+  "en": "No statements to print.",
+  "lo": "ບໍ່ມີໃບແຈ້ງລາຍການສຳລັບພິມ."
+},
+  "operations.f667b3ed8272": {
+  "ko": "견적서 리소스 로딩 실패: {p0}",
+  "en": "Could not load quotation resources: {p0}",
+  "lo": "ໂຫຼດຂໍ້ມູນໃບສະເໜີລາຄາບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.2e52d71add46": {
+  "ko": "견적서 리소스가 준비되지 않았습니다.",
+  "en": "Quotation resources are not ready.",
+  "lo": "ຂໍ້ມູນໃບສະເໜີລາຄາຍັງບໍ່ພ້ອມ."
+},
+  "operations.a8d53084e74a": {
+  "ko": "가견적서 이미지 저장",
+  "en": "Save estimate image",
+  "lo": "ບັນທຶກຮູບໃບປະເມີນລາຄາ"
+},
+  "operations.683deb81a0ff": {
+  "ko": "가견적서 이미지를 저장했습니다.",
+  "en": "Estimate image saved.",
+  "lo": "ບັນທຶກຮູບໃບປະເມີນລາຄາແລ້ວ."
+},
+  "operations.3cbeac8c4e8d": {
+  "ko": "가견적서 출력용 PDF 저장",
+  "en": "Save printable estimate PDF",
+  "lo": "ບັນທຶກ PDF ໃບປະເມີນລາຄາສຳລັບພິມ"
+},
+  "operations.bb1952f67fdc": {
+  "ko": "{p0} · 가견적서",
+  "en": "{p0} · Estimate",
+  "lo": "{p0} · ໃບປະເມີນລາຄາ"
+},
+  "operations.e5a0c18b2022": {
+  "ko": "가견적서를 불러오지 못했습니다.",
+  "en": "Could not load the estimate.",
+  "lo": "ໂຫຼດໃບປະເມີນລາຄາບໍ່ສຳເລັດ."
+},
+  "operations.f14749da3f03": {
+  "ko": "체크된 전체 명세서 출력용 PDF 저장",
+  "en": "Save selected statements as one printable PDF",
+  "lo": "ບັນທຶກໃບແຈ້ງລາຍການທີ່ເລືອກເປັນ PDF ດຽວສຳລັບພິມ"
+},
+  "operations.a8354f9ae9f6": {
+  "ko": "총 {p0}개의 명세서를 하나의 PDF로 저장했습니다.",
+  "en": "Saved {p0} statements in one PDF.",
+  "lo": "ບັນທຶກ {p0} ໃບແຈ້ງລາຍການໃນ PDF ດຽວແລ້ວ."
+},
+  "operations.cfd79ed49e01": {
+  "ko": "전체 명세서 PDF 저장 실패: {p0}",
+  "en": "Could not save combined statement PDF: {p0}",
+  "lo": "ບັນທຶກ PDF ໃບແຈ້ງລາຍການລວມບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.8fa8734d0c23": {
+  "ko": "체크된 명세서 출력용 PDF",
+  "en": "Selected statements: printable PDF",
+  "lo": "ໃບແຈ້ງລາຍການທີ່ເລືອກ: PDF ສຳລັບພິມ"
+},
+  "operations.377fca6afa72": {
+  "ko": "총 {p0}개의 명세서가 선택되었습니다.",
+  "en": "{p0} statements selected.",
+  "lo": "ເລືອກ {p0} ໃບແຈ້ງລາຍການແລ້ວ."
+},
+  "operations.1aba6b299d7c": {
+  "ko": "체크된 {p0}개 명세서 전체를 하나의 출력용 PDF로 저장하시겠습니까?",
+  "en": "Save all {p0} selected statements in one printable PDF?",
+  "lo": "ບັນທຶກທັງ {p0} ໃບແຈ້ງລາຍການທີ່ເລືອກເປັນ PDF ດຽວສຳລັບພິມຫຼືບໍ່?"
+},
+  "operations.f580d823974d": {
+  "ko": "전체 명세서 출력용 PDF 다운로드",
+  "en": "Download all statements as one PDF",
+  "lo": "ດາວໂຫຼດໃບແຈ້ງລາຍການທັງໝົດເປັນ PDF ດຽວ"
+},
+  "operations.2494cb105594": {
+  "ko": "항차별 총액 계산 실패: {p0}",
+  "en": "Voyage total calculation failed: {p0}",
+  "lo": "ຄິດໄລ່ຍອດລວມຕາມຖ້ຽວບໍ່ສຳເລັດ: {p0}"
+},
+  "operations.f57ee19fdf5b": {
+  "ko": "실제 데이타 기준 총액 계산",
+  "en": "Calculate totals from actual data",
+  "lo": "ຄິດໄລ່ຍອດລວມຈາກຂໍ້ມູນຈິງ"
+},
+  "operations.d43593e6e558": {
+  "ko": "실제 총 물품 개수",
+  "en": "Actual total item count",
+  "lo": "ຈຳນວນສິນຄ້າຈິງທັງໝົດ"
+},
+  "operations.ccc6d4809e70": {
+  "ko": "할인 전 총액",
+  "en": "Gross total",
+  "lo": "ຍອດລວມກ່ອນຫັກສ່ວນຫຼຸດ"
+},
+  "operations.fc334d621f6a": {
+  "ko": "총 할인 금액",
+  "en": "Total discount",
+  "lo": "ສ່ວນຫຼຸດທັງໝົດ"
+},
+  "operations.0e7825d91d91": {
+  "ko": "실제 총액 (총액 - 할인)",
+  "en": "Actual total (gross minus discount)",
+  "lo": "ຍອດຈິງ (ຍອດລວມຫັກສ່ວນຫຼຸດ)"
+},
+  "operations.0db46ed1acc5": {
+  "ko": "단체별 할인 금액",
+  "en": "Discounts by group",
+  "lo": "ສ່ວນຫຼຸດຕາມກຸ່ມ"
+},
+  "operations.b534f9e77ce2": {
+  "ko": "영수번호별 정산 ({p0}건)",
+  "en": "Settlement by receipt ({p0})",
+  "lo": "ສະຫຼຸບຍອດຕາມໃບຮັບ ({p0})"
+},
+  "operations.54020bc12298": {
+  "ko": "{p0}개 · 실제 {p1}",
+  "en": "{p0} items · Actual {p1}",
+  "lo": "{p0} ລາຍການ · ຈິງ {p1}"
+},
+  "operations.75d65641eefa": {
+  "ko": "최종 실제 금액",
+  "en": "Final actual amount",
+  "lo": "ຈຳນວນເງິນຈິງສຸດທ້າຍ"
+},
+  "quote.subject": {
+  "ko": "제목",
+  "en": "Subject",
+  "lo": "ຫົວຂໍ້"
+},
+  "purchase.date": {
+  "ko": "작성일",
+  "en": "Date",
+  "lo": "ວັນທີ"
+},
+  "operations.23ecab2714e3": {
+  "ko": "상단 고정",
+  "en": "Pin to Top",
+  "lo": "ປັກໄວ້ເທິງ"
 }
 };

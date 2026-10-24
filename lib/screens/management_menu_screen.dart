@@ -236,14 +236,14 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
         {
           'label': _m('하역 자료 관리'),
           'icon': Icons.view_column_outlined,
-          'page': const UnloadingListManagementScreen(),
+          'page': UnloadingListManagementScreen(language: widget.language),
         },
       ]);
       items.addAll([
         {
           'label': _m('고객 리스트'),
           'icon': Icons.view_column_outlined,
-          'page': const CustomerListManagementScreen(),
+          'page': CustomerListManagementScreen(language: widget.language),
         },
       ]);
     }
@@ -258,7 +258,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
     items.add({
       'label': _m('화물 데이타 엑셀 파일 관리'),
       'icon': Icons.folder_copy_outlined,
-      'page': const ExcelExportScreen(),
+      'page': ExcelExportScreen(language: widget.language),
     });
 
     if (_isAdmin) {
@@ -266,7 +266,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
         {
           'label': _m('추가 기능 개발'),
           'icon': Icons.developer_mode_outlined,
-          'page': const AdditionalFeatureDevelopmentScreen(),
+          'page': AdditionalFeatureDevelopmentScreen(language: widget.language),
         },
         {
           'label': _m('회원 종합 관리'),
@@ -278,19 +278,19 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
           'label': _m('화물 내용 변경 승인 관리'),
           'icon': Icons.fact_check_outlined,
           'menuKey': 'change_approval',
-          'page': const ChangeApprovalScreen(),
+          'page': ChangeApprovalScreen(language: widget.language),
         },
         {
           'label': _m('엑셀 데이타 일괄 관리\n(편집 잠금/해제, 구획 및 영수 번호 관리)'),
           'icon': Icons.table_view_outlined,
           'compactLabel': true,
-          'page': const ExcelBulkManagementScreen(),
+          'page': ExcelBulkManagementScreen(language: widget.language),
         },
         {
           'label': _m('할인 적용 관리'),
           'icon': Icons.percent_outlined,
           'menuKey': 'discount_management',
-          'page': const DiscountManagementScreen(),
+          'page': DiscountManagementScreen(language: widget.language),
         },
         {
           'label': _m('시내.지방 배송 list 관리'),
@@ -317,7 +317,7 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
         {
           'label': _m('기준 환율 입력'),
           'icon': Icons.currency_exchange,
-          'page': const ExchangeRateScreen(),
+          'page': ExchangeRateScreen(language: widget.language),
         },
       ]);
     }
@@ -382,6 +382,3 @@ class _ManagementMenuScreenState extends State<ManagementMenuScreen> with Shared
     );
   }
 }
-
-
-

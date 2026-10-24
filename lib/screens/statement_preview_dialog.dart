@@ -1,3 +1,4 @@
+import '../core/operational_localizations.dart';
 import '../core/receipt_delivery_cost.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -76,6 +77,8 @@ class StatementPreviewDialog extends StatefulWidget {
 }
 
 class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+
   List<Map<String, dynamic>> _rows = const [];
   FreightCalculation? _freight;
   String _inlandDeliveryText = '';
@@ -174,7 +177,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('명세서 로딩 실패: $error')));
+          .showSnackBar(SnackBar(content: Text(_l('명세서 로딩 실패: $error'))));
     }
   }
 
@@ -257,12 +260,12 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '명세서 이미지를 저장했습니다.')),
+        SnackBar(content: Text(_l(path == null ? '저장을 취소했습니다.' : '명세서 이미지를 저장했습니다.'))),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('이미지 저장 실패: $e')));
+            .showSnackBar(SnackBar(content: Text(_l('이미지 저장 실패: $e'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -292,12 +295,12 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(path == null ? '저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.')),
+        SnackBar(content: Text(_l(path == null ? '저장을 취소했습니다.' : '출력용 PDF를 저장했습니다.'))),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('PDF 저장 실패: $e')));
+            .showSnackBar(SnackBar(content: Text(_l('PDF 저장 실패: $e'))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -321,7 +324,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${widget.receiptNumber} · 명세서',
+                      _l('${widget.receiptNumber} · 명세서'),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -342,9 +345,9 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : !ready
-                        ? const Center(
+                        ? Center(
                             child: Text(
-                              '명세서를 불러오지 못했습니다.',
+                              _l('명세서를 불러오지 못했습니다.'),
                               style: TextStyle(color: Colors.white),
                             ),
                           )
@@ -385,7 +388,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('닫기'),
+                      child: Text(_l('닫기')),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -393,7 +396,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                     child: FilledButton.tonalIcon(
                       onPressed: !ready || _saving ? null : _saveImage,
                       icon: const Icon(Icons.image_outlined, size: 18),
-                      label: const Text('이미지 저장'),
+                      label: Text(_l('이미지 저장')),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -407,7 +410,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      label: const Text('출력용 PDF'),
+                      label: Text(_l('출력용 PDF')),
                     ),
                   ),
                 ],

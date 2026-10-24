@@ -1,3 +1,5 @@
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
 import 'package:flutter/material.dart';
@@ -15,13 +17,17 @@ import '../services/shipment_service.dart';
 import '../services/unknown_recipient_service.dart';
 
 class ChangeApprovalScreen extends StatefulWidget {
-  const ChangeApprovalScreen({super.key});
+  const ChangeApprovalScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<ChangeApprovalScreen> createState() => _ChangeApprovalScreenState();
 }
 
 class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRefreshState {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   bool _automaticLoad = false;
   final _fieldFilter = ManagementFieldFilter();
   @override
@@ -82,7 +88,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
           onPressed: count == 0 || _processing
               ? null
               : () => edit ? _editBatch(kind) : _runBatch(kind, action),
-          child: Text(label),
+          child: Text(_l(label)),
         );
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -108,10 +114,10 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       }
                     }),
             ),
-            const Text('전체 선택'),
+            Text(_l('전체 선택')),
           ],
         ),
-        Text('$count / ${items.length}건 선택'),
+        Text(_l('$count / ${items.length}건 선택')),
         if (kind == ApprovalKind.changes) ...[
           action('선택 수정 후 승인', 'modified_approve', edit: true),
           action('선택 승인', 'approve'),
@@ -141,7 +147,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
     final values = await showDialog<Map<String, Map<String, dynamic>>>(
       context: context,
       builder: (_) =>
-          ApprovalBatchEditor(items: items, savedDrafts: _batchDrafts),
+          ApprovalBatchEditor(language: widget.language, items: items, savedDrafts: _batchDrafts),
     );
     _batchDialogOpen = false;
     if (!mounted || values == null) return;
@@ -175,24 +181,24 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text('선택 ${items.length}건 일괄 처리'),
+          title: Text(_l('선택 ${items.length}건 일괄 처리')),
           content: Text(
-            '요청 내용과 실제 화물·송장 정보를 확인하셨습니까?\n선택한 ${items.length}건만 처리합니다.\n${action == 'complete'
+            _l('요청 내용과 실제 화물·송장 정보를 확인하셨습니까?\n선택한 ${items.length}건만 처리합니다.\n${action == 'complete'
                 ? '현재 값으로 확인 완료하고 데이터 잠금을 적용합니다.'
                 : action == 'keep'
                 ? '수취인 불명 상태를 유지하고 확인 완료합니다.'
                 : action == 'reject'
                 ? '선택한 요청을 거절합니다.'
-                : '각 항목의 요청 값 또는 검토한 수정 값을 반영합니다.'}',
+                : '각 항목의 요청 값 또는 검토한 수정 값을 반영합니다.'}'),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('취소'),
+              child: Text(_l('취소')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('확인 후 처리'),
+              child: Text(_l('확인 후 처리')),
             ),
           ],
         ),
@@ -263,7 +269,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('닫기'),
+                child: Text(_l('닫기')),
               ),
             ],
           ),
@@ -474,31 +480,31 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
         await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('수취인 불명 데이터 정상화'),
+            title: Text(_l('수취인 불명 데이터 정상화')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(
-                      labelText: '수취인 이름 / 회사명',
+                    decoration: InputDecoration(
+                      labelText: _l('수취인 이름 / 회사명'),
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: phone,
-                    decoration: const InputDecoration(
-                      labelText: '전화번호',
+                    decoration: InputDecoration(
+                      labelText: _l('전화번호'),
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: invoice,
-                    decoration: const InputDecoration(
-                      labelText: '송장번호',
+                    decoration: InputDecoration(
+                      labelText: _l('송장번호'),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -506,8 +512,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                   TextField(
                     controller: notes,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: '비고',
+                    decoration: InputDecoration(
+                      labelText: _l('비고'),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -517,11 +523,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('취소'),
+                child: Text(_l('취소')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('수정 후 정상화'),
+                child: Text(_l('수정 후 정상화')),
               ),
             ],
           ),
@@ -587,39 +593,39 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
           context: context,
           builder: (dialogContext) => StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
-              title: Text(lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정'),
+              title: Text(_l(lock ? '확인 완료 / 데이터 잠금' : '불확실 데이터 확인 / 수정')),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: invoice,
-                      decoration: const InputDecoration(
-                        labelText: '송장번호',
+                      decoration: InputDecoration(
+                        labelText: _l('송장번호'),
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: name,
-                      decoration: const InputDecoration(
-                        labelText: '수취인 이름 / 회사명',
+                      decoration: InputDecoration(
+                        labelText: _l('수취인 이름 / 회사명'),
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: phone,
-                      decoration: const InputDecoration(
-                        labelText: '전화번호 (없으면 비워도 됨)',
+                      decoration: InputDecoration(
+                        labelText: _l('전화번호 (없으면 비워도 됨)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: receipt,
-                      decoration: const InputDecoration(
-                        labelText: '영수번호',
+                      decoration: InputDecoration(
+                        labelText: _l('영수번호'),
                         border: OutlineInputBorder(),
                       ),
                       onChanged: (_) {
@@ -646,8 +652,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                     TextField(
                       controller: notes,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: '비고',
+                      decoration: InputDecoration(
+                        labelText: _l('비고'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -657,7 +663,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
                 FilledButton(
                   onPressed: () async {
@@ -688,7 +694,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       Navigator.pop(dialogContext, true);
                     }
                   },
-                  child: Text(lock ? '확정 및 잠금' : '수정 저장'),
+                  child: Text(_l(lock ? '확정 및 잠금' : '수정 저장')),
                 ),
               ],
             ),
@@ -764,8 +770,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                           vertical: 4,
                         ),
                       ),
-                      child: const Text(
-                        '확인/수정',
+                      child: Text(
+                        _l('확인/수정'),
                         style: TextStyle(fontSize: 11),
                       ),
                     ),
@@ -780,8 +786,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                         ),
                       ),
                       icon: const Icon(Icons.lock_outline, size: 14),
-                      label: const Text(
-                        '확정/잠금',
+                      label: Text(
+                        _l('확정/잠금'),
                         style: TextStyle(fontSize: 11),
                       ),
                     ),
@@ -790,15 +796,15 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               ],
             ),
             Text(
-              '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
-              '${row['voyage'] ?? ''}항차',
+              _l('${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
+              '${row['voyage'] ?? ''}항차'),
             ),
             const SizedBox(height: 6),
-            Text('수취인/회사명: ${row['consignee_name'] ?? ''}'),
-            Text('전화번호: ${row['consignee_phone'] ?? '(없음)'}'),
+            Text(_l('수취인/회사명: ${row['consignee_name'] ?? ''}')),
+            Text(_l('전화번호: ${row['consignee_phone'] ?? '(없음)'}')),
             Text(
-              '영수번호: ${row['receipt_number'] ?? '-'} · '
-              '구획: ${row['unloading_zone'] ?? '-'}',
+              _l('영수번호: ${row['receipt_number'] ?? '-'} · '
+              '구획: ${row['unloading_zone'] ?? '-'}'),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             Padding(
@@ -841,25 +847,25 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               ],
             ),
             Text(
-              '${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
-              '${row['voyage'] ?? ''}항차',
+              _l('${row['route'] ?? ''} · ${row['shipment_year'] ?? ''}년 · '
+              '${row['voyage'] ?? ''}항차'),
             ),
             const SizedBox(height: 6),
-            Text('현재 수취인/회사명: ${row['consignee_name'] ?? ''}'),
-            Text('현재 전화번호: ${row['consignee_phone'] ?? ''}'),
+            Text(_l('현재 수취인/회사명: ${row['consignee_name'] ?? ''}')),
+            Text(_l('현재 전화번호: ${row['consignee_phone'] ?? ''}')),
             Text(
-              '임시 영수번호: ${row['receipt_number'] ?? 'XX'} · '
-              '구획: ${row['unloading_zone'] ?? 'F'}',
+              _l('임시 영수번호: ${row['receipt_number'] ?? 'XX'} · '
+              '구획: ${row['unloading_zone'] ?? 'F'}'),
               style: const TextStyle(
                 color: Colors.redAccent,
                 fontWeight: FontWeight.bold,
               ),
             ),
             if (row['data_locked'] == true)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Text(
-                  '데이터 수정 잠금 상태',
+                  _l('데이터 수정 잠금 상태'),
                   style: TextStyle(
                     color: Colors.redAccent,
                     fontWeight: FontWeight.bold,
@@ -872,12 +878,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               children: [
                 OutlinedButton(
                   onPressed: () => _keepAutoUnmatched(row),
-                  child: const Text('불명 유지'),
+                  child: Text(_l('불명 유지')),
                 ),
                 const SizedBox(width: 6),
                 FilledButton(
                   onPressed: () => _resolveAutoUnmatched(row),
-                  child: const Text('확인 / 수정'),
+                  child: Text(_l('확인 / 수정')),
                 ),
               ],
             ),
@@ -899,23 +905,23 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
           await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
-              title: const Text('수취인 불명 화물 확인 승인'),
+              title: Text(_l('수취인 불명 화물 확인 승인')),
               content: Text(
-                '이 요청을 승인하면:\n'
+                _l('이 요청을 승인하면:\n'
                 '이름: 수취인 불명 / ${claim['claimant_name'] ?? ''}\n'
                 '연락처: ${claim['claimant_phone'] ?? ''}\n'
                 '영수번호: 해당 항차 마지막 영수번호 다음 번호\n\n'
                 '으로 반영됩니다.'
-                '${claim['data_locked'] == true ? '\n\n데이터 잠금은 승인 후에도 유지됩니다.' : ''}',
+                '${claim['data_locked'] == true ? '\n\n데이터 잠금은 승인 후에도 유지됩니다.' : ''}'),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('확인 및 승인'),
+                  child: Text(_l('확인 및 승인')),
                 ),
               ],
             ),
@@ -949,22 +955,22 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
           await showDialog<bool>(
             context: context,
             builder: (dialogContext) => AlertDialog(
-              title: const Text('송장 뒷자리 화물 정보 정정 승인'),
+              title: Text(_l('송장 뒷자리 화물 정보 정정 승인')),
               content: Text(
-                '요청 회원의 정보로 화물 수취인을 변경합니다.\n\n'
+                _l('요청 회원의 정보로 화물 수취인을 변경합니다.\n\n'
                 '이름: ${request['claimant_name'] ?? ''}\n'
                 '연락처: ${request['claimant_phone'] ?? ''}\n'
                 '송장번호: ${request['invoice_number'] ?? ''}\n\n'
-                '실물 송장 및 회원 정보를 확인한 후 승인해 주세요.',
+                '실물 송장 및 회원 정보를 확인한 후 승인해 주세요.'),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('취소'),
+                  child: Text(_l('취소')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('확인 후 승인'),
+                  child: Text(_l('확인 후 승인')),
                 ),
               ],
             ),
@@ -989,7 +995,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
   void _message(String message) {
     if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+        .showSnackBar(SnackBar(content: Text(_l(message))));
   }
 
   @override
@@ -997,8 +1003,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
     canPop: !_processing,
     child: Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'consignee_name':'수령인','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','status':'상태','request_source':'요청 경로','created_at':'요청일'}, onChanged: () => setState(() { _selected.clear(); _batchDrafts.clear(); })),
-        title: Text(_processing ? '일괄 처리 중 $_progress' : '화물 내용 변경 승인 관리'),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'consignee_name':'수령인','consignee_phone':'연락처','receipt_number':'명세서 번호','box_number':'박스 번호','invoice_number':'송장번호','status':'상태','request_source':'요청 경로','created_at':'요청일'}, onChanged: () => setState(() { _selected.clear(); _batchDrafts.clear(); })),
+        title: Text(_l(_processing ? '일괄 처리 중 $_progress' : '화물 내용 변경 승인 관리')),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
       ),
@@ -1014,11 +1020,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                   children: [
                     if (_processing) ...[
                       const LinearProgressIndicator(),
-                      Text('일괄 처리 중 $_progress'),
+                      Text(_l('일괄 처리 중 $_progress')),
                     ],
                     if (_incomplete.isNotEmpty) ...[
-                      const Text(
-                        '불확실 / 확인 필요 데이터',
+                      Text(
+                        _l('불확실 / 확인 필요 데이터'),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1026,8 +1032,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '이름은 확인되지만 연락처가 없는 화물입니다. 일반 영수번호/구획으로 정리되며, 확인 후 잠금하면 이 목록에서 완료 처리됩니다.',
+                      Text(
+                        _l('이름은 확인되지만 연락처가 없는 화물입니다. 일반 영수번호/구획으로 정리되며, 확인 후 잠금하면 이 목록에서 완료 처리됩니다.'),
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
@@ -1038,8 +1044,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       const SizedBox(height: 8),
                     ],
                     if (_autoUnmatched.isNotEmpty) ...[
-                      const Text(
-                        '신규 업로드 · 수취인 불명 자동분류',
+                      Text(
+                        _l('신규 업로드 · 수취인 불명 자동분류'),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1047,8 +1053,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '수취인 이름이 없거나 명시적으로 수취인 불명으로 표시된 화물입니다. 확인 전에는 임시 영수번호 XX / 구획 F로 유지됩니다.',
+                      Text(
+                        _l('수취인 이름이 없거나 명시적으로 수취인 불명으로 표시된 화물입니다. 확인 전에는 임시 영수번호 XX / 구획 F로 유지됩니다.'),
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
@@ -1059,8 +1065,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       const SizedBox(height: 8),
                     ],
                     if (_unknownClaims.isNotEmpty) ...[
-                      const Text(
-                        '수취인 불명 화물 확인 요청',
+                      Text(
+                        _l('수취인 불명 화물 확인 요청'),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1075,8 +1081,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       const SizedBox(height: 8),
                     ],
                     if (_invoiceCorrections.isNotEmpty) ...[
-                      const Text(
-                        '송장 뒷자리 일치 · 회원 화물 정정 요청',
+                      Text(
+                        _l('송장 뒷자리 일치 · 회원 화물 정정 요청'),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1084,8 +1090,8 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '수취인 오류로 일반 조회가 안 된 화물입니다. 송장 뒷자리와 회원 본인 정보를 확인한 후 처리하세요.',
+                      Text(
+                        _l('수취인 오류로 일반 조회가 안 된 화물입니다. 송장 뒷자리와 회원 본인 정보를 확인한 후 처리하세요.'),
                         style: TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
@@ -1100,10 +1106,10 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                         _invoiceCorrections.isEmpty &&
                         _autoUnmatched.isEmpty &&
                         _incomplete.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(vertical: 40),
                         child: Center(
-                          child: Text('대기 중인 화물 내용 변경 승인 요청이 없습니다.'),
+                          child: Text(_l('대기 중인 화물 내용 변경 승인 요청이 없습니다.')),
                         ),
                       ),
                     if (_requests.isNotEmpty) ...[
@@ -1132,7 +1138,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '수취인 불명 · 본인 화물 확인 요청',
+                    _l('수취인 불명 · 본인 화물 확인 요청'),
                     style: TextStyle(
                       color: Colors.orange,
                       fontWeight: FontWeight.bold,
@@ -1150,29 +1156,29 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               ),
             ),
             Text(
-              '${claim['route'] ?? ''} · ${claim['shipment_year'] ?? ''}년 · '
-              '${claim['voyage'] ?? ''}항차',
+              _l('${claim['route'] ?? ''} · ${claim['shipment_year'] ?? ''}년 · '
+              '${claim['voyage'] ?? ''}항차'),
             ),
             const SizedBox(height: 6),
-            Text('현재 이름: ${claim['current_unknown_name'] ?? ''}'),
-            Text('현재 연락처: ${claim['current_unknown_phone'] ?? ''}'),
+            Text(_l('현재 이름: ${claim['current_unknown_name'] ?? ''}')),
+            Text(_l('현재 연락처: ${claim['current_unknown_phone'] ?? ''}')),
             const Divider(height: 20),
             Text(
-              '요청 회원: ${claim['claimant_name'] ?? ''} '
-              '(${claim['requester_email'] ?? ''})',
+              _l('요청 회원: ${claim['claimant_name'] ?? ''} '
+              '(${claim['requester_email'] ?? ''})'),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text('요청 연락처: ${claim['claimant_phone'] ?? ''}'),
+            Text(_l('요청 연락처: ${claim['claimant_phone'] ?? ''}')),
             if ('${claim['note'] ?? ''}'.trim().isNotEmpty)
-              Text('확인 참고 내용: ${claim['note']}'),
+              Text(_l('확인 참고 내용: ${claim['note']}')),
             if (claim['data_locked'] == true) ...[
               const SizedBox(height: 8),
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.lock, size: 16, color: Colors.redAccent),
                   SizedBox(width: 5),
                   Text(
-                    '🔒 현재 잠금 상태',
+                    _l('🔒 현재 잠금 상태'),
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.bold,
@@ -1187,12 +1193,12 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               children: [
                 TextButton(
                   onPressed: () => _reviewUnknownClaim(claim, 'reject'),
-                  child: const Text('거절'),
+                  child: Text(_l('거절')),
                 ),
                 const SizedBox(width: 6),
                 FilledButton(
                   onPressed: () => _reviewUnknownClaim(claim, 'approve'),
-                  child: const Text('본인 화물 확인 승인'),
+                  child: Text(_l('본인 화물 확인 승인')),
                 ),
               ],
             ),
@@ -1217,7 +1223,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '수취인 정보 오류 정정 요청',
+                    _l('수취인 정보 오류 정정 요청'),
                     style: TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
@@ -1235,33 +1241,33 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               ),
             ),
             Text(
-              '${request['route'] ?? ''} · ${request['shipment_year'] ?? ''}년 · '
-              '${request['voyage'] ?? ''}항차',
+              _l('${request['route'] ?? ''} · ${request['shipment_year'] ?? ''}년 · '
+              '${request['voyage'] ?? ''}항차'),
             ),
             const SizedBox(height: 6),
-            Text('현재 수취인: ${request['current_name'] ?? ''}'),
-            Text('현재 연락처: ${request['current_phone'] ?? ''}'),
+            Text(_l('현재 수취인: ${request['current_name'] ?? ''}')),
+            Text(_l('현재 연락처: ${request['current_phone'] ?? ''}')),
             const Divider(height: 20),
             Text(
-              '요청 회원: ${request['claimant_name'] ?? ''} '
-              '(${request['requester_email'] ?? ''})',
+              _l('요청 회원: ${request['claimant_name'] ?? ''} '
+              '(${request['requester_email'] ?? ''})'),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text('요청 연락처: ${request['claimant_phone'] ?? ''}'),
+            Text(_l('요청 연락처: ${request['claimant_phone'] ?? ''}')),
             if ('${request['note'] ?? ''}'.trim().isNotEmpty)
-              Text('확인 메모: ${request['note']}'),
+              Text(_l('확인 메모: ${request['note']}')),
             const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
                   onPressed: () => _reviewInvoiceCorrection(request, 'reject'),
-                  child: const Text('거절'),
+                  child: Text(_l('거절')),
                 ),
                 const SizedBox(width: 6),
                 FilledButton(
                   onPressed: () => _reviewInvoiceCorrection(request, 'approve'),
-                  child: const Text('확인 후 정정 승인'),
+                  child: Text(_l('확인 후 정정 승인')),
                 ),
               ],
             ),
@@ -1307,13 +1313,13 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.redAccent),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.lock, size: 13, color: Colors.redAccent),
                         SizedBox(width: 3),
                         Text(
-                          '잠금',
+                          _l('잠금'),
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.redAccent,
@@ -1326,19 +1332,19 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
               ],
             ),
             Text(
-              '${r['route'] ?? ''} · ${r['shipment_year'] ?? ''}년 · '
+              _l('${r['route'] ?? ''} · ${r['shipment_year'] ?? ''}년 · '
               '${r['voyage'] ?? ''}항차\n'
               '요청인: ${r['requester_name'] ?? ''} '
-              '(${r['requester_email'] ?? ''})',
+              '(${r['requester_email'] ?? ''})'),
             ),
 
             const SizedBox(height: 8),
-            const Text('요청 내용', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(_l('요청 내용'), style: TextStyle(fontWeight: FontWeight.bold)),
             Text(_changesText(requested, r)),
             if (editing) ...[
               const Divider(height: 22),
-              const Text(
-                '관리자 수정',
+              Text(
+                _l('관리자 수정'),
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -1351,11 +1357,11 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                   children: [
                     OutlinedButton(
                       onPressed: () => setState(() => _editing.remove(id)),
-                      child: const Text('취소'),
+                      child: Text(_l('취소')),
                     ),
                     FilledButton(
                       onPressed: () => _review(r, 'modified_approve'),
-                      child: const Text('수정 후 승인'),
+                      child: Text(_l('수정 후 승인')),
                     ),
                   ],
                 ),
@@ -1369,15 +1375,15 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
                       _editControllersFor(r);
                       setState(() => _editing.add(id));
                     },
-                    child: const Text('수정'),
+                    child: Text(_l('수정')),
                   ),
                   TextButton(
                     onPressed: () => _review(r, 'reject'),
-                    child: const Text('거절'),
+                    child: Text(_l('거절')),
                   ),
                   FilledButton(
                     onPressed: () => _review(r, 'approve'),
-                    child: const Text('승인'),
+                    child: Text(_l('승인')),
                   ),
                 ],
               ),
@@ -1404,7 +1410,7 @@ class _ChangeApprovalScreenState extends State<ChangeApprovalScreen> with AutoRe
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: _l(label),
           border: const OutlineInputBorder(),
           isDense: true,
         ),

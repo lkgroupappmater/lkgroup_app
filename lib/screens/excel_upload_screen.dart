@@ -1,3 +1,7 @@
+import '../core/shipment_period_labels.dart';
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -6,13 +10,17 @@ import '../services/excel_bulk_management_service.dart';
 import '../services/recalculation_job_service.dart';
 
 class ExcelUploadScreen extends StatefulWidget {
-  const ExcelUploadScreen({super.key});
+  const ExcelUploadScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<ExcelUploadScreen> createState() => _ExcelUploadScreenState();
 }
 
 class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   final _recalc = RecalculationJobService.instance;
   bool get _recalculating => _recalc.running;
   final _queue = ExcelImportQueueService.instance;
@@ -181,9 +189,9 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  job.status == ExcelImportJobStatus.processing
+                  _l(job.status == ExcelImportJobStatus.processing
                       ? '% 진행중'
-                      : _statusText(job.status),
+                      : _statusText(job.status)),
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.bold,
@@ -193,9 +201,9 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
             ),
             const SizedBox(height: 5),
             Text(
-              '${job.routeLabel} · '
+              '${_routeText(job.routeLabel)} · '
               '${job.year == 0 ? '-' : '${job.year}년'} · '
-              '${job.voyage == '-' ? '-' : '${job.voyage}항차'}',
+              '${job.voyage == '-' ? '-' : ShipmentPeriodLabels.voyage(job.voyage, widget.language)}',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -225,7 +233,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('화물 데이타 엑셀 업로드 및 Update'),
+          title: Text(_l('화물 데이타 엑셀 업로드 및 Update')),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
         ),
@@ -234,8 +242,8 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const Text(
-                '관리자·직원·협력/파트너사 전용',
+              Text(
+                _l('관리자·직원·협력/파트너사 전용'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -243,30 +251,30 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                '기초 접수 검사: XLSX/XLSM · 운송 경로 · 년도 · 항차\n'
+              Text(
+                _l('기초 접수 검사: XLSX/XLSM · 운송 경로 · 년도 · 항차\n'
                 '예: KR_LA_SEA_2026_V08_SHIPMENTS.xlsx\n'
                 '또는: 2026년 LKS 08항차 최종본.xlsm\n'
                 '경로·년도·항차만 포함하면 앞뒤 파일명은 자유롭게 사용할 수 있습니다.\n\n'
                 '총괄 관리자 업로드는 해당 항차의 전체 Excel을 기준으로 수정·삭제·복원 요청을 변경·정정 승인에 등록합니다. '
                 '명세서 번호를 포함한 기존 화물의 모든 변경은 승인 후 반영됩니다. 삭제 승인 후 30일 동안 복구할 수 있습니다.\n'
-                '직원·협력사 업로드는 기존 변경 승인 절차를 따릅니다.',
+                '직원·협력사 업로드는 기존 변경 승인 절차를 따릅니다.'),
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: _pick,
                 icon: const Icon(Icons.add_to_queue),
-                label: const Text('Excel 파일 추가 / 업로드 접수'),
+                label: Text(_l('Excel 파일 추가 / 업로드 접수')),
               ),
               const SizedBox(height: 10),
               Text(
-                _message,
+                _l(_message),
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 20),
               const Divider(height: 34),
-              const Text(
-                '현재 데이터 재연산 및 Update',
+              Text(
+                _l('현재 데이터 재연산 및 Update'),
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -274,9 +282,9 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 ),
               ),
               const SizedBox(height: 7),
-              const Text(
-                '직접 데이터 수정 또는 고객/배송/할인 규칙 변경 후 반영이 의심될 때 '
-                '선택 항차의 영수번호·구획·자동 특이사항·할인/정산을 다시 계산합니다.',
+              Text(
+                _l('직접 데이터 수정 또는 고객/배송/할인 규칙 변경 후 반영이 의심될 때 '
+                '선택 항차의 영수번호·구획·자동 특이사항·할인/정산을 다시 계산합니다.'),
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -289,12 +297,12 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 DropdownButtonFormField<String>(
                   value: _route,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '운송 경로',
+                  decoration: InputDecoration(
+                    labelText: _l('운송 경로'),
                     border: OutlineInputBorder(),
                   ),
                   items: _routes
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .map((e) => DropdownMenuItem(value: e, child: Text(_routeText(e))))
                       .toList(),
                   onChanged: _recalculating
                       ? null
@@ -309,13 +317,13 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   value: _year,
-                  decoration: const InputDecoration(
-                    labelText: '년도',
+                  decoration: InputDecoration(
+                    labelText: _l('년도'),
                     border: OutlineInputBorder(),
                   ),
                   items: _years
                       .map((e) =>
-                          DropdownMenuItem(value: e, child: Text('$e년')))
+                          DropdownMenuItem(value: e, child: Text(ShipmentPeriodLabels.year(e, widget.language))))
                       .toList(),
                   onChanged: _route == null || _recalculating
                       ? null
@@ -329,14 +337,14 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _voyage,
-                  decoration: const InputDecoration(
-                    labelText: '항차',
+                  decoration: InputDecoration(
+                    labelText: _l('항차'),
                     border: OutlineInputBorder(),
                   ),
                   items: _voyages
                       .map((e) => DropdownMenuItem(
                             value: e,
-                            child: Text('${e}항차'),
+                            child: Text(ShipmentPeriodLabels.voyage(e, widget.language)),
                           ))
                       .toList(),
                   onChanged: _year == null || _recalculating
@@ -358,13 +366,13 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.sync),
-                  label: const Text('재연산 및 Update'),
+                  label: Text(_l('재연산 및 Update')),
                 ),
               ],
               if ((_recalculateMessage.isNotEmpty || RecalculationJobService.instance.message.isNotEmpty)) ...[
                 const SizedBox(height: 8),
                 Text(
-                  _recalculateMessage,
+                  _l(_recalculateMessage),
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -375,9 +383,9 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
               if (_queue.jobs.isNotEmpty) ...[
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        '업로드 / 처리 작업 현황',
+                        _l('업로드 / 처리 작업 현황'),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primary,
@@ -387,7 +395,7 @@ class _ExcelUploadScreenState extends State<ExcelUploadScreen> {
                     if (!_queue.isProcessing && _queue.pendingCount == 0)
                       TextButton(
                         onPressed: _queue.clearFinished,
-                        child: const Text('완료 목록 지우기'),
+                        child: Text(_l('완료 목록 지우기')),
                       ),
                   ],
                 ),

@@ -1,3 +1,7 @@
+import '../core/shipment_period_labels.dart';
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import '../widgets/company_verification.dart';
 import '../widgets/management_field_search.dart';
 import '../widgets/auto_refresh_state.dart';
@@ -12,12 +16,16 @@ import 'package:pdf/widgets.dart' as pw;
 import '../services/supabase_service.dart';
 
 class CustomerListManagementScreen extends StatefulWidget {
-  const CustomerListManagementScreen({super.key});
+  const CustomerListManagementScreen({super.key, this.language = AppLanguage.korean});
+  final AppLanguage language;
   @override
   State<CustomerListManagementScreen> createState() => _CustomerListManagementScreenState();
 }
 
 class _CustomerListManagementScreenState extends State<CustomerListManagementScreen> with AutoRefreshState {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   bool _automaticLoad = false;
   bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
@@ -63,7 +71,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         _year=_years.isNotEmpty?_years.first:null; _voyage=_voyages.isNotEmpty?_voyages.first:null;
         _loading=false;
       });
-    } catch(e){_fail('고객 리스트 조회 실패: $e');}
+    } catch(e){_fail(_l('고객 리스트 조회 실패: $e'));}
   }
 
   num _num(dynamic v)=>v is num?v:(num.tryParse('${v??''}')??0);
@@ -136,29 +144,29 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       });
       if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return;
       setState((){_rows=result;_loading=false;});
-    }catch(e){_fail('고객 리스트 조회 실패: $e');}
+    }catch(e){_fail(_l('고객 리스트 조회 실패: $e'));}
   }
 
   void _fail(String m){
     if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return; setState(()=>_loading=false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(m)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_l(m))));
   }
 
   Future<void> _edit(Map<String,dynamic> r) async {
     final receipt=TextEditingController(text:'${r['receipt']}');
     final zone=TextEditingController(text:'${r['zone']}');
     final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
-      title:Text('${r['name']} 수정'),
+      title:Text(_l('${r['name']} 수정')),
       content:Column(mainAxisSize:MainAxisSize.min,children:[
-        TextField(controller:receipt,decoration:const InputDecoration(labelText:'영수증 번호')),
+        TextField(controller:receipt,decoration:InputDecoration(labelText:_l('영수증 번호'))),
         const SizedBox(height:10),
-        TextField(controller:zone,decoration:const InputDecoration(labelText:'구획(Zone)')),
+        TextField(controller:zone,decoration:InputDecoration(labelText:_l('구획(Zone)'))),
         const SizedBox(height:8),
-        const Text('현재 영수증 번호에 묶인 화물 전체에 동일하게 적용됩니다.',style:TextStyle(fontSize:12)),
+        Text(_l('현재 영수증 번호에 묶인 화물 전체에 동일하게 적용됩니다.'),style:TextStyle(fontSize:12)),
       ]),
       actions:[
-        TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('취소')),
-        FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('저장')),
+        TextButton(onPressed:()=>Navigator.pop(ctx,false),child:Text(_l('취소'))),
+        FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:Text(_l('저장'))),
       ],
     ));
     if(ok!=true)return;
@@ -169,9 +177,9 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         'receipt_number':nr,'unloading_zone':nz,
       }).eq('route',_route!).eq('shipment_year',_year!).eq('voyage',_voyage!)
        .eq('receipt_number','${r['receipt']}').isFilter('deletion_requested_at',null);
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('영수증 번호 / Zone 수정 완료')));
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(_l('영수증 번호 / Zone 수정 완료'))));
       await _loadRows();
-    }catch(e){_fail('수정 실패: $e');}
+    }catch(e){_fail(_l('수정 실패: $e'));}
   }
 
   String _deliveryOnlyLabel(String text) {
@@ -229,7 +237,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     required String Function(T) text,required ValueChanged<T?> onChanged}) {
     return DropdownButtonFormField<T>(
       value:items.contains(value)?value:null,isExpanded:true,
-      decoration:InputDecoration(labelText:label,border:const OutlineInputBorder(),
+      decoration:InputDecoration(labelText:_l(label),border:const OutlineInputBorder(),
         isDense:true,contentPadding:const EdgeInsets.symmetric(horizontal:8,vertical:10)),
       items:items.map((e)=>DropdownMenuItem(value:e,child:Text(text(e),overflow:TextOverflow.ellipsis))).toList(),
       onChanged:_loading||_saving?null:onChanged,
@@ -237,8 +245,8 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   }
 
   String get _title {
-    final route = (_route ?? '').replaceAll('_', '-').toUpperCase();
-    return '$route ${_year ?? ''} ${_voyage ?? ''}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)';
+    final route = _routeText(_route ?? '');
+    return _l('$route ${_year ?? ''} ${_voyage ?? ''}항차 고객 리스트 (ລາຍການລູກຄ້າຂອງທາງເຮືອ)');
   }
 
   void _paintText(Canvas c,String text,Rect r,double size,{bool bold=false,TextAlign align=TextAlign.center}) {
@@ -286,7 +294,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       final r=Rect.fromLTRB(xs[i],y,xs[i+1],y+colH);
       c.drawRect(r,headerFill);
       c.drawRect(r,line);
-      _paintText(c,heads[i],r,15,bold:true);
+      _paintText(c,_l(heads[i]),r,15,bold:true);
     }
     y+=colH;
 
@@ -359,8 +367,8 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       final name='${(_route??'LK').toUpperCase()}_${_year}_${_voyage}_CUSTOMER_LIST.png';
       final path=await FilePicker.saveFile(dialogTitle:'고객 리스트 이미지 저장',fileName:name,bytes:bytes,
         mimeType:'image/png',type:FileType.custom,allowedExtensions:const ['png']);
-      if(path!=null&&mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('고객 리스트 이미지 저장 완료')));
-    }catch(e){_fail('이미지 저장 실패: $e');}
+      if(path!=null&&mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(_l('고객 리스트 이미지 저장 완료'))));
+    }catch(e){_fail(_l('이미지 저장 실패: $e'));}
     finally{if(mounted)setState(()=>_saving=false);}
   }
 
@@ -388,8 +396,8 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
       final name='${(_route??'LK').toUpperCase()}_${_year}_${_voyage}_CUSTOMER_LIST.pdf';
       final path=await FilePicker.saveFile(dialogTitle:'고객 리스트 PDF 저장',fileName:name,bytes:bytes,
         mimeType:'application/pdf',type:FileType.custom,allowedExtensions:const ['pdf']);
-      if(path!=null&&mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('고객 리스트 PDF 저장 완료')));
-    }catch(e){_fail('PDF 저장 실패: $e');}
+      if(path!=null&&mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(_l('고객 리스트 PDF 저장 완료'))));
+    }catch(e){_fail(_l('PDF 저장 실패: $e'));}
     finally{if(mounted)setState(()=>_saving=false);}
   }
 
@@ -398,23 +406,23 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     final totalQty=_rows.fold<num>(0,(a,r)=>a+_num(r['quantity']));
     return Scaffold(
       appBar:AppBar(
-        bottom: ManagementFieldSearch(filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () => setState(() {})),title:const Text('고객 리스트')),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () => setState(() {})),title:Text(_l('고객 리스트'))),
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
         const CompanyVerificationButton(),
         Row(children:[
-          Expanded(flex:4,child:_selector<String>(label:'운송 경로',value:_route,items:_routes,text:(v)=>v,onChanged:(v){
+          Expanded(flex:4,child:_selector<String>(label:'운송 경로',value:_route,items:_routes,text:(v)=>_routeText(v),onChanged:(v){
             setState((){_route=v;_year=_years.isNotEmpty?_years.first:null;_voyage=_voyages.isNotEmpty?_voyages.first:null;_rows=const [];});})),
           const SizedBox(width:6),
-          Expanded(flex:3,child:_selector<int>(label:'년도',value:_year,items:_years,text:(v)=>'$v년',onChanged:(v){
+          Expanded(flex:3,child:_selector<int>(label:'년도',value:_year,items:_years,text:(v)=>ShipmentPeriodLabels.year(v, widget.language),onChanged:(v){
             setState((){_year=v;_voyage=_voyages.isNotEmpty?_voyages.first:null;_rows=const [];});})),
           const SizedBox(width:6),
-          Expanded(flex:3,child:_selector<String>(label:'항차',value:_voyage,items:_voyages,text:(v)=>v.endsWith('항차')?v:'$v항차',onChanged:(v){setState((){_voyage=v;_rows=const [];});})),
+          Expanded(flex:3,child:_selector<String>(label:'항차',value:_voyage,items:_voyages,text:(v)=>ShipmentPeriodLabels.voyage(v, widget.language),onChanged:(v){setState((){_voyage=v;_rows=const [];});})),
         ]),
         const SizedBox(height:6),
         Row(children:[
-          Text('검색 ${_searchRows.length} / 고객 ${_rows.length}명',style:const TextStyle(fontWeight:FontWeight.w800)),
+          Text(_l('검색 ${_searchRows.length} / 고객 ${_rows.length}명'),style:const TextStyle(fontWeight:FontWeight.w800)),
           const Spacer(),
-          FilledButton.icon(onPressed:_loading||_route==null||_year==null||_voyage==null?null:_loadRows,icon:const Icon(Icons.search),label:const Text('검색')),
+          FilledButton.icon(onPressed:_loading||_route==null||_year==null||_voyage==null?null:_loadRows,icon:const Icon(Icons.search),label:Text(_l('검색'))),
         ]),
         const Divider(height:1),
         Expanded(child:_loading?const Center(child:CircularProgressIndicator()):ListView.separated(
@@ -427,22 +435,21 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
                 Text('Zone ${r['zone']}',style:const TextStyle(fontSize:11,fontWeight:FontWeight.w700)),
               ])),
               title:Text('${r['name']}',style:const TextStyle(fontWeight:FontWeight.w800)),
-              subtitle:Text([if('${r['phone']}'.isNotEmpty)'${r['phone']}','수량 ${r['quantity']}',if(note.isNotEmpty)note].join(' · '),
+              subtitle:Text([if('${r['phone']}'.isNotEmpty)'${r['phone']}',_l('수량 ${r['quantity']}'),if(note.isNotEmpty)note].join(' · '),
                 maxLines:2,overflow:TextOverflow.ellipsis),
-              trailing:IconButton(tooltip:'영수증 번호 / Zone 수정',onPressed:()=>_edit(r),icon:const Icon(Icons.edit_outlined,size:20)));
+              trailing:IconButton(tooltip:_l('영수증 번호 / Zone 수정'),onPressed:()=>_edit(r),icon:const Icon(Icons.edit_outlined,size:20)));
           })),
         Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),
-          child:Text('현재 항차 · 고객 ${_rows.length}명 · 총 수량 $totalQty',textAlign:TextAlign.center,
+          child:Text(_l('현재 항차 · 고객 ${_rows.length}명 · 총 수량 $totalQty'),textAlign:TextAlign.center,
             style:const TextStyle(fontWeight:FontWeight.w800))),
         Row(children:[
           Expanded(child:OutlinedButton.icon(onPressed:_rows.isEmpty||_saving?null:_saveImage,
-            icon:const Icon(Icons.image_outlined),label:const Text('이미지 저장'))),
+            icon:const Icon(Icons.image_outlined),label:Text(_l('이미지 저장')))),
           const SizedBox(width:8),
           Expanded(child:FilledButton.icon(onPressed:_rows.isEmpty||_saving?null:_savePdf,
-            icon:const Icon(Icons.picture_as_pdf_outlined),label:Text(_saving?'생성 중...':'PDF 저장 / 프린트'))),
+            icon:const Icon(Icons.picture_as_pdf_outlined),label:Text(_l(_saving?'생성 중...':'PDF 저장 / 프린트')))),
         ]),
       ]))),
     );
   }
 }
-

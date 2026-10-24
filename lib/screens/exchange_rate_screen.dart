@@ -1,15 +1,22 @@
+import '../core/route_catalog.dart';
+import '../core/operational_localizations.dart';
+import '../core/app_language.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../services/exchange_rate_service.dart';
 
 class ExchangeRateScreen extends StatefulWidget {
-  const ExchangeRateScreen({super.key});
+  const ExchangeRateScreen({super.key, this.language = AppLanguage.korean});
 
+  final AppLanguage language;
   @override
   State<ExchangeRateScreen> createState() => _ExchangeRateScreenState();
 }
 
 class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
+  String _l(String value) => OperationalLocalizations.text(widget.language, value);
+  String _routeText(String value) => RouteCatalog.localizedLabel(value, widget.language);
+
   final _kip = TextEditingController();
   final _thb = TextEditingController();
   final _krw = TextEditingController();
@@ -59,7 +66,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
         thbAdjustment == null ||
         krwAdjustment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('기준 환율과 운임 확인 적용 환율 보정을 모두 숫자로 입력해 주세요.')),
+        SnackBar(content: Text(_l('기준 환율과 운임 확인 적용 환율 보정을 모두 숫자로 입력해 주세요.'))),
       );
       return;
     }
@@ -76,7 +83,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('기준 환율 및 운임 확인 적용 환율 보정을 저장했습니다.')),
+        SnackBar(content: Text(_l('기준 환율 및 운임 확인 적용 환율 보정을 저장했습니다.'))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -95,7 +102,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
   }
 
   InputDecoration _decoration(String label, String suffix) => InputDecoration(
-        labelText: label,
+        labelText: _l(label),
         suffixText: suffix,
         filled: true,
         fillColor: AppColors.inputFill,
@@ -134,7 +141,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('기준 환율 입력'),
+          title: Text(_l('기준 환율 입력')),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -142,13 +149,13 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Text(
-              '현찰 살 때 기준 환율과 운임 확인 적용 환율 보정을 입력합니다.',
+            Text(
+              _l('현찰 살 때 기준 환율과 운임 확인 적용 환율 보정을 입력합니다.'),
               style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '운임 확인 적용 환율 = 기준 환율 + 운임 확인 적용 환율 보정',
+            Text(
+              _l('운임 확인 적용 환율 = 기준 환율 + 운임 확인 적용 환율 보정'),
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
@@ -178,7 +185,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
               child: ElevatedButton.icon(
                 onPressed: _busy ? null : _save,
                 icon: const Icon(Icons.save_outlined),
-                label: Text(_busy ? '처리 중...' : '기준 환율 저장'),
+                label: Text(_l(_busy ? '처리 중...' : '기준 환율 저장')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

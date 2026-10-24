@@ -609,7 +609,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
       if (row['cargo'] is Map) _cargoRows = [Map<String, dynamic>.from(row['cargo'])];
       if (_scope == 'statement' && row['statement'] is Map) {
         _confirmed = Map<String, dynamic>.from(row['statement']);
-        _route = '${_confirmed!['route']}'; _year = '${_confirmed!['shipment_year']}';
+        _route = '${RouteCatalog.localizedLabel('${_confirmed!['route']}', widget.language)}'; _year = '${_confirmed!['shipment_year']}';
         _voyage = '${_confirmed!['voyage']}'; _receipt.text = '${_confirmed!['receipt_number']}';
       }
     }
@@ -778,7 +778,7 @@ class _DomesticWaybillEditorState extends State<DomesticWaybillEditor> with Shar
         decoration: InputDecoration(labelText: t('statementNumber'), hintText: t('exampleStatement')),
         onChanged: (_) => setState(_invalidate), onFieldSubmitted: (_) => _confirmStatement()),
       OutlinedButton(key: const Key('delivery-confirm-statement'), onPressed: _busy || _finding || _filtersLoading ? null : _confirmStatement, child: Text(t('confirmStatement'))),
-      if (_confirmed != null) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('${t('statementConfirmed')}\n${_confirmed!['route']} · ${_confirmed!['shipment_year']} / ${_confirmed!['voyage']} · ${_confirmed!['receipt_number']}${_cargoCount == null ? '' : '\n${t('cargoCount')} $_cargoCount'}')),
+      if (_confirmed != null) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('${t('statementConfirmed')}\n${RouteCatalog.localizedLabel('${_confirmed!['route']}', widget.language)} · ${_confirmed!['shipment_year']} / ${_confirmed!['voyage']} · ${_confirmed!['receipt_number']}${_cargoCount == null ? '' : '\n${t('cargoCount')} $_cargoCount'}')),
     ]);
   }
   Widget _cargoSelector() => Column(children: [
@@ -955,5 +955,3 @@ class _DomesticEventEditorState extends State<DomesticEventEditor> with SharedUi
     ),
   );
 }
-
-
