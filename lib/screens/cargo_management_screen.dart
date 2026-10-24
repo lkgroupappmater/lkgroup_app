@@ -1,3 +1,6 @@
+import '../core/cargo_number_input.dart';
+import '../core/cargo_entry_text.dart';
+import '../core/shipment_customer_prefill.dart';
 import '../widgets/delivery_note_highlight.dart';
 import '../core/measurement_input.dart';
 import '../widgets/measurement_warning.dart';
@@ -195,13 +198,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     _syncEditControllers();
   }
 
-  String _boxNumberForRequest() {
-    final raw = _boxNumberController.text.trim();
-    if (raw.isEmpty) return '';
-    final prefix = RouteCatalog.boxPrefixFor(_route);
-    if (prefix.isEmpty) return raw;
-    return '$prefix$raw';
-  }
+  String _boxNumberForRequest() => CargoNumberInput.complete(_boxNumberController.text, RouteCatalog.boxPrefixFor(_route));
 
   void _submitSearch() {
     if (_busy) return;
@@ -1124,14 +1121,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 controller: _boxNumberController,
                 textInputAction: TextInputAction.search,
                 onSubmitted: (_) => _submitSearch(),
-                keyboardType: RouteCatalog.boxPrefixFor(_route).isEmpty
-                    ? TextInputType.text
-                    : TextInputType.number,
-                inputFormatters: RouteCatalog.boxPrefixFor(_route).isEmpty
-                    ? null
-                    : <TextInputFormatter>[
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
-                      ],
+                keyboardType: TextInputType.text,
+                inputFormatters: [CargoNumberInput.formatter(RouteCatalog.boxPrefixFor(_route))],
                 decoration: _decoration(
                   RouteCatalog.boxExampleFor(_route).isEmpty
                       ? _l('박스번호')
@@ -1246,7 +1237,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                   controller: _editBoxNumberController,
                   keyboardType: TextInputType.number,
                   inputFormatters: <TextInputFormatter>[
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9()\-]')),
                   ],
                   decoration: _decoration(_l('박스번호'), Icons.inventory_2_outlined).copyWith(
                     prefixText: _selectedBoxPrefix(),
@@ -1382,6 +1373,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     if (mounted) setState(() => _busy = false);
     if (!mounted) return;
 
+    final box = TextEditingController(text: nextBox);
+    final zone = TextEditingController();
+    bool boxEdited = false;
     final invoice = TextEditingController();
     final name = TextEditingController();
     final phone = TextEditingController();
@@ -1391,6 +1385,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     final width = TextEditingController();
     final height = TextEditingController();
 
+    final prefill = ShipmentCustomerPrefill(name: name, phone: phone, zone: zone, notes: notes,
+      scope: () => '$_route|$year|$_voyage',
+      lookup: (name, phone) => ShipmentService.instance.customerDefaults(route: _route, year: year, voyage: _voyage, name: name, phone: phone));
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1400,13 +1397,15 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                readOnly: true,
-                controller: TextEditingController(text: nextBox),
-                decoration: InputDecoration(labelText: _l('박스번호')),
+                controller: box,
+                onChanged: (_) => boxEdited = true,
+                decoration: InputDecoration(labelText: CargoEntryText.value(widget.language, 'number')),
               ),
               TextField(controller: invoice, decoration: InputDecoration(labelText: _l('송장번호'))),
               TextField(controller: name, decoration: InputDecoration(labelText: _l('이름/라오스 수령인'))),
               TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: _l('연락처'))),
+              TextField(controller: zone, decoration: InputDecoration(labelText: _l('구획'))),
+              AnimatedBuilder(animation: prefill, builder: (context, child) => Text(CargoEntryText.value(widget.language, prefill.status))),
               TextField(controller: notes, decoration: InputDecoration(labelText: _l('기타 내용'))),
               Row(children: [
                 Expanded(child: TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('무게(kg)')))),
@@ -1434,11 +1433,13 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
     if (saved == true) {
       setState(() => _busy = true);
       try {
-        await ShipmentService.instance.adminAddShipmentRow(
+        await prefill.runNow();
+        final created = await ShipmentService.instance.createShipment(
           route: _route,
           year: year,
           voyage: _voyage,
-          boxNumber: nextBox,
+          boxNumber: boxEdited ? box.text : null,
+          unloadingZone: zone.text,
           invoiceNumber: invoice.text,
           consigneeName: name.text,
           consigneePhone: phone.text,
@@ -1448,7 +1449,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
           widthCm: num.tryParse(width.text.trim()),
           heightCm: num.tryParse(height.text.trim()),
         );
-        _message(_lf('{box} 박스 행을 추가했습니다.', {'box': nextBox}));
+        _message(_lf('{box} 박스 행을 추가했습니다.', {'box': '${created['box_number'] ?? box.text}'}));
         await _search();
       } catch (error) {
         _message('${_l('박스 행 추가 실패')}: $error');
@@ -1457,6 +1458,9 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
       }
     }
 
+    prefill.dispose();
+    box.dispose();
+    zone.dispose();
     invoice.dispose();
     name.dispose();
     phone.dispose();

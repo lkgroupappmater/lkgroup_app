@@ -366,6 +366,33 @@ class ShipmentService {
     );
   }
 
+  Future<Map<String, dynamic>> customerDefaults({required String route, required int year,
+    required String voyage, required String name, required String phone}) async {
+    if (!SupabaseConfig.isConfigured) return const {};
+    final result = await SupabaseService.client.rpc('manager_shipment_customer_defaults', params: {
+      'p_route': route, 'p_year': year, 'p_voyage': voyage.replaceAll('항차', '').trim(),
+      'p_name': name, 'p_phone': phone,
+    });
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  Future<Map<String, dynamic>> createShipment({required String route, required int year,
+    required String voyage, String? boxNumber, String invoiceNumber = '', String consigneeName = '',
+    String consigneePhone = '', String notes = '', String unloadingZone = '', int quantity = 1,
+    DateTime? receivedAt, num? weightKg, num? lengthCm, num? widthCm, num? heightCm}) async {
+    MeasurementInput.validate({'weight_kg': weightKg, 'length_cm': lengthCm, 'width_cm': widthCm, 'height_cm': heightCm});
+    if (!SupabaseConfig.isConfigured) return const {};
+    final result = await SupabaseService.client.rpc('manager_create_shipment', params: {
+      'p_route': route, 'p_year': year, 'p_voyage': voyage.replaceAll('항차', '').trim(),
+      'p_box_number': boxNumber?.trim(), 'p_invoice_number': invoiceNumber.trim(),
+      'p_consignee_name': consigneeName.trim(), 'p_consignee_phone': consigneePhone.trim(),
+      'p_notes': notes.trim(), 'p_unloading_zone': unloadingZone.trim(), 'p_quantity': quantity,
+      'p_received_at': receivedAt?.toIso8601String(), 'p_weight_kg': weightKg,
+      'p_length_cm': lengthCm, 'p_width_cm': widthCm, 'p_height_cm': heightCm,
+    });
+    return Map<String, dynamic>.from(result as Map);
+  }
+
   Future<String> getNextBoxNumber({
     required String route,
     required int year,
@@ -642,3 +669,4 @@ class ShipmentService {
   static num? _num(dynamic value) => num.tryParse('${value ?? ''}'.trim());
   static String _escape(String value) => value.replaceAll(',', '');
 }
+
