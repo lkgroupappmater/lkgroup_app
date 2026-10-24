@@ -496,7 +496,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               key: const ValueKey('cargo-list-download'),
               onPressed: _selected == null || _exporting || _recalculating
                   ? null : () => _export(cargoOnly: true),
-              icon: const Icon(Icons.table_chart_outlined),
+              icon: const Icon(Icons.download_outlined),
               label: Text(_downloadText( '입고 내역만 Excel', 'Cargo list only · Excel', 'Excel · ລາຍການຮັບສິນຄ້າ')),
             ),
             const SizedBox(height: 8),
