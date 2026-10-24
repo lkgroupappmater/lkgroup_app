@@ -6,10 +6,12 @@ import '../services/domestic_tracking_service.dart';
 typedef RegistryRow = Map<String, dynamic>;
 
 class CustomerRegistryBulkEditor extends StatefulWidget {
-  const CustomerRegistryBulkEditor({super.key, required this.rows, required this.language, required this.merge, required this.callApi});
+  const CustomerRegistryBulkEditor({super.key, required this.rows, required this.language, required this.merge, required this.callApi, this.embedded = false, this.onFinished, this.onBusyChanged});
   final List<RegistryRow> rows;
   final AppLanguage language;
   final bool merge;
+  final bool embedded;
+  final ValueChanged<bool>? onFinished, onBusyChanged;
   final Future<RegistryRow> Function(String, RegistryRow) callApi;
   @override
   State<CustomerRegistryBulkEditor> createState() => _CustomerRegistryBulkEditorState();
@@ -46,20 +48,20 @@ class _CustomerRegistryBulkEditorState extends State<CustomerRegistryBulkEditor>
   Future<void> _save() async {
     if (_busy || !valid || !mappingValid || !changed || (mergeCount > 0 && !_reviewed) || !_form.currentState!.validate()) return;
     setState(() { _busy = true; _message = null; });
+    widget.onBusyChanged?.call(true);
     try {
       await widget.callApi('customers_bulk', {'confirmed': true, 'reason': _reason.text, 'rows': widget.rows.map((c) {
         final id = '${c['id']}', f = _fields[id]!;
         final keep = _targets[id] == id;
         return {'id': id, 'updated_at': c['updated_at'], 'target_id': _targets[id], 'customer_no': keep ? int.parse(f[0].text) : c['customer_no'], 'name': keep ? f[1].text.trim() : c['name'], 'phone': keep ? f[2].text.trim() : c['phone']};
       }).toList()});
-      if (valid) { setState(() => _busy = false); Navigator.pop(context, true); }
+      if (valid) { setState(() => _busy = false); if (widget.embedded) { widget.onFinished?.call(true); } else { Navigator.pop(context, true); } }
     } catch (e) { if (valid) setState(() => _message = t(e is DomesticTrackingException ? e.code : 'error')); }
-    finally { if (mounted) setState(() => _busy = false); }
+    finally { if (mounted) { setState(() => _busy = false); widget.onBusyChanged?.call(false); } }
   }
   @override
-  Widget build(BuildContext context) => PopScope(canPop: !_busy, child: Scaffold(
-    appBar: AppBar(title: Text(t(widget.merge ? 'bulkMerge' : 'bulkEdit'))),
-    body: Form(key: _form, child: ListView(padding: const EdgeInsets.all(16), children: [
+  Widget build(BuildContext context) {
+    final content = Form(key: _form, child: ListView(padding: const EdgeInsets.all(16), children: [
       Text('${t('selectedCustomers')}: ${widget.rows.length}'),
       if (widget.merge) ...[
         Text(t('bulkMergeHelp')), Text(t('mergeHelp')),
@@ -77,8 +79,15 @@ class _CustomerRegistryBulkEditorState extends State<CustomerRegistryBulkEditor>
       if (_message != null) Text(_message!),
       if (_busy) const LinearProgressIndicator(),
       FilledButton(key: const ValueKey('bulk-save'), onPressed: _busy || !changed || !mappingValid || (mergeCount > 0 && !_reviewed) ? null : _save, child: Text(t('bulkSave'))),
-    ])),
-  ));
+    ]));
+    if (widget.embedded) return Column(children: [
+      Row(children: [Expanded(child: Text(t(widget.merge ? 'bulkMerge' : 'bulkEdit'), style: Theme.of(context).textTheme.titleSmall)),
+        IconButton(key: const ValueKey('bulk-close'), tooltip: t('close'), onPressed: _busy ? null : () => widget.onFinished?.call(false), icon: const Icon(Icons.close)),
+      ]),
+      Expanded(child: content),
+    ]);
+    return PopScope(canPop: !_busy, child: Scaffold(appBar: AppBar(title: Text(t(widget.merge ? 'bulkMerge' : 'bulkEdit'))), body: content));
+  }
   Widget _row(RegistryRow c) {
     final id = '${c['id']}', f = _fields[id]!, keep = _targets[id] == id;
     return Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

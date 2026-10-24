@@ -224,15 +224,17 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  Future<void> _export([ExcelExportBatch? base]) async {
+  String _downloadText(String ko, String en, String lo) => switch (widget.language) { AppLanguage.korean => ko, AppLanguage.english => en, AppLanguage.lao => lo };
+
+  Future<void> _export({ExcelExportBatch? base, bool cargoOnly = false}) async {
     final selected = base ?? _selected;
     if (selected == null || _exporting) return;
     setState(() {
       _exporting = true;
-      _message = '원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...';
+      _message = cargoOnly ? _downloadText( '입고 내역을 만드는 중입니다...', 'Preparing cargo list...', 'ກຳລັງສ້າງລາຍການຮັບສິນຄ້າ...') : '원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...';
     });
     try {
-      final result = await ExcelExportService.instance.exportAndSave(selected);
+      final result = await ExcelExportService.instance.exportAndSave(selected, cargoOnly: cargoOnly, language: widget.language.code);
       if (!mounted) return;
       setState(() {
         _message = result.saved
@@ -252,7 +254,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       ListTile(title: Text(_l('최신 BASE Excel 다운로드'))),
       for (final base in _bases) ListTile(title: Text(_routeText(base.routeLabel)), onTap: () => Navigator.pop(context, base)),
     ])));
-    if (selected != null && mounted) await _export(selected);
+    if (selected != null && mounted) await _export(base: selected);
   }
 
   Color _jobColor(ExcelImportJobStatus status) {
@@ -490,10 +492,18 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
 
             const SizedBox(height: 10),
 
+            OutlinedButton.icon(
+              key: const ValueKey('cargo-list-download'),
+              onPressed: _selected == null || _exporting || _recalculating
+                  ? null : () => _export(cargoOnly: true),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: Text(_downloadText( '입고 내역만 Excel', 'Cargo list only · Excel', 'Excel · ລາຍການຮັບສິນຄ້າ')),
+            ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _selected == null || _exporting || _recalculating
                   ? null
-                  : _export,
+                  : () => _export(),
               icon: const Icon(Icons.download_outlined),
               label: Text(
                 _l(_exporting
