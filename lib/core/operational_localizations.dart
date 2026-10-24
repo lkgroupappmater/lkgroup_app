@@ -17,7 +17,7 @@ class OperationalLocalizations {
       'completed': ['완료', 'Completed', 'ສຳເລັດ'],
     };
     final label = labels[value];
-    return label == null ? value : sharedText(language, label[0], label[1], label[2]);
+    return label == null ? value : label[language == AppLanguage.english ? 1 : language == AppLanguage.lao ? 2 : 0];
   }
 
   static final _templates = sharedKoreanTextKeys.keys
