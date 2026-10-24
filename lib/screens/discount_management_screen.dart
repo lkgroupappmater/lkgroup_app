@@ -127,7 +127,7 @@ class _DiscountManagementScreenState
                           ...RouteCatalog.routes.map(
                             (e) => DropdownMenuItem(
                               value: RouteCatalog.keyFor(e),
-                              child: Text(e),
+                              child: Text(_routeText(e)),
                             ),
                           ),
                         ],
@@ -424,7 +424,7 @@ class _DiscountManagementScreenState
                             ...RouteCatalog.routes.map(
                               (e) => DropdownMenuItem(
                                 value: RouteCatalog.keyFor(e),
-                                child: Text(e),
+                                child: Text(_routeText(e)),
                               ),
                             ),
                           ],

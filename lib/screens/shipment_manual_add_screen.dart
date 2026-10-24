@@ -332,7 +332,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
                     decoration:
                         _decoration('항차', Icons.confirmation_number_outlined),
                     items: _voyages
-                        .map((v) => DropdownMenuItem(value: v, child: Text(OperationalLocalizations.text(widget.language, v))))
+                        .map((v) => DropdownMenuItem(value: v, child: Text(ShipmentPeriodLabels.voyage(v, widget.language))))
                         .toList(),
                     onChanged: _busy
                         ? null

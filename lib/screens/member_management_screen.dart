@@ -631,12 +631,12 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
     );
   }
 
-  String _roleLabel(dynamic value) => switch (value?.toString()) {
+  String _roleLabel(dynamic value) => _l(switch (value?.toString()) {
         'admin' => '관리자(총괄)',
         'staff' => '관리자(직원)',
         'partner' => '협력/파트너사',
         _ => '일반 회원',
-      };
+      });
 }
 
 class _AdminMemberRegistrationDialog extends StatefulWidget {
