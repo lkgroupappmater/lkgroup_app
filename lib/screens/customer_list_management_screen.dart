@@ -1,3 +1,4 @@
+import '../widgets/delivery_note_highlight.dart';
 import '../core/shipment_period_labels.dart';
 import '../core/route_catalog.dart';
 import '../core/operational_localizations.dart';
@@ -435,8 +436,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
                 Text('Zone ${r['zone']}',style:const TextStyle(fontSize:11,fontWeight:FontWeight.w700)),
               ])),
               title:Text('${r['name']}',style:const TextStyle(fontWeight:FontWeight.w800)),
-              subtitle:Text([if('${r['phone']}'.isNotEmpty)'${r['phone']}',_l('수량 ${r['quantity']}'),if(note.isNotEmpty)note].join(' · '),
-                maxLines:2,overflow:TextOverflow.ellipsis),
+              subtitle:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text([if('${r['phone']}'.isNotEmpty)'${r['phone']}',_l('수량 ${r['quantity']}')].join(' · ')),if(note.isNotEmpty)DeliveryNoteHighlight(row:{...r,'route':_route,'shipment_year':_year,'voyage':_voyage},child:Text(note,maxLines:2,overflow:TextOverflow.ellipsis))]),
               trailing:IconButton(tooltip:_l('영수증 번호 / Zone 수정'),onPressed:()=>_edit(r),icon:const Icon(Icons.edit_outlined,size:20)));
           })),
         Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),
@@ -453,3 +453,5 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     );
   }
 }
+
+

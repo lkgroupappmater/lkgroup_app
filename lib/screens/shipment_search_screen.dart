@@ -1,3 +1,4 @@
+import '../widgets/delivery_note_highlight.dart';
 import 'unknown_cargo_media_screen.dart';
 import '../core/waybill_intake_text.dart';
 import '../widgets/auto_refresh_state.dart';
@@ -305,7 +306,8 @@ class _ShipmentSearchBodyState extends State<ShipmentSearchBody> with AutoRefres
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
+                  DeliveryNoteHighlight.field(
+                    row: row,
                     controller: note,
                     maxLines: 3,
                     decoration: InputDecoration(
@@ -1673,4 +1675,5 @@ class ShipmentSearchScreen extends StatelessWidget {
         ),
       );
 }
+
 

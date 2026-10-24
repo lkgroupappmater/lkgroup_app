@@ -1,3 +1,4 @@
+import '../widgets/delivery_note_highlight.dart';
 import '../core/measurement_input.dart';
 import '../widgets/measurement_warning.dart';
 import '../core/receipt_delivery_cost.dart';
@@ -666,6 +667,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
               '${_weightOneDecimal(item['weight_kg'])} kg / $size',
             ),
             _infoRow(_l('입고날짜'), receivedDate),
+                  if ('${item['notes'] ?? item['special_note_auto'] ?? ''}'.trim().isNotEmpty || '${item['special_note_auto'] ?? ''}'.trim().isNotEmpty)
+                    DeliveryNoteHighlight(row: item, child: _infoRow(_l('비고'), '${item['notes'] ?? ''}'.trim().isNotEmpty ? '${item['notes']}' : '${item['special_note_auto'] ?? ''}')),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -1266,7 +1269,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 decoration: _decoration(_l('연락처'), Icons.phone_outlined),
               ),
               const SizedBox(height: 8),
-              TextField(
+              DeliveryNoteHighlight.field(
+                row: _results.firstWhere((r) => _selectedIds.contains('${r['id']}'), orElse: () => <String,dynamic>{}),
                 controller: _editNoteController,
                 maxLines: 3,
                 decoration: _decoration(_l('기타 내용'), Icons.edit_note_outlined),
@@ -1590,7 +1594,7 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 ),
               TextField(controller: name, decoration: InputDecoration(labelText: _l('이름/수령인'))),
               TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: _l('연락처'))),
-              TextField(controller: notes, decoration: InputDecoration(labelText: _l('기타 내용'))),
+              DeliveryNoteHighlight.field(row: one ?? <String,dynamic>{}, controller: notes, decoration: InputDecoration(labelText: _l('기타 내용'))),
               if (_isManager) ...[
                 TextField(controller: weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('무게(kg)'))),
                 TextField(controller: length, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _l('가로(cm)'))),
@@ -1768,7 +1772,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                 ),
               ),
               const SizedBox(height: 8),
-              TextField(
+              DeliveryNoteHighlight.field(
+                row: first,
                 controller: notes,
                 maxLines: 3,
                 decoration: InputDecoration(
@@ -2806,6 +2811,8 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
                     '${_weightOneDecimal(item['weight_kg'])} kg / $size',
                   ),
                   _infoRow(_l('입고날짜'), receivedDate),
+                  if ('${item['notes'] ?? item['special_note_auto'] ?? ''}'.trim().isNotEmpty || '${item['special_note_auto'] ?? ''}'.trim().isNotEmpty)
+                    DeliveryNoteHighlight(row: item, child: _infoRow(_l('비고'), '${item['notes'] ?? ''}'.trim().isNotEmpty ? '${item['notes']}' : '${item['special_note_auto'] ?? ''}')),
                 ],
               ),
             ),
@@ -3055,3 +3062,5 @@ class _CargoManagementScreenState extends State<CargoManagementScreen> with Auto
         ),
       );
 }
+
+
