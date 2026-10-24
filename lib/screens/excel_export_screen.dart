@@ -224,12 +224,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
+  String _downloadText(String ko, String en, String lo) => switch (widget.language) { AppLanguage.korean => ko, AppLanguage.english => en, AppLanguage.lao => lo };
+
   Future<void> _export({ExcelExportBatch? base, bool cargoOnly = false}) async {
     final selected = base ?? _selected;
     if (selected == null || _exporting) return;
     setState(() {
       _exporting = true;
-      _message = cargoOnly ? sharedText(widget.language, '입고 내역을 만드는 중입니다...', 'Preparing cargo list...', 'ກຳລັງສ້າງລາຍການຮັບສິນຄ້າ...') : '원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...';
+      _message = cargoOnly ? _downloadText( '입고 내역을 만드는 중입니다...', 'Preparing cargo list...', 'ກຳລັງສ້າງລາຍການຮັບສິນຄ້າ...') : '원본 Excel 모양을 유지하면서 최신 자료를 반영 중입니다...';
     });
     try {
       final result = await ExcelExportService.instance.exportAndSave(selected, cargoOnly: cargoOnly, language: widget.language.code);
@@ -495,7 +497,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
               onPressed: _selected == null || _exporting || _recalculating
                   ? null : () => _export(cargoOnly: true),
               icon: const Icon(Icons.table_chart_outlined),
-              label: Text(sharedText(widget.language, '입고 내역만 Excel', 'Cargo list only · Excel', 'Excel · ລາຍການຮັບສິນຄ້າ')),
+              label: Text(_downloadText( '입고 내역만 Excel', 'Cargo list only · Excel', 'Excel · ລາຍການຮັບສິນຄ້າ')),
             ),
             const SizedBox(height: 8),
             FilledButton.icon(

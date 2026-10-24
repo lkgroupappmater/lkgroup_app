@@ -134,7 +134,7 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
         child: CustomerRegistryBulkEditor(key: ValueKey('bulk-$_bulkVersion'), rows: _bulkRows!, language: widget.language, merge: _bulkMerge, callApi: _call,
           embedded: true, onFinished: _finishBulk, onBusyChanged: (value) { if (mounted && _bulkRows != null) setState(() => _busy = value); }),
       )),
-      Expanded(child: ListView(key: const ValueKey('registry-list'), controller: _listScroll, padding: const EdgeInsets.all(8), children: [
+      Expanded(key: const ValueKey('registry-list-pane'), child: ListView(key: const ValueKey('registry-list'), controller: _listScroll, padding: const EdgeInsets.all(8), children: [
         for (final c in _rows) Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Checkbox(key: ValueKey('select-${c['id']}'), value: _selected.containsKey(c['id']), onChanged: _busy ? null : (v) => _select(c, v ?? false)),
