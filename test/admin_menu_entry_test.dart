@@ -1,4 +1,6 @@
+// ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 import 'dart:convert';
+import 'package:lkgroup_app/services/live_data_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -40,6 +42,12 @@ void main() {
     expect(find.textContaining('Visible member'), findsOneWidget);
     expect(find.byKey(const Key('member-customer-id-management')), findsOneWidget);
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('고객 ID 관리')), findsNothing);
+    final before = calls.length;
+    LiveDataService.instance.topics = {'profiles','shipments'};
+    LiveDataService.instance.notifyListeners();
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pumpAndSettle();
+    expect(calls.length, before);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -71,6 +79,12 @@ void main() {
     expect(calls.any((r) => r.url.path.endsWith('/admin_save_voyage_settlement_snapshot')), isFalse);
     final request = calls.singleWhere((r) => r.url.path.endsWith('/voyage_settlement_snapshots'));
     expect(request.url.queryParameters['select'], isNot(contains('receipts')));
+    final before = calls.length;
+    LiveDataService.instance.topics = {'profiles','shipments'};
+    LiveDataService.instance.notifyListeners();
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pumpAndSettle();
+    expect(calls.length, before);
     await tester.pumpWidget(const SizedBox());
   });
 }

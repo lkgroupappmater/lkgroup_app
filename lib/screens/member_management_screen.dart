@@ -34,6 +34,8 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
+  bool get autoRefreshAllowed => false;
+  @override
   Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadMembers(); } finally { _automaticLoad = false; } }
 
   String _submittedSearch = '';

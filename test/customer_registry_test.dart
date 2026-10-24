@@ -29,6 +29,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('quick-phone-row1'))); await tester.pumpAndSettle();
     expect(queries.last['query'], '0001'); expect(tester.takeException(), isNull);
   });
+  testWidgets('selected editor opens below controls without resetting the customer list', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1000); tester.view.devicePixelRatio = 1;
+    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
+    final many = List.generate(30, (i) => {...rows[1], 'id': 'row$i', 'name': 'Name $i'});
+    await tester.pumpWidget(MaterialApp(home: CustomerRegistryScreen(callApi: (a,b) async => {'customers': many, 'total': 30, 'summary': {'customers': 30}, 'has_more': false})));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-row0'))); await tester.pump();
+    await tester.drag(find.byKey(const ValueKey('registry-list')), const Offset(0, -500)); await tester.pumpAndSettle();
+    final controller = tester.widget<ListView>(find.byKey(const ValueKey('registry-list'))).controller!;
+    final offset = controller.offset;
+    await tester.tap(find.text('선택 항목 일괄 수정')); await tester.pumpAndSettle();
+    expect(controller.offset, offset);
+    expect(find.byKey(const ValueKey('registry-workspace')), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('registry-workspace'))).dy, greaterThan(tester.getBottomLeft(find.text('선택 항목 일괄 수정').first).dy));
+    await tester.tap(find.byKey(const ValueKey('bulk-close'))); await tester.pumpAndSettle();
+    expect(controller.offset, offset); expect(find.byKey(const ValueKey('registry-workspace')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('selected contacts save together with no required reason', (tester) async {
     largeView(tester); final writes = <Map<String, dynamic>>[];
     await tester.pumpWidget(MaterialApp(home: CustomerRegistryScreen(callApi: (action, body) async {

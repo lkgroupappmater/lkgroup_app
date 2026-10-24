@@ -21,6 +21,9 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
   final _search = TextEditingController();
   final _listScroll = ScrollController();
   List<CustomerRow> _rows = [];
+  List<CustomerRow>? _bulkRows;
+  bool _bulkMerge = false;
+  int _bulkVersion = 0;
   CustomerRow _summary = {};
   final Map<String, CustomerRow> _selected = {};
   Future<CustomerRow> _call(String action, CustomerRow body) => widget.callApi?.call(action, body) ?? WaybillIntakeService.call(action, body);
@@ -79,10 +82,14 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
       else { _message = t('bulkHelp'); }
     });
   }
-  Future<void> _bulk(bool merge) async {
-    final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CustomerRegistryBulkEditor(rows: _selected.values.toList(), language: widget.language, merge: merge, callApi: _call)));
-    if (valid && saved == true) {
-      setState(() => _selected.clear());
+  void _bulk(bool merge) {
+    if (_busy || _selected.isEmpty) return;
+    setState(() { _bulkRows = _selected.values.map((r) => Map<String, dynamic>.of(r)).toList(); _bulkMerge = merge; _bulkVersion++; });
+  }
+  Future<void> _finishBulk(bool saved) async {
+    if (!valid) return;
+    setState(() { _bulkRows = null; _busy = false; if (saved) _selected.clear(); });
+    if (saved) {
       await _load();
       if (valid) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('bulkSaved'))));
     }
@@ -122,6 +129,11 @@ class _CustomerRegistryScreenState extends State<CustomerRegistryScreen> {
         TextButton(onPressed: _busy || _selected.isEmpty ? null : () => setState(() => _selected.clear()), child: Text(t('clearSelection'), style: const TextStyle(fontSize: 12))),
       ])),
       if (_busy) const LinearProgressIndicator(), if (_message != null) Text(_message!),
+      if (_bulkRows != null) Expanded(child: Card(
+        key: const ValueKey('registry-workspace'),
+        child: CustomerRegistryBulkEditor(key: ValueKey('bulk-$_bulkVersion'), rows: _bulkRows!, language: widget.language, merge: _bulkMerge, callApi: _call,
+          embedded: true, onFinished: _finishBulk, onBusyChanged: (value) { if (mounted && _bulkRows != null) setState(() => _busy = value); }),
+      )),
       Expanded(child: ListView(key: const ValueKey('registry-list'), controller: _listScroll, padding: const EdgeInsets.all(8), children: [
         for (final c in _rows) Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [

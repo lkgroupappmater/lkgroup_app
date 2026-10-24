@@ -77,7 +77,7 @@ class ExcelExportService {
     return rows.map((r) => ExcelExportBatch(routeKey: '${r['route_key']}', routeLabel: '${r['route_label']}', year: DateTime.now().year, voyage: '00', hasBaseTemplate: true)).toList();
   }
 
-  Future<ExcelExportResult> exportAndSave(ExcelExportBatch batch) async {
+  Future<ExcelExportResult> exportAndSave(ExcelExportBatch batch, {bool cargoOnly = false, String language = 'ko'}) async {
     if (!SupabaseConfig.isConfigured) {
       return const ExcelExportResult(
         saved: false,
@@ -85,15 +85,16 @@ class ExcelExportService {
         message: 'Supabase 설정을 확인해 주세요.',
       );
     }
-    if (!batch.hasVoyageTemplate && !batch.hasBaseTemplate) {
+    if (!cargoOnly && !batch.hasVoyageTemplate && !batch.hasBaseTemplate) {
       throw StateError(
         '${batch.routeLabel} 기본 Excel 폼이 DB에 등록되어 있지 않습니다.',
       );
     }
 
     final isBase = batch.voyage == '00';
+    if (cargoOnly && isBase) throw StateError('항차를 선택해 주세요.');
     List<Map<String, dynamic>> settlementRows = [];
-    if (!isBase) {
+    if (!isBase && !cargoOnly) {
     if (AuthService.instance.currentUser?.role == UserRole.admin) await SupabaseService.client.rpc('admin_apply_customer_id_receipts', params: {'p_route': batch.routeLabel, 'p_year': batch.year, 'p_voyage': batch.voyage});
     await SupabaseService.client.rpc('admin_finalize_excel_batch_rules_fast', params: {
       'p_route': batch.routeLabel, 'p_year': batch.year,
@@ -121,11 +122,12 @@ class ExcelExportService {
     }
 
     final response = await SupabaseService.client.functions.invoke(
-      'export-shipment-excel',
+      cargoOnly ? 'export-cargo-list' : 'export-shipment-excel',
       body: {
         'route_key': batch.routeKey,
         'route_label': batch.routeLabel,
-        'shipment_rows': settlementRows,
+        if (!cargoOnly) 'shipment_rows': settlementRows,
+        if (cargoOnly) 'language': language,
         'shipment_year': batch.year,
         'voyage': batch.voyage,
         if (isBase) 'refresh_base': true,
