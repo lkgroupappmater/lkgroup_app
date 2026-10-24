@@ -27,6 +27,8 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> with Au
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
+  bool get autoRefreshAllowed => false;
+  @override
   Future<void> refreshAutomatically() async { if (!canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _items.where(_fieldFilter.matches).toList(growable: false);
 
@@ -297,7 +299,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> with Au
 
     return Scaffold(
       appBar: AppBar(
-        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'title':'제목','content':'내용','created_at':'작성일','is_pinned':'상단 고정'}, onChanged: () => setState(() {})),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'title':'제목','content':'내용','created_at':'작성일','is_pinned':'상단 고정'}, onChanged: () { setState(() {}); _load(); }),
         title: Text(_u('공지 및 안내 목록 관리')),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,

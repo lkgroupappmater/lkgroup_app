@@ -27,6 +27,8 @@ class _DiscountManagementScreenState
   @override
   Set<String> get autoRefreshTopics => {'*'};
   @override
+  bool get autoRefreshAllowed => false;
+  @override
   Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<DiscountRule> _rules = const [];
   String _route = 'all';

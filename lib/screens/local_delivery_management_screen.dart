@@ -24,6 +24,8 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   @override
   Set<String> get autoRefreshTopics => {'customers', 'local_delivery_profiles'};
   @override
+  bool get autoRefreshAllowed => false;
+  @override
   Future<void> refreshAutomatically() async { if (_searched) await _load(silent: true); }
   bool _searched = false;
   final _fieldFilter = ManagementFieldFilter();
