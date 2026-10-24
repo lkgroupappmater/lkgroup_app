@@ -390,7 +390,7 @@ class _ShipmentManualAddScreenState extends State<ShipmentManualAddScreen> {
               decoration: _decoration('연락처', Icons.phone_outlined),
             ),
             const SizedBox(height: 10),
-            TextField(controller: _zone, decoration: _decoration('구획', Icons.location_on_outlined)),
+            TextField(controller: _zone, decoration: _decoration('구획', Icons.inventory_2_outlined)),
             const SizedBox(height: 10),
             AnimatedBuilder(animation: _prefill, builder: (context, child) {
               final text = CargoEntryText.value(widget.language, _prefill.status);
