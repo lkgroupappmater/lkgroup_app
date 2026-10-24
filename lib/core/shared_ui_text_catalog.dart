@@ -937,9 +937,9 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "lo": "ບໍ່ມີສິດເບິ່ງ ຫຼື ແກ້ໄຂ."
 },
   "domestic.INVALID_BATCH": {
-  "ko": "송장번호는 한 번에 1~20개까지 등록할 수 있습니다.",
-  "en": "Register 1–20 tracking numbers at a time.",
-  "lo": "ລົງທະບຽນໄດ້ 1–20 ເລກຕໍ່ຄັ້ງ."
+  "ko": "송장번호는 한 번에 1~50개까지 등록할 수 있습니다.",
+  "en": "Register 1–50 tracking numbers at a time.",
+  "lo": "ລົງທະບຽນໄດ້ 1–50 ເລກຕໍ່ຄັ້ງ."
 },
   "domestic.INVALID_IMAGE": {
   "ko": "JPG, PNG, WebP 사진만 등록할 수 있습니다.",
@@ -1002,9 +1002,9 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "lo": "ເລືອກເສັ້ນທາງ, ປີ, ຖ້ຽວ ແລະ ປ້ອນເລກ ແລ້ວກວດໃບລາຍການ."
 },
   "domestic.TOO_MANY_PHOTOS": {
-  "ko": "기존 사진을 포함해 송장당 최대 10장까지 등록할 수 있습니다.",
-  "en": "Each waybill can have up to 10 photos, including existing photos.",
-  "lo": "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 10 ຮູບ ລວມຮູບເກົ່າ."
+  "ko": "기존 사진을 포함해 송장당 최대 50장까지 등록할 수 있습니다.",
+  "en": "Each waybill can have up to 50 photos, including existing photos.",
+  "lo": "ແຕ່ລະໃບສົ່ງມີໄດ້ສູງສຸດ 50 ຮູບ ລວມຮູບເກົ່າ."
 },
   "domestic.TOO_MANY_REQUESTS": {
   "ko": "잠시 후 다시 조회해 주세요.",
@@ -1042,9 +1042,9 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "lo": "ທັງໝົດ"
 },
   "domestic.autoRefreshHint": {
-  "ko": "등록·조회 시 배송 이력을 자동 확인합니다. 화면을 열어 둔 동안 5분마다 갱신합니다.",
-  "en": "History is checked automatically when saving or viewing, and every 5 minutes while this screen is open.",
-  "lo": "ກວດປະຫວັດອັດຕະໂນມັດເມື່ອບັນທຶກ ຫຼື ເບິ່ງ ແລະ ທຸກ 5 ນາທີຂະນະເປີດໜ້ານີ້."
+  "ko": "조건을 선택한 뒤 검색을 누르면 배송 이력을 확인합니다. 최신 이력은 배송 이력 조회를 눌러 확인하세요.",
+  "en": "Choose the filters, then press Search. Use Check delivery history to request the latest events.",
+  "lo": "ເລືອກເງື່ອນໄຂ ແລ້ວກົດຄົ້ນຫາ. ກົດກວດປະຫວັດຈັດສົ່ງເພື່ອເບິ່ງຂໍ້ມູນລ່າສຸດ."
 },
   "domestic.cargo": {
   "ko": "명세서·화물 선택",
@@ -1317,9 +1317,9 @@ const sharedTextDefaults = <String, Map<String, String>>{
   "lo": "ຮູບຈະເຊື່ອມກັບໃບສົ່ງທີ່ບັນທຶກພ້ອມກັນ ແລະ ສະແດງໃນໃບລາຍການ. ໃຊ້ JPG, PNG ຫຼື WebP."
 },
   "domestic.photoInput": {
-  "ko": "송장 사진 여러 장 선택 · 최대 10장, 장당 5MB, 합계 15MB",
-  "en": "Select waybill photos · up to 10, 5MB each, 15MB total",
-  "lo": "ເລືອກຫຼາຍຮູບ · ສູງສຸດ 10 ຮູບ, ຮູບລະ 5MB, ລວມ 15MB"
+  "ko": "송장 사진 여러 장 선택 · 최대 50장, 장당 5MB, 합계 250MB",
+  "en": "Select waybill photos · up to 50, 5MB each, 250MB total",
+  "lo": "ເລືອກຫຼາຍຮູບ · ສູງສຸດ 50 ຮູບ, ຮູບລະ 5MB, ລວມ 250MB"
 },
   "domestic.prev": {
   "ko": "이전 페이지",
