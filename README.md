@@ -49,3 +49,11 @@ build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
 `node_modules`, Flutter 빌드 캐시, 과거 패치·백업 파일은 저장소에 포함하지
 않습니다. 런타임에 불필요한 중복 Excel 원본 폴더와 로고 중간 작업물도
 제거했습니다. 필요할 때 `flutter pub get` 또는 `npm install`로 의존성을 다시 생성합니다.
+
+
+## 앱·웹 공통 변경 기준
+
+로직·권한·DB 변경은 [공통 동기화 기준](docs/app-web-sync-contract.md)에 따라 앱과 웹을 함께 확인합니다.
+서버 반영, 웹 배포, 앱 소스 반영, 앱 패치/설치본 배포 및 실제 기기 적용 상태를 구분합니다.
+명세서 미리보기와 일괄 PDF 출력은 웹과 같은 `statement_delivery_context`를 사용합니다.
+공용 DB 마이그레이션은 이미 적용되어 있어 앱 업데이트 시 재실행하지 않습니다.

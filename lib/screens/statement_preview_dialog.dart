@@ -20,7 +20,6 @@ import '../core/document_form_painter.dart';
 import '../services/document_pdf_export.dart';
 import '../services/freight_service.dart';
 import '../services/statement_service.dart';
-import '../services/customer_benefit_service.dart';
 import '../services/receipt_extra_cost_service.dart';
 
 
@@ -141,8 +140,13 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
         throw StateError('명세서에 표시할 화물 데이터가 없습니다.');
       }
       final freight = await FreightService.instance.calculate(rows);
-      final inland = await CustomerBenefitService.instance
-          .inlandRuleForRows(widget.routeLabel, rows);
+      final inland = await StatementService.instance.deliveryForReceipt(
+        route: widget.routeLabel,
+        year: widget.year,
+        voyage: widget.voyage,
+        receiptNumber: widget.receiptNumber,
+        rows: rows,
+      );
       final extraCosts = await ReceiptExtraCostService.instance.list(
         route: widget.routeLabel,
         year: widget.year,
@@ -849,8 +853,13 @@ class StatementDocumentRenderer {
       throw StateError('${request.receiptNumber}: 명세서 데이터가 없습니다.');
     }
     final freight = await FreightService.instance.calculate(rows);
-    final inland = await CustomerBenefitService.instance
-        .inlandRuleForRows(request.routeLabel, rows);
+    final inland = await StatementService.instance.deliveryForReceipt(
+      route: request.routeLabel,
+      year: request.year,
+      voyage: request.voyage,
+      receiptNumber: request.receiptNumber,
+      rows: rows,
+    );
     final extraCosts = await ReceiptExtraCostService.instance.list(
       route: request.routeLabel,
       year: request.year,
@@ -935,3 +944,4 @@ class StatementDocumentRenderer {
     }
   }
 }
+
