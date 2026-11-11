@@ -142,7 +142,7 @@ class ExcelImportService {
       onProgress?.call(0.30, 'V00 BASE 확인 · 실제 화물 데이터는 변경하지 않습니다');
       await _importLocalDeliveryProfiles(bytes, workbook, routeKey: routeKey, policyRules: policyRules);
 
-      onProgress?.call(0.45, '시내·지방배송 BASE 반영 완료 · 할인 고객 갱신 중');
+      onProgress?.call(0.45, '시내·지방배송 BASE 읽기 완료 · 할인 고객 확인 중');
       final customerRuleResult =
           await _importCustomerDiscountRules(workbook, routeKey: routeKey, policyRules: policyRules);
       await _importStatementShareRules(workbook, routeKey: routeKey, policyRules: policyRules);
@@ -163,7 +163,9 @@ class ExcelImportService {
             customerRuleResult.waitingForPhone,
         message:
             'V00 BASE Update 완료: 실제 화물은 추가/삭제/덮어쓰기 하지 않고, '
-            '$routeLabel 경로의 기준 원본·배송·할인·선공유 규칙을 갱신했습니다. 기존 항차 번호와 정산은 유지됩니다.',
+            '$routeLabel 경로의 기준 원본·할인·선공유 규칙을 갱신했습니다. '
+            '${routeKey == 'kr_la_sea' || routeKey == 'kr_la_air' ? '라오스 지방·시내배송 정보와 배송 색상은 한국→라오스 해상·항공에 공통 적용됩니다. ' : ''}'
+            '항차별 예외는 유지됩니다.',
       );
     }
 
@@ -1826,3 +1828,4 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
+

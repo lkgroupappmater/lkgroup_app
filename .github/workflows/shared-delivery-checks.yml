@@ -1,0 +1,21 @@
+name: Shared delivery checks
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**synchronize_shared_local_delivery_base.sql'
+      - 'tests/shared-delivery-base.test.mjs'
+      - 'tests/fixtures/shared-delivery-before.sql'
+      - 'shared-backend/export-shipment-excel/**'
+      - '.github/workflows/shared-delivery-checks.yml'
+permissions:
+  contents: read
+jobs:
+  shared-delivery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.10
+      - run: node --test tests/shared-delivery-base.test.mjs
