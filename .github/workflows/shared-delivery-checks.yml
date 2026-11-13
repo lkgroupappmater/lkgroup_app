@@ -2,7 +2,7 @@ name: Shared delivery checks
 on:
   pull_request:
     paths:
-      - 'supabase/migrations/**synchronize_shared_local_delivery_base.sql'
+      - 'supabase/migrations/**synchronize_kr_la_sea_air_delivery_base.sql'
       - 'tests/shared-delivery-base.test.mjs'
       - 'tests/fixtures/shared-delivery-before.sql'
       - 'shared-backend/export-shipment-excel/**'

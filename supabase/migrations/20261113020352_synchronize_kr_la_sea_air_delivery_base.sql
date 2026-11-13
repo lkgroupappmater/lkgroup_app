@@ -231,6 +231,8 @@ update public.excel_workbook_policies set changes=changes where (route_key,shipm
  select route_key,shipment_year,voyage from public.excel_workbook_policies where voyage='00' and route_key=any(array['kr_la_sea','kr_la_air']) order by updated_at desc limit 1
 );
 
-revoke all on function public.lk_import_excel_base_rules_impl(text,jsonb,jsonb,jsonb) from public,anon,authenticated;
+-- Preserve existing RPC privileges. The internal implementation is already
+-- owner-only; authenticated/service_role access to import_excel_workbook_policy
+-- remains unchanged by CREATE OR REPLACE FUNCTION.
 -- Existing public RPC keeps the same signature for installed app and website clients.
 notify pgrst, 'reload schema';

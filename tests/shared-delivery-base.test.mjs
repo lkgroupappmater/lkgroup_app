@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {planDeliveryBlocks} from '../shared-backend/export-shipment-excel/shared-delivery-blocks.mjs';
-const sql=fs.readFileSync(new URL('../supabase/migrations/20261111060858_synchronize_shared_local_delivery_base.sql',import.meta.url),'utf8');
+const sql=fs.readFileSync(new URL('../supabase/migrations/20261113020352_synchronize_kr_la_sea_air_delivery_base.sql',import.meta.url),'utf8');
 let db;
 const rows=async(q,params=[]) => (await db.query(q,params)).rows;
 const all=()=>rows('select * from local_delivery_profiles order by route_key,source_no');
