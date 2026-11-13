@@ -1,5 +1,6 @@
 // Presentation-only patch for the official KR -> LA sea/air statement forms.
 // Keep the XLSM package, VBA, drawings, source values and existing rounding intact.
+import {statementDiscountFooter} from './statement-footer.mjs';
 export function formatStatementAmounts(files, routeKey) {
   if (!['kr_la_sea', 'kr_la_air'].includes(routeKey)) return;
   const decode = bytes => new TextDecoder().decode(bytes);
@@ -59,18 +60,21 @@ export function formatStatementAmounts(files, routeKey) {
     if (!path) continue;
     if (!path.startsWith('xl/')) path = `xl/${path}`;
     let xml = decode(files[path]);
+    const footer = statementDiscountFooter(xml);
+    if (!footer) continue;
+    const r = footer.row;
     const cell = ref => xml.match(new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*>[\\s\\S]*?<\\/c>`))?.[0];
-    const formula = ref => cell(ref)?.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1];
-    const source = formula('M19'), deduction = formula('N19');
-    if (source && deduction?.includes('M19')) {
-      const old = cell('N19');
-      xml = xml.replace(old, () => old.replace(/(<f\b[^>]*>)[\s\S]*?(<\/f>)/, (_, a, b) => a + deduction.replace(/\bM19\b/g, () => `(${source})`) + b));
-      const rateCell = cell('M19');
-      xml = xml.replace(rateCell, () => rateCell.replace(/(<f\b[^>]*>)[\s\S]*?(<\/f>)/,
-        (_, a, b) => a + 'IFERROR(N19/MAX(0,N17-$W$11),0)' + b).replace(/<v>[^<]*<\/v>/, '<v>0</v>'));
+    const source = footer.source, deduction = footer.deduction;
+    if (source && footer.expanded !== deduction) {
+      const old = cell(`N${r}`);
+      xml = xml.replace(old, () => old.replace(/<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/, () => `<f>${escape(footer.expanded)}</f>`));
+      const rateCell = cell(`M${r}`);
+      xml = xml.replace(rateCell, () => rateCell.replace(/<f\b[^>]*?(?:\/>|>[\s\S]*?<\/f>)/,
+        () => `<f>IFERROR(N${r}/MAX(0,N${r-2}-$W$11),0)</f>`).replace(/<v>[^<]*<\/v>/, '<v>0</v>'));
     }
-    xml = xml.replace(/<c\b[^>]*\br="(M(?:18|19|20)|N(?:17|18|19|20|21|22|23|24))"[^>]*>/g, (tag, ref) => {
-      const kind = ref.startsWith('M') ? 'percent' : ({N22: 'kip', N23: 'thb', N24: 'krw'}[ref] || 'usd');
+    const targets = [...[r-1,r,r+1].map(n => `M${n}`), ...Array.from({length:8},(_,i) => `N${r-2+i}`)];
+    xml = xml.replace(new RegExp(`<c\\b[^>]*\\br="(${targets.join('|')})"[^>]*>`, 'g'), (tag, ref) => {
+      const kind = ref.startsWith('M') ? 'percent' : ({[`N${r+3}`]: 'kip', [`N${r+4}`]: 'thb', [`N${r+5}`]: 'krw'}[ref] || 'usd');
       return setAttr(tag, 's', styleFor(Number(tag.match(/\bs="(\d+)"/)?.[1] || 0), kind));
     });
     files[path] = encode(xml);
@@ -80,3 +84,4 @@ export function formatStatementAmounts(files, routeKey) {
   styles = styles.replace(xfBlock[0], () => `<cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs>`);
   files['xl/styles.xml'] = encode(styles);
 }
+
