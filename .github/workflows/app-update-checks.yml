@@ -29,7 +29,9 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          # Match the successful validated release toolchain; do not float to a new SDK.
           channel: stable
+          flutter-version: '3.47.9'
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/core/customer_discounts.dart lib/services/freight_service.dart lib/services/excel_import_service.dart lib/services/excel_export_service.dart lib/screens/excel_export_screen.dart lib/screens/excel_statement_controls_screen.dart test/customer_discounts_test.dart
