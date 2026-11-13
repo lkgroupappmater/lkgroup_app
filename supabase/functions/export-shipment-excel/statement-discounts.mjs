@@ -1,7 +1,8 @@
 // Targeted formula repair. All other XLSM parts, styles and VBA stay unchanged.
+import {statementDiscountFooter} from './statement-footer.mjs';
 const decode = bytes => new TextDecoder().decode(bytes);
 const encode = text => new TextEncoder().encode(text);
-const unescape = text => text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&');
+const unescape = text => text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&apos;', "'").replaceAll('&amp;', '&');
 const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const cellPattern = ref => new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`);
 const formulaAt = (xml, ref) => {
@@ -95,16 +96,18 @@ export function separateStatementDiscounts(files, routeKey, collectChanges = tru
   for (const {name, path} of sheets) {
     if (!/^(LKS|LKA)\s/.test(name) && name !== '명세서 빠르게 확인') continue;
     let sheet = decode(files[path]);
-    const end = formulaAt(sheet, 'N19')?.match(/'물품 입고 내역'!\$AE\$6:\$AE\$(\d+)/)?.[1];
-    if (!end) throw Error(`Unsupported special discount formula: ${name}`);
+    const footer = statementDiscountFooter(sheet);
+    if (!footer) throw Error(`명세서 특별할인 수식 위치를 확인할 수 없습니다: ${name}. 원본 수식과 행 맞춤을 확인해 주세요.`);
+    const {row, end} = footer, target = `N${row}`;
     const rate = `IFERROR(INDEX('물품 입고 내역'!$AP$6:$AP$${end},MATCH($N$2,'물품 입고 내역'!$N$6:$N$${end},0)),0)`;
     const amount = `IFERROR(INDEX('물품 입고 내역'!$AE$6:$AE$${end},MATCH($N$2,'물품 입고 내역'!$N$6:$N$${end},0)),0)`;
-    const f = `IFERROR(MIN(MAX(0,MAX(0,N17-$W$11)*(${rate})+(${amount})),MAX(0,N17-$W$11-N18)),0)`;
-    if (formulaAt(sheet, 'N19') !== f) {
-      sheet = putFormula(sheet, 'N19', f);
-      if (collectChanges) changes.push({sheet:name,ref:'N19',formula:f});
+    const f = `IFERROR(MIN(MAX(0,MAX(0,N${row-2}-$W$11)*(${rate})+(${amount})),MAX(0,N${row-2}-$W$11-N${row-1})),0)`;
+    if (formulaAt(sheet, target) !== f) {
+      sheet = putFormula(sheet, target, f);
+      if (collectChanges) changes.push({sheet:name,ref:target,formula:f});
       files[path] = encode(sheet);
     }
   }
   return changes;
 }
+

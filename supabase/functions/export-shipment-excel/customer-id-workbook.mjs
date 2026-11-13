@@ -1,10 +1,11 @@
+import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
 // shared with the authored spreadsheet prototype and the online exporter.
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-09-28.merged-delivery-id-v8';
+export const ID_WORKBOOK_VERSION='2026-11-13.shared-delivery-layout-v10';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -85,9 +86,17 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  for(const s of context.sources??shipments)if(s.customer_no){const c=byNumber.get(s.customer_no);add(matchKey(s.source_name??s.consignee_name,s.source_phone??s.consignee_phone),s.source_name??s.consignee_name,s.source_phone??s.consignee_phone,c);}
  const ids=[['고객 ID 자동 매칭'],['기존 숫자 ID는 유지하며 LK 형식으로 표시합니다.'],['신규 고객 ID 시트에서 빈 번호를 임시 배정합니다. 업로드 후 DB 확정 ID로 최신 자료를 받으세요.'],['연락처만 같은 고객과 보호된 복수 이름은 자동 통합하지 않습니다.'],['매칭 Key','등록 이름 / 별칭','등록 연락처','고객 번호','고객 고유 ID'],...[...keys.values()].sort((a,b)=>a[3]-b[3]||a[0].localeCompare(b[0]))];
  const legacy=context.numberingMode==='legacy';
+ const groupsByCustomer=new Map(),groupsByIdentity=new Map(),groupsByReceipt=new Map();
+ const addGroup=(map,key,row)=>{if(!map.has(key))map.set(key,[]);map.get(key).push(row);};
+ for(const s of shipments){
+  const special=specialName(s.consignee_name);
+  addGroup(groupsByCustomer,`${typeof s.customer_no}:${s.customer_no}|${special}`,s);
+  addGroup(groupsByIdentity,identityKey(s.customer_no,special),s);
+  addGroup(groupsByReceipt,String(s.receipt_number||''),s);
+ }
  const controls=[['명세서 번호 관리'],['E열: 수동 번호 / F열: 잠금 선택 / G열: 고정할 번호'],['인쇄 전 G열 번호를 확인하고 F열을 잠금으로 선택하세요. 각 행에서 해제할 수 있습니다.'],['신규 고객의 임시 번호는 업로드 후 DB가 확정합니다. 임시 명세서는 확정·인쇄 전에 최신 자료로 교체하세요.'],['매칭 Key','고객 고유 ID','고객명 / 구분','자동 번호','수동 지정 번호','번호 상태','고정 번호','적용 번호','화물 행 수','확인 사항','저장 당시 상태','승인 대기 번호 유지']];
  if(!legacy){for(const c of customers){for(const special of [false,true]){
-  const row=controls.length+1,key=identityKey(c.customer_no,special),group=shipments.filter(s=>s.customer_no===c.customer_no&&specialName(s.consignee_name)===special),numbers=[...new Set(group.map(s=>s.receipt_number).filter(Boolean))];
+  const row=controls.length+1,key=identityKey(c.customer_no,special),group=groupsByCustomer.get(`${typeof c.customer_no}:${c.customer_no}|${special}`)||[],numbers=[...new Set(group.map(s=>s.receipt_number).filter(Boolean))];
   if(numbers.length>1)throw new Error('같은 고객 ID에 서로 다른 명세서 번호가 있습니다. 번호 변경 승인을 완료하거나 고객 ID 구분을 확인하세요.');
   const current=numbers.length===1?numbers[0]:'',manual=group.find(s=>s.receipt_number_override)?.receipt_number_override??'',locked=group.some(s=>s.receipt_number_locked||s.data_locked),auto=statementCode(prefix,c.customer_no,special);
   const count=cargo?formula(`COUNTIF('물품 입고 내역'!$BE$6:$BE$${cargoLast},A${row})`,group.length):group.length;
@@ -112,7 +121,7 @@ export function makeIdentityTables(context,{prefix,shipments=[],deliveryRefs=new
  controls[4][13]='확인 순서';
  controls[3]=[String(controls[3]?.[0]||'')+' / 오프라인에서 새로 확인한 건은 N열에 기존 최댓값 다음 순서를 입력하세요.'];
  for(const row of controls.slice(5)){
-  const group=shipments.filter(x=>legacy?String(x.receipt_number||'')===row[3]:identityKey(x.customer_no,specialName(x.consignee_name))===row[0]);
+  const group=(legacy?groupsByReceipt.get(row[3]):groupsByIdentity.get(row[0]))||[];
   const order=recoveredOrder(group);row[13]=Number.isFinite(order)?order:'';
   row[10]=JSON.stringify({...JSON.parse(row[10]),recovered_order:row[13]||null});
  }
@@ -266,14 +275,14 @@ function refreshPolicyInputs(files,context,strings){
  files[path]=bytes(text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n)))));
 }
 
-export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false,preserveSharedMasters=true}={}){
+export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false,preserveSharedMasters=true,managedDelivery=false,preserveDeliveryLayout=false}={}){
  if(preserveSharedMasters)recoverDeliverySelectorMasters(files,sheetPath);
  const sharedMasters=preserveSharedMasters?captureSharedFormulaMasters(files):null;
- const result=applyCustomerIdWorkbookContent(files,context,{prefix,shipments,base});
+ const result=applyCustomerIdWorkbookContent(files,context,{prefix,shipments,base,managedDelivery,preserveDeliveryLayout});
  if(sharedMasters)restoreSharedFormulaMasters(files,sharedMasters);
  return result;
 }
-function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[],base=false}={}){
+function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[],base=false,managedDelivery=false,preserveDeliveryLayout=false}={}){
  const strings=sharedStrings(files),cargoPath=sheetPath(files,'물품 입고 내역'),deliveryRefs=new Map(),deliveryRefFormulas=new Map();
  refreshPolicyInputs(files,context,strings);
  // Refresh only editable delivery input columns, keeping existing calculation,
@@ -290,16 +299,22 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
    if(['A','B','D','E','F','G'].some(c=>read(row,c)))lastInput=row.n;
   }
   const updates=new Map(),set=(n,c,v)=>{if(!updates.has(n))updates.set(n,{});updates.get(n)[c]=v;};
+  const plan=planDeliveryBlocks(profiles,blocks,{
+   key:d=>matchKey(d.customer_name,d.phone_display||d.phone),
+   readKey:b=>matchKey(read(b.first,'B'),read(b.first,'E')),
+   create:number=>{const row=physical.find(r=>r.n>lastInput&&r.n<=800);if(!row)throw new Error(`${name}: 배송 입력 공간이 부족합니다.`);lastInput=row.n;const block={number,first:row,rows:[row]};blocks.push(block);return block;}
+  });
+  // Clear removed inputs and selectors, keeping workbook formula/style cells.
+  if(managedDelivery)for(const block of plan.unused){
+   if(preserveDeliveryLayout&&!read(block.first,'B'))continue;
+   for(const row of block.rows)for(const c of preserveDeliveryLayout?['B','C','D','E','G','H']:['A','B','C','D','E','F','G','H'])set(row.n,c,'');
+  }
   for(const d of profiles){
-   const number=d.original_source_no||((Number(d.source_no)>=10000&&Number(d.source_no)<20000)?Number(d.source_no)-10000:Number(d.source_no));
-   const numbered=blocks.filter(b=>b.number===number);
-   const profileKey=matchKey(d.customer_name,d.phone_display||d.phone);
-   let block=blocks.find(b=>(b.matchKey??=matchKey(read(b.first,'B'),read(b.first,'E')))===profileKey)||(numbered.length===1?numbered[0]:null);
-   if(!block){const row=physical.find(r=>r.n>lastInput&&r.n<=800);if(!row)throw new Error(`${name}: 배송 입력 공간이 부족합니다.`);lastInput=row.n;block={number:number||lastInput,first:row,rows:[row]};blocks.push(block);}
+   const number=deliveryNumber(d),block=plan.assigned.get(d);
    // Preserve every other carrier/address alternative already in the BASE.
    const choices=block.rows.filter(r=>read(r,'F')||read(r,'G')||r.n===block.first.n);
    const chosen=choices.find(r=>nameKey(read(r,'F'))===nameKey(d.local_company)&&read(r,'G')===String(d.destination_address??''))||choices.find(r=>d.local_company&&nameKey(read(r,'F'))===nameKey(d.local_company))||block.rows.find(r=>read(r,'H')==='사용')||block.first;
-   for(const [c,v] of Object.entries({A:block.number,B:d.customer_name,C:d.paid_by,D:d.alternate_name,E:d.phone_display||d.phone}))set(block.first.n,c,v);
+   for(const [c,v] of Object.entries({A:number,B:d.customer_name,C:d.paid_by,D:d.alternate_name,E:d.phone_display||d.phone}))set(block.first.n,c,v);
    set(chosen.n,'F',d.local_company);set(chosen.n,'G',d.destination_address);
    // H remains the workbook's existing address selector, with one active row.
    for(const row of block.rows)if(read(row,'F')||read(row,'G')||row.n===chosen.n)set(row.n,'H',row.n===chosen.n?'사용':'');
@@ -362,3 +377,5 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  }
  return {tables,applied:true,version:ID_WORKBOOK_VERSION};
 }
+
+

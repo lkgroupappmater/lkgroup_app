@@ -3,7 +3,12 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**synchronize_kr_la_sea_air_delivery_base.sql'
-      - 'tests/shared-delivery-base.test.mjs'
+      - 'tests/shared-delivery*.test.mjs'
+      - 'tests/excel_identity_handler.test.mjs'
+      - 'supabase/migrations/**preserve_shared_delivery_layout.sql'
+      - 'supabase/functions/export-shipment-excel/**'
+      - 'supabase/functions/prepare-shipment-identities/**'
+      - 'supabase/functions/finalize-shipment-excel/**'
       - 'tests/fixtures/shared-delivery-before.sql'
       - 'shared-backend/export-shipment-excel/**'
       - '.github/workflows/shared-delivery-checks.yml'
@@ -17,5 +22,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.10
-      - run: node --test tests/shared-delivery-base.test.mjs
+      - run: npm install --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.10 fflate@0.8.2
+      - run: node --test tests/shared-delivery*.test.mjs tests/excel_identity_handler.test.mjs

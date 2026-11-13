@@ -1,3 +1,4 @@
+import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
 import {rewriteWorksheetRows,worksheetRowEntries,worksheetMetadata} from './worksheet-rows.mjs';
 import { applyUnknownPrefixZones } from './unknown-zone.mjs';
 import { applyCustomerIdWorkbook, ID_WORKBOOK_VERSION } from './customer-id-workbook.mjs';
@@ -2044,6 +2045,24 @@ function wireStatementPaymentAccounts(files: Record<string, Uint8Array>): void {
     files[drawingPath] = strToU8(drawing);
   }
 }
+// This path only changes recognized minimum-freight formulas. No cargo import,
+// customer matching, receipt assignment, macro or styling pipeline is called.
+async function repairMinimumBytes(bytes:Uint8Array) {
+  const files=await unzipWorkbook(bytes,{Unzip});
+  validateWorkbookFormulas(files);
+  const repair=applyFreightMinimum(files);
+  const integrity={...validateWorkbookFormulas(files),freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count};
+  return {bytes:repair.changed_count?await zipWorkbook(files,{Zip,ZipPassThrough}):bytes,repair,integrity};
+}
+async function storeVerifiedMinimum(admin:any,path:string,bytes:Uint8Array,fileName:string,metadata:Record<string,unknown>={}) {
+  const bucket=admin.storage.from('shipment-excel-templates');
+  const uploaded=await bucket.upload(path,bytes,{upsert:false,metadata,contentType:fileName.endsWith('.xlsm')?'application/vnd.ms-excel.sheet.macroEnabled.12':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  if(uploaded.error)throw uploaded.error;
+  const downloaded=await bucket.download(path);
+  const hash=async(data:Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data))).map(v=>v.toString(16).padStart(2,'0')).join('');
+  if(downloaded.error||!downloaded.data||await hash(new Uint8Array(await downloaded.data.arrayBuffer()))!==await hash(bytes))throw new Error('최소 운임 수식 저장 검증 실패. 기존 원본을 유지합니다.');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -2084,6 +2103,30 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    if(body.action==='repair_freight_minimum') {
+      if(workerRequest||profile.role!=='admin')return json(403,{error:'관리자 권한이 필요합니다.'});
+      const route=String(body.route_key??''),year=Number(body.shipment_year),voyage=String(body.voyage??'');
+      if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
+      const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
+      if(found.error)throw found.error;const template=found.data;
+      if(template.storage_path.startsWith('minimum-freight-v1/'))return json(200,{ok:true,...template});
+      const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
+      if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
+      const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()));
+      if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
+      const path=`minimum-freight-v1/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
+      // Retain recovery metadata and the original object. A concurrent user
+      // upload wins: publish only if the exact source registration is unchanged.
+      // Use the signed-in administrator's existing RLS permissions. The service
+      // role intentionally has no UPDATE grant on this registration table.
+      const actorClient=createClient(supabaseUrl,Deno.env.get('SUPABASE_ANON_KEY')||serviceRoleKey,{global:{headers:{Authorization:authHeader}},auth:{persistSession:false,autoRefreshToken:false}});
+      let commit=actorClient.from('shipment_excel_templates').update({storage_path:path}).eq('id',template.id).eq('storage_path',template.storage_path);
+      commit=template.uploaded_at?commit.eq('uploaded_at',template.uploaded_at):commit.is('uploaded_at',null);
+      const saved=await commit.select('id').maybeSingle();
+      if(saved.error||!saved.data)throw saved.error??new Error('다른 작업에서 원본이 변경되었습니다. 목록을 새로고침해 주세요.');
+      return json(200,{ok:true,file_name:template.file_name,storage_path:path,integrity:fixed.integrity});
+    }
     const exporterRevision=Deno.env.get('DENO_DEPLOYMENT_ID')||ID_WORKBOOK_VERSION;
     if(workerRequest&&body.action==='automation_version')return json(200,{exporter_revision:exporterRevision,automation_version:ID_WORKBOOK_VERSION});
     const routeKey = String(body.route_key ?? '').trim();
@@ -2131,10 +2174,21 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       const {data:latest,error:latestError}=await admin.from('excel_base_sync_state').select('revision,completed_revision,status').eq('route_key',routeKey).single();
       if(latestError)throw latestError;
       if(canReuseValidatedBase(baseTemplate,latest,ID_WORKBOOK_VERSION)){
+        let downloadBytes=new Uint8Array(await blob.arrayBuffer());
+        let minimumIntegrity=baseTemplate.policy_summary.integrity;
+        if(minimumIntegrity.freight_minimum_version!==FREIGHT_MINIMUM_VERSION) {
+          const fixed=await repairMinimumBytes(downloadBytes);downloadBytes=fixed.bytes;minimumIntegrity=fixed.integrity;
+          if(fixed.repair.changed_count) {
+            const basePath=`base/${routeKey}/${crypto.randomUUID()}_${baseTemplate.file_name}`;
+            await storeVerifiedMinimum(admin,basePath,downloadBytes,baseTemplate.file_name);
+            const saved=await admin.rpc('lk_commit_validated_excel_base',{p_route_key:routeKey,p_revision:baseRevision,p_exporter_revision:exporterRevision,p_old_path:baseTemplate.storage_path,p_old_updated_at:baseTemplate.updated_at,p_path:basePath,p_file_name:baseTemplate.file_name,p_version:ID_WORKBOOK_VERSION,p_integrity:{...minimumIntegrity,stored_download_verified:true},p_actor:authData.user.id});
+            if(saved.error||!saved.data)throw saved.error??new Error('BASE가 변경되었습니다. 목록을 새로고침해 주세요.');
+          }
+        }
         const exportPath=`${routeKey}/${shipmentYear}/00/${crypto.randomUUID()}_${baseTemplate.file_name}`;
-        const {error:copyError}=await admin.storage.from('shipment-excel-exports').upload(exportPath,new Uint8Array(await blob.arrayBuffer()),{upsert:false,contentType:baseTemplate.file_name.endsWith('.xlsm')?'application/vnd.ms-excel.sheet.macroEnabled.12':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+        const {error:copyError}=await admin.storage.from('shipment-excel-exports').upload(exportPath,downloadBytes,{upsert:false,contentType:baseTemplate.file_name.endsWith('.xlsm')?'application/vnd.ms-excel.sheet.macroEnabled.12':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
         if(copyError)throw copyError;
-        return json(200,{ok:true,file_name:baseTemplate.file_name,automation_version:ID_WORKBOOK_VERSION,integrity:baseTemplate.policy_summary.integrity,storage_path:exportPath,shipment_count:0,mode:'validated-current-base',template_source:'base'});
+        return json(200,{ok:true,file_name:baseTemplate.file_name,automation_version:ID_WORKBOOK_VERSION,integrity:minimumIntegrity,storage_path:exportPath,shipment_count:0,mode:'validated-current-base',template_source:'base'});
       }
     }
     const useBase = baseTemplate && (isBaseRefresh || !voyageTemplate);
@@ -2353,6 +2407,18 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     });
     console.log('[EXCEL200C] unzip done');
 
+    // Preserve the uploaded delivery sheets in both BASEs, including carrier
+    // alternatives and blank slots. Never replace a voyage's own workbook form.
+    let deliveryLayoutSource:any=null;
+    if(useBase&&['kr_la_sea','kr_la_air'].includes(routeKey)){
+      const layout=baseTemplate?.policy_summary?.common_delivery_layout;
+      if(layout){
+        if(!['kr_la_sea','kr_la_air'].includes(layout.route_key)||typeof layout.storage_path!=='string'||
+          ![(`base/${layout.route_key}/`),(`macro-updates/${layout.route_key}/`)].some(p=>layout.storage_path.startsWith(p)))throw Error('잘못된 공통 배송 원본 경로입니다.');
+        deliveryLayoutSource=layout;
+      }
+    }
+
     recoverDeliverySelectorMasters(files,workbookSheetPath);
     const originalSharedMasters=captureSharedFormulaMasters(files);
 
@@ -2444,76 +2510,37 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       kipAdjustment:Number(exchangeRate.kip_adjustment??2000),thbAdjustment:Number(exchangeRate.thb_adjustment??1.5),krwAdjustment:Number(exchangeRate.krw_adjustment??40),
     });
     await new Promise<void>((resolve)=>setTimeout(resolve,0));
-    applyCustomerIdWorkbook(files,identityContext,{prefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false});
-    // BASE refreshes and voyage exports must both repair inherited presentation.
-    // Run after delivery input updates so newly filled number cells are covered.
-    formatDeliveryNumbers(files, routeKey);
-    // Patch133: Row data 하단 SYSTEM SETTLEMENT 중복 블록은 더 이상 추가하지 않습니다.
-// 수식 셀 자체는 보존하고, 오래된 calcChain만 정상적으로 제거합니다.
-    // calcChain을 파일만 지우고 관계/ContentType을 남기면 Excel이 복구 경고를 낼 수 있습니다.
-    delete files['xl/calcChain.xml'];
-
-    const relsPath = 'xl/_rels/workbook.xml.rels';
-    if (files[relsPath]) {
-      let relsXml = strFromU8(files[relsPath]);
-      relsXml = relsXml.replace(
-        /<Relationship\b[^>]*Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/calcChain"[^>]*\/>/g,
-        '',
-      );
-      files[relsPath] = strToU8(relsXml);
+    const identityContextEntry='_lk_internal_identity_context.json';
+    if(files[identityContextEntry])throw new Error('원본에 예약된 Excel 처리 파일이 있습니다. 원본 파일을 확인해 주세요.');
+    files[identityContextEntry]=strToU8(JSON.stringify({
+      version:1,routeKey,isBaseRefresh,identityContext,enrichedShipments,deliveryLayoutSource,
+      receiptPrefix:String(routeDefinition?.receipt_prefix||routeReceiptPrefix(routeKey)),
+      sharedMasters:[...originalSharedMasters].map(([path,masters])=>[path,[...masters]]),
+    }));
+    // Each Edge request has a 2-second CPU budget. Keep cargo preparation
+    // here, then use separate authenticated identity and finalization requests
+    // for every route and for both BASE and voyage exports.
+    const prepared = await zipWorkbook(files, { Zip, ZipPassThrough });
+    const target = new URL(supabaseUrl + '/functions/v1/prepare-shipment-identities');
+    for (const [key,value] of Object.entries({route:routeKey,year:String(shipmentYear),voyage:voyageToken,file_name:outputFileName})) target.searchParams.set(key,value);
+    console.log('[EXCEL] cargo preparation complete; identity and finalization delegated', prepared.byteLength);
+    const response = await fetch(target, {
+      method:'POST',headers:{Authorization:'Bearer '+serviceRoleKey,apikey:serviceRoleKey,'Content-Type':'application/octet-stream'},
+      body:prepared,signal:AbortSignal.timeout(90000),
+    });
+    const completed = await response.json().catch(()=>null);
+    if (!response.ok || !completed?.ok || !completed?.integrity?.stored_download_verified) {
+      throw new Error(completed?.error || 'Excel 최종 검증·저장 처리에 실패했습니다. 잠시 후 다시 다운로드해 주세요.');
     }
-
-    const contentTypesPath = '[Content_Types].xml';
-    if (files[contentTypesPath]) {
-      let contentTypesXml = strFromU8(files[contentTypesPath]);
-      contentTypesXml = contentTypesXml.replace(
-        /<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g,
-        '',
-      );
-      files[contentTypesPath] = strToU8(contentTypesXml);
-    }
-
-    // Excel에서 기존 VLOOKUP/INDEX/MATCH 수식을 다시 계산하도록 지정합니다.
-    let workbookXml = strFromU8(files['xl/workbook.xml']);
-    if (/<calcPr\b/.test(workbookXml)) {
-      workbookXml = workbookXml.replace(
-        /<calcPr\b[^>]*\/>/,
-        '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>',
-      );
-    } else {
-      workbookXml = workbookXml.replace(
-        '</workbook>',
-        '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/></workbook>',
-      );
-    }
-    files['xl/workbook.xml'] = strToU8(workbookXml);
-
-    // Native DEFLATE retains normal XLSM size without spending Edge CPU on a
-    // JavaScript compressor. VBA and all other parts remain byte-identical.
-    restoreSharedFormulaMasters(files,originalSharedMasters);
-    applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
-    const integrity=validateWorkbookFormulas(files);
-    upgradeStatementMacros(files);
-    console.log('[EXCEL200C] zip start');
-    const encoded = await zipWorkbook(files, { Zip, ZipPassThrough });
-    console.log('[EXCEL200C] zip done', encoded.byteLength);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const exportPath =
-      `${routeKey}/${shipmentYear}/${voyageToken}/${stamp}_${outputFileName}`;
-
-    const { error: uploadError } = await admin.storage
-      .from('shipment-excel-exports')
-      .upload(exportPath, encoded, {
-        upsert: false,
-        contentType: outputExtension === 'xlsm'
-          ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
-          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-    if (uploadError) throw uploadError;
+    const integrity=completed.integrity,exportPath=completed.storage_path;
 
     // A latest BASE download also refreshes the registered private BASE. This
     // does not re-import rules or cargo and never overwrites a concurrent upload.
     if (isBaseRefresh && profile.role === 'admin' && baseTemplate) {
+      // Copy the verified FINAL bytes, never the intermediate workbook.
+      const finalized=await admin.storage.from('shipment-excel-exports').download(exportPath);
+      if(finalized.error||!finalized.data)throw finalized.error??new Error('검증된 Excel 결과 다운로드 실패');
+      const encoded=new Uint8Array(await finalized.data.arrayBuffer());
       const basePath = `base/${routeKey}/${crypto.randomUUID()}_${outputFileName}`;
       const stored = await admin.storage.from('shipment-excel-templates').upload(basePath, encoded, {
         upsert: false,
@@ -2570,3 +2597,5 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     return json(500, { error: message });
   }
 });
+
+
