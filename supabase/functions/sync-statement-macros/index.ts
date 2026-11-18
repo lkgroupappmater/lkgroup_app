@@ -1,3 +1,4 @@
+import {captureTemplateStyles,assertTemplateStyles} from '../export-shipment-excel/template-style-guard.mjs';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 import {unzipSync,Zip,ZipPassThrough} from 'npm:fflate@0.8.2';
 import {upgradeStatementMacros} from '../export-shipment-excel/statement-macros.mjs';
@@ -19,6 +20,7 @@ Deno.serve(async(req)=>{
   const workbookText=new TextDecoder().decode(files['xl/workbook.xml']||new Uint8Array());
   const worksheetParts=Object.entries(files).filter(([path])=>/^xl\/worksheets\/sheet[^/]*\.xml$/.test(path));
   const audit={sheet_count:worksheetParts.length,vba_present:!!files['xl/vbaProject.bin'],archive_bytes:original.length,external_links:Object.keys(files).filter(p=>/^xl\/externalLinks\/externalLink[^/]*\.xml$/.test(p)).length,calculation_properties:workbookText.match(/<calcPr\b[^>]*\/>/)?.[0]||null,style_count:(new TextDecoder().decode(files['xl/styles.xml']||new Uint8Array()).match(/<xf\b/g)||[]).length};
+  const templateStyles=captureTemplateStyles(files);
   const result=upgradeStatementMacros(files),beforeFormat=new Map(Object.entries(files));
   formatDeliveryNumbers(files,job.route_key);
   const presentationChanges=Object.keys(files).filter(path=>files[path]!==beforeFormat.get(path)&&!equalBytes(files[path],beforeFormat.get(path)!));
@@ -46,7 +48,7 @@ Deno.serve(async(req)=>{
    const uploaded=await bucket.upload(target,encoded,{upsert:false,contentType:'application/vnd.ms-excel.sheet.macroEnabled.12'});if(uploaded.error)throw uploaded.error;
    const saved=await bucket.download(target);if(saved.error||!saved.data)throw saved.error||Error('Saved file unavailable');targetHash=await hash(encoded);if(await hash(new Uint8Array(await saved.data.arrayBuffer()))!==targetHash)throw Error('Saved workbook verification failed');
   }
-  const details={...result,audit,delivery_format_version:'delivery-numbers-11pt-v2',delivery_format_parts:presentationChanges,source_sha256:sourceHash,target_sha256:targetHash,changed_parts:changed,unrelated_parts_unchanged:true,stored_download_verified:true};
+  const details={...result,audit,template_styles:assertTemplateStyles(files,templateStyles),delivery_format_version:'delivery-numbers-11pt-v2',delivery_format_parts:presentationChanges,source_sha256:sourceHash,target_sha256:targetHash,changed_parts:changed,unrelated_parts_unchanged:true,stored_download_verified:true};
   const completed=await db.rpc('lk_finish_statement_macro_upgrade',{p_resource_key:job.resource_key,p_lease_token:job.lease_token,p_target_path:target,p_details:details});
   if(completed.error)throw completed.error;if(completed.data!==true&&target)await bucket.remove([target]);
   return Response.json({ok:true,resource:job.resource_key,...details,committed:completed.data});

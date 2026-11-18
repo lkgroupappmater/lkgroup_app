@@ -1,3 +1,5 @@
+import {repairApprovedTemplateHeaders} from './template-header-repair.mjs';
+import {beginTemplateStyleGuard} from './template-style-guard.mjs';
 import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
 import {rewriteWorksheetRows,worksheetRowEntries,worksheetMetadata} from './worksheet-rows.mjs';
 import { applyUnknownPrefixZones } from './unknown-zone.mjs';
@@ -1824,6 +1826,7 @@ function applyStatementWrapText(
   const xfList = [...cellXfsMatch[4].matchAll(
     /<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g,
   )].map(m => m[0]);
+  if (xfList.length !== Number(cellXfsMatch[2])) throw Error('Cannot safely resolve wrapped statement styles.');
   if (xfList.length === 0) return;
 
   const workbook = strFromU8(files['xl/workbook.xml']);
@@ -1838,13 +1841,17 @@ function applyStatementWrapText(
   const appendedXfs: string[] = [];
 
   const wrappedStyleFor = (styleIndex: number): number => {
-    const safeIndex =
-      styleIndex >= 0 && styleIndex < xfList.length ? styleIndex : 0;
+    if (styleIndex < 0 || styleIndex >= xfList.length) throw Error('Unknown statement wrap style');
+    const safeIndex = styleIndex;
     const cached = wrapStyleMap.get(safeIndex);
     if (cached != null) return cached;
 
-    const newIndex = xfList.length + appendedXfs.length;
-    appendedXfs.push(withWrapTextXf(xfList[safeIndex]));
+    const wrapped = withWrapTextXf(xfList[safeIndex]);
+    let newIndex = xfList.indexOf(wrapped);
+    if (newIndex < 0) {
+      const appended = appendedXfs.indexOf(wrapped);
+      newIndex = xfList.length + (appended >= 0 ? appended : appendedXfs.push(wrapped) - 1);
+    }
     wrapStyleMap.set(safeIndex, newIndex);
     return newIndex;
   };
@@ -2406,6 +2413,9 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       filter: (entry) => entry.name !== 'xl/calcChain.xml',
     });
     console.log('[EXCEL200C] unzip done');
+    const headerRepair=repairApprovedTemplateHeaders(files,String(template.storage_path));
+    beginTemplateStyleGuard(files,{headerRepair});
+    if(headerRepair)console.log('[EXCEL] approved header formats restored',JSON.stringify(headerRepair));
 
     // Preserve the uploaded delivery sheets in both BASEs, including carrier
     // alternatives and blank slots. Never replace a voyage's own workbook form.

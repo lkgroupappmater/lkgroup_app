@@ -1,3 +1,4 @@
+import {preserveTemplateHeaderFonts} from './template-header-macros.mjs';
 // MS-CFB / MS-OVBA edits preserve issued numbers, formulas and row-fit procedures.
 // Workbook presentation changes are limited to buttons, conditional fills and tabs.
 // Format references: Microsoft [MS-CFB] and [MS-OVBA] 2.3.4 / 2.4.1.
@@ -169,6 +170,8 @@ export function upgradeStatementMacros(files){
   let src,offsetRecord=-1,offset=0;
   if(dir){const name=ascii.encode(e.name),prefix=new Uint8Array(6);prefix[0]=25;put32(prefix,2,name.length);const moduleStart=indexOfBytes(dir,join([prefix,name]));if(moduleStart>=0){const termination=indexOfBytes(dir,new Uint8Array([43,0,0,0,0,0]),moduleStart),found=indexOfBytes(dir,new Uint8Array([49,0,4,0,0,0]),moduleStart);if(found>=0&&(termination<0||found<termination)){offsetRecord=found+6;offset=u32(dir,offsetRecord);}}}
   try{src=decompressVba(e.data.subarray(offset));}catch{continue;}
+  const preserved=preserveTemplateHeaderFonts(src);
+  if(preserved){src=preserved;e.data=compressVba(src);if(offset){if(offsetRecord<0)throw Error('Missing header module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
   const enhanced=enhanceStatementFeatures(src,e.name);
   if(enhanced){src=enhanced;e.data=compressVba(src);if(offset){if(offsetRecord<0)throw Error('Missing feature module offset');put32(dir,offsetRecord,0);dirChanged=true;}changed++;}
   if(/Workbook_(SheetActivate|SheetChange|Open)/.test(new TextDecoder().decode(src)))eventSources.push({module:e.name,source:new TextDecoder('euc-kr').decode(src)});
@@ -210,5 +213,6 @@ export function upgradeStatementMacros(files){
  if(changed){if(dirChanged)dirEntry.data=compressVba(dir);const cache=c.entries.find(e=>e.name==='_VBA_PROJECT');if(cache)cache.data=new Uint8Array([0xcc,0x61,0xff,0xff,0,3,0]);for(const e of c.entries)if(e.name.startsWith('__SRP_'))e.data=new Uint8Array();files['xl/vbaProject.bin']=writeCompound(c);}
  const {buttons}=renameStatementButtons(files);
  const specialButtons=addSpecialStatementButtons(files),buttonLayouts=fitStatementButtons(files),taxColors=applyTaxStatementColors(files);
- return {present:true,changed:!!(changed||buttons||specialButtons||buttonLayouts||taxColors),modules:changed,buttons,special_buttons:specialButtons,button_layout_parts:buttonLayouts,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'statements-36pt-yellow-tabs-v7'};
+ return {present:true,changed:!!(changed||buttons||specialButtons||buttonLayouts||taxColors),modules:changed,buttons,special_buttons:specialButtons,button_layout_parts:buttonLayouts,tax_color_parts:taxColors,grouped_sheet_guard:groupGuard,unguarded_group_refresh_found:unsafeGroupRefresh,workbook_events:eventSources,version:'statements-preserve-template-headers-v8'};
 }
+

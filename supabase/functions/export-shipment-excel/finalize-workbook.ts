@@ -1,3 +1,4 @@
+import {beginTemplateStyleGuard,finishTemplateStyleGuard,STYLE_CONTEXT_ENTRY} from './template-style-guard.mjs';
 import {strFromU8} from 'npm:fflate@0.8.2';
 import {applyUnknownPrefixZones} from './unknown-zone.mjs';
 import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
@@ -77,9 +78,12 @@ function decodeXmlText(value: string): string {
 
 
 export function finalizeWorkbook(files:Record<string,Uint8Array>){
+ const captureStage=files[STYLE_CONTEXT_ENTRY]?'source':'finalizer';
+ // Accept older in-flight exporters during the staged deployment.
+ if(captureStage==='finalizer')beginTemplateStyleGuard(files);
  applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
  const repair=applyFreightMinimum(files);
  const integrity={...validateWorkbookFormulas(files),freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count};
  upgradeStatementMacros(files);
- return integrity;
+ return {...integrity,template_styles:{...finishTemplateStyleGuard(files),capture_stage:captureStage}};
 }
