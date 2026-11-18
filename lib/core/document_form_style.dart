@@ -21,7 +21,9 @@ class DocumentFormStyle {
   static const currencyKip = Color(0xFFFFC21A);
   static const currencyThb = Color(0xFF91D18B);
   static const currencyKrw = Color(0xFF23B6D8);
-  static const tableTop = 266.0;
+  static const partyTop = 120.0;
+  static const partyRowHeight = 62.0;
+  static const tableTop = partyTop + partyRowHeight * 3;
   static const headerHeight = 52.0;
   static const rowHeight = 38.0;
   static const emptyRowHeight = 32.0;

@@ -46,13 +46,13 @@ class DocumentFormPainter {
       ('전화번호', '+856 20 9112 6780'),
     ];
     final rightValues = [('고객명/회사명', customer), ('연락처', phone), (lastLabel, lastValue)];
-    // The taller address row keeps the same font as the other party fields.
-    const heights = [42.0, 62.0, 42.0];
-    var top = 120.0;
+    // Equal rows fill both party columns, including the two-line address.
+    const rowHeight = DocumentFormStyle.partyRowHeight;
+    var top = DocumentFormStyle.partyTop;
     for (var i = 0; i < 3; i++) {
       for (var side = 0; side < 2; side++) {
         final pair = side == 0 ? leftValues[i] : rightValues[i];
-        final r = Rect.fromLTWH(side * w / 2, top, w / 2, heights[i]);
+        final r = Rect.fromLTWH(side * w / 2, top, w / 2, rowHeight);
         box(c, r, const Color(0xFFF1F7FC));
         final label = Rect.fromLTWH(r.left, r.top, 176, r.height);
         box(c, label, const Color(0xFFF1F7FC));
@@ -62,7 +62,7 @@ class DocumentFormPainter {
           Rect.fromLTRB(label.right + 8, r.top + 4, r.right - 8, r.bottom - 4), 20,
           center: true, bold: true, lineHeight: 1.25);
       }
-      top += heights[i];
+      top += rowHeight;
     }
   }
 
