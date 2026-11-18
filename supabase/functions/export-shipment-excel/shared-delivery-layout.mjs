@@ -15,12 +15,12 @@ export function deliverySheetIndex(files){
  const rels=new Map(tags(text(files['xl/_rels/workbook.xml.rels']),'Relationship').map(r=>[attr(r,'Id'),resolve('xl/workbook.xml',attr(r,'Target')||'')]));
  return tags(text(files['xl/workbook.xml']),'sheet').map((s,index)=>({name:entities(attr(s,'name')||''),index,path:rels.get(attr(s,'r:id'))}));
 }
-function styleMapper(target,source){
+export function styleMapper(target,source){
  let dst=text(target['xl/styles.xml']);const src=text(source['xl/styles.xml']);
  if(!src||!dst)throw Error('Delivery layout styles are missing');
  const tables={},names={numFmts:'numFmt',fonts:'font',fills:'fill',borders:'border',cellStyleXfs:'xf',cellXfs:'xf',dxfs:'dxf'};
  for(const [name,child] of Object.entries(names)){
-  const section=s=>s.match(new RegExp(`<${name}\\b[^>]*(?:/>|>[\\s\\S]*?</${name}>)`))?.[0]||'';
+  const section=s=>s.match(new RegExp(`<${name}\\b[^>]*?(?:/>|>[\\s\\S]*?</${name}>)`))?.[0]||'';
   tables[name]={from:tags(section(src),child),to:tags(section(dst),child),old:section(dst),mapped:new Map()};
  }
  const theme=text(source['xl/theme/theme1.xml']);
