@@ -1,0 +1,99 @@
+[
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": 10031,
+      "original_source_no": 31,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": "+856 20 1234 5678 / 020 8765 4321",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "province",
+      "alternate_name": "김수령"
+    },
+    "expected": "No. 31\n김수령\n+856 20 1234 5678 / 020 8765 4321\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  },
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": 10031,
+      "original_source_no": 31,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": "+856 20 1234 5678 / 020 8765 4321",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "province",
+      "alternate_name": "Receiver Jane"
+    },
+    "expected": "No. 31\nReceiver Jane\n+856 20 1234 5678 / 020 8765 4321\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  },
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": 10031,
+      "original_source_no": 31,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": "+856 20 1234 5678 / 020 8765 4321",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "province",
+      "alternate_name": "ຜູ້ຮັບ ສົມພອນ"
+    },
+    "expected": "No. 31\nຜູ້ຮັບ ສົມພອນ\n+856 20 1234 5678 / 020 8765 4321\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  },
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": 10031,
+      "original_source_no": 31,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": "+856 20 1234 5678 / 020 8765 4321",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "province",
+      "alternate_name": "Receiver <Jane> & Co."
+    },
+    "expected": "No. 31\nReceiver <Jane> & Co.\n+856 20 1234 5678 / 020 8765 4321\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  },
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": null,
+      "original_source_no": null,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": " ",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "city",
+      "alternate_name": "  "
+    },
+    "expected": "연결용 고객\n02012345678\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  },
+  {
+    "profile": {
+      "id": 31,
+      "active": true,
+      "source_no": 10031,
+      "original_source_no": null,
+      "customer_name": "연결용 고객",
+      "phone": "02012345678",
+      "phone_display": "+856 20 1234 5678 / 020 8765 4321",
+      "local_company": "HAL / ຮຸ່ງອາລຸນ",
+      "destination_address": "ບ້ານສີເມືອງ\nVientiane, Laos / 2층",
+      "delivery_type": "city",
+      "alternate_name": "City Receiver",
+      "paid_by": "선결제"
+    },
+    "expected": "No. 31\nCity Receiver\n+856 20 1234 5678 / 020 8765 4321\nHAL / ຮຸ່ງອາລຸນ\nບ້ານສີເມືອງ\nVientiane, Laos / 2층"
+  }
+]
