@@ -183,6 +183,8 @@ class LocalDeliveryRule {
       };
 
   String toStatementText() {
+    // Excel Receiver (column D) is display data, not the matching customer in B.
+    // Preserve its original script, phone formatting and address in every locale.
     final name = alternateName.isNotEmpty ? alternateName : customerName;
     final tel = phoneDisplay.isNotEmpty ? phoneDisplay : phone;
     final displayNo = originalSourceNo ?? (sourceNo == null

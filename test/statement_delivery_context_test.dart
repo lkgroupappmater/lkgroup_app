@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -68,6 +69,21 @@ void main() {
     expect(rule.isPrepaid, isTrue);
     expect(rule.displayColor, 'A1B2C3');
     expect(rule.destinationAddress, '배송지');
+  });
+  test('receipt delivery preserves Excel Receiver and original address text', () async {
+    final fixtures = jsonDecode(File('test-fixtures/statement-delivery-original-text.json').readAsStringSync()) as List;
+    for (final fixture in fixtures) {
+      final profile = Map<String, dynamic>.from(fixture['profile'] as Map);
+      response = {
+        'matches': [{'name': '고객 A', 'phone': '02012345678', 'id': profile['id']}],
+        'deliveries': [profile],
+        'appearance': {},
+      };
+      final rule = await load();
+      expect(rule.customerName, profile['customer_name']);
+      expect(rule.toStatementText(), fixture['expected']);
+      expect(rule.destinationAddress, profile['destination_address']);
+    }
   });
   test('unmatched or inactive profiles are never substituted by name or phone', () async {
     response['deliveries'] = [

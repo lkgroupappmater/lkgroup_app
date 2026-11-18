@@ -30,3 +30,11 @@
 
 Android 패치는 현재 저장소의 검증/배포 워크플로를 따른다. 패치 다운로드·재실행 또는 새 설치본이 필요한 경우 그 상태를 명시한다. iOS는 별도의 서명·빌드·배포 확인이 필요하다.
 
+
+## 명세서 배송 원문 계약 (2026-11-18)
+
+- 배송 연결은 기존 `statement_delivery_context.matches`의 허용된 배송 ID로 판단한다.
+- 출력 순서: 원본 번호 → Excel Receiver (`alternate_name`, D열) → 표시용 전화번호 → 배송업체 → 배송주소. 연결용 고객명 (`customer_name`, B열)은 Receiver가 비어 있을 때만 대체 표시한다.
+- 이름·전화·업체·주소의 문자, 내부 줄바꿈과 순서는 한국어/영어/라오스어 UI 모두 동일하다. 제목 등 화면 안내 문구만 번역한다. 웹 배송 본문에는 `translate="no"`를 적용한다.
+- BASE/항차별 정책 선택과 관리자/직원/회원의 명세서 접근 권한은 기존 공용 RPC를 유지한다. 원본 고객명이나 배송정보를 DB에서 덮어쓰지 않는다.
+- 양쪽 `test-fixtures/statement-delivery-original-text.json`으로 같은 입력과 예상 원문을 검증한다. 앱의 기존 `LocalDeliveryRule.toStatementText()`가 이미 Receiver 우선이므로 이번 수정에 앱 실행 코드 변경이나 DB 마이그레이션은 필요하지 않다.
