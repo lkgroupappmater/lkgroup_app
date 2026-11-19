@@ -29,9 +29,10 @@ pw.Page _twoUpPage(pw.ImageProvider image) {
   final width = PdfPageFormat.a4.width - _pageMargin * 2;
   final height = PdfPageFormat.a4.height - _pageMargin * 2 - PdfPageFormat.mm;
   final copyHeight = (height - _cutGap) / 2;
-  pw.Widget copy() => pw.SizedBox(
+  pw.Widget copy() => pw.Container(
         width: width,
         height: copyHeight,
+        alignment: pw.Alignment.center,
         child: pw.Image(image, width: width, height: copyHeight,
             fit: pw.BoxFit.contain),
       );
