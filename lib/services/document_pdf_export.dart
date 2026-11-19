@@ -1,10 +1,13 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+const _pageMargin = 7 * PdfPageFormat.mm;
+const _cutGap = 6 * PdfPageFormat.mm;
+
 pw.Widget _centerCutLine() => pw.Container(
-      height: 24,
+      height: _cutGap,
       alignment: pw.Alignment.center,
       child: pw.Row(
         children: List<pw.Widget>.generate(
@@ -19,6 +22,26 @@ pw.Widget _centerCutLine() => pw.Container(
       ),
     );
 
+// Keep two complete copies on one A4 page even when a translated address,
+// remark or additional cargo rows make the source image taller. Match the web
+// print layout: 7 mm margins, 6 mm cut gap and 1 mm rounding allowance.
+pw.Page _twoUpPage(pw.ImageProvider image) {
+  final width = PdfPageFormat.a4.width - _pageMargin * 2;
+  final height = PdfPageFormat.a4.height - _pageMargin * 2 - PdfPageFormat.mm;
+  final copyHeight = (height - _cutGap) / 2;
+  pw.Widget copy() => pw.SizedBox(
+        width: width,
+        height: copyHeight,
+        child: pw.Image(image, width: width, height: copyHeight,
+            fit: pw.BoxFit.contain),
+      );
+  return pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(_pageMargin),
+    build: (_) => pw.Column(children: [copy(), _centerCutLine(), copy()]),
+  );
+}
+
 class DocumentPdfExport {
   DocumentPdfExport._();
 
@@ -27,11 +50,9 @@ class DocumentPdfExport {
     required double sourceWidth,
     required double sourceHeight,
   }) async {
-    return _twoUp(
-      pngBytes,
-      sourceWidth: sourceWidth,
-      sourceHeight: sourceHeight,
-    );
+    final pdf = pw.Document();
+    pdf.addPage(_twoUpPage(pw.MemoryImage(pngBytes)));
+    return pdf.save();
   }
 
   static Future<Uint8List> statementTwoUp(
@@ -40,70 +61,12 @@ class DocumentPdfExport {
     required double sourceHeight,
   }) async {
     final batch = StatementPdfBatchBuilder();
-    batch.addStatement(
-      imageBytes,
-      sourceWidth: sourceWidth,
-      sourceHeight: sourceHeight,
-    );
+    batch.addStatement(imageBytes,
+        sourceWidth: sourceWidth, sourceHeight: sourceHeight);
     return batch.save();
   }
 
-  static Future<Uint8List> _twoUp(
-    Uint8List pngBytes, {
-    required double sourceWidth,
-    required double sourceHeight,
-  }) async {
-    final pdf = pw.Document();
-    final image = pw.MemoryImage(pngBytes);
-    final pageW = PdfPageFormat.a4.width - 16;
-    final pageH = PdfPageFormat.a4.height - 12;
-    final projected = pageW * sourceHeight / sourceWidth;
-
-    if (projected <= (pageH - 24) / 2) {
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-          build: (_) => pw.Column(
-            children: [
-              pw.Expanded(
-                child: pw.Align(
-                  alignment: pw.Alignment.topCenter,
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-              _centerCutLine(),
-              pw.Expanded(
-                child: pw.Align(
-                  alignment: pw.Alignment.topCenter,
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      for (var i = 0; i < 2; i++) {
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-            build: (_) => pw.Align(
-              alignment: pw.Alignment.topCenter,
-              child: pw.Image(image, fit: pw.BoxFit.contain),
-            ),
-          ),
-        );
-      }
-    }
-    return pdf.save();
-  }
-
-
-  static Future<Uint8List> batchStatements(
-    List<Uint8List> imagePages,
-  ) async {
+  static Future<Uint8List> batchStatements(List<Uint8List> imagePages) async {
     final batch = StatementPdfBatchBuilder();
     for (final bytes in imagePages) {
       batch.addStatement(bytes, sourceWidth: 1800, sourceHeight: 1120);
@@ -112,9 +75,7 @@ class DocumentPdfExport {
   }
 }
 
-/// Incrementally assembles statement pages. Callers can render, add, and
-/// release one statement image at a time instead of keeping every PNG in a
-/// second list before PDF creation.
+/// Assemble one A4 page per statement, with two fitted copies on each page.
 class StatementPdfBatchBuilder {
   final pw.Document _pdf = pw.Document();
 
@@ -123,49 +84,7 @@ class StatementPdfBatchBuilder {
     required double sourceWidth,
     required double sourceHeight,
   }) {
-    final image = pw.MemoryImage(imageBytes);
-    final pageW = PdfPageFormat.a4.width - 16;
-    final pageH = PdfPageFormat.a4.height - 16;
-    final projected = pageW * sourceHeight / sourceWidth;
-
-    if (projected <= pageH * .485) {
-      _pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-          build: (_) => pw.Column(
-            children: [
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-              _centerCutLine(),
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.only(top: 10),
-                  child: pw.Image(image, fit: pw.BoxFit.contain),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      return;
-    }
-
-    for (var i = 0; i < 2; i++) {
-      _pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-          build: (_) => pw.Center(
-            child: pw.Image(image, fit: pw.BoxFit.contain),
-          ),
-        ),
-      );
-    }
+    _pdf.addPage(_twoUpPage(pw.MemoryImage(imageBytes)));
   }
 
   Future<Uint8List> save() => _pdf.save();
