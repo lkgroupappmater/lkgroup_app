@@ -133,3 +133,11 @@ test('offline allocation is separate from canonical ID matching and receipt cont
  const ambiguous=makeIdentityTables({...context,customers:[customer,{...customer,id:'b',customer_no:99}]},{prefix:'LKS'});
  assert.equal(ambiguous.ids.find(r=>r[0]==='이경희|p02055551234')[3],0);
 });
+
+test('a saved discount contact edit updates its registered row even when the chart is full',async()=>{
+ const {applyCustomerIdWorkbook}=await import('./customer-id-workbook.mjs'),e=new TextEncoder(),d=new TextDecoder();
+ const c=(r,v)=>`<c r="${r}" t="inlineStr"><is><t>${v}</t></is></c>`;
+ const files={'[Content_Types].xml':e.encode('<Types/>'),'xl/workbook.xml':e.encode('<workbook><sheets><sheet name="Row data" sheetId="1" r:id="r1"/></sheets></workbook>'),'xl/_rels/workbook.xml.rels':e.encode('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),'xl/worksheets/sheet1.xml':e.encode(`<worksheet><sheetData><row r="7">${c('H7','기업 할인 고객 리스트')}</row><row r="8">${c('H8','이름')}${c('J8','회사명')}${c('K8','전화번호')}${c('L8','할인율')}</row><row r="9">${c('H9','Old member')}${c('J9','Old company')}${c('K9','02011112222 / 02033334444')}<c r="L9" s="0"><v>0.1</v></c><c r="AM9"><f>L9</f><v>0.1</v></c></row></sheetData></worksheet>`)};
+ applyCustomerIdWorkbook(files,{customers:[],aliases:[],deliveries:[],discounts:[{id:41,excel_source_row:9,customer_name:'New member',company_name:'',phone:'0205555666602077778888',phone_display:'020-5555-6666 / 020 7777 8888',discount_percent:.2,special_discount_percent:0,group_name:'기업 할인',active:true}]},{base:true});
+ const xml=d.decode(files['xl/worksheets/sheet1.xml']);assert.match(xml,/New member/);assert.match(xml,/020-5555-6666 \/ 020 7777 8888/);assert.doesNotMatch(xml,/Old member|Old company|02011112222/);assert.match(xml,/<c r="L9" s="0"><v>0.2<\/v>/);assert.match(xml,/<c r="AM9"><f>L9<\/f><v>0.1<\/v>/);
+});
