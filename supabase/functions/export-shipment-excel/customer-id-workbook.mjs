@@ -7,7 +7,7 @@ import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-11-21.excel-rich-text-discount-v15';
+export const ID_WORKBOOK_VERSION='2026-11-22.approved-excel-fonts-v16';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -264,6 +264,14 @@ function refreshPolicyInputs(files,context,strings){
    const row=byRow.get(n),name=read(row,col(table.c)),phone=read(row,col(table.p));
    const candidates=rules.filter(d=>nameKey(d.customer_name)===nameKey(name)&&(!d.group_name||groupKey(d.group_name)===groupKey(table.group)||special&&Number(d.special_discount_percent)>0));
    let matches=candidates.filter(d=>phoneKey(d.phone)===phoneKey(phone));
+   // A saved website/app edit may replace a name or one of its phone numbers.
+   // Keep the chart's registered source row instead of disabling its old entry
+   // and trying to append the edited rule past a potentially full group table.
+   if(!matches.some(d=>d.active)){
+    const edited=rules.filter(d=>d.active&&Number(d.excel_source_row)===n&&
+      (groupKey(d.group_name)===groupKey(table.group)||special&&Number(d.special_discount_percent)>0));
+    if(edited.length===1)matches=edited;
+   }
    if(!phoneKey(phone)){const active=candidates.filter(d=>d.active&&(d.excel_source_row===n||candidates.filter(x=>x.active).length===1));if(active.length===1)matches=active;}
    matches.sort((a,b)=>Number(b.active)-Number(a.active)||String(b.updated_at).localeCompare(String(a.updated_at)));
    const d=matches[0];if(!d){set(n,table.d,0);continue;}used.add(d.id+'|'+Number(special));
@@ -271,8 +279,8 @@ function refreshPolicyInputs(files,context,strings){
    if(!Number.isFinite(pct)||pct<0||pct>1)continue;
    set(n,table.c,d.customer_name);
    const display=d.phone_display||discountPhoneTokens(d.phone).filter(Boolean).join(' / ')||d.phone;
-   if(phoneKey(phone)!==phoneKey(d.phone)||(!/[/,;|\r\n]/.test(phone)&&discountPhoneTokens(display).length>1))set(n,table.p,display);
-   if(table.company>=0&&String(d.company_name||'').trim())set(n,table.company,d.company_name);
+   if(phone!==display)set(n,table.p,display);
+   if(table.company>=0&&d.company_name!==undefined)set(n,table.company,d.company_name||'');
    set(n,table.d,!d.active&&phoneKey(d.phone)?0:pct);
   }
   const additions=rules.filter(d=>d.active&&(special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0))>0:groupKey(d.group_name)===groupKey(table.group))&&!used.has(d.id+'|'+Number(special))&&d.rate_override==null&&!d.bulk_threshold);

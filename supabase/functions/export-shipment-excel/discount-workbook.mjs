@@ -3,7 +3,7 @@ import {worksheetRowEntries,rewriteWorksheetRows} from './worksheet-rows.mjs';
 const enc=new TextEncoder(),dec=new TextDecoder(),text=b=>dec.decode(b),bytes=s=>enc.encode(s);
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const formulaText=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
-export const DISCOUNT_FORMULA_STORAGE='independent-lookup-cells-v3';
+export const DISCOUNT_FORMULA_STORAGE='independent-array-selectors-v4';
 const SHEET='_LK_Discount_Identity';
 // These ranges are on the helper itself. Keep their ordinary A1 references
 // short, including when each cargo row is written as an independent formula.
@@ -53,19 +53,25 @@ function selector(row,phoneColumn,special){
  // older Excel calculation modes must not silently turn every match into 0.
  return `IF(OR(LEN(${p})<8,LEN(${p})>15),0,IFERROR(1000+LOOKUP(2,1/(${mask}*${memberMatch}),ROW(${range('H')})),IFERROR(LOOKUP(2,1/(${mask}*${companyMatch}),ROW(${range('H')})),0)))`;
 }
-const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
+// Explicit single-cell arrays make the nested range calculations unambiguous
+// in desktop Excel. Each selector owns exactly its own output cell: no shared
+// formula masters, dependent references or multi-cell spill range are written.
+const cell=(ref,f,value='',array=false)=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f${array?` t="array" ref="${ref}"`:''}>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
 export function validateDiscountWorksheet(data){
- const xml=typeof data==='string'?data:text(data);let formulaCount=0;
- if(/<f\b[^>]*\b(?:t|si|ref)=/.test(xml))throw Error('Discount worksheet must contain independent formulas');
+ const xml=typeof data==='string'?data:text(data);let formulaCount=0,arrayCount=0;
+ if(/<f\b[^>]*\b(?:si=|t="shared")/.test(xml))throw Error('Discount worksheet must contain independent formulas');
  for(const m of xml.matchAll(/<c\b[^>]*>[\s\S]*?<\/c>/g)){
-  const header=m[0].slice(0,m[0].indexOf('>')+1),ref=header.match(/\br="([^"]+)"/)?.[1],f=m[0].match(/<f>([^<]+)<\/f>/)?.[1];
-  if(!f||!/<v>(?:0)?<\/v>/.test(m[0]))throw Error(`Discount worksheet ${ref}: missing formula or cache`);
+  const header=m[0].slice(0,m[0].indexOf('>')+1),ref=header.match(/\br="([^"]+)"/)?.[1],formula=m[0].match(/<f\b([^>]*)>([^<]+)<\/f>/),f=formula?.[2];
+  if(!f||formula[1].trim().endsWith('/')||!/<v>(?:0)?<\/v>/.test(m[0]))throw Error(`Discount worksheet ${ref}: missing formula or cache`);
+  const selector=/^[O-R]\d+$/.test(ref||'');
+  if(selector){if(formula[1]!==` t="array" ref="${ref}"`)throw Error(`Discount worksheet ${ref}: invalid single-cell array range`);arrayCount++;}
+  else if(formula[1])throw Error(`Discount worksheet ${ref}: unexpected formula attributes`);
   const stringCell=/^(?:A|B|C|D|J|K|L|M|N|S)\d+$/.test(ref||'');
   if(stringCell!==/\bt="str"/.test(header))throw Error(`Discount worksheet ${ref}: invalid formula cache type`);
   formulaCount++;
  }
  if(!formulaCount)throw Error('Discount worksheet has no formulas');
- return {formula_storage:DISCOUNT_FORMULA_STORAGE,formula_count:formulaCount};
+ return {formula_storage:DISCOUNT_FORMULA_STORAGE,formula_count:formulaCount,array_formula_count:arrayCount};
 }
 function putFormula(row,ref,f,value){
  const pattern=new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`),prior=row.match(pattern)?.[0];
@@ -118,7 +124,7 @@ export function applyDiscountMatching(files){
    formulas.O=selector(r,'M',false);formulas.P=selector(r,'N',false);formulas.Q=selector(r,'M',true);formulas.R=selector(r,'N',true);
   }
   for(const f of Object.values(formulas))if(f.length>8192)throw Error('Discount formula exceeds Excel limit');
-  const render=columns=>columns.map(c=>cell(`${c}${rowToken}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0)).join('');
+  const render=columns=>columns.map(c=>cell(`${c}${rowToken}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0,['O','P','Q','R'].includes(c))).join('');
   const sourceTemplate=render(sourceColumns),cargoTemplate=render(cargoColumns);
  for(let r=1;r<=end;r++){
   // Excel repair reports removed formula/shared-formula records in this part.

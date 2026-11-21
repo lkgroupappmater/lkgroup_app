@@ -6,7 +6,7 @@ const dec=new TextDecoder(),enc=new TextEncoder();
 const text=b=>dec.decode(b||new Uint8Array());
 const attr=(s,n)=>s.match(new RegExp(`(?:^|\\s)${n}="([^"]*)"`))?.[1];
 const names={numFmts:'numFmt',fonts:'font',fills:'fill',borders:'border',cellStyleXfs:'xf',cellXfs:'xf',dxfs:'dxf'};
-export const TEMPLATE_STYLE_VERSION='2026-11-21.template-rich-text-v2';
+export const TEMPLATE_STYLE_VERSION='2026-11-22.delivery-font-preservation-v3';
 export const STYLE_CONTEXT_ENTRY='_lk_internal_template_styles.json';
 export function styleTables(xml){
  const out={};
@@ -55,10 +55,24 @@ function captureRichText(files,paths){
 }
 export function captureTemplateStyles(files){
  const sheets=deliverySheetIndex(files).filter(s=>!helpers.has(s.name)&&files[s.path]).map(s=>({name:s.name,path:s.path,...header(text(files[s.path]),s.name)}));
- return {version:TEMPLATE_STYLE_VERSION,tables:styleTables(text(files['xl/styles.xml'])),theme:text(files['xl/theme/theme1.xml']),sheets,richText:captureRichText(files)};
+ return {version:TEMPLATE_STYLE_VERSION,tables:styleTables(text(files['xl/styles.xml'])),theme:text(files['xl/theme/theme1.xml']),sheets,richText:captureRichText(files),deliveryFonts:captureDeliveryFonts(files)};
+}
+function captureDeliveryFonts(files){
+ const tables=styleTables(text(files['xl/styles.xml'])),fonts={},sheets=[];
+ for(const s of deliverySheetIndex(files).filter(s=>['지방배송','시내배송'].includes(s.name))){
+  const cells={};
+  for(const [cell] of text(files[s.path]).matchAll(/<c\b[^>]*>/g)){
+   const ref=attr(cell,'r');if(!/^[B-H]\d+$/.test(ref||'')||Number(ref.slice(1))>800)continue;
+   const xf=tables.cellXfs[Number(attr(cell,'s')||0)],id=Number(attr(xf||'','fontId')||0);
+   if(!xf||!tables.fonts[id])throw Error(`Unknown delivery font: ${s.name}!${ref}`);
+   fonts[id]=tables.fonts[id];cells[ref]=[id,attr(xf,'applyFont')??null];
+  }
+  sheets.push({name:s.name,path:s.path,cells});
+ }
+ return {fonts,sheets};
 }
 export function assertTemplateStyles(files,before){
- if(![TEMPLATE_STYLE_VERSION,'2026-11-18.template-style-preservation-v1'].includes(before?.version))throw Error('Invalid Excel template style manifest');
+ if(![TEMPLATE_STYLE_VERSION,'2026-11-21.template-rich-text-v2','2026-11-18.template-style-preservation-v1'].includes(before?.version))throw Error('Invalid Excel template style manifest');
  const after=styleTables(text(files['xl/styles.xml']));
  if(before.theme!==text(files['xl/theme/theme1.xml']))throw Error('Excel template theme changed');
  // Every existing index must keep its definition. Additional styles are allowed.
@@ -76,6 +90,15 @@ export function assertTemplateStyles(files,before){
    checked++;
   }
   for(const key of ['rows','cols','merges'])if(JSON.stringify(s[key])!==JSON.stringify(current[key]))throw Error(`Excel template ${key} changed: ${s.name}`);
+ }
+ let deliveryChecked=0;
+ if(before.deliveryFonts){
+  const current=captureDeliveryFonts(files),bySheet=new Map(current.sheets.map(s=>[s.path,s]));
+  for(const s of before.deliveryFonts.sheets)for(const [ref,[id,apply]] of Object.entries(s.cells)){
+   const next=bySheet.get(s.path)?.cells[ref];
+   if(!next||current.fonts[next[0]]!==before.deliveryFonts.fonts[id]||next[1]!==apply)throw Error(`Excel delivery font changed: ${s.name}!${ref}`);
+   deliveryChecked++;
+  }
  }
  const shared=sharedRichText(files),byPath=new Map();
  for(const s of before.richText??[]){
@@ -95,18 +118,19 @@ export function assertTemplateStyles(files,before){
   }
   for(const [format] of body.matchAll(/<rPr\b[^>]*?(?:\/>|>[\s\S]*?<\/rPr>)/g))if(!formats.has(format))throw Error(`Excel rich text font changed: ${s.sheet}!${s.ref}`);
  }
- return {version:TEMPLATE_STYLE_VERSION,protected_sheets:before.sheets.length,protected_header_cells:checked,protected_rich_text_cells:before.richText?.length??0,original_style_definitions_preserved:true,header_formats_preserved:true,rich_text_formats_preserved:!!before.richText,...(before.headerRepair?{approved_header_repair:before.headerRepair}:{})};
+ return {version:TEMPLATE_STYLE_VERSION,protected_sheets:before.sheets.length,protected_header_cells:checked,protected_rich_text_cells:before.richText?.length??0,protected_delivery_font_cells:deliveryChecked,original_style_definitions_preserved:true,header_formats_preserved:true,rich_text_formats_preserved:!!before.richText,delivery_fonts_preserved:!!before.deliveryFonts,...(before.headerRepair?{approved_header_repair:before.headerRepair}:{}),...(before.approvedFonts?{approved_fonts:before.approvedFonts}:{})};
 }
 export function refreshDeliveryStyleGuard(files){
  if(!files[STYLE_CONTEXT_ENTRY])return;
  const before=JSON.parse(text(files[STYLE_CONTEXT_ENTRY]));
  const paths=new Set(deliverySheetIndex(files).filter(s=>['지방배송','시내배송'].includes(s.name)).map(s=>s.path));
  before.richText=[...(before.richText??[]).filter(s=>!paths.has(s.path)),...captureRichText(files,paths)];
+ before.deliveryFonts=captureDeliveryFonts(files);
  files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify(before));
 }
-export function beginTemplateStyleGuard(files,{headerRepair}={}){
+export function beginTemplateStyleGuard(files,{headerRepair,approvedFonts}={}){
  if(files[STYLE_CONTEXT_ENTRY])throw Error('Reserved Excel template style manifest already exists');
- files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify({...captureTemplateStyles(files),...(headerRepair?{headerRepair}:{})}));
+ files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify({...captureTemplateStyles(files),...(headerRepair?{headerRepair}:{}),...(approvedFonts?{approvedFonts}:{})}));
 }
 export function finishTemplateStyleGuard(files){
  if(!files[STYLE_CONTEXT_ENTRY])throw Error('Excel template style preservation was not initialized');
