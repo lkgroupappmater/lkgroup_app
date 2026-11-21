@@ -2,8 +2,12 @@ import {discountWorkbookSource,discountMatchRank,DISCOUNT_MATCH_VERSION} from '.
 import {worksheetRowEntries,rewriteWorksheetRows} from './worksheet-rows.mjs';
 const enc=new TextEncoder(),dec=new TextDecoder(),text=b=>dec.decode(b),bytes=s=>enc.encode(s);
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const formulaText=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+export const DISCOUNT_FORMULA_STORAGE='independent-cells-v2';
 const SHEET='_LK_Discount_Identity';
-const range=col=>`'${SHEET}'!$${col}$3:$${col}$256`;
+// These ranges are on the helper itself. Keep their ordinary A1 references
+// short, including when each cargo row is written as an independent formula.
+const range=col=>`$${col}$3:$${col}$256`;
 const sub=(value,from,to)=>`SUBSTITUTE(${value},${typeof from==='object'?from.f:JSON.stringify(from)},${JSON.stringify(to)})`;
 function separators(value){
  for(const token of ['\\r\\n','\\r','\\n','／',';',',','|',{f:'CHAR(13)'},{f:'CHAR(10)'}])value=sub(value,token,'/');
@@ -44,7 +48,20 @@ function selector(row,phoneColumn,special){
  // Highest member match wins before a company-only match, then original row order.
  return `IFERROR(_xlfn.AGGREGATE(14,6,(ROW('Row data'!$AK$3:$AK$256)+1000*${memberMatch})/${mask},1),0)`;
 }
-const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${esc(f)}</f><v>${esc(value)}</v></c>`;
+const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
+export function validateDiscountWorksheet(data){
+ const xml=text(data);let formulaCount=0;
+ if(/<f\b[^>]*\b(?:t|si|ref)=/.test(xml))throw Error('Discount worksheet must contain independent formulas');
+ for(const m of xml.matchAll(/<c\b[^>]*>[\s\S]*?<\/c>/g)){
+  const ref=m[0].match(/\br="([^"]+)"/)?.[1],f=m[0].match(/<f>([^<]+)<\/f>/)?.[1];
+  if(!f||!/<v>(?:0)?<\/v>/.test(m[0]))throw Error(`Discount worksheet ${ref}: missing formula or cache`);
+  const stringCell=/^(?:A|B|C|D|J|K|L|M|N|S)\d+$/.test(ref||'');
+  if(stringCell!==/\bt="str"/.test(m[0]))throw Error(`Discount worksheet ${ref}: invalid formula cache type`);
+  formulaCount++;
+ }
+ if(!formulaCount)throw Error('Discount worksheet has no formulas');
+ return {formula_storage:DISCOUNT_FORMULA_STORAGE,formula_count:formulaCount};
+}
 function putFormula(row,ref,f,value){
  const pattern=new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`),prior=row.match(pattern)?.[0];
  if(!prior)return row;
@@ -81,11 +98,11 @@ export function applyDiscountMatching(files){
  const cargoRows=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>Number(m[1])).filter(r=>r>=6),cargoLast=Math.max(...cargoRows),end=Math.max(256,cargoLast),helper=[];
  const sourceColumns=['A','B','C','D','E','F','G'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
  for(let r=1;r<=end;r++){
-  const formulas={};if(r===3){
+  const formulas={};if(r>=3&&r<=256){
    formulas.A=memberBase(`'Row data'!H${r}`);formulas.B=`SUBSTITUTE(A${r},"/","|")`;formulas.C=`SUBSTITUTE(${memberBase(`'Row data'!J${r}`)},"/","|")`;formulas.D=phonesBase(`'Row data'!K${r}`);
    formulas.E=`IF(B${r}="||",0,${count(`A${r}`,'/')}+1)`;formulas.F=`MAX(0,${count(`B${r}`,'|')}-1)`;formulas.G=`MAX(0,${count(`D${r}`,'|')}-1)`;
   }
-  if(r===6){
+  if(r>=6&&r<=cargoLast){
    const full=`IF('물품 입고 내역'!AL${r}=2,MID('물품 입고 내역'!E${r},FIND("/",'물품 입고 내역'!E${r})+1,LEN('물품 입고 내역'!E${r})),'물품 입고 내역'!E${r})`;
    formulas.J=`SUBSTITUTE(${memberBase(full)},"/","|")`;formulas.K=first(`J${r}`);formulas.L=last(`J${r}`);
    formulas.S=phonesBase(`'물품 입고 내역'!F${r}`);formulas.M=first(`S${r}`);formulas.N=last(`S${r}`);
@@ -93,10 +110,10 @@ export function applyDiscountMatching(files){
   }
   for(const f of Object.values(formulas))if(f.length>8192)throw Error('Discount formula exceeds Excel limit');
   const columns=[...(r>=3&&r<=256?sourceColumns:[]),...(r>=6&&r<=cargoLast?cargoColumns:[])];
-  helper.push(`<row r="${r}">${columns.map(c=>{
-   const source=sourceColumns.includes(c),start=source?3:6,lastRow=source?256:cargoLast,si=source?sourceColumns.indexOf(c):sourceColumns.length+cargoColumns.indexOf(c);
-   return `<c r="${c}${r}"><f t="shared" si="${si}"${r===start?` ref="${c}${start}:${c}${lastRow}">${esc(formulas[c])}</f>`:'/>'}<v/></c>`;
-  }).join('')}</row>`);
+  // Excel repair reports removed formula/shared-formula records in this part.
+  // Do not hand-serialize shared masters and dependent cells here. Every cell
+  // carries its complete formula with an explicit, correctly typed cache.
+  helper.push(`<row r="${r}">${columns.map(c=>cell(`${c}${r}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0)).join('')}</row>`);
  }
  const path=installSheet(files,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`);
  // Formula references are relative by cargo row. Existing styles, print areas,
@@ -107,5 +124,5 @@ export function applyDiscountMatching(files){
   return putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
  });
  const changed=!originalHelper||text(originalHelper)!==text(files[path])||xml!==text(files[cargo]);
- return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path};
+ return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(files[path])};
 }
