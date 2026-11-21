@@ -4,6 +4,7 @@ import {formatDeliveryNumbers} from './delivery-number-format.mjs';
 import {restoreSharedFormulaMasters,captureSharedFormulaMasters} from './workbook-integrity.mjs';
 import {copySharedDeliveryLayout,deliverySheetIndex} from './shared-delivery-layout.mjs';
 import {unzipWorkbook} from './workbook-zip.mjs';
+import {prepareWorkbookFinalization} from './finalization-preparation.mjs';
 
 // This internal context travels only between authenticated server requests.
 // It is removed before the finished workbook is ever stored or downloaded.
@@ -78,6 +79,7 @@ export async function prepareIdentityWorkbook(files:Record<string,Uint8Array>,ro
     // Native DEFLATE retains normal XLSM size without spending Edge CPU on a
     // JavaScript compressor. VBA and all other parts remain byte-identical.
     restoreSharedFormulaMasters(files,originalSharedMasters);
+    prepareWorkbookFinalization(files);
  return deliveryLayout;
 }
 
