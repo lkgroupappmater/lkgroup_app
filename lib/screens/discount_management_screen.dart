@@ -32,6 +32,7 @@ class _DiscountManagementScreenState
   Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _load(); } finally { _automaticLoad = false; } }
   List<DiscountRule> _rules = const [];
   String _route = 'all';
+  int _loadRequest = 0;
   bool _loading = false;
 
   List<DiscountRule> get _visible => _rules.where((r) {
@@ -45,16 +46,17 @@ class _DiscountManagementScreenState
   }
 
   Future<void> _load() async {
+    final request = ++_loadRequest;
     if (!_automaticLoad) _searched = true;
     if (!_automaticLoad) setState(() => _loading = true);
     try {
       final rules =
           await CustomerBenefitService.instance.listDiscountRules();
-      if (mounted) setState(() => _rules = rules);
+      if (mounted && request == _loadRequest) setState(() => _rules = rules);
     } catch (e) {
-      if (mounted) _msg(_l('할인 목록 조회 실패: $e'));
+      if (mounted && request == _loadRequest) _msg(_l('할인 목록 조회 실패: $e'));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && request == _loadRequest) setState(() => _loading = false);
     }
   }
 

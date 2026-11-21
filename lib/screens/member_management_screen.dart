@@ -40,6 +40,7 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
 
   String _submittedSearch = '';
   List<Map<String, dynamic>> _members = [];
+  int _loadRequest = 0;
   bool _loading = false;
   Map<String,dynamic>? _registrySummary;
   Future<void> _loadRegistrySummary() async {
@@ -63,8 +64,9 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
   }
 
   Future<void> _loadMembers() async {
+    final request = ++_loadRequest;
     if (!_automaticLoad) _searched = true;
-    if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+    if (!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh)) return;
     if (!_automaticLoad) setState(() => _loading = true);
     _loadRegistrySummary();
     try {
@@ -78,13 +80,13 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> with Au
             .order('created_at', ascending: false);
         final loaded = List<Map<String, dynamic>>.from(rows);
         try { await CustomerIdentityService.enrichMembers(loaded); } catch (_) { for (final m in loaded) { m['identity_status'] = 'error'; } }
-        if (!mounted || owner != Supabase.instance.client.auth.currentUser?.id) return;
+        if (!mounted || request != _loadRequest || owner != Supabase.instance.client.auth.currentUser?.id) return;
         _members = loaded;
       }
     } catch (e) {
-      _message('회원 목록 조회 실패: $e', error: true);
+      if (request == _loadRequest) _message('회원 목록 조회 실패: $e', error: true);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && request == _loadRequest) setState(() => _loading = false);
     }
   }
 
