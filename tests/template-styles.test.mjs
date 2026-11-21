@@ -23,6 +23,11 @@ test('a date changed to a currency style is rejected even if all formulas are va
  files['xl/worksheets/sheet1.xml']=enc(dec(files['xl/worksheets/sheet1.xml']).replace('r="B1" s="1"','r="B1" s="2"'));
  assert.throws(()=>assertTemplateStyles(files,before),/formatting changed/);
 });
+test('regenerating the internal discount helper does not change a user template',()=>{
+ const files=fixture('_LK_Discount_Identity'),before=captureTemplateStyles(files);
+ files['xl/worksheets/sheet1.xml']=enc('<worksheet><sheetData><row r="1"/><row r="3"><c r="H3"><f>1</f><v>0</v></c></row></sheetData></worksheet>');
+ assert.equal(assertTemplateStyles(files,before).protected_sheets,0);
+});
 test('shifting global style definitions, changing fonts and losing merges fail closed',()=>{
  for(const [path,a,b] of [['xl/styles.xml','val="20"','val="11"'],['xl/styles.xml','horizontal="center"','horizontal="left"'],['xl/worksheets/sheet1.xml','A2:B2','A2:C2']]){
   const files=fixture(),before=captureTemplateStyles(files);files[path]=enc(dec(files[path]).replace(a,b));assert.throws(()=>assertTemplateStyles(files,before),/changed/);

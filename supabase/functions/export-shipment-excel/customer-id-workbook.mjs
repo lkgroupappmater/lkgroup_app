@@ -1,4 +1,5 @@
 import {discountPhoneTokens} from './discount-matching.mjs';
+import {inlineRichTextStrings,preserveCellText} from './cell-text-format.mjs';
 import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
@@ -6,7 +7,7 @@ import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-11-21.excel-package-v14';
+export const ID_WORKBOOK_VERSION='2026-11-21.excel-rich-text-discount-v15';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -41,7 +42,10 @@ function parsedCells(row){return new Map([...row.matchAll(/<c\b[^>]*?(?:\/>|>[\s
 function patchRow(row,n,values,existingCells){
  if(!values||!Object.keys(values).length)return row;
  const cells=existingCells??parsedCells(row);
- for(const [c,v] of Object.entries(values))cells.set(c,cell(c+n,v,cells.get(c)?.match(/\bs="(\d+)"/)?.[1]??''));
+ for(const [c,v] of Object.entries(values)){
+  const prior=cells.get(c);
+  cells.set(c,(typeof v==='string'?preserveCellText(prior,v):null)??cell(c+n,v,prior?.match(/\bs="(\d+)"/)?.[1]??''));
+ }
  const ordered=[...cells].sort((a,b)=>columnIndex(a[0])-columnIndex(b[0])).map(x=>x[1]).join('');
  return row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'').replace('</row>',ordered+'</row>');
 }
@@ -281,6 +285,9 @@ function refreshPolicyInputs(files,context,strings){
 }
 
 export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false,preserveSharedMasters=true,managedDelivery=false,preserveDeliveryLayout=false}={}){
+ // Main export already prepared visible text. Direct callers need only the
+ // policy/delivery inputs below, not another scan of every cargo/helper formula.
+ inlineRichTextStrings(files,new Set(['Row data','지방배송','시내배송'].map(name=>sheetPath(files,name)).filter(Boolean)));
  if(preserveSharedMasters)recoverDeliverySelectorMasters(files,sheetPath);
  const sharedMasters=preserveSharedMasters?captureSharedFormulaMasters(files):null;
  const result=applyCustomerIdWorkbookContent(files,context,{prefix,shipments,base,managedDelivery,preserveDeliveryLayout});

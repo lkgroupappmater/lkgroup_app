@@ -1,4 +1,5 @@
 import {applyDiscountMatching} from './discount-workbook.mjs';
+import {inlineRichTextStrings,preserveCellText} from './cell-text-format.mjs';
 import {DISCOUNT_MATCH_VERSION} from './discount-matching.mjs';
 import {discardCalculationChain,validateWorkbookPackage,WORKBOOK_PACKAGE_VERSION} from './workbook-package.mjs';
 import {repairApprovedTemplateHeaders} from './template-header-repair.mjs';
@@ -380,7 +381,7 @@ function updateCell(
       ? blankCell(ref, style)
       : numericCell(ref, style, serial);
   } else {
-    replacement = inlineCell(ref, style, value);
+    replacement = preserveCellText(existing?.[0], value) ?? inlineCell(ref, style, value);
   }
 
   if (existing) return rowXml.replace(existing[0], () => replacement);
@@ -2123,12 +2124,12 @@ Deno.serve(async (req) => {
       if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
       const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
       if(found.error)throw found.error;const template=found.data;
-      if(template.storage_path.startsWith('excel-integrity-v3/'))return json(200,{ok:true,...template});
+      if(template.storage_path.startsWith('excel-integrity-v5/'))return json(200,{ok:true,...template});
       const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
       if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
       const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()));
       if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
-      const path=`excel-integrity-v3/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      const path=`excel-integrity-v5/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
       await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
       // Retain recovery metadata and the original object. A concurrent user
       // upload wins: publish only if the exact source registration is unchanged.
@@ -2420,6 +2421,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       filter: (entry) => entry.name !== 'xl/calcChain.xml',
     });
     console.log('[EXCEL200C] unzip done');
+    inlineRichTextStrings(files);
     const headerRepair=repairApprovedTemplateHeaders(files,String(template.storage_path));
     beginTemplateStyleGuard(files,{headerRepair});
     if(headerRepair)console.log('[EXCEL] approved header formats restored',JSON.stringify(headerRepair));

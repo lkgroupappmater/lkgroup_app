@@ -3,7 +3,7 @@ import {worksheetRowEntries,rewriteWorksheetRows} from './worksheet-rows.mjs';
 const enc=new TextEncoder(),dec=new TextDecoder(),text=b=>dec.decode(b),bytes=s=>enc.encode(s);
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const formulaText=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
-export const DISCOUNT_FORMULA_STORAGE='independent-cells-v2';
+export const DISCOUNT_FORMULA_STORAGE='independent-lookup-cells-v3';
 const SHEET='_LK_Discount_Identity';
 // These ranges are on the helper itself. Keep their ordinary A1 references
 // short, including when each cargo row is written as an independent formula.
@@ -37,18 +37,21 @@ function selector(row,phoneColumn,special){
  const phoneOrdinal=`(${count(`LEFT(${range('D')},${phonePosition})`,'|')})`;
  const member = name => {
   const pos=`IFERROR(FIND("|"&${name}&"|",${range('B')}),0)`;
-  const ordinal=`IF(${range('E')}=${range('G')},${count(`LEFT(${range('A')},${pos})`,'/')}+1,${count(`LEFT(${range('B')},${pos})`,'|')})`;
-  const paired=`((${range('E')}=1)+(${range('G')}=1)+(((${range('E')}=${range('G')})+(${range('F')}=${range('G')}))*(${ordinal}=${phoneOrdinal})))`;
+  const groupOrdinal=`(${count(`LEFT(${range('A')},${pos})`,'/')}+1)`;
+  const flatOrdinal=`(${count(`LEFT(${range('B')},${pos})`,'|')})`;
+  const paired=`((${range('E')}=1)+(${range('G')}=1)+((${range('E')}=${range('G')})*(${groupOrdinal}=${phoneOrdinal}))+((${range('E')}<>${range('G')})*(${range('F')}=${range('G')})*(${flatOrdinal}=${phoneOrdinal})))`;
   return `((${name}<>"")*(${pos}>0)*(${paired}>0))`;
  };
  const memberMatch=`((${member(`$K${row}`)}+${member(`$L${row}`)})>0)`;
  const companyMatch=`((($K${row}<>"")*ISNUMBER(FIND("|"&$K${row}&"|",${range('C')}))+($L${row}<>"")*ISNUMBER(FIND("|"&$L${row}&"|",${range('C')})))>0)`;
- const active=`('Row data'!$AK$3:$AK$256<>"")*('Row data'!$AG$3:$AG$256${special?'=':'<>'}"특별할인")`;
- const mask=`(${active}*(LEN(${p})>=8)*(LEN(${p})<=15)*(${phonePosition}>0)*((${memberMatch}+${companyMatch})>0))`;
+ const mask=`((${range('H')}=${special?2:1})*(${phonePosition}>0))`;
  // Highest member match wins before a company-only match, then original row order.
  // BASE has many empty cargo rows. Their result is already zero; avoid
  // evaluating the full chart array until a usable phone has been entered.
- return `IF(OR(LEN(${p})<8,LEN(${p})>15),0,IFERROR(_xlfn.AGGREGATE(14,6,(ROW('Row data'!$AK$3:$AK$256)+1000*${memberMatch})/${mask},1),0))`;
+ // LOOKUP explicitly consumes its array argument in desktop Excel as well as
+ // other engines. Keep IF out of range expressions: implicit intersection in
+ // older Excel calculation modes must not silently turn every match into 0.
+ return `IF(OR(LEN(${p})<8,LEN(${p})>15),0,IFERROR(1000+LOOKUP(2,1/(${mask}*${memberMatch}),ROW(${range('H')})),IFERROR(LOOKUP(2,1/(${mask}*${companyMatch}),ROW(${range('H')})),0)))`;
 }
 const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
 export function validateDiscountWorksheet(data){
@@ -98,7 +101,7 @@ export function applyDiscountMatching(files){
  if(!/r="AJ6"/.test(xml)||!xml.includes('Row data'))return {version:DISCOUNT_MATCH_VERSION,applicable:false};
  if(source.rules.some(r=>r.refs.name[0]!=='H'||r.refs.phone[0]!=='K'))throw Error('Discount source columns require review');
  const cargoRows=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>Number(m[1])).filter(r=>r>=6),cargoLast=Math.max(...cargoRows),end=Math.max(256,cargoLast),helper=[];
- const sourceColumns=['A','B','C','D','E','F','G'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
+ const sourceColumns=['A','B','C','D','E','F','G','H'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
  // Compile the same cell XML once, then substitute only this row sentinel.
  // Rebuilding and XML-escaping four large selectors for every Sea row exceeded
  // the Edge CPU budget. This changes no formula or output byte.
@@ -106,6 +109,7 @@ export function applyDiscountMatching(files){
  {
    formulas.A=memberBase(`'Row data'!H${r}`);formulas.B=`SUBSTITUTE(A${r},"/","|")`;formulas.C=`SUBSTITUTE(${memberBase(`'Row data'!J${r}`)},"/","|")`;formulas.D=phonesBase(`'Row data'!K${r}`);
    formulas.E=`IF(B${r}="||",0,${count(`A${r}`,'/')}+1)`;formulas.F=`MAX(0,${count(`B${r}`,'|')}-1)`;formulas.G=`MAX(0,${count(`D${r}`,'|')}-1)`;
+   formulas.H=`IF('Row data'!AK${r}="",0,IF('Row data'!AG${r}="특별할인",2,1))`;
   }
   {
    const full=`IF('물품 입고 내역'!AL${r}=2,MID('물품 입고 내역'!E${r},FIND("/",'물품 입고 내역'!E${r})+1,LEN('물품 입고 내역'!E${r})),'물품 입고 내역'!E${r})`;
@@ -134,6 +138,22 @@ export function applyDiscountMatching(files){
   row=putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
   cargoChanged ||= row!==before;return row;
  });
- const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged;
+ // Raw/original downloads also call this function without the identity stage.
+ // Do not retain Excel's old calculation ID with newly written zero caches.
+ const beforeWorkbook=text(files['xl/workbook.xml']);
+ const calculation='<calcPr calcId="0" calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
+ let workbook=beforeWorkbook;
+ if(/<calcPr\b/.test(workbook))workbook=workbook.replace(/<calcPr\b[^>]*\/?>(?:<\/calcPr>)?/,tag=>{
+  for(const [key,value] of [['calcId','0'],['calcMode','auto'],['fullCalcOnLoad','1'],['forceFullCalc','1']]){
+   const attr=new RegExp(`\\b${key}="[^"]*"`);tag=attr.test(tag)?tag.replace(attr,`${key}="${value}"`):tag.replace(/\/?>(?:<\/calcPr>)?$/,` ${key}="${value}"/>`);
+  }
+  return tag;
+ });
+ else {
+  const next=workbook.search(/<(?:oleSize|customWorkbookViews|pivotCaches|smartTagPr|smartTagTypes|webPublishing|fileRecoveryPr|webPublishObjects|extLst)\b/);
+  workbook=next<0?workbook.replace('</workbook>',calculation+'</workbook>'):workbook.slice(0,next)+calculation+workbook.slice(next);
+ }
+ files['xl/workbook.xml']=bytes(workbook);
+ const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged||workbook!==beforeWorkbook;
  return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(helperXml)};
 }

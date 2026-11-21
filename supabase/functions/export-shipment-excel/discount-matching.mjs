@@ -1,6 +1,6 @@
 // Discount identities only. Delivery/customer-registration matching is separate.
 import {excelIdentity,recoveredName} from './receipt-order.mjs';
-export const DISCOUNT_MATCH_VERSION = '2026-11-21.name-and-any-registered-phone-v2';
+export const DISCOUNT_MATCH_VERSION = '2026-11-21.name-and-any-registered-phone-v3';
 const lines = value => String(value ?? '').replace(/\\r\\n|\\n|\\r/g, '\n').replace(/[／]/g, '/');
 export const discountNameKey = value => String(value ?? '').toLowerCase()
   .replace(/대표님|사장님|대표|사장|님/g, '').replace(/[\s\u00a0\-\/().,'"\[\]]/g, '');
