@@ -1,3 +1,4 @@
+import {applyDiscountMatching} from './discount-workbook.mjs';
 import {beginTemplateStyleGuard,finishTemplateStyleGuard,STYLE_CONTEXT_ENTRY} from './template-style-guard.mjs';
 import {strFromU8} from 'npm:fflate@0.8.2';
 import {applyUnknownPrefixZones} from './unknown-zone.mjs';
@@ -83,7 +84,9 @@ export function finalizeWorkbook(files:Record<string,Uint8Array>){
  if(captureStage==='finalizer')beginTemplateStyleGuard(files);
  applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
  const repair=applyFreightMinimum(files);
- const integrity={...validateWorkbookFormulas(files),freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count};
+ const discount=applyDiscountMatching(files);
+ const integrity={...validateWorkbookFormulas(files),discount_identity:discount,freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count};
  upgradeStatementMacros(files);
  return {...integrity,template_styles:{...finishTemplateStyleGuard(files),capture_stage:captureStage}};
 }
+

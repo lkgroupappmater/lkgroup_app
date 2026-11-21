@@ -1,0 +1,111 @@
+import {discountWorkbookSource,discountMatchRank,DISCOUNT_MATCH_VERSION} from './discount-matching.mjs';
+import {worksheetRowEntries,rewriteWorksheetRows} from './worksheet-rows.mjs';
+const enc=new TextEncoder(),dec=new TextDecoder(),text=b=>dec.decode(b),bytes=s=>enc.encode(s);
+const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const SHEET='_LK_Discount_Identity';
+const range=col=>`'${SHEET}'!$${col}$3:$${col}$256`;
+const sub=(value,from,to)=>`SUBSTITUTE(${value},${typeof from==='object'?from.f:JSON.stringify(from)},${JSON.stringify(to)})`;
+function separators(value){
+ for(const token of ['\\r\\n','\\r','\\n','／',';',',','|',{f:'CHAR(13)'},{f:'CHAR(10)'}])value=sub(value,token,'/');
+ for(const token of [' ',{f:'CHAR(160)'},{f:'CHAR(9)'},'-','.',"'"])value=sub(value,token,'');
+ return value;
+}
+function memberBase(value){
+ value=separators(value);
+ for(const token of ['대표님','사장님','대표','사장','님'])value=sub(value,token,'');
+ value=sub(sub(value,'(','|'),')','');
+ // Slash plus a wrapped line break is one separator, not an empty member.
+ for(let i=0;i<4;i++)value=sub(value,'//','/');
+ return `"|"&LOWER(${value})&"|"`;
+}
+function phonesBase(value){
+ value=separators(value);for(const token of ['+','(',')'])value=sub(value,token,'');
+ for(let i=0;i<4;i++)value=sub(value,'//','/');
+ value=`"|"&${sub(value,'/','|')}&"|"`;
+ for(const [from,to] of [['|00856','|0'],['|856','|0'],['|0082','|0'],['|82','|0']])value=sub(value,from,to);
+ return value;
+}
+const count=(value,delimiter)=>`LEN(${value})-LEN(SUBSTITUTE(${value},"${delimiter}",""))`;
+const first=value=>`IFERROR(MID(${value},2,FIND("|",${value},2)-2),"")`;
+const last=value=>`IF(LEN(${value})<3,"",TRIM(RIGHT(SUBSTITUTE(LEFT(${value},LEN(${value})-1),"|",REPT(" ",LEN(${value}))),LEN(${value}))))`;
+function selector(row,phoneColumn,special){
+ const p=`$${phoneColumn}${row}`,phonePosition=`IFERROR(FIND("|"&${p}&"|",${range('D')}),0)`;
+ const phoneOrdinal=`(${count(`LEFT(${range('D')},${phonePosition})`,'|')})`;
+ const member = name => {
+  const pos=`IFERROR(FIND("|"&${name}&"|",${range('B')}),0)`;
+  const ordinal=`IF(${range('E')}=${range('G')},${count(`LEFT(${range('A')},${pos})`,'/')}+1,${count(`LEFT(${range('B')},${pos})`,'|')})`;
+  const paired=`((${range('E')}=1)+(${range('G')}=1)+(((${range('E')}=${range('G')})+(${range('F')}=${range('G')}))*(${ordinal}=${phoneOrdinal})))`;
+  return `((${name}<>"")*(${pos}>0)*(${paired}>0))`;
+ };
+ const memberMatch=`((${member(`$K${row}`)}+${member(`$L${row}`)})>0)`;
+ const companyMatch=`((($K${row}<>"")*ISNUMBER(FIND("|"&$K${row}&"|",${range('C')}))+($L${row}<>"")*ISNUMBER(FIND("|"&$L${row}&"|",${range('C')})))>0)`;
+ const active=`('Row data'!$AK$3:$AK$256<>"")*('Row data'!$AG$3:$AG$256${special?'=':'<>'}"특별할인")`;
+ const mask=`(${active}*(LEN(${p})>=8)*(LEN(${p})<=15)*(${phonePosition}>0)*((${memberMatch}+${companyMatch})>0))`;
+ // Highest member match wins before a company-only match, then original row order.
+ return `IFERROR(_xlfn.AGGREGATE(14,6,(ROW('Row data'!$AK$3:$AK$256)+1000*${memberMatch})/${mask},1),0)`;
+}
+const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${esc(f)}</f><v>${esc(value)}</v></c>`;
+function putFormula(row,ref,f,value){
+ const pattern=new RegExp(`<c\\b[^>]*\\br="${ref}"[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)`),prior=row.match(pattern)?.[0];
+ if(!prior)return row;
+ const style=prior.match(/\bs="\d+"/)?.[0];
+ return row.replace(pattern,`<c r="${ref}"${style?' '+style:''}><f>${esc(f)}</f><v>${value}</v></c>`);
+}
+function cargoPath(files){
+ const wb=text(files['xl/workbook.xml']),rels=text(files['xl/_rels/workbook.xml.rels']);
+ const tag=[...wb.matchAll(/<sheet\b[^>]*>/g)].map(m=>m[0]).find(s=>s.includes('name="물품 입고 내역"'));if(!tag)return null;
+ const id=tag.match(/\br:id="([^"]+)"/)?.[1],rel=[...rels.matchAll(/<Relationship\b[^>]*>/g)].map(m=>m[0]).find(s=>s.includes(`Id="${id}"`));
+ const p=rel?.match(/\bTarget="([^"]+)"/)?.[1]?.replace(/^\//,'');return p?.startsWith('xl/')?p:p?'xl/'+p:null;
+}
+function installSheet(files,xml){
+ let wb=text(files['xl/workbook.xml']),rels=text(files['xl/_rels/workbook.xml.rels']),types=text(files['[Content_Types].xml']);
+ const old=[...wb.matchAll(/<sheet\b[^>]*>/g)].map(m=>m[0]).find(t=>t.includes(`name="${SHEET}"`));let path;
+ if(old){const id=old.match(/\br:id="([^"]+)"/)[1],rel=[...rels.matchAll(/<Relationship\b[^>]*>/g)].map(m=>m[0]).find(t=>t.includes(`Id="${id}"`));path=rel.match(/\bTarget="([^"]+)"/)[1].replace(/^\//,'');if(!path.startsWith('xl/'))path='xl/'+path;}
+ else{
+  const id='rIdLKDiscountIdentity',sheetId=1+Math.max(...[...wb.matchAll(/\bsheetId="(\d+)"/g)].map(m=>Number(m[1])));
+  path='xl/worksheets/lk-discount-identity.xml';if(files[path])throw Error('Reserved discount worksheet path is already used');
+  wb=wb.replace('</sheets>',`<sheet name="${SHEET}" sheetId="${sheetId}" state="veryHidden" r:id="${id}"/></sheets>`);
+  rels=rels.replace('</Relationships>',`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/lk-discount-identity.xml"/></Relationships>`);
+  types=types.replace('</Types>',`<Override PartName="/${path}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`);
+  files['xl/workbook.xml']=bytes(wb);files['xl/_rels/workbook.xml.rels']=bytes(rels);files['[Content_Types].xml']=bytes(types);
+ }
+ files[path]=bytes(xml);return path;
+}
+export function applyDiscountMatching(files){
+ const originalHelper=files['xl/worksheets/lk-discount-identity.xml'];
+ const source=discountWorkbookSource(files),cargo=cargoPath(files);
+ if(!source||!cargo)return {version:DISCOUNT_MATCH_VERSION,applicable:false};
+ const xml=text(files[cargo]);
+ if(!/r="AJ6"/.test(xml)||!xml.includes('Row data'))return {version:DISCOUNT_MATCH_VERSION,applicable:false};
+ if(source.rules.some(r=>r.refs.name[0]!=='H'||r.refs.phone[0]!=='K'))throw Error('Discount source columns require review');
+ const cargoRows=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>Number(m[1])).filter(r=>r>=6),cargoLast=Math.max(...cargoRows),end=Math.max(256,cargoLast),helper=[];
+ const sourceColumns=['A','B','C','D','E','F','G'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
+ for(let r=1;r<=end;r++){
+  const formulas={};if(r===3){
+   formulas.A=memberBase(`'Row data'!H${r}`);formulas.B=`SUBSTITUTE(A${r},"/","|")`;formulas.C=`SUBSTITUTE(${memberBase(`'Row data'!J${r}`)},"/","|")`;formulas.D=phonesBase(`'Row data'!K${r}`);
+   formulas.E=`IF(B${r}="||",0,${count(`A${r}`,'/')}+1)`;formulas.F=`MAX(0,${count(`B${r}`,'|')}-1)`;formulas.G=`MAX(0,${count(`D${r}`,'|')}-1)`;
+  }
+  if(r===6){
+   const full=`IF('물품 입고 내역'!AL${r}=2,MID('물품 입고 내역'!E${r},FIND("/",'물품 입고 내역'!E${r})+1,LEN('물품 입고 내역'!E${r})),'물품 입고 내역'!E${r})`;
+   formulas.J=`SUBSTITUTE(${memberBase(full)},"/","|")`;formulas.K=first(`J${r}`);formulas.L=last(`J${r}`);
+   formulas.S=phonesBase(`'물품 입고 내역'!F${r}`);formulas.M=first(`S${r}`);formulas.N=last(`S${r}`);
+   formulas.O=selector(r,'M',false);formulas.P=selector(r,'N',false);formulas.Q=selector(r,'M',true);formulas.R=selector(r,'N',true);
+  }
+  for(const f of Object.values(formulas))if(f.length>8192)throw Error('Discount formula exceeds Excel limit');
+  const columns=[...(r>=3&&r<=256?sourceColumns:[]),...(r>=6&&r<=cargoLast?cargoColumns:[])];
+  helper.push(`<row r="${r}">${columns.map(c=>{
+   const source=sourceColumns.includes(c),start=source?3:6,lastRow=source?256:cargoLast,si=source?sourceColumns.indexOf(c):sourceColumns.length+cargoColumns.indexOf(c);
+   return `<c r="${c}${r}"><f t="shared" si="${si}"${r===start?` ref="${c}${start}:${c}${lastRow}">${esc(formulas[c])}</f>`:'/>'}<v/></c>`;
+  }).join('')}</row>`);
+ }
+ const path=installSheet(files,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`);
+ // Formula references are relative by cargo row. Existing styles, print areas,
+ // delivery matching, customer IDs, notes, discount rates and VBA are untouched.
+ files[cargo]=rewriteWorksheetRows(xml,(row,r)=>{
+  if(r<6)return row;
+  row=putFormula(row,`AJ${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!O${r}:P${r}),1000))`,0);
+  return putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
+ });
+ const changed=!originalHelper||text(originalHelper)!==text(files[path])||xml!==text(files[cargo]);
+ return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path};
+}
