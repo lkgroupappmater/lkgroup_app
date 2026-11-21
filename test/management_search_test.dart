@@ -60,7 +60,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Supabase.initialize(
       url: 'https://company-search.invalid', publishableKey: 'test-key',
-      authOptions: const FlutterAuthClientOptions(autoRefreshToken: false),
+      authOptions: const FlutterAuthClientOptions(autoRefreshToken: false, detectSessionInUri: false),
       httpClient: MockClient((request) async {
         calls.add(request);
         final key = request.url.pathSegments.last;
@@ -101,8 +101,12 @@ void main() {
 
   Future<void> settle(WidgetTester tester) async {
     // functions_client decodes Edge Function JSON outside the fake test clock.
-    await tester.pump();
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 250)));
+    // Encoding and decoding each cross the isolate boundary. Pump between
+    // real event-loop turns so their continuations can schedule the next stage.
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+    }
     try {
       await tester.pumpAndSettle();
     } catch (_) {
