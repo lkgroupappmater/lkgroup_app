@@ -5,6 +5,7 @@ import {restoreSharedFormulaMasters,captureSharedFormulaMasters} from './workboo
 import {copySharedDeliveryLayout,deliverySheetIndex} from './shared-delivery-layout.mjs';
 import {unzipWorkbook} from './workbook-zip.mjs';
 import {prepareWorkbookFinalization} from './finalization-preparation.mjs';
+import {refreshDeliveryStyleGuard} from './template-style-guard.mjs';
 
 // This internal context travels only between authenticated server requests.
 // It is removed before the finished workbook is ever stored or downloaded.
@@ -28,6 +29,7 @@ export async function prepareIdentityWorkbook(files:Record<string,Uint8Array>,ro
   const paths=deliverySheetIndex(meta).filter((s:any)=>['지방배송','시내배송'].includes(s.name)).map((s:any)=>s.path);
   const source=await unzipWorkbook(layoutBytes,{Unzip,filter:(entry:any)=>!entry.name.startsWith('xl/worksheets/')||paths.includes(entry.name)||paths.some((p:string)=>entry.name===p.replace('/worksheets/','/worksheets/_rels/')+'.rels')});
   const sheets=copySharedDeliveryLayout(files,source);
+  refreshDeliveryStyleGuard(files);
   const updatedMasters=captureSharedFormulaMasters(files);
   for(const sheet of sheets)originalSharedMasters.set(sheet.target_path,updatedMasters.get(sheet.target_path)||new Map());
   deliveryLayout={version:1,source:data.deliveryLayoutSource,sheets};

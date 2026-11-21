@@ -6,6 +6,7 @@ on:
       - 'tests/shared-delivery*.test.mjs'
       - 'tests/excel_identity_handler.test.mjs'
       - 'tests/template-styles.test.mjs'
+      - 'tests/cell-text-format.test.mjs'
       - 'supabase/migrations/**preserve_shared_delivery_layout.sql'
       - 'supabase/functions/export-shipment-excel/**'
       - 'supabase/functions/prepare-shipment-identities/**'
@@ -24,4 +25,4 @@ jobs:
         with:
           node-version: '24'
       - run: npm install --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.10 fflate@0.8.2
-      - run: node --test tests/shared-delivery*.test.mjs tests/excel_identity_handler.test.mjs tests/template-styles.test.mjs
+      - run: node --test tests/shared-delivery*.test.mjs tests/excel_identity_handler.test.mjs tests/template-styles.test.mjs tests/cell-text-format.test.mjs
