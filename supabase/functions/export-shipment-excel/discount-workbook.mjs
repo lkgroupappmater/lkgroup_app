@@ -99,23 +99,28 @@ export function applyDiscountMatching(files){
  if(source.rules.some(r=>r.refs.name[0]!=='H'||r.refs.phone[0]!=='K'))throw Error('Discount source columns require review');
  const cargoRows=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>Number(m[1])).filter(r=>r>=6),cargoLast=Math.max(...cargoRows),end=Math.max(256,cargoLast),helper=[];
  const sourceColumns=['A','B','C','D','E','F','G'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
- for(let r=1;r<=end;r++){
-  const formulas={};if(r>=3&&r<=256){
+ // Compile the same cell XML once, then substitute only this row sentinel.
+ // Rebuilding and XML-escaping four large selectors for every Sea row exceeded
+ // the Edge CPU budget. This changes no formula or output byte.
+ const rowToken='__LK_DISCOUNT_ROW__',r=rowToken,formulas={};
+ {
    formulas.A=memberBase(`'Row data'!H${r}`);formulas.B=`SUBSTITUTE(A${r},"/","|")`;formulas.C=`SUBSTITUTE(${memberBase(`'Row data'!J${r}`)},"/","|")`;formulas.D=phonesBase(`'Row data'!K${r}`);
    formulas.E=`IF(B${r}="||",0,${count(`A${r}`,'/')}+1)`;formulas.F=`MAX(0,${count(`B${r}`,'|')}-1)`;formulas.G=`MAX(0,${count(`D${r}`,'|')}-1)`;
   }
-  if(r>=6&&r<=cargoLast){
+  {
    const full=`IF('물품 입고 내역'!AL${r}=2,MID('물품 입고 내역'!E${r},FIND("/",'물품 입고 내역'!E${r})+1,LEN('물품 입고 내역'!E${r})),'물품 입고 내역'!E${r})`;
    formulas.J=`SUBSTITUTE(${memberBase(full)},"/","|")`;formulas.K=first(`J${r}`);formulas.L=last(`J${r}`);
    formulas.S=phonesBase(`'물품 입고 내역'!F${r}`);formulas.M=first(`S${r}`);formulas.N=last(`S${r}`);
    formulas.O=selector(r,'M',false);formulas.P=selector(r,'N',false);formulas.Q=selector(r,'M',true);formulas.R=selector(r,'N',true);
   }
   for(const f of Object.values(formulas))if(f.length>8192)throw Error('Discount formula exceeds Excel limit');
-  const columns=[...(r>=3&&r<=256?sourceColumns:[]),...(r>=6&&r<=cargoLast?cargoColumns:[])];
+  const render=columns=>columns.map(c=>cell(`${c}${rowToken}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0)).join('');
+  const sourceTemplate=render(sourceColumns),cargoTemplate=render(cargoColumns);
+ for(let r=1;r<=end;r++){
   // Excel repair reports removed formula/shared-formula records in this part.
   // Do not hand-serialize shared masters and dependent cells here. Every cell
   // carries its complete formula with an explicit, correctly typed cache.
-  helper.push(`<row r="${r}">${columns.map(c=>cell(`${c}${r}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0)).join('')}</row>`);
+  helper.push(`<row r="${r}">${(r>=3&&r<=256?sourceTemplate:'').replaceAll(rowToken,String(r))}${(r>=6&&r<=cargoLast?cargoTemplate:'').replaceAll(rowToken,String(r))}</row>`);
  }
  const path=installSheet(files,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`);
  // Formula references are relative by cargo row. Existing styles, print areas,
