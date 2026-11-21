@@ -1408,10 +1408,14 @@ class ExcelImportService {
         // 전화번호/연락처 열은 차후 추가되더라도 같은 목록 안에서 자동 인식합니다.
         var discountOffset = -1;
         var phoneOffset = -1;
+        var companyOffset = -1;
         for (var offset = 1; offset <= 6 && c + offset < row.length; offset++) {
           final header = row[c + offset].trim();
           if (discountOffset < 0 && _isDiscountHeader(header)) {
             discountOffset = offset;
+          }
+          if (companyOffset < 0 && const ['회사','회사명','소속','상호','업체명','company','companyname','customercompany'].contains(header.toLowerCase().replaceAll(RegExp(r'[\s._-]'), ''))) {
+            companyOffset = offset;
           }
           if (phoneOffset < 0 && _isPhoneHeader(header)) {
             phoneOffset = offset;
@@ -1447,6 +1451,8 @@ class ExcelImportService {
           rules.add({
             'customer_name': name,
             'phone': normalizedPhone,
+            'phone_display': phone,
+            'company_name': companyOffset >= 0 && c + companyOffset < dataRow.length ? dataRow[c + companyOffset].trim() : '',
             'route_key': routeKey,
             'discount_percent': discount,
             'excel_source_row': rr + 1,
@@ -1828,4 +1834,5 @@ class ExcelImportService {
     return aliases[key] ?? key;
   }
 }
+
 

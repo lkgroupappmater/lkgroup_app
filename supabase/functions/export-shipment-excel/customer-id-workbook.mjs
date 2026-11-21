@@ -1,3 +1,4 @@
+import {discountPhoneTokens} from './discount-matching.mjs';
 import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 // Targeted OOXML extension. Existing VBA, drawings, pricing and discount formulas
 // remain in their original ZIP entries. The three new sheets use one data model
@@ -5,7 +6,7 @@ import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-11-18.template-style-preservation-v11';
+export const ID_WORKBOOK_VERSION='2026-11-21.discount-identity-v12';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
@@ -246,10 +247,11 @@ function refreshPolicyInputs(files,context,strings){
  const text=txt(files[path]),physical=rowsOf(text),byRow=new Map(physical.map(r=>[r.n,r])),tables=[];
  const key=v=>String(v??'').toLowerCase().replace(/[\s._-]/g,'');
  const groupKey=v=>key(v).replace(/(?:할인)?고객리스트$|할인$/g,'');
+ const companyHeader=v=>['회사','회사명','소속','상호','업체명','company','companyname','customercompany'].includes(key(v));
  const nameHeader=v=>['이름','성함','고객명','name','customername'].includes(key(v)),phoneHeader=v=>['전화번호','연락처','tel','phone','telephone','contact'].includes(key(v));
- for(const row of physical){for(let c=0;c<32;c++){if(!nameHeader(read(row,col(c))))continue;let p=-1,d=-1;for(let j=c+1;j<=c+6;j++){const v=read(row,col(j));if(phoneHeader(v))p=j;if(['할인','할인율','discount','discountrate'].includes(key(v)))d=j;}if(p<0||d<0)continue;
+ for(const row of physical){for(let c=0;c<32;c++){if(!nameHeader(read(row,col(c))))continue;let p=-1,d=-1,company=-1;for(let j=c+1;j<=c+6;j++){const v=read(row,col(j));if(phoneHeader(v))p=j;if(companyHeader(v))company=j;if(['할인','할인율','discount','discountrate'].includes(key(v)))d=j;}if(p<0||d<0)continue;
   let group='';outer:for(let n=row.n;n>=Math.max(1,row.n-12);n--){const prior=byRow.get(n);if(!prior)continue;for(let j=Math.max(0,c-1);j<=c+6;j++){const v=read(prior,col(j));if(!nameHeader(v)&&!phoneHeader(v)&&!['할인','할인율','할인금액','할인액','할인총합'].includes(key(v))&&/라선협|지상사|회원사|법인장|지인|아파트|기업|특별|파트너|협력사|할인/.test(v)){group=v.replace(/customer\s*list|discount\s*list|customer\s*discount|할인\s*고객\s*리스트|고객\s*리스트|할인\s*고객/gi,'').trim();if(group)break outer;}}}
-  tables.push({row:row.n,c,p,d,group});
+  tables.push({row:row.n,c,p,d,company,group});
  }}
  const updates=new Map(),set=(n,c,v)=>{if(!updates.has(n))updates.set(n,{});updates.get(n)[col(c)]=v;};
  const rules=context.discounts,used=new Set();
@@ -263,13 +265,16 @@ function refreshPolicyInputs(files,context,strings){
    const d=matches[0];if(!d){set(n,table.d,0);continue;}used.add(d.id+'|'+Number(special));
    const pct=special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0)):Number(d.discount_percent)-Number(d.special_discount_percent||0);
    if(!Number.isFinite(pct)||pct<0||pct>1)continue;
-   set(n,table.c,d.customer_name);if(phoneKey(phone)!==phoneKey(d.phone))set(n,table.p,d.phone);
+   set(n,table.c,d.customer_name);
+   const display=d.phone_display||discountPhoneTokens(d.phone).filter(Boolean).join(' / ')||d.phone;
+   if(phoneKey(phone)!==phoneKey(d.phone)||(!/[/,;|\r\n]/.test(phone)&&discountPhoneTokens(display).length>1))set(n,table.p,display);
+   if(table.company>=0&&String(d.company_name||'').trim())set(n,table.company,d.company_name);
    set(n,table.d,!d.active&&phoneKey(d.phone)?0:pct);
   }
   const additions=rules.filter(d=>d.active&&(special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0))>0:groupKey(d.group_name)===groupKey(table.group))&&!used.has(d.id+'|'+Number(special))&&d.rate_override==null&&!d.bulk_threshold);
   for(const d of additions){const row=byRow.get(n);if(!row||[table.c,table.p,table.d].some(c=>read(row,col(c)))||tables.some(t=>t.row===n))break;
    const pct=special?Number(d.special_discount_percent??(groupKey(d.group_name)==='특별'?d.discount_percent:0)):Number(d.discount_percent)-Number(d.special_discount_percent||0);if(!Number.isFinite(pct)||pct<0||pct>1)continue;
-   set(n,table.c,d.customer_name);set(n,table.p,d.phone);set(n,table.d,pct);used.add(d.id+'|'+Number(special));n++;
+   set(n,table.c,d.customer_name);set(n,table.p,d.phone_display||discountPhoneTokens(d.phone).filter(Boolean).join(' / ')||d.phone);if(table.company>=0&&d.company_name)set(n,table.company,d.company_name);set(n,table.d,pct);used.add(d.id+'|'+Number(special));n++;
   }
  }
  files[path]=bytes(text.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(row,n)=>patchRow(row,n,updates.get(Number(n)))));
@@ -377,5 +382,6 @@ function applyCustomerIdWorkbookContent(files,context,{prefix='LKS',shipments=[]
  }
  return {tables,applied:true,version:ID_WORKBOOK_VERSION};
 }
+
 
 

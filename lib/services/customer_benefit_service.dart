@@ -44,7 +44,9 @@ class DiscountRule {
         id: (map['id'] as num?)?.toInt(),
         customerName: '${map['customer_name'] ?? ''}'.trim(),
         companyName: '${map['company_name'] ?? ''}'.trim(),
-        phone: '${map['phone'] ?? ''}'.trim(),
+        phone: '${map['phone_display'] ?? ''}'.trim().isNotEmpty
+            ? '${map['phone_display']}'.trim()
+            : '${map['phone'] ?? ''}'.trim(),
         routeKey: '${map['route_key'] ?? 'all'}'.trim(),
         groupName: '${map['group_name'] ?? ''}'.trim(),
         discountPercent:
@@ -70,6 +72,7 @@ class DiscountRule {
         'customer_name': customerName.trim(),
         'company_name': companyName.trim(),
         'phone': CustomerBenefitService.normalizePhone(phone),
+        'phone_display': phone.trim(),
         'route_key': routeKey.trim().isEmpty ? 'all' : routeKey.trim(),
         'group_name': groupName.trim(),
         'discount_percent': discountPercent,
@@ -465,3 +468,4 @@ class CustomerBenefitService {
     }
   }
 }
+
