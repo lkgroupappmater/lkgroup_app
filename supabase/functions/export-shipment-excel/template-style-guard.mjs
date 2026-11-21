@@ -41,12 +41,12 @@ function header(xml,sheetName){
  }
  return {cells,rows,cols,merges:xml.match(/<mergeCells\b[^>]*?(?:\/>|>[\s\S]*?<\/mergeCells>)/)?.[0]||''};
 }
-const helpers=new Set(['고객 ID','명세서 번호 관리','배송 매칭 확인','신규 고객 ID','명세서 고객 ID 연결','지방배송','시내배송']);
+const helpers=new Set(['고객 ID','명세서 번호 관리','배송 매칭 확인','신규 고객 ID','명세서 고객 ID 연결','지방배송','시내배송','_LK_Discount_Identity']);
 function captureRichText(files,paths){
  const shared=sharedRichText(files),out=[];
  for(const s of deliverySheetIndex(files)){
   if(paths&&!paths.has(s.path))continue;
-  const xml=text(files[s.path]);if(!/<r\b/.test(xml)&&!shared.size)continue;
+  const xml=text(files[s.path]);if(!xml.includes('<r>')&&!xml.includes('<r ')&&(!shared.size||!xml.includes('t="s"')))continue;
   for(const [cell] of xml.matchAll(/<c\b[^>]*\bt="(?:s|inlineStr)"[^>]*>[\s\S]*?<\/c>/g)){
    const body=richTextBody(cell,shared);if(body!==undefined)out.push({path:s.path,sheet:s.name,ref:attr(cell.slice(0,cell.indexOf('>')+1),'r'),body});
   }
@@ -65,6 +65,9 @@ export function assertTemplateStyles(files,before){
  for(const [name,entries] of Object.entries(before.tables))for(let i=0;i<entries.length;i++)if(entries[i]!==after[name][i])throw Error(`Excel original ${name}[${i}] was changed`);
  let checked=0;
  for(const s of before.sheets){
+  // Older exports already contain the generated hidden discount helper. It is
+  // intentionally rebuilt, and is not part of the user's visible template.
+  if(s.name==='_LK_Discount_Identity')continue;
   if(!files[s.path])throw Error(`Excel template sheet missing: ${s.name}`);
   const current=header(text(files[s.path]),s.name);
   for(const [ref,id] of Object.entries(s.cells)){

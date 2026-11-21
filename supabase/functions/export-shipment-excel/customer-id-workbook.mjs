@@ -285,7 +285,9 @@ function refreshPolicyInputs(files,context,strings){
 }
 
 export function applyCustomerIdWorkbook(files,context,{prefix='LKS',shipments=[],base=false,preserveSharedMasters=true,managedDelivery=false,preserveDeliveryLayout=false}={}){
- inlineRichTextStrings(files);
+ // Main export already prepared visible text. Direct callers need only the
+ // policy/delivery inputs below, not another scan of every cargo/helper formula.
+ inlineRichTextStrings(files,new Set(['Row data','지방배송','시내배송'].map(name=>sheetPath(files,name)).filter(Boolean)));
  if(preserveSharedMasters)recoverDeliverySelectorMasters(files,sheetPath);
  const sharedMasters=preserveSharedMasters?captureSharedFormulaMasters(files):null;
  const result=applyCustomerIdWorkbookContent(files,context,{prefix,shipments,base,managedDelivery,preserveDeliveryLayout});

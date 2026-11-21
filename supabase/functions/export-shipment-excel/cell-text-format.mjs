@@ -20,11 +20,13 @@ export function richTextBody(cell,shared=new Map()){
  const body=cell.match(/<is\b[^>]*>([\s\S]*?)<\/is>/)?.[1];
  return body&&/<r\b/.test(body)?body:undefined;
 }
-export function inlineRichTextStrings(files){
+export function inlineRichTextStrings(files,paths){
  const rich=sharedRichText(files);if(!rich.size)return;
  for(const path of Object.keys(files)){
   if(!/^xl\/worksheets\/[^/]+\.xml$/.test(path))continue;
+  if(paths&&!paths.has(path))continue;
   const xml=dec.decode(files[path]);let changed=false;
+  if(!xml.includes('t="s"'))continue;
   const next=xml.replace(/<c\b[^>]*\bt="s"[^>]*>[\s\S]*?<\/c>/g,cell=>{
    const body=richTextBody(cell,rich);if(body===undefined)return cell;
    changed=true;return cell.replace(/\bt="s"/,'t="inlineStr"').replace(/<v>\d+<\/v>/,()=>'<is>'+body+'</is>');
