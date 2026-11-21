@@ -83,13 +83,23 @@ export function validateWorkbookFormulas(files){
  let sheetCount=0,formulaCount=0,sharedGroupCount=0;
  for(const [path,data] of Object.entries(files)){
   if(!/^xl\/worksheets\/[^/]+\.xml$/.test(path))continue;sheetCount++;
-  const xml=dec.decode(data),seen=new Set();
+  const xml=dec.decode(data),seen=new Set(),groups=new Map();
   for(const m of cells(xml)){
    const ref=attr(m[0].slice(0,m[0].indexOf('>')+1),'r');if(seen.has(ref))throw Error(`${path}: duplicate cell ${ref}`);seen.add(ref);
-   const fs=m[0].match(/<f\b/g)?.length||0;formulaCount+=fs;
-   if(fs>1||(m[0].match(/<v\b/g)?.length||0)>1)throw Error(`${path}!${ref}: duplicate formula/cache`);
+   // Read small formula/cache tags in one pass. Decoding every shared formula
+   // and scanning the full worksheet again is unnecessary for validation and
+   // exhausts the Edge CPU budget on the Sea workbook's large helper sheet.
+   let fs=0,vs=0;
+   for(const f of m[0].matchAll(/<[fv]\b[^>]*>/g)){
+    if(f[0][1]==='v'){vs++;continue;}fs++;
+    if(attr(f[0],'t')!=='shared')continue;
+    const si=attr(f[0],'si');if(!groups.has(si))groups.set(si,[]);
+    const start=f.index+f[0].length,hasFormula=!f[0].endsWith('/>')&&m[0].indexOf('</f>',start)>start;
+    groups.get(si).push({cell:ref,si,ref:attr(f[0],'ref'),formula:hasFormula});
+   }
+   formulaCount+=fs;if(fs>1||vs>1)throw Error(`${path}!${ref}: duplicate formula/cache`);
   }
-  for(const [si,items] of groupMap(xml)){
+  for(const [si,items] of groups){
    sharedGroupCount++;const masters=items.filter(x=>x.formula);
    if(si==null||masters.length!==1)throw Error(`${path}: shared formula ${si} has ${masters.length} masters`);
    const [lo,hi]=String(masters[0].ref||'').split(':').map(point),end=hi||lo;
@@ -98,3 +108,5 @@ export function validateWorkbookFormulas(files){
  }
  return {sheet_count:sheetCount,formula_count:formulaCount,shared_group_count:sharedGroupCount,shared_formula_errors:0};
 }
+
+
