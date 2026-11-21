@@ -38,6 +38,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   Future<void> refreshAutomatically() async { if (!_searched || !canApplyAutoRefresh) return; _automaticLoad = true; try { await _loadRows(); } finally { _automaticLoad = false; } }
   List<Map<String, dynamic>> get _searchRows => _rows.where(_fieldFilter.matches).toList(growable: false);
 
+  int _loadRequest = 0;
   bool _loading = true;
   bool _saving = false;
   String? _route;
@@ -78,6 +79,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
   num _num(dynamic v)=>v is num?v:(num.tryParse('${v??''}')??0);
 
   Future<void> _loadRows() async {
+    final request = ++_loadRequest;
     if (!_automaticLoad) _searched = true;
     if(_route==null||_year==null||_voyage==null)return;
     if (!_automaticLoad) setState(()=>_loading=true);
@@ -143,9 +145,9 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
         if(aa!=bb)return aa.compareTo(bb);
         return '${a['receipt']??''}'.compareTo('${b['receipt']??''}');
       });
-      if(!mounted || (_automaticLoad && !canApplyAutoRefresh))return;
+      if(!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh))return;
       setState((){_rows=result;_loading=false;});
-    }catch(e){_fail(_l('고객 리스트 조회 실패: $e'));}
+    }catch(e){if(request == _loadRequest)_fail(_l('고객 리스트 조회 실패: $e'));}
   }
 
   void _fail(String m){
@@ -407,7 +409,7 @@ class _CustomerListManagementScreenState extends State<CustomerListManagementScr
     final totalQty=_rows.fold<num>(0,(a,r)=>a+_num(r['quantity']));
     return Scaffold(
       appBar:AppBar(
-        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () { setState(() {}); if (_searched) _loadRows(); }),title:Text(_l('고객 리스트'))),
+        bottom: ManagementFieldSearch(language: widget.language, filter: _fieldFilter, fields: const {'name':'고객명','phone':'연락처','receipt':'명세서 번호','zone':'구획','delivery':'배송 유형','note':'비고'}, onChanged: () { setState(() {}); _loadRows(); }),title:Text(_l('고객 리스트'))),
       body:SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(8,8,8,8),child:Column(children:[
         const CompanyVerificationButton(),
         Row(children:[

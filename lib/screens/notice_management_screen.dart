@@ -33,6 +33,7 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> with Au
   List<Map<String, dynamic>> get _searchRows => _items.where(_fieldFilter.matches).toList(growable: false);
 
   List<Map<String, dynamic>> _items = [];
+  int _loadRequest = 0;
   bool _loading = true;
 
   @override
@@ -63,15 +64,16 @@ class _NoticeManagementScreenState extends State<NoticeManagementScreen> with Au
   }
 
   Future<void> _load() async {
+    final request = ++_loadRequest;
     try {
       final rows = await ContentService.fetchNotices(includePendingDeletion: true);
-      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+      if (!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _items = rows;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+      if (!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() => _loading = false);
       _message(_ue('공지 및 안내 조회 실패', e));
     }

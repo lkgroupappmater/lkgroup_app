@@ -37,6 +37,7 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> wit
   List<Map<String, dynamic>> get _searchRows => _items.where(_fieldFilter.matches).toList(growable: false);
 
   List<Map<String, dynamic>> _items = [];
+  int _loadRequest = 0;
   bool _loading = true;
 
   @override
@@ -58,15 +59,16 @@ class _ScheduleManagementScreenState extends State<ScheduleManagementScreen> wit
       ShipmentPeriodLabels.voyage(value, widget.language);
 
   Future<void> _load() async {
+    final request = ++_loadRequest;
     try {
       final rows = await ContentService.fetchSchedules(includePendingDeletion: true);
-      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+      if (!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() {
         _items = rows;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted || (_automaticLoad && !canApplyAutoRefresh)) return;
+      if (!mounted || request != _loadRequest || (_automaticLoad && !canApplyAutoRefresh)) return;
       setState(() => _loading = false);
       _message(_ue('일정 조회 실패', e));
     }

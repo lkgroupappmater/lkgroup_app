@@ -34,6 +34,7 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   List<String> get _companies => _rules.map((r) => r.localCompany).where((v) => v.isNotEmpty).toSet().toList()..sort();
   List<LocalDeliveryRule> _rules = const [];
   String _route = 'kr_la_sea';
+  int _loadRequest = 0;
   bool _loading = false;
 
   List<LocalDeliveryRule> get _visible => _rules.where((r) =>
@@ -51,16 +52,17 @@ class _LocalDeliveryManagementScreenState extends State<LocalDeliveryManagementS
   }
 
   Future<void> _load({bool silent = false}) async {
+    final request = ++_loadRequest;
     if (!silent) _searched = true;
     if (!silent) setState(() => _loading = true);
     try {
       final rows = await CustomerBenefitService.instance.listLocalDeliveryRules();
       final codes = await CustomerIdentityService.deliveryCodes(rows.where((r) => r.id != null).map((r) => r.id!).toList());
-      if (mounted && (!silent || canApplyAutoRefresh)) setState(() { _rules = rows; _customerCodes = codes; if (!_rules.any((r) => r.localCompany == _companyFilter)) _companyFilter = ''; });
+      if (mounted && request == _loadRequest && (!silent || canApplyAutoRefresh)) setState(() { _rules = rows; _customerCodes = codes; if (!_rules.any((r) => r.localCompany == _companyFilter)) _companyFilter = ''; });
     } catch (e) {
-      if (mounted) _msg(_l('시내·지방 배송 목록 조회 실패: $e'));
+      if (mounted && request == _loadRequest) _msg(_l('시내·지방 배송 목록 조회 실패: $e'));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && request == _loadRequest) setState(() => _loading = false);
     }
   }
 
