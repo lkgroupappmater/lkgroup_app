@@ -14,9 +14,15 @@ export function createWorkbookIdentityHandler({url,serviceKey,Unzip,Zip,ZipPassT
    if(files['_lk_internal_identity_context.json']||files['_lk_internal_delivery_layout.xlsm'])throw new Error('Internal Excel context was not consumed.');
    const prepared=await zipWorkbook(files,{Zip,ZipPassThrough});
    const target=new URL(url+'/functions/v1/finalize-shipment-excel');target.search=new URL(req.url).search;
-   const response=await request(target,{method:'POST',headers:{Authorization:'Bearer '+serviceKey,apikey:serviceKey,'Content-Type':'application/octet-stream'},body:prepared,signal:AbortSignal.timeout(90000)});
+   const options={method:'POST',headers:{Authorization:'Bearer '+serviceKey,apikey:serviceKey,'Content-Type':'application/octet-stream'},body:prepared,signal:AbortSignal.timeout(90000)};
+   let response=await request(target,options),resourceRetries=0;
+   // A warm Edge worker can exhaust its cumulative CPU allowance when Sea
+   // follows another workbook. HTTP 546 terminates that worker; retry the same
+   // prepared bytes once on a fresh worker. Never retry validation/auth errors.
+   if(response.status===546){await response.arrayBuffer().catch(()=>{});resourceRetries++;response=await request(target,options);}
    const completed=await response.json().catch(()=>null);
    if(!response.ok||!completed?.ok||!completed?.integrity?.stored_download_verified)throw new Error(completed?.error||'Excel 최종 검증·저장 처리에 실패했습니다.');
+   if(resourceRetries)completed.integrity.finalizer_resource_retries=resourceRetries;
    if(deliveryLayout)completed.integrity.shared_delivery_layout=deliveryLayout;
    return json(200,completed);
   }catch(error){reportError('prepare-shipment-identities failed:',error);return json(500,{error:error?.message||'Excel 고객 ID 반영에 실패했습니다.'});}
