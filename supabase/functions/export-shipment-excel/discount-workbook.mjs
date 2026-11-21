@@ -52,13 +52,13 @@ function selector(row,phoneColumn,special){
 }
 const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
 export function validateDiscountWorksheet(data){
- const xml=text(data);let formulaCount=0;
+ const xml=typeof data==='string'?data:text(data);let formulaCount=0;
  if(/<f\b[^>]*\b(?:t|si|ref)=/.test(xml))throw Error('Discount worksheet must contain independent formulas');
  for(const m of xml.matchAll(/<c\b[^>]*>[\s\S]*?<\/c>/g)){
-  const ref=m[0].match(/\br="([^"]+)"/)?.[1],f=m[0].match(/<f>([^<]+)<\/f>/)?.[1];
+  const header=m[0].slice(0,m[0].indexOf('>')+1),ref=header.match(/\br="([^"]+)"/)?.[1],f=m[0].match(/<f>([^<]+)<\/f>/)?.[1];
   if(!f||!/<v>(?:0)?<\/v>/.test(m[0]))throw Error(`Discount worksheet ${ref}: missing formula or cache`);
   const stringCell=/^(?:A|B|C|D|J|K|L|M|N|S)\d+$/.test(ref||'');
-  if(stringCell!==/\bt="str"/.test(m[0]))throw Error(`Discount worksheet ${ref}: invalid formula cache type`);
+  if(stringCell!==/\bt="str"/.test(header))throw Error(`Discount worksheet ${ref}: invalid formula cache type`);
   formulaCount++;
  }
  if(!formulaCount)throw Error('Discount worksheet has no formulas');
@@ -122,14 +122,18 @@ export function applyDiscountMatching(files){
   // carries its complete formula with an explicit, correctly typed cache.
   helper.push(`<row r="${r}">${(r>=3&&r<=256?sourceTemplate:'').replaceAll(rowToken,String(r))}${(r>=6&&r<=cargoLast?cargoTemplate:'').replaceAll(rowToken,String(r))}</row>`);
  }
- const path=installSheet(files,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`);
+ const helperXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`;
+ const path=installSheet(files,helperXml);
  // Formula references are relative by cargo row. Existing styles, print areas,
  // delivery matching, customer IDs, notes, discount rates and VBA are untouched.
+ let cargoChanged=false;
  files[cargo]=rewriteWorksheetRows(xml,(row,r)=>{
   if(r<6)return row;
+  const before=row;
   row=putFormula(row,`AJ${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!O${r}:P${r}),1000))`,0);
-  return putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
+  row=putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
+  cargoChanged ||= row!==before;return row;
  });
- const changed=!originalHelper||text(originalHelper)!==text(files[path])||xml!==text(files[cargo]);
- return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(files[path])};
+ const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged;
+ return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(helperXml)};
 }

@@ -7,9 +7,9 @@ import {createWorkbookFinalizer} from '../supabase/functions/export-shipment-exc
 
 const context='_lk_internal_identity_context.json';
 const input=await zipWorkbook({[context]:strToU8('{}'),'xl/workbook.xml':strToU8('<workbook/>')},{Zip,ZipPassThrough});
-function harness({consume=true,childStatus=200,verified=true}={}){
- let prepares=0,requests=0;
- const handler=createWorkbookIdentityHandler({url:'https://db.example',serviceKey:'internal-test-key',Unzip,Zip,ZipPassThrough,prepareIdentityWorkbook(files,route){assert.equal(route,'kr_la_sea');prepares++;if(consume)delete files[context];},async request(target,options){requests++;assert.equal(new URL(target).pathname,'/functions/v1/finalize-shipment-excel');assert.equal(options.headers.Authorization,'Bearer internal-test-key');assert.equal((await unzipWorkbook(options.body,{Unzip}))[context],undefined);return Response.json({ok:childStatus===200,integrity:{stored_download_verified:verified},storage_path:'verified-output.xlsm'},{status:childStatus});},reportError(){}});
+function harness({consume=true,childStatus=200,childStatuses=[],verified=true}={}){
+ let prepares=0,requests=0,firstOptions;
+ const handler=createWorkbookIdentityHandler({url:'https://db.example',serviceKey:'internal-test-key',Unzip,Zip,ZipPassThrough,prepareIdentityWorkbook(files,route){assert.equal(route,'kr_la_sea');prepares++;if(consume)delete files[context];},async request(target,options){const status=childStatuses[requests]??childStatus;requests++;if(firstOptions){assert.deepEqual(options.body,firstOptions.body);assert.equal(options.signal,firstOptions.signal);}else firstOptions={...options,body:options.body.slice()};assert.equal(new URL(target).pathname,'/functions/v1/finalize-shipment-excel');assert.equal(options.headers.Authorization,'Bearer internal-test-key');assert.equal((await unzipWorkbook(options.body,{Unzip}))[context],undefined);return Response.json({ok:status===200,integrity:{stored_download_verified:verified},storage_path:'verified-output.xlsm'},{status});},reportError(){}});
  const request=(auth='Bearer internal-test-key')=>new Request('https://db.example/functions/v1/prepare-shipment-identities?route=kr_la_sea&year=2026&voyage=V10&file_name=SEA.xlsm',{method:'POST',headers:{authorization:auth},body:input});
  return {handler,request,get state(){return {prepares,requests};}};
 }
@@ -25,6 +25,17 @@ test('unconsumed identity context cannot be sent to finalizer or published',asyn
 });
 test('failed or unverified child output is never returned as a successful export',async()=>{
  for(const options of [{childStatus:500},{verified:false}]){const h=harness(options),r=await h.handler(h.request()),body=await r.json();assert.equal(r.status,500);assert.equal(body.storage_path,undefined);}
+});
+test('a terminated resource-limited worker is retried once with identical bytes and one deadline',async()=>{
+ const h=harness({childStatuses:[546,200]}),response=await h.handler(h.request()),body=await response.json();
+ assert.equal(response.status,200);assert.equal(body.integrity.finalizer_resource_retries,1);
+ assert.equal(body.integrity.stored_download_verified,true);assert.deepEqual(h.state,{prepares:1,requests:2});
+});
+test('resource retry remains bounded and never bypasses auth, validation or storage verification',async()=>{
+ for(const [statuses,verified,calls] of [[[546,546,200],true,2],[[403,200],true,1],[[500,200],true,1],[[546,200],false,2]]){
+  const h=harness({childStatuses:statuses,verified}),response=await h.handler(h.request()),body=await response.json();
+  assert.equal(response.status,500);assert.equal(body.storage_path,undefined);assert.deepEqual(h.state,{prepares:1,requests:calls});
+ }
 });
 test('final storage stage independently rejects private identity context',async()=>{
  let touched=false;
