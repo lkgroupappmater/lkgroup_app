@@ -46,7 +46,9 @@ function selector(row,phoneColumn,special){
  const active=`('Row data'!$AK$3:$AK$256<>"")*('Row data'!$AG$3:$AG$256${special?'=':'<>'}"특별할인")`;
  const mask=`(${active}*(LEN(${p})>=8)*(LEN(${p})<=15)*(${phonePosition}>0)*((${memberMatch}+${companyMatch})>0))`;
  // Highest member match wins before a company-only match, then original row order.
- return `IFERROR(_xlfn.AGGREGATE(14,6,(ROW('Row data'!$AK$3:$AK$256)+1000*${memberMatch})/${mask},1),0)`;
+ // BASE has many empty cargo rows. Their result is already zero; avoid
+ // evaluating the full chart array until a usable phone has been entered.
+ return `IF(OR(LEN(${p})<8,LEN(${p})>15),0,IFERROR(_xlfn.AGGREGATE(14,6,(ROW('Row data'!$AK$3:$AK$256)+1000*${memberMatch})/${mask},1),0))`;
 }
 const cell=(ref,f,value='')=>`<c r="${ref}"${typeof value==='number'?'':' t="str"'}><f>${formulaText(f)}</f><v>${esc(value)}</v></c>`;
 export function validateDiscountWorksheet(data){
