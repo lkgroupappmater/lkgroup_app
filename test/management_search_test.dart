@@ -40,7 +40,7 @@ void main() {
       'route_key': 'kr_la_sea', 'route': '한국->라오스 해상',
       'shipment_year': 2026, 'year': 2026, 'voyage': '22',
       'phone': '0201234567$i', 'consignee_phone': '0201234567$i',
-      'receipt_number': 'LKS 000${i + 1}', 'box_number': '${i + 1}',
+      'receipt_number': 'LKS${i + 1}', 'box_number': '${i + 1}',
       'unloading_zone': 'A', 'quantity': 1, 'source_no': i + 1,
       'local_company': 'HAL', 'destination_address': 'Vientiane',
       'delivery_type': 'province', 'active': true, 'discount_percent': 0.05,
@@ -99,13 +99,25 @@ void main() {
   tearDownAll(() async => Supabase.instance.dispose());
   setUp(() { calls.clear(); pending.clear(); failLists = false; });
 
+  Future<void> settle(WidgetTester tester) async {
+    // functions_client decodes Edge Function JSON outside the fake test clock.
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 250)));
+    try {
+      await tester.pumpAndSettle();
+    } catch (_) {
+      // Keep failures actionable without logging synthetic auth headers/tokens.
+      debugPrint('HTTP paths: ${calls.map((r) => r.url.path).toList()}');
+      rethrow;
+    }
+  }
   Future<void> open(WidgetTester tester, Widget screen) async {
     tester.view.physicalSize = const Size(1200, 2000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MaterialApp(home: screen));
-    await tester.pumpAndSettle();
+    await settle(tester);
   }
   Finder text(String name) => find.byWidgetPredicate((w) => w is Text && (w.data ?? '').contains(name));
   Finder searchBar() => find.byType(ManagementFieldSearch);
@@ -117,11 +129,11 @@ void main() {
     } else {
       await tester.tap(find.descendant(of: searchBar(), matching: find.widgetWithText(TextButton, '검색')));
     }
-    await tester.pumpAndSettle();
+    await settle(tester);
   }
   Future<void> reset(WidgetTester tester) async {
     await tester.tap(find.descendant(of: searchBar(), matching: find.widgetWithText(TextButton, '초기화')));
-    await tester.pumpAndSettle();
+    await settle(tester);
   }
   for (final entry in screens.entries) {
     testWidgets('${entry.key}: first search, repeated search, reset, no matches and retry', (tester) async {
@@ -152,7 +164,7 @@ void main() {
       expect(text('Beta'), findsWidgets);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpAndSettle();
+      await settle(tester);
     });
     testWidgets('${entry.key}: a slower previous request cannot overwrite the latest list', (tester) async {
       await open(tester, entry.value());
@@ -166,15 +178,15 @@ void main() {
       await tester.pump();
       expect(pending[entry.key], isEmpty);
       latest.complete(rows(['Latest result']));
-      await tester.pumpAndSettle();
+      await settle(tester);
       expect(text('Latest result'), findsWidgets);
       older.complete(rows(['Outdated result']));
-      await tester.pumpAndSettle();
+      await settle(tester);
       expect(text('Latest result'), findsWidgets);
       expect(text('Outdated result'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpAndSettle();
+      await settle(tester);
     });
   }
   for (final key in ['local_delivery_profiles', 'admin_list_discount_rules_with_identity', 'shipments']) {
@@ -190,7 +202,7 @@ void main() {
       expect(text('Alpha'), findsWidgets);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpAndSettle();
+      await settle(tester);
     });
   }
 }
