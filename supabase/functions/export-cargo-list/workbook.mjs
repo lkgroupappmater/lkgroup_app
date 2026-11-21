@@ -1,6 +1,7 @@
 // The small Artifact Tool template preserves the existing A:Q cargo layout.
 // Filling OOXML cells avoids loading/recalculating a macro workbook per download.
 import {templateBase64} from './template.mjs';
+import {validateWorkbookPackage} from '../export-shipment-excel/workbook-package.mjs';
 export const cargoFields=['id','box_number','invoice_number','sender_name','consignee_name','consignee_phone','contents','package_type','quantity','weight_kg','length_cm','width_cm','height_cm','receipt_number','unloading_zone','notes','received_at'];
 const headers={
  ko:['No.','화물번호','송장번호','보내는 분','수취인','연락처','품목','포장','수량','중량 (kg)','길이 (cm)','너비 (cm)','높이 (cm)','No. Bill','구획','비고','입고일'],
@@ -27,5 +28,7 @@ export function buildCargoWorkbook(rows,{route,year,voyage,language='ko'},zip){
  let data=`<x:row r="1">${cell('LK Group · '+label,0,1,2)}</x:row><x:row r="3">${cell(`${route} · ${year} · V${voyage}`,0,3,1)}</x:row><x:row r="5" ht="36" customHeight="1">${(headers[language]||headers.ko).map((v,c)=>cell(v,c,5,6)).join('')}</x:row>`;
  data+=matrix.map((values,i)=>`<x:row r="${i+6}" ht="26" customHeight="1">${values.map((v,c)=>cell(v,c,i+6,styles[c])).join('')}</x:row>`).join('');
  files[name]=encoder.encode(source.replace(/<x:sheetData>[\s\S]*?<\/x:sheetData>/,`<x:sheetData>${data}</x:sheetData>`));
+ validateWorkbookPackage(files);
  return zip.zipSync(files,{level:6});
 }
+

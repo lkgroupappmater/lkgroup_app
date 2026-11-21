@@ -4,6 +4,7 @@ import {strFromU8} from 'npm:fflate@0.8.2';
 import {applyUnknownPrefixZones} from './unknown-zone.mjs';
 import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
 import {validateWorkbookFormulas} from './workbook-integrity.mjs';
+import {discardCalculationChain,validateWorkbookPackage} from './workbook-package.mjs';
 import {upgradeStatementMacros} from './statement-macros.mjs';
 
 function sharedStrings(files: Record<string, Uint8Array>): string[] {
@@ -80,6 +81,7 @@ function decodeXmlText(value: string): string {
 
 export function finalizeWorkbook(files:Record<string,Uint8Array>){
  const captureStage=files[STYLE_CONTEXT_ENTRY]?'source':'finalizer';
+ const calculationChain=discardCalculationChain(files);
  // Accept older in-flight exporters during the staged deployment.
  if(captureStage==='finalizer')beginTemplateStyleGuard(files);
  applyUnknownPrefixZones(files,{sheetPath:workbookSheetPath,strings:sharedStrings(files),cellText});
@@ -87,6 +89,7 @@ export function finalizeWorkbook(files:Record<string,Uint8Array>){
  const discount=applyDiscountMatching(files);
  const integrity={...validateWorkbookFormulas(files),discount_identity:discount,freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count};
  upgradeStatementMacros(files);
- return {...integrity,template_styles:{...finishTemplateStyleGuard(files),capture_stage:captureStage}};
+ const templateStyles={...finishTemplateStyleGuard(files),capture_stage:captureStage};
+ return {...integrity,template_styles:templateStyles,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
 }
 
