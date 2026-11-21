@@ -46,6 +46,10 @@ const helperPath='xl/worksheets/lk-discount-identity.xml',helper=strFromU8(files
 assert.doesNotMatch(helper,/<f[^>]*\bt="shared"/);
 assert.doesNotMatch(helper,/_xlfn\.AGGREGATE/);
 assert.ok(validateDiscountWorksheet(files[helperPath]).formula_count>10000);
+assert.equal(validateDiscountWorksheet(files[helperPath]).array_formula_count,(Math.max(...inputs.map((v,i)=>v.row||i+6))-5)*4);
+assert.match(helper,/<c r="O6"><f t="array" ref="O6">/);
+assert.throws(()=>validateDiscountWorksheet(strToU8(helper.replace('ref="O6"','ref="O6:P6"'))),/single-cell array range/);
+assert.throws(()=>validateDiscountWorksheet(strToU8(helper.replace(' t="array" ref="O6"',''))),/single-cell array range/);
 assert.throws(()=>validateDiscountWorksheet(strToU8(helper.replace('<f>','<f t="shared" si="0">'))),/independent formulas/);
 assert.throws(()=>validateDiscountWorksheet(strToU8(helper.replace('<f>','<f/>'))),/missing formula/);
 assert.throws(()=>validateDiscountWorksheet(strToU8(helper.replace(' t="str"',''))),/cache type/);
