@@ -138,6 +138,22 @@ export function applyDiscountMatching(files){
   row=putFormula(row,`AO${r}`,`IF(OR(Y${r}="",AC${r}=1),0,MOD(MAX('${SHEET}'!Q${r}:R${r}),1000))`,0);
   cargoChanged ||= row!==before;return row;
  });
- const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged;
+ // Raw/original downloads also call this function without the identity stage.
+ // Do not retain Excel's old calculation ID with newly written zero caches.
+ const beforeWorkbook=text(files['xl/workbook.xml']);
+ const calculation='<calcPr calcId="0" calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
+ let workbook=beforeWorkbook;
+ if(/<calcPr\b/.test(workbook))workbook=workbook.replace(/<calcPr\b[^>]*\/?>(?:<\/calcPr>)?/,tag=>{
+  for(const [key,value] of [['calcId','0'],['calcMode','auto'],['fullCalcOnLoad','1'],['forceFullCalc','1']]){
+   const attr=new RegExp(`\\b${key}="[^"]*"`);tag=attr.test(tag)?tag.replace(attr,`${key}="${value}"`):tag.replace(/\/?>(?:<\/calcPr>)?$/,` ${key}="${value}"/>`);
+  }
+  return tag;
+ });
+ else {
+  const next=workbook.search(/<(?:oleSize|customWorkbookViews|pivotCaches|smartTagPr|smartTagTypes|webPublishing|fileRecoveryPr|webPublishObjects|extLst)\b/);
+  workbook=next<0?workbook.replace('</workbook>',calculation+'</workbook>'):workbook.slice(0,next)+calculation+workbook.slice(next);
+ }
+ files['xl/workbook.xml']=bytes(workbook);
+ const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged||workbook!==beforeWorkbook;
  return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(helperXml)};
 }
