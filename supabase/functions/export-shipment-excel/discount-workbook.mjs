@@ -3,7 +3,7 @@ import {worksheetRowEntries,rewriteWorksheetRows} from './worksheet-rows.mjs';
 const enc=new TextEncoder(),dec=new TextDecoder(),text=b=>dec.decode(b),bytes=s=>enc.encode(s);
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const formulaText=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
-export const DISCOUNT_FORMULA_STORAGE='independent-array-selectors-v4';
+export const DISCOUNT_FORMULA_STORAGE='unordered-array-selectors-v5';
 const SHEET='_LK_Discount_Identity';
 // These ranges are on the helper itself. Keep their ordinary A1 references
 // short, including when each cargo row is written as an independent formula.
@@ -32,26 +32,36 @@ function phonesBase(value){
 const count=(value,delimiter)=>`LEN(${value})-LEN(SUBSTITUTE(${value},"${delimiter}",""))`;
 const first=value=>`IFERROR(MID(${value},2,FIND("|",${value},2)-2),"")`;
 const last=value=>`IF(LEN(${value})<3,"",TRIM(RIGHT(SUBSTITUTE(LEFT(${value},LEN(${value})-1),"|",REPT(" ",LEN(${value}))),LEN(${value}))))`;
-function selector(row,phoneColumn,special){
- const p=`$${phoneColumn}${row}`,phonePosition=`IFERROR(FIND("|"&${p}&"|",${range('D')}),0)`;
- const phoneOrdinal=`(${count(`LEFT(${range('D')},${phonePosition})`,'|')})`;
- const member = name => {
-  const pos=`IFERROR(FIND("|"&${name}&"|",${range('B')}),0)`;
-  const groupOrdinal=`(${count(`LEFT(${range('A')},${pos})`,'/')}+1)`;
-  const flatOrdinal=`(${count(`LEFT(${range('B')},${pos})`,'|')})`;
-  const paired=`((${range('E')}=1)+(${range('G')}=1)+((${range('E')}=${range('G')})*(${groupOrdinal}=${phoneOrdinal}))+((${range('E')}<>${range('G')})*(${range('F')}=${range('G')})*(${flatOrdinal}=${phoneOrdinal})))`;
-  return `((${name}<>"")*(${pos}>0)*(${paired}>0))`;
- };
- const memberMatch=`((${member(`$K${row}`)}+${member(`$L${row}`)})>0)`;
- const companyMatch=`((($K${row}<>"")*ISNUMBER(FIND("|"&$K${row}&"|",${range('C')}))+($L${row}<>"")*ISNUMBER(FIND("|"&$L${row}&"|",${range('C')})))>0)`;
- const mask=`((${range('H')}=${special?2:1})*(${phonePosition}>0))`;
- // Highest member match wins before a company-only match, then original row order.
- // BASE has many empty cargo rows. Their result is already zero; avoid
- // evaluating the full chart array until a usable phone has been entered.
- // LOOKUP explicitly consumes its array argument in desktop Excel as well as
- // other engines. Keep IF out of range expressions: implicit intersection in
- // older Excel calculation modes must not silently turn every match into 0.
- return `IF(OR(LEN(${p})<8,LEN(${p})>15),0,IFERROR(1000+LOOKUP(2,1/(${mask}*${memberMatch}),ROW(${range('H')})),IFERROR(LOOKUP(2,1/(${mask}*${companyMatch}),ROW(${range('H')})),0)))`;
+// Split every entered name/phone, including middle tokens. INDEX bounds this
+// horizontal array to the actual token count; no fixed two-name/phone limit.
+function tokenArray(value){
+ const positions=`COLUMN($A$1:INDEX($1:$1,1,MAX(1,${count(value,'|')}-1)))`;
+ const values=`TRIM(MID(SUBSTITUTE(${value},"|",REPT(" ",LEN(${value}))),${positions}*LEN(${value})+1,LEN(${value})))`;
+ return {positions,values};
+}
+// A receipt suffix such as Member A2 is ignored only for discount names.
+// Keep internal digits (3M, A1B) and check the original token as well.
+function withoutReceiptDigits(value,values){
+ const characters=`ROW($A$1:INDEX($A:$A,MAX(1,LEN(${value}))))`;
+ const suffix=`RIGHT(${values},${characters})`;
+ let residue=suffix;for(const digit of '0123456789')residue=sub(residue,digit,'');
+ const lengths=`MMULT(TRANSPOSE(${characters}^0),((${residue}="")*(${characters}<=LEN(${values}))))`;
+ return `LEFT(${values},LEN(${values})-${lengths})`;
+}
+function intersects(value,column,phone=false,receiptDigits=false){
+ const {positions,values:raw}=tokenArray(value);
+ const values=receiptDigits?withoutReceiptDigits(value,raw):raw;
+ const valid=phone?`((LEN(${values})>=8)*(LEN(${values})<=15)*ISNUMBER(IFERROR(VALUE(${values}),"")))`:`(${values}<>"")`;
+ return `(MMULT((ISNUMBER(FIND("|"&${values}&"|",${range(column)})))*${valid},TRANSPOSE(${positions}^0))>0)`;
+}
+function selector(row,special,receiptDigits=false){
+ const phoneMatch=intersects(`$S${row}`,'D',true);
+ const memberMatch=intersects(`$J${row}`,'B',false,receiptDigits);
+ const companyMatch=intersects(`$J${row}`,'C',false,receiptDigits);
+ const mask=`((${range('H')}=${special?2:1})*${phoneMatch})`;
+ // Keep member-before-company and original chart-row precedence. Each match
+ // uses names and phones from the same rule, independent of either list order.
+ return `IF(OR($J${row}="||",$S${row}="||"),0,IFERROR(1000+LOOKUP(2,1/(${mask}*${memberMatch}),ROW(${range('H')})),IFERROR(LOOKUP(2,1/(${mask}*${companyMatch}),ROW(${range('H')})),0)))`;
 }
 // Explicit single-cell arrays make the nested range calculations unambiguous
 // in desktop Excel. Each selector owns exactly its own output cell: no shared
@@ -121,9 +131,9 @@ export function applyDiscountMatching(files){
    const full=`IF('물품 입고 내역'!AL${r}=2,MID('물품 입고 내역'!E${r},FIND("/",'물품 입고 내역'!E${r})+1,LEN('물품 입고 내역'!E${r})),'물품 입고 내역'!E${r})`;
    formulas.J=`SUBSTITUTE(${memberBase(full)},"/","|")`;formulas.K=first(`J${r}`);formulas.L=last(`J${r}`);
    formulas.S=phonesBase(`'물품 입고 내역'!F${r}`);formulas.M=first(`S${r}`);formulas.N=last(`S${r}`);
-   formulas.O=selector(r,'M',false);formulas.P=selector(r,'N',false);formulas.Q=selector(r,'M',true);formulas.R=selector(r,'N',true);
+   formulas.O=selector(r,false);formulas.P=selector(r,false,true);formulas.Q=selector(r,true);formulas.R=selector(r,true,true);
   }
-  for(const f of Object.values(formulas))if(f.length>8192)throw Error('Discount formula exceeds Excel limit');
+  for(const f of Object.values(formulas))if(f.replaceAll(rowToken,String(end)).length>8192)throw Error('Discount formula exceeds Excel limit');
   const render=columns=>columns.map(c=>cell(`${c}${rowToken}`,formulas[c],['A','B','C','D','J','K','L','M','N','S'].includes(c)?'':0,['O','P','Q','R'].includes(c))).join('');
   const sourceTemplate=render(sourceColumns),cargoTemplate=render(cargoColumns);
  for(let r=1;r<=end;r++){

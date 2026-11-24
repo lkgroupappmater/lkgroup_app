@@ -54,7 +54,7 @@ function masterTag(items,source){
 export function restoreSharedFormulaMasters(files,snapshot){
  let repaired=0;
  for(const [path,masters] of snapshot){
-  if(!files[path])continue;const xml=dec.decode(files[path]),replacements=new Map();
+  if(!files[path]||!masters.size)continue;const xml=dec.decode(files[path]),replacements=new Map();
   for(const [si,items] of groupMap(xml))if(!items.some(x=>x.formula)&&masters.has(si)){
    replacements.set(items[0].cell,masterTag(items,masters.get(si)));repaired++;
   }

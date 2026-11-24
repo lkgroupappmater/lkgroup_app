@@ -1,0 +1,32 @@
+name: Discount identity checks
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/export-shipment-excel/discount-*.mjs'
+      - 'tests/discount-*'
+      - 'supabase/migrations/**discount_identity_matching.sql'
+      - '.github/workflows/discount-matching-checks.yml'
+permissions:
+  contents: read
+jobs:
+  discount-matching:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.10 fflate@0.8.2
+      - run: node --test supabase/functions/export-shipment-excel/discount-*.test.mjs
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: node tests/discount-workbook-native.mjs --prepare-only
+      - run: dotnet run --project tests/discount-openxml/Validate.csproj -- test-results/discount-native/*.xlsx
+      - run: sudo apt-get update && sudo apt-get install -y libreoffice-calc
+      - run: node tests/discount-workbook-native.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discount-native-calculation
+          path: test-results/discount-native/

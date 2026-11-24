@@ -2127,12 +2127,12 @@ Deno.serve(async (req) => {
       if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
       const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
       if(found.error)throw found.error;const template=found.data;
-      if(template.storage_path.startsWith('excel-integrity-v6/'))return json(200,{ok:true,...template});
+      if(template.storage_path.startsWith('excel-integrity-v7/'))return json(200,{ok:true,...template});
       const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
       if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
       const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at);
       if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
-      const path=`excel-integrity-v6/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      const path=`excel-integrity-v7/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
       await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
       // Retain recovery metadata and the original object. A concurrent user
       // upload wins: publish only if the exact source registration is unchanged.
@@ -2438,7 +2438,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       if(layout){
         if(!['kr_la_sea','kr_la_air'].includes(layout.route_key)||typeof layout.storage_path!=='string'||
           ![(`base/${layout.route_key}/`),(`macro-updates/${layout.route_key}/`)].some(p=>layout.storage_path.startsWith(p)))throw Error('잘못된 공통 배송 원본 경로입니다.');
-        deliveryLayoutSource=layout;
+        const copied=baseTemplate?.policy_summary?.integrity?.shared_delivery_layout?.source;
+        const verifiedCopy=baseTemplate?.policy_summary?.integrity?.stored_download_verified===true&&
+          copied?.storage_path===layout.storage_path&&copied?.uploaded_at===layout.uploaded_at;
+        deliveryLayoutSource={...layout,reuse_template:template.storage_path===layout.storage_path||verifiedCopy};
       }
     }
 

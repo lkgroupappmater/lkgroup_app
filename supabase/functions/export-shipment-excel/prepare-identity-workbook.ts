@@ -23,6 +23,11 @@ export async function prepareIdentityWorkbook(files:Record<string,Uint8Array>,ro
   const layout=data.deliveryLayoutSource;
   if(!['kr_la_sea','kr_la_air'].includes(routeKey)||!['kr_la_sea','kr_la_air'].includes(layout.route_key)||typeof layout.storage_path!=='string'||
      ![`base/${layout.route_key}/`,`macro-updates/${layout.route_key}/`].some(p=>layout.storage_path.startsWith(p))||!downloadDeliveryLayout)throw Error('Invalid common delivery layout context');
+  if(layout.reuse_template===true){
+   // The authenticated exporter verified this exact immutable layout is already
+   // present. Keep all carrier alternatives without downloading/copying it twice.
+   deliveryLayout={version:1,source:data.deliveryLayoutSource,sheets:[],reused_template_layout:true};
+  }else{
   // Read the immutable source inside the existing authenticated processing stage.
   // Do not embed a nested ZIP in the streamed workbook passed between stages.
   const layoutBytes=await downloadDeliveryLayout(layout.storage_path);
@@ -32,9 +37,10 @@ export async function prepareIdentityWorkbook(files:Record<string,Uint8Array>,ro
   const approvedFonts=repairApprovedWorkbookFonts(source,layout.uploaded_at,{onlyDelivery:true});
   const sheets=copySharedDeliveryLayout(files,source);
   refreshDeliveryStyleGuard(files);
-  const updatedMasters=captureSharedFormulaMasters(files);
+  const updatedMasters=captureSharedFormulaMasters(Object.fromEntries(sheets.map((sheet:any)=>[sheet.target_path,files[sheet.target_path]])));
   for(const sheet of sheets)originalSharedMasters.set(sheet.target_path,updatedMasters.get(sheet.target_path)||new Map());
   deliveryLayout={version:1,source:data.deliveryLayoutSource,sheets,approvedFonts};
+  }
  }
     applyCustomerIdWorkbook(files,identityContext,{prefix:receiptPrefix,shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false,managedDelivery:['kr_la_sea','kr_la_air'].includes(routeKey),preserveDeliveryLayout:!!deliveryLayout});
     // BASE refreshes and voyage exports must both repair inherited presentation.
