@@ -1,4 +1,4 @@
-import {applyDiscountMatching} from './discount-workbook.mjs';
+import {applyDiscountMatching,stageDiscountHelperRebuild} from './discount-workbook.mjs';
 import {inlineRichTextStrings,preserveCellText} from './cell-text-format.mjs';
 import {DISCOUNT_MATCH_VERSION} from './discount-matching.mjs';
 import {discardCalculationChain,validateWorkbookPackage,WORKBOOK_PACKAGE_VERSION} from './workbook-package.mjs';
@@ -2059,7 +2059,7 @@ function wireStatementPaymentAccounts(files: Record<string, Uint8Array>): void {
 }
 // Repair recognized formulas and explicitly approved legacy fonts only. Cargo
 // input, customer matching, receipt assignment and macro execution are unchanged.
-async function repairMinimumBytes(bytes:Uint8Array,templateDate:string) {
+async function repairMinimumBytes(bytes:Uint8Array,templateDate:string,routeKey:string) {
   const files=await unzipWorkbook(bytes,{Unzip});
   const calculationChain=discardCalculationChain(files);
   validateWorkbookFormulas(files);
@@ -2067,7 +2067,7 @@ async function repairMinimumBytes(bytes:Uint8Array,templateDate:string) {
   if(calculationChain.parts+calculationChain.relationships+calculationChain.content_types)repair.changed_count++;
   const discount=applyDiscountMatching(files);
   if(discount.changed)repair.changed_count++;
-  const approvedFonts=repairApprovedWorkbookFonts(files,templateDate);
+  const approvedFonts=repairApprovedWorkbookFonts(files,templateDate,{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
   if(approvedFonts?.changed_cells)repair.changed_count++;
   const integrity={...validateWorkbookFormulas(files),discount_identity:discount,approved_fonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false},freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
   return {bytes:repair.changed_count?await zipWorkbook(files,{Zip,ZipPassThrough}):bytes,repair,integrity};
@@ -2127,12 +2127,12 @@ Deno.serve(async (req) => {
       if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
       const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
       if(found.error)throw found.error;const template=found.data;
-      if(template.storage_path.startsWith('excel-integrity-v7/'))return json(200,{ok:true,...template});
+      if(template.storage_path.startsWith('excel-integrity-v8/'))return json(200,{ok:true,...template});
       const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
       if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
-      const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at);
+      const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at,template.route_key);
       if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
-      const path=`excel-integrity-v7/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      const path=`excel-integrity-v8/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
       await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
       // Retain recovery metadata and the original object. A concurrent user
       // upload wins: publish only if the exact source registration is unchanged.
@@ -2195,7 +2195,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
         let downloadBytes=new Uint8Array(await blob.arrayBuffer());
         let minimumIntegrity=baseTemplate.policy_summary.integrity;
         if(minimumIntegrity.freight_minimum_version!==FREIGHT_MINIMUM_VERSION||minimumIntegrity.discount_identity?.version!==DISCOUNT_MATCH_VERSION||minimumIntegrity.package_integrity?.version!==WORKBOOK_PACKAGE_VERSION||(minimumIntegrity.approved_fonts??minimumIntegrity.template_styles?.approved_fonts)?.version!==APPROVED_FONT_VERSION) {
-          const fixed=await repairMinimumBytes(downloadBytes,baseTemplate.updated_at);downloadBytes=fixed.bytes;minimumIntegrity=fixed.integrity;
+          const fixed=await repairMinimumBytes(downloadBytes,baseTemplate.updated_at,routeKey);downloadBytes=fixed.bytes;minimumIntegrity=fixed.integrity;
           if(fixed.repair.changed_count) {
             const basePath=`base/${routeKey}/${crypto.randomUUID()}_${baseTemplate.file_name}`;
             await storeVerifiedMinimum(admin,basePath,downloadBytes,baseTemplate.file_name);
@@ -2424,9 +2424,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       filter: (entry) => entry.name !== 'xl/calcChain.xml',
     });
     console.log('[EXCEL200C] unzip done');
+    stageDiscountHelperRebuild(files);
     inlineRichTextStrings(files);
     const headerRepair=repairApprovedTemplateHeaders(files,String(template.storage_path));
-    const approvedFonts=repairApprovedWorkbookFonts(files,String(template.updated_at??template.uploaded_at));
+    const approvedFonts=repairApprovedWorkbookFonts(files,String(template.updated_at??template.uploaded_at),{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
     beginTemplateStyleGuard(files,{headerRepair,approvedFonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false}});
     if(headerRepair)console.log('[EXCEL] approved header formats restored',JSON.stringify(headerRepair));
 

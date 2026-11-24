@@ -47,7 +47,9 @@ export function repairApprovedWorkbookFonts(files,templateDate,{force=false,only
   if(onlyDelivery&&!['지방배송','시내배송'].includes(sheet.name))continue;
   const last=sheet.name==='고객 리스트'?3:sheet.name==='물품 입고 내역'?4:800;let count=0;
   files[sheet.path]=rewriteWorksheetRows(text(files[sheet.path]),(row,n)=>n>last?row:row.replace(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,cell=>{
-   const tag=cell.slice(0,cell.indexOf('>')+1),ref=attr(tag,'r'),profile=spec[ref];if(!profile)return cell;
+   const tag=cell.slice(0,cell.indexOf('>')+1),ref=attr(tag,'r');
+   const deliveryInput=['지방배송','시내배송'].includes(sheet.name)&&/^[B-H][0-9]+$/.test(ref||'')&&Number(ref.slice(1))>=3;
+   const profile=spec[ref]||(deliveryInput?spec[ref.replace(/[0-9]+$/,'3')]:null);if(!profile)return cell;
    let next=cell.replace(tag,()=>set(tag,'s',styleFor(Number(attr(tag,'s')||0),profile.font)));
    if(!/<f\b/.test(cell)){
     const body=attr(tag,'t')==='s'?shared[Number(cell.match(/<v>(\d+)<\/v>/)?.[1])]:cell.match(/<is\b[^>]*>([\s\S]*?)<\/is>/)?.[1];

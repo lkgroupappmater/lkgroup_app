@@ -52,3 +52,24 @@ test('copying the approved common delivery sheet refreshes the font guard baseli
  repairApprovedWorkbookFonts(files,'',{force:true,onlyDelivery:true});refreshDeliveryStyleGuard(files);
  assert.ok(finishTemplateStyleGuard(files).delivery_fonts_preserved);
 });
+
+test('a new BASE upload date cannot bypass explicitly pinned approved fonts',()=>{
+ const files=fixture();const before=structuredClone(files);
+ assert.equal(repairApprovedWorkbookFonts(files,'2026-11-25T00:00:00Z'),null);
+ const report=repairApprovedWorkbookFonts(files,'2026-11-25T00:00:00Z',{force:true});
+ assert.ok(report.changed_cells>0);
+ assert.match(font(files,'xl/worksheets/sheet2.xml','D2').font,/<sz val="9"/);
+ assert.match(font(files,'xl/worksheets/sheet3.xml','D3').font,/<sz val="11"/);
+ for(const token of ['Original Customer','Original Payer','Receiver','02011112222','HAL','Original address'])assert.ok(dec(files['xl/worksheets/sheet3.xml']).includes(token));
+ assert.deepEqual(files['xl/vbaProject.bin'],before['xl/vbaProject.bin']);
+ const once=structuredClone(files);assert.equal(repairApprovedWorkbookFonts(files,'2026-12-01T00:00:00Z',{force:true}).changed_cells,0);assert.deepEqual(files,once);
+});
+
+test('new delivery rows beyond the reference sample inherit the approved column fonts',()=>{
+ const files=fixture();
+ files['xl/worksheets/sheet3.xml']=enc(dec(files['xl/worksheets/sheet3.xml']).replace('</sheetData>','<row r="250">'+c('B250','New Customer')+c('D250','New Receiver')+c('E250','02011112222')+c('G250','New Address')+'</row></sheetData>'));
+ files['xl/worksheets/sheet4.xml']=enc(dec(files['xl/worksheets/sheet4.xml']).replace('</sheetData>','<row r="40">'+c('B40','New City Customer')+c('D40','New City Receiver')+'</row></sheetData>'));
+ repairApprovedWorkbookFonts(files,'2026-11-25T00:00:00Z',{force:true});
+ for(const [sheet,refs]of [['sheet3',['B250','D250','E250','G250']],['sheet4',['B40','D40']]])for(const ref of refs)assert.match(font(files,`xl/worksheets/${sheet}.xml`,ref).font,/<sz val="11"/);
+ assert.ok(dec(files['xl/worksheets/sheet3.xml']).includes('New Receiver'));
+});

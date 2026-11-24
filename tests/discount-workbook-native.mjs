@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {zipSync,unzipSync,strToU8,strFromU8} from 'fflate';
-import {applyDiscountMatching,validateDiscountWorksheet} from '../supabase/functions/export-shipment-excel/discount-workbook.mjs';
+import {applyDiscountMatching,validateDiscountWorksheet,stageDiscountHelperRebuild} from '../supabase/functions/export-shipment-excel/discount-workbook.mjs';
 import {discountMatchRank,discountPhoneTokens} from '../supabase/functions/export-shipment-excel/discount-matching.mjs';
 import {validateWorkbookFormulas} from '../supabase/functions/export-shipment-excel/workbook-integrity.mjs';
 const out=path.resolve('test-results/discount-native');fs.mkdirSync(out,{recursive:true});
@@ -63,6 +63,24 @@ files['xl/_rels/workbook.xml.rels']=strToU8(strFromU8(files['xl/_rels/workbook.x
 files['[Content_Types].xml']=strToU8(strFromU8(files['[Content_Types].xml']).replace('</Types>','<Override PartName="/xl/worksheets/statement-check.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'));
 files['xl/worksheets/statement-check.xml']=strToU8(sheet(inputs.map((v,i)=>{const r=v.row||i+6;return `<row r="${r}">${cell('A'+r,'LKS '+r)+f('B'+r,`IFERROR(INDEX('물품 입고 내역'!AD:AD,MATCH(A${r},'물품 입고 내역'!N:N,0)),0)`)+f('C'+r,`ROUND(4.5*B${r},3)`)+f('D'+r,`IFERROR(INDEX('물품 입고 내역'!AE:AE,MATCH(A${r},'물품 입고 내역'!N:N,0)),0)`)+f('E'+r,`ROUND(4.5*D${r},3)`)}</row>`;}).sort((a,b)=>Number(a.match(/r="(\d+)/)[1])-Number(b.match(/r="(\d+)/)[1])).join('')));
 const firstResult=files['xl/worksheets/sheet2.xml'].slice(),firstHelper=files[helperPath].slice();applyDiscountMatching(files);assert.deepEqual(files['xl/worksheets/sheet2.xml'],firstResult);assert.deepEqual(files[helperPath],firstHelper);
+// Staging removes only the regenerated hidden helper from the expensive middle
+// stage. Finalized files must be byte-identical, with no internal marker left.
+const staged=structuredClone(files),beforeStaging=structuredClone(files);
+assert.equal(stageDiscountHelperRebuild(staged),true);
+assert.ok(staged[helperPath].length<1000);
+assert.ok(staged['_lk_internal_discount_rebuild.json']);
+assert.throws(()=>stageDiscountHelperRebuild(staged),/already exists/);
+applyDiscountMatching(staged);assert.deepEqual(staged,beforeStaging);
+const renamed=structuredClone(files),renamedPath='xl/worksheets/sheet16.xml';
+renamed[renamedPath]=renamed[helperPath];delete renamed[helperPath];
+for(const p of ['xl/_rels/workbook.xml.rels','[Content_Types].xml'])renamed[p]=strToU8(strFromU8(renamed[p]).replaceAll('lk-discount-identity.xml','sheet16.xml'));
+const renamedBefore=structuredClone(renamed);assert.equal(stageDiscountHelperRebuild(renamed),true);
+assert.ok(renamed[renamedPath].length<1000);applyDiscountMatching(renamed);assert.deepEqual(renamed,renamedBefore);
+const broken=structuredClone(files);stageDiscountHelperRebuild(broken);
+broken['xl/worksheets/sheet2.xml']=strToU8(strFromU8(broken['xl/worksheets/sheet2.xml']).replace('r="AJ6"','r="AZ6"'));
+assert.throws(()=>applyDiscountMatching(broken),/Required discount helper rebuild/);
+const visible=structuredClone(files);visible['xl/workbook.xml']=strToU8(strFromU8(visible['xl/workbook.xml']).replace('state="veryHidden"','state="visible"'));
+const visibleBefore=structuredClone(visible);assert.equal(stageDiscountHelperRebuild(visible),false);assert.deepEqual(visible,visibleBefore);
 function writeFixture(name,rs,rate=.2,special=false){
  // Change only the visible input cells AFTER installing the formulas. This
  // proves offline recalculation rather than generating a new matching cache.

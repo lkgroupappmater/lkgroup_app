@@ -109,12 +109,36 @@ function installSheet(files,xml){
  }
  files[path]=bytes(xml);return path;
 }
+const REBUILD_ENTRY='_lk_internal_discount_rebuild.json';
+// The generated helper is recreated from visible input cells at finalization.
+// Do not inflate/scan/compress its old large formulas again in the identity stage.
+// Keep its part/relationship intact; a required finalization marker prevents an
+// empty placeholder ever being stored as a finished workbook.
+export function stageDiscountHelperRebuild(files){
+ if(files[REBUILD_ENTRY])throw Error('Reserved discount rebuild context already exists');
+ const wb=text(files['xl/workbook.xml']),rels=text(files['xl/_rels/workbook.xml.rels']);
+ const tag=[...wb.matchAll(/<sheet\b[^>]*>/g)].map(m=>m[0]).find(s=>s.includes(`name="${SHEET}"`));
+ if(!tag||!tag.includes('state="veryHidden"'))return false;
+ const id=tag.match(/\br:id="([^"]+)"/)?.[1];
+ const rel=[...rels.matchAll(/<Relationship\b[^>]*>/g)].map(m=>m[0]).find(s=>s.includes(`Id="${id}"`));
+ const target=rel?.match(/\bTarget="([^"]+)"/)?.[1];
+ const relative=target?.replace(/^\//,'');const path=relative?.startsWith('xl/')?relative:relative?'xl/'+relative:null;
+ if(!path||!/^xl\/worksheets\/[^/]+\.xml$/.test(path)||!files[path])return false;
+ const source=discountWorkbookSource(files),cargo=cargoPath(files);
+ if(!source||!cargo)return false;
+ const xml=text(files[cargo]);if(!/r="AJ6"/.test(xml)||!xml.includes('Row data'))return false;
+ files[path]=bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>');
+ files[REBUILD_ENTRY]=bytes(JSON.stringify({version:1,path}));return true;
+}
 export function applyDiscountMatching(files){
+ const staged=files[REBUILD_ENTRY]?JSON.parse(text(files[REBUILD_ENTRY])):null;
+ if(staged&&(staged.version!==1||!/^xl\/worksheets\/[^/]+\.xml$/.test(staged.path||'')))throw Error('Invalid discount rebuild context');
+ const inapplicable=()=>{if(staged)throw Error('Required discount helper rebuild was not completed');return {version:DISCOUNT_MATCH_VERSION,applicable:false};};
  const originalHelper=files['xl/worksheets/lk-discount-identity.xml'];
  const source=discountWorkbookSource(files),cargo=cargoPath(files);
- if(!source||!cargo)return {version:DISCOUNT_MATCH_VERSION,applicable:false};
+ if(!source||!cargo)return inapplicable();
  const xml=text(files[cargo]);
- if(!/r="AJ6"/.test(xml)||!xml.includes('Row data'))return {version:DISCOUNT_MATCH_VERSION,applicable:false};
+ if(!/r="AJ6"/.test(xml)||!xml.includes('Row data'))return inapplicable();
  if(source.rules.some(r=>r.refs.name[0]!=='H'||r.refs.phone[0]!=='K'))throw Error('Discount source columns require review');
  const cargoRows=[...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>/g)].map(m=>Number(m[1])).filter(r=>r>=6),cargoLast=Math.max(...cargoRows),end=Math.max(256,cargoLast),helper=[];
  const sourceColumns=['A','B','C','D','E','F','G','H'],cargoColumns=['J','K','L','M','N','O','P','Q','R','S'];
@@ -144,6 +168,7 @@ export function applyDiscountMatching(files){
  }
  const helperXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:S${end}"/><sheetData>${helper.join('')}</sheetData></worksheet>`;
  const path=installSheet(files,helperXml);
+ if(staged&&path!==staged.path)throw Error('Discount rebuild target changed');
  // Formula references are relative by cargo row. Existing styles, print areas,
  // delivery matching, customer IDs, notes, discount rates and VBA are untouched.
  let cargoChanged=false;
@@ -171,5 +196,7 @@ export function applyDiscountMatching(files){
  }
  files['xl/workbook.xml']=bytes(workbook);
  const changed=!originalHelper||text(originalHelper)!==helperXml||cargoChanged||workbook!==beforeWorkbook;
- return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validateDiscountWorksheet(helperXml)};
+ const validation=validateDiscountWorksheet(helperXml);
+ delete files[REBUILD_ENTRY];
+ return {version:DISCOUNT_MATCH_VERSION,applicable:true,changed,cargoRows:cargoRows.length,helper:path,...validation};
 }
