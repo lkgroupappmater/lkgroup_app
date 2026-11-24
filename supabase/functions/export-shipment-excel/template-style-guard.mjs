@@ -1,12 +1,13 @@
 // Formatting is part of the uploaded template, not a recalculated business value.
 // This manifest travels only between the existing authenticated export stages.
+import {captureStatementNotices} from './statement-notice-format.mjs';
 import {deliverySheetIndex} from './shared-delivery-layout.mjs';
 import {richTextBody,richTextValue,sharedRichText} from './cell-text-format.mjs';
 const dec=new TextDecoder(),enc=new TextEncoder();
 const text=b=>dec.decode(b||new Uint8Array());
 const attr=(s,n)=>s.match(new RegExp(`(?:^|\\s)${n}="([^"]*)"`))?.[1];
 const names={numFmts:'numFmt',fonts:'font',fills:'fill',borders:'border',cellStyleXfs:'xf',cellXfs:'xf',dxfs:'dxf'};
-export const TEMPLATE_STYLE_VERSION='2026-11-22.delivery-font-preservation-v3';
+export const TEMPLATE_STYLE_VERSION='2026-11-25.statement-notice-styles-v4';
 export const STYLE_CONTEXT_ENTRY='_lk_internal_template_styles.json';
 export function styleTables(xml){
  const out={};
@@ -55,7 +56,7 @@ function captureRichText(files,paths){
 }
 export function captureTemplateStyles(files){
  const sheets=deliverySheetIndex(files).filter(s=>!helpers.has(s.name)&&files[s.path]).map(s=>({name:s.name,path:s.path,...header(text(files[s.path]),s.name)}));
- return {version:TEMPLATE_STYLE_VERSION,tables:styleTables(text(files['xl/styles.xml'])),theme:text(files['xl/theme/theme1.xml']),sheets,richText:captureRichText(files),deliveryFonts:captureDeliveryFonts(files)};
+ return {version:TEMPLATE_STYLE_VERSION,tables:styleTables(text(files['xl/styles.xml'])),theme:text(files['xl/theme/theme1.xml']),sheets,statementNotices:captureStatementNotices(files),richText:captureRichText(files),deliveryFonts:captureDeliveryFonts(files)};
 }
 function captureDeliveryFonts(files){
  const tables=styleTables(text(files['xl/styles.xml'])),fonts={},sheets=[];
@@ -72,7 +73,7 @@ function captureDeliveryFonts(files){
  return {fonts,sheets};
 }
 export function assertTemplateStyles(files,before){
- if(![TEMPLATE_STYLE_VERSION,'2026-11-21.template-rich-text-v2','2026-11-18.template-style-preservation-v1'].includes(before?.version))throw Error('Invalid Excel template style manifest');
+ if(![TEMPLATE_STYLE_VERSION,'2026-11-22.delivery-font-preservation-v3','2026-11-21.template-rich-text-v2','2026-11-18.template-style-preservation-v1'].includes(before?.version))throw Error('Invalid Excel template style manifest');
  const after=styleTables(text(files['xl/styles.xml']));
  if(before.theme!==text(files['xl/theme/theme1.xml']))throw Error('Excel template theme changed');
  // Every existing index must keep its definition. Additional styles are allowed.
@@ -90,6 +91,22 @@ export function assertTemplateStyles(files,before){
    checked++;
   }
   for(const key of ['rows','cols','merges'])if(JSON.stringify(s[key])!==JSON.stringify(current[key]))throw Error(`Excel template ${key} changed: ${s.name}`);
+ }
+ const noticeFormats={};
+ let noticeCount=0;
+ if(before.statementNotices){
+  const notices=captureStatementNotices(files);
+  // Compare after manifest serialization as well as in-process capture.
+  if(JSON.stringify(notices)!==JSON.stringify(before.statementNotices))throw Error('Excel statement notice text, font, alignment or row geometry changed');
+  for(const {notices:lines} of notices)for(const line of lines){
+   noticeCount++;
+   if(!/^A\d+:N\d+$/.test(line.range))continue;
+   const xf=after.cellXfs[line.style];
+   if(!xf)throw Error('Unknown Excel statement notice style');
+   const font=after.fonts[Number(attr(xf,'fontId')||0)]||'';
+   const key=(attr(font.match(/<sz\b[^>]*>/)?.[0]||'','val')||'inherited')+'pt/'+(attr(xf.match(/<alignment\b[^>]*>/)?.[0]||'','horizontal')||'general');
+   noticeFormats[key]=(noticeFormats[key]||0)+1;
+  }
  }
  let deliveryChecked=0;
  if(before.deliveryFonts){
@@ -118,7 +135,7 @@ export function assertTemplateStyles(files,before){
   }
   for(const [format] of body.matchAll(/<rPr\b[^>]*?(?:\/>|>[\s\S]*?<\/rPr>)/g))if(!formats.has(format))throw Error(`Excel rich text font changed: ${s.sheet}!${s.ref}`);
  }
- return {version:TEMPLATE_STYLE_VERSION,protected_sheets:before.sheets.length,protected_header_cells:checked,protected_rich_text_cells:before.richText?.length??0,protected_delivery_font_cells:deliveryChecked,original_style_definitions_preserved:true,header_formats_preserved:true,rich_text_formats_preserved:!!before.richText,delivery_fonts_preserved:!!before.deliveryFonts,...(before.headerRepair?{approved_header_repair:before.headerRepair}:{}),...(before.approvedFonts?{approved_fonts:before.approvedFonts}:{})};
+ return {version:TEMPLATE_STYLE_VERSION,protected_sheets:before.sheets.length,protected_header_cells:checked,protected_statement_notices:noticeCount,full_width_notice_formats:noticeFormats,statement_notice_repairs:before.noticeRepairs??0,protected_rich_text_cells:before.richText?.length??0,protected_delivery_font_cells:deliveryChecked,original_style_definitions_preserved:true,header_formats_preserved:true,rich_text_formats_preserved:!!before.richText,delivery_fonts_preserved:!!before.deliveryFonts,...(before.headerRepair?{approved_header_repair:before.headerRepair}:{}),...(before.approvedFonts?{approved_fonts:before.approvedFonts}:{})};
 }
 export function refreshDeliveryStyleGuard(files){
  if(!files[STYLE_CONTEXT_ENTRY])return;
@@ -128,9 +145,9 @@ export function refreshDeliveryStyleGuard(files){
  before.deliveryFonts=captureDeliveryFonts(files);
  files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify(before));
 }
-export function beginTemplateStyleGuard(files,{headerRepair,approvedFonts}={}){
+export function beginTemplateStyleGuard(files,{headerRepair,approvedFonts,noticeRepairs=0}={}){
  if(files[STYLE_CONTEXT_ENTRY])throw Error('Reserved Excel template style manifest already exists');
- files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify({...captureTemplateStyles(files),...(headerRepair?{headerRepair}:{}),...(approvedFonts?{approvedFonts}:{})}));
+ files[STYLE_CONTEXT_ENTRY]=enc.encode(JSON.stringify({...captureTemplateStyles(files),noticeRepairs,...(headerRepair?{headerRepair}:{}),...(approvedFonts?{approvedFonts}:{})}));
 }
 export function finishTemplateStyleGuard(files){
  if(!files[STYLE_CONTEXT_ENTRY])throw Error('Excel template style preservation was not initialized');
