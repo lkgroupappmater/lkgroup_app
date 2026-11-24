@@ -23,20 +23,30 @@ export async function prepareIdentityWorkbook(files:Record<string,Uint8Array>,ro
   const layout=data.deliveryLayoutSource;
   if(!['kr_la_sea','kr_la_air'].includes(routeKey)||!['kr_la_sea','kr_la_air'].includes(layout.route_key)||typeof layout.storage_path!=='string'||
      ![`base/${layout.route_key}/`,`macro-updates/${layout.route_key}/`].some(p=>layout.storage_path.startsWith(p))||!downloadDeliveryLayout)throw Error('Invalid common delivery layout context');
+  if(layout.reuse_template===true){
+   // The authenticated exporter verified this exact immutable layout is already
+   // present. Keep all carrier alternatives without downloading/copying it twice.
+   deliveryLayout={version:1,source:data.deliveryLayoutSource,sheets:[],reused_template_layout:true};
+  }else{
   // Read the immutable source inside the existing authenticated processing stage.
   // Do not embed a nested ZIP in the streamed workbook passed between stages.
   const layoutBytes=await downloadDeliveryLayout(layout.storage_path);
   const meta=await unzipWorkbook(layoutBytes,{Unzip,filter:(entry:any)=>['xl/workbook.xml','xl/_rels/workbook.xml.rels'].includes(entry.name)});
   const paths=deliverySheetIndex(meta).filter((s:any)=>['지방배송','시내배송'].includes(s.name)).map((s:any)=>s.path);
   const source=await unzipWorkbook(layoutBytes,{Unzip,filter:(entry:any)=>!entry.name.startsWith('xl/worksheets/')||paths.includes(entry.name)||paths.some((p:string)=>entry.name===p.replace('/worksheets/','/worksheets/_rels/')+'.rels')});
-  const approvedFonts=repairApprovedWorkbookFonts(source,layout.uploaded_at,{onlyDelivery:true});
+  const approvedFonts=repairApprovedWorkbookFonts(source,layout.uploaded_at,{force:true,onlyDelivery:true});
   const sheets=copySharedDeliveryLayout(files,source);
   refreshDeliveryStyleGuard(files);
-  const updatedMasters=captureSharedFormulaMasters(files);
+  const updatedMasters=captureSharedFormulaMasters(Object.fromEntries(sheets.map((sheet:any)=>[sheet.target_path,files[sheet.target_path]])));
   for(const sheet of sheets)originalSharedMasters.set(sheet.target_path,updatedMasters.get(sheet.target_path)||new Map());
   deliveryLayout={version:1,source:data.deliveryLayoutSource,sheets,approvedFonts};
+  }
  }
     applyCustomerIdWorkbook(files,identityContext,{prefix:receiptPrefix,shipments:enrichedShipments,base:isBaseRefresh,preserveSharedMasters:false,managedDelivery:['kr_la_sea','kr_la_air'].includes(routeKey),preserveDeliveryLayout:!!deliveryLayout});
+    if(['kr_la_sea','kr_la_air'].includes(routeKey)){
+     repairApprovedWorkbookFonts(files,'',{force:true,onlyDelivery:true});
+     refreshDeliveryStyleGuard(files);
+    }
     // BASE refreshes and voyage exports must both repair inherited presentation.
     // Run after delivery input updates so newly filled number cells are covered.
     formatDeliveryNumbers(files, routeKey);

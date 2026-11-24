@@ -1,6 +1,6 @@
 // Discount identities only. Delivery/customer-registration matching is separate.
 import {excelIdentity,recoveredName} from './receipt-order.mjs';
-export const DISCOUNT_MATCH_VERSION = '2026-11-22.name-and-any-registered-phone-v4';
+export const DISCOUNT_MATCH_VERSION = '2026-11-24.unordered-rule-name-phone-v5';
 const lines = value => String(value ?? '').replace(/\\r\\n|\\n|\\r/g, '\n').replace(/[／]/g, '/');
 export const discountNameKey = value => String(value ?? '').toLowerCase()
   .replace(/대표님|사장님|대표|사장|님/g, '').replace(/[\s\u00a0\-\/().,'"\[\]]/g, '');
@@ -32,20 +32,15 @@ export function discountMemberGroups(name, phoneCount) {
 export function discountMatchRank(name, phone, rule) {
   if (['','XX'].includes(excelIdentity(name,phone))) return 9999;
   name=recoveredName(name,phone)??name;
-  const inputNames = discountNameParts(name), inputPhones = discountPhoneTokens(phone).filter(Boolean);
+  const exactNames = discountNameParts(name);
+  const inputNames = [...new Set(exactNames.flatMap(n=>[n,n.replace(/[0-9]+$/,'')]).filter(Boolean))], inputPhones = discountPhoneTokens(phone).filter(Boolean);
   if (!inputNames.length || !inputPhones.length) return 9999;
   const phones = discountPhoneTokens(rule.phone_display || rule.phone);
-  const members = discountMemberGroups(rule.customer_name, phones.length);
-  const company = discountNameParts(rule.company_name);
-  let rank = 9999;
-  phones.forEach((number, index) => {
-    if (!number || !inputPhones.includes(number)) return;
-    if (company.some(n => inputNames.includes(n))) rank = Math.min(rank, 1);
-    const eligible = members.length === 1 || phones.length === 1 ? members.flat()
-      : members.length === phones.length ? members[index] : [];
-    if (eligible.some(n => inputNames.includes(n))) rank = 0;
-  });
-  return rank;
+  if (!phones.some(number => number && inputPhones.includes(number))) return 9999;
+  // The name and phone must belong to this same registered discount row.
+  // Member/phone counts and positions do not form individual pairs.
+  if (discountNameParts(rule.customer_name).some(n => inputNames.includes(n))) return 0;
+  return discountNameParts(rule.company_name).some(n => inputNames.includes(n)) ? 1 : 9999;
 }
 
 const decode = b => new TextDecoder().decode(b);

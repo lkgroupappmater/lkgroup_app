@@ -7,7 +7,7 @@ import {planDeliveryBlocks, deliveryNumber} from './shared-delivery-blocks.mjs';
 import {unknownPrefixZone,unknownZoneCondition} from './unknown-zone.mjs';
 import {rewriteWorksheetRows,worksheetIdentityRange} from './worksheet-rows.mjs';
 import {captureSharedFormulaMasters,restoreSharedFormulaMasters,recoverDeliverySelectorMasters} from './workbook-integrity.mjs';
-export const ID_WORKBOOK_VERSION='2026-11-22.approved-excel-fonts-v16';
+export const ID_WORKBOOK_VERSION='2026-11-25.pinned-fonts-discount-identities-v18';
 const enc=new TextEncoder(),dec=new TextDecoder();
 const xml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
 const unxml=v=>String(v??'').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&apos;',"'").replaceAll('&amp;','&');
