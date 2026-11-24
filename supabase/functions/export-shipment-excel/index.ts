@@ -4,7 +4,8 @@ import {DISCOUNT_MATCH_VERSION} from './discount-matching.mjs';
 import {discardCalculationChain,validateWorkbookPackage,WORKBOOK_PACKAGE_VERSION} from './workbook-package.mjs';
 import {repairApprovedTemplateHeaders} from './template-header-repair.mjs';
 import {repairApprovedWorkbookFonts,APPROVED_FONT_VERSION} from './approved-font-repair.mjs';
-import {beginTemplateStyleGuard} from './template-style-guard.mjs';
+import {beginTemplateStyleGuard,styleTables} from './template-style-guard.mjs';
+import {repairStatementNotices} from './statement-notice-format.mjs';
 import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
 import {rewriteWorksheetRows,worksheetRowEntries,worksheetMetadata} from './worksheet-rows.mjs';
 import { applyUnknownPrefixZones } from './unknown-zone.mjs';
@@ -1867,32 +1868,27 @@ function applyStatementWrapText(
 
     let xml = strFromU8(files[path]);
 
-    // Remark A:E and Delivery F:K display area.
-    // Preserve existing fills/fonts/borders/alignment; clone only to add wrapText.
-    xml = xml.replace(
-      /<c\b([^>]*)r="([A-K])(1[89]|2[0-4])"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
-      (full, before, column, rowText, after, body) => {
-        const attrs = `${before ?? ''}${after ?? ''}`;
-        const styleMatch = attrs.match(/\bs="(\d+)"/);
-        const oldStyle = Number(styleMatch?.[1] ?? 0);
-        const newStyle = wrappedStyleFor(oldStyle);
-
-        let newAttrs = attrs;
-        if (styleMatch) {
-          newAttrs = newAttrs.replace(/\bs="\d+"/, ` s="${newStyle}"`);
-        } else {
-          newAttrs = `${newAttrs} s="${newStyle}"`;
-        }
-
-        const cleanAttrs = newAttrs.trim();
-        const attrPrefix = cleanAttrs ? ` ${cleanAttrs}` : '';
-
-        if (body == null) {
-          return `<c${attrPrefix} r="${column}${rowText}"/>`;
-        }
-        return `<c${attrPrefix} r="${column}${rowText}">${body}</c>`;
-      },
-    );
+    // The row-fit macro can move these blocks. Wrap only the two displayed
+    // value cells in the paired Remark / Inland merged areas.
+    const merges = [...xml.matchAll(/<mergeCell\b[^>]*\bref="([^"]+)"/g)].map(m => m[1]);
+    const targets = new Set<string>();
+    for (const range of merges) {
+      const block = /^A(\d+):E(\d+)$/.exec(range);
+      if (!block || Number(block[2]) <= Number(block[1])) continue;
+      const start = Number(block[1]), end = Number(block[2]), heading = start - 1;
+      if (!merges.includes(`A${heading}:E${heading}`) || !merges.includes(`F${heading}:K${heading}`) ||
+          !merges.includes(`F${start}:K${end}`)) continue;
+      targets.add('A' + start);
+      targets.add('F' + start);
+    }
+    xml = xml.replace(/<c\b[^>]*>/g, tag => {
+      const ref = tag.match(/\br="([^"]+)"/)?.[1];
+      if (!ref || !targets.has(ref)) return tag;
+      const style = tag.match(/\bs="(\d+)"/);
+      const id = wrappedStyleFor(Number(style?.[1] ?? 0));
+      return style ? tag.replace(/\bs="\d+"/, `s="${id}"`) :
+        tag.replace(/\/?>(?=$)/, close => ` s="${id}"${close}`);
+    });
 
     files[path] = strToU8(xml);
   }
@@ -2065,11 +2061,13 @@ async function repairMinimumBytes(bytes:Uint8Array,templateDate:string,routeKey:
   validateWorkbookFormulas(files);
   const repair=applyFreightMinimum(files);
   if(calculationChain.parts+calculationChain.relationships+calculationChain.content_types)repair.changed_count++;
+  const noticeRepairs=repairStatementNotices(files,styleTables(strFromU8(files['xl/styles.xml'])));
+  if(noticeRepairs)repair.changed_count++;
   const discount=applyDiscountMatching(files);
   if(discount.changed)repair.changed_count++;
   const approvedFonts=repairApprovedWorkbookFonts(files,templateDate,{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
   if(approvedFonts?.changed_cells)repair.changed_count++;
-  const integrity={...validateWorkbookFormulas(files),discount_identity:discount,approved_fonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false},freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
+  const integrity={...validateWorkbookFormulas(files),statement_notice_repairs:noticeRepairs,discount_identity:discount,approved_fonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false},freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
   return {bytes:repair.changed_count?await zipWorkbook(files,{Zip,ZipPassThrough}):bytes,repair,integrity};
 }
 async function storeVerifiedMinimum(admin:any,path:string,bytes:Uint8Array,fileName:string,metadata:Record<string,unknown>={}) {
@@ -2127,12 +2125,12 @@ Deno.serve(async (req) => {
       if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
       const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
       if(found.error)throw found.error;const template=found.data;
-      if(template.storage_path.startsWith('excel-integrity-v8/'))return json(200,{ok:true,...template});
+      if(template.storage_path.startsWith('excel-integrity-v9/'))return json(200,{ok:true,...template});
       const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
       if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
       const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at,template.route_key);
       if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
-      const path=`excel-integrity-v8/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      const path=`excel-integrity-v9/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
       await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
       // Retain recovery metadata and the original object. A concurrent user
       // upload wins: publish only if the exact source registration is unchanged.
@@ -2428,7 +2426,8 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     inlineRichTextStrings(files);
     const headerRepair=repairApprovedTemplateHeaders(files,String(template.storage_path));
     const approvedFonts=repairApprovedWorkbookFonts(files,String(template.updated_at??template.uploaded_at),{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
-    beginTemplateStyleGuard(files,{headerRepair,approvedFonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false}});
+    const noticeRepairs=repairStatementNotices(files,styleTables(strFromU8(files['xl/styles.xml'])));
+    beginTemplateStyleGuard(files,{headerRepair,noticeRepairs,approvedFonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false}});
     if(headerRepair)console.log('[EXCEL] approved header formats restored',JSON.stringify(headerRepair));
 
     // Preserve the uploaded delivery sheets in both BASEs, including carrier
