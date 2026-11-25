@@ -33,15 +33,12 @@ class DocumentTextCatalog {
 
   static String _deadline(
     DateTime now, {
-    bool english = true,
     bool addGenericQuoteRemark = false,
   }) {
     final parts = <String>[];
-    if (english) {
-      parts.add(
+    parts.add(
         '- valid end of ${monthsEn[now.month - 1]}/${now.year}, after confirm price but incase departrue delayed by customer request or needs, rate should be change.',
-      );
-    }
+    );
     parts.add(
       '- 기한: ${now.year}년 ${now.month.toString().padLeft(2, '0')}월 말, 고객의 요청에 의하여 견적후 배송/출발 지연이 발생할 경우 운임 변동이 있을수 있으니 참고 부탁 드립니다.',
     );
@@ -49,73 +46,41 @@ class DocumentTextCatalog {
     return parts.join('\n');
   }
 
-  static List<String> _footer(String key, {required bool statement}) {
-    switch (key) {
-      case 'kr_la_sea':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 1.5/kg 입니다.',
-          '* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.',
-          '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
-          '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
-        ];
-      case 'kr_la_air':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 14/kg 입니다.',
-          '* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.',
-          '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
-          '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
-        ];
-      case 'ch_la_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 1.2/kg 입니다.',
-          '* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.',
-          '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
-          '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
-        ];
-      case 'th_la_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 4/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-          '* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.',
-          '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
-          '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
-        ];
-      case 'la_kr_air_exp':
-        if (statement) {
-          return const [
-            '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 18/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-          ];
-        }
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 18/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-          '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
-          '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
-        ];
-      case 'la_ch_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 13.4/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-        ];
-      case 'kh_la_land':
-      case 'la_kh_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 22.5/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-        ];
-      case 'la_vn_land':
-      case 'vn_la_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 13.6/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-        ];
-      case 'la_th_land':
-        return const [
-          '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ 10/kg 이며, 청구중량에 따라 차등 운임이 적용 됩니다.',
-        ];
-      default:
-        return const [];
-    }
+  static String _rateText(double rate) =>
+      rate == rate.truncateToDouble() ? rate.toStringAsFixed(0) : rate.toString();
+
+  static final _minimumRate = RegExp(
+    r'((?:최소\s*운임(?:은|는)?|minimum freight|ຄ່າຂົນສົ່ງຂັ້ນຕ່ຳ)\s*[:：]?\s*(?:US\s*\$|USD\s*\$?|\$)\s*)\d+(?:\.\d+)?(?=\s*/\s*kg\b)',
+    caseSensitive: false,
+  );
+
+  static String applyMinimumRate(String line, double? rate) {
+    if (rate == null || !rate.isFinite || rate <= 0) return line;
+    return line.replaceFirstMapped(_minimumRate, (m) => '${m[1]}${_rateText(rate)}');
+  }
+
+  static List<String> _footer(String key, double? rate, {required bool statement}) {
+    const storageRoutes = {'kr_la_sea', 'kr_la_air', 'ch_la_land', 'th_la_land'};
+    const tieredRoutes = {'th_la_land', 'la_kr_air_exp', 'la_ch_land', 'kh_la_land',
+      'la_kh_land', 'la_vn_land', 'vn_la_land', 'la_th_land'};
+    final tiered = tieredRoutes.contains(key);
+    return [
+      if (rate != null && rate.isFinite && rate > 0)
+        '* 모든 비용은 회사의 내규 및 각 물품의 중량/크기 실측을 기준으로 청구되며 최소 운임은 \$ ${_rateText(rate)}/kg '
+        '${tiered ? '이며, 청구중량에 따라 차등 운임이 적용 됩니다.' : '입니다.'}',
+      if (storageRoutes.contains(key))
+        '* 입.출고지를 떠나시기 전 꼭! 고객님 본인 물품 및 개수 확인 부탁 드립니다. 물품이 출고된 이후 LK그룹은 물품의 파손/분실에 대한 어떠한 책임도 없습니다.',
+      if (storageRoutes.contains(key) || (key == 'la_kr_air_exp' && !statement)) ...[
+        '* 물품 도착 및 출고 후 특별한 사유 없이 장기 미수취 물품의 경우 보관료등 기타 추가 비용이 발생 할 수 있습니다.',
+        '* 물품 출고 후 1주 후부터 보관료(최소 3불/CBM/day)가 발생하며, 특별한 사유 없이 2달 이상 보관 물품들은 임의로 폐기/처분 될 수 있습니다.',
+      ],
+    ];
   }
 
   static DocumentTextContent quotation(String routeLabel, DateTime now,
-      {AppLanguage language = AppLanguage.korean}) {
-    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, true);
+      {AppLanguage language = AppLanguage.korean, double? oneKgRate}) {
+    now = now.toUtc().add(const Duration(hours: 7));
+    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, true, oneKgRate);
     final key = RouteCatalog.formRouteKeyFor(routeLabel);
     String remark;
     switch (key) {
@@ -127,8 +92,6 @@ class DocumentTextCatalog {
         remark = _deadline(now);
         break;
       case 'la_ch_land':
-        remark = _deadline(now, english: false, addGenericQuoteRemark: true);
-        break;
       case 'la_vn_land':
       case 'vn_la_land':
         remark = _deadline(now, addGenericQuoteRemark: true);
@@ -138,25 +101,26 @@ class DocumentTextCatalog {
     }
     return DocumentTextContent(
       remark: remark,
-      footerLines: _footer(key, statement: false),
+      footerLines: _footer(key, oneKgRate, statement: false),
     );
   }
 
   static DocumentTextContent statement(String routeLabel, DateTime now,
-      {AppLanguage language = AppLanguage.korean}) {
-    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, false);
+      {AppLanguage language = AppLanguage.korean, double? oneKgRate}) {
+    now = now.toUtc().add(const Duration(hours: 7));
+    if (language != AppLanguage.korean) return _localized(routeLabel, now, language, false, oneKgRate);
     final key = RouteCatalog.formRouteKeyFor(routeLabel);
     final hasDeadline = const <String>{
       'kh_la_land', 'la_ch_land', 'la_kh_land', 'la_vn_land', 'vn_la_land',
     }.contains(key);
     return DocumentTextContent(
       remark: hasDeadline ? _deadline(now) : '',
-      footerLines: _footer(key, statement: true),
+      footerLines: _footer(key, oneKgRate, statement: true),
     );
   }
 
   static DocumentTextContent _localized(String routeLabel, DateTime now,
-      AppLanguage language, bool quotation) {
+      AppLanguage language, bool quotation, double? oneKgRate) {
     final route = RouteCatalog.formRouteKeyFor(routeLabel);
     String t(String key, [Map<String, Object?> values = const {}]) =>
         DocumentLocalizations.key(language, key, values);
@@ -170,7 +134,7 @@ class DocumentTextCatalog {
         : route == 'kr_la_air' ? t('statement-preview.statementBaseRemark.fuelNotice', {'generic': generic})
         : ['kh_la_land','la_kh_land'].contains(route) ? deadline
         : deadlineRoute ? '$deadline\n$generic' : generic;
-    final footer = _footer(route, statement: !quotation).map((line) {
+    final footer = _footer(route, oneKgRate, statement: !quotation).map((line) {
       final match = RegExp(r'최소 운임은 (.+?)/kg').firstMatch(line);
       if (match != null) return t('statement-preview.statementFooterLines.minimumFreightNotice', {
         'standard': '${match[1]}/kg',

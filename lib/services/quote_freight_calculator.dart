@@ -53,6 +53,7 @@ class QuoteFreightResult {
     required this.totalUsd,
     required this.sourceFile,
     this.footerLines,
+    this.oneKgRate,
   });
 
   final String route;
@@ -60,6 +61,7 @@ class QuoteFreightResult {
   final double totalUsd;
   final String sourceFile;
   final List<String>? footerLines;
+  final double? oneKgRate;
 }
 
 class QuoteFreightCalculator {
@@ -140,6 +142,7 @@ class QuoteFreightCalculator {
         (sum, line) => sum + line.amountUsd,
       ),
       sourceFile: policy.sourceNote,
+      oneKgRate: policy.rateFor(1),
       footerLines: footer is List ? footer.map((line) => '$line').toList(growable: false) : null,
     );
   }

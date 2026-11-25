@@ -13,11 +13,18 @@ export function commonFooter(xml,stringsXml=''){
  for(const m of xml.matchAll(/<c\b([^>]*\br="([A-Z]+)(\d+)"[^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
   const body=m[4]||'',type=m[1].match(/\bt="([^"]+)"/)?.[1],value=body.match(/<v\b[^>]*>([\s\S]*?)<\/v>/)?.[1]||'';
   const text=type==='s'?(strings[Number(value)]||''):type==='inlineStr'?texts(body):entities(value);
-  cells.push({col:m[2],row:Number(m[3]),text:text.trim(),formula:/<f\b/.test(body)});
+  // Permit a cached string from the printed tariff link only when both
+  // literal parts agree with the cache and the intervening text is a price.
+  const formula = body.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1];
+  const link = formula && /^"((?:[^"]|"")*)"&'Row data'!\$[A-Z]+\$[1-9]\d*&"((?:[^"]|"")*)"$/.exec(entities(formula));
+  const prefix = link && link[1].replaceAll('""','"'), suffix = link && link[2].replaceAll('""','"');
+  const linkedMinimum = !!link && /최소\s*운임[^\n]*\$\s*$/.test(prefix) && /^\s*\/\s*kg\b/i.test(suffix) &&
+    text.startsWith(prefix) && text.endsWith(suffix) && /^\d+(?:\.\d+)?$/.test(text.slice(prefix.length,text.length-suffix.length));
+  cells.push({col:m[2],row:Number(m[3]),text:text.trim(),formula:/<f\b/.test(body),linkedMinimum});
  }
  const remark=cells.find(c=>c.col==='A'&&/remark|비\s*고/i.test(c.text));
  if(!remark||!cells.some(c=>/합\s*계|총\s*운임|total/i.test(c.text)))return null;
- const lines=cells.filter(c=>c.col==='A'&&c.row>remark.row+1&&!c.formula&&/^[*＊※•]/.test(c.text)).map(c=>c.text);
+ const lines=cells.filter(c=>c.col==='A'&&c.row>remark.row+1&&(!c.formula || (c.linkedMinimum && /최소\s*운임/.test(c.text)))&&/^[*＊※•]/.test(c.text)).map(c=>c.text);
  // Missing or unfamiliar layout must retain the last verified common copy.
  return lines.length?[...new Set(lines)]:null;
 }
