@@ -5,6 +5,7 @@ import {discardCalculationChain,validateWorkbookPackage,WORKBOOK_PACKAGE_VERSION
 import {repairApprovedTemplateHeaders} from './template-header-repair.mjs';
 import {repairApprovedWorkbookFonts,APPROVED_FONT_VERSION} from './approved-font-repair.mjs';
 import {beginTemplateStyleGuard,styleTables} from './template-style-guard.mjs';
+import {freightNoticePeriod, refreshFreightNotices} from './freight-notices.mjs';
 import {repairStatementNotices} from './statement-notice-format.mjs';
 import {applyFreightMinimum,FREIGHT_MINIMUM_VERSION} from './freight-minimum.mjs';
 import {rewriteWorksheetRows,worksheetRowEntries,worksheetMetadata} from './worksheet-rows.mjs';
@@ -2055,7 +2056,15 @@ function wireStatementPaymentAccounts(files: Record<string, Uint8Array>): void {
 }
 // Repair recognized formulas and explicitly approved legacy fonts only. Cargo
 // input, customer matching, receipt assignment and macro execution are unchanged.
-async function repairMinimumBytes(bytes:Uint8Array,templateDate:string,routeKey:string) {
+async function routeOneKgRate(admin:any, route:string):Promise<number|null> {
+  const {data,error} = await admin.from('freight_rate_tiers').select('rate_per_kg')
+    .eq('route_key',route).eq('active',true).lte('min_weight_kg',1)
+    .order('min_weight_kg',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw error;
+  return data ? Number(data.rate_per_kg) : null;
+}
+
+async function repairMinimumBytes(bytes:Uint8Array,templateDate:string,routeKey:string,terms:{period:string,routeRate:number|null,useWorkbookRate:boolean}) {
   const files=await unzipWorkbook(bytes,{Unzip});
   const calculationChain=discardCalculationChain(files);
   validateWorkbookFormulas(files);
@@ -2063,11 +2072,13 @@ async function repairMinimumBytes(bytes:Uint8Array,templateDate:string,routeKey:
   if(calculationChain.parts+calculationChain.relationships+calculationChain.content_types)repair.changed_count++;
   const noticeRepairs=repairStatementNotices(files,styleTables(strFromU8(files['xl/styles.xml'])));
   if(noticeRepairs)repair.changed_count++;
+  const freightNotices=refreshFreightNotices(files,terms);
+  if(freightNotices.changed)repair.changed_count++;
   const discount=applyDiscountMatching(files);
   if(discount.changed)repair.changed_count++;
   const approvedFonts=repairApprovedWorkbookFonts(files,templateDate,{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
   if(approvedFonts?.changed_cells)repair.changed_count++;
-  const integrity={...validateWorkbookFormulas(files),statement_notice_repairs:noticeRepairs,discount_identity:discount,approved_fonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false},freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
+  const integrity={...validateWorkbookFormulas(files),statement_notice_repairs:noticeRepairs,freight_notices:freightNotices,discount_identity:discount,approved_fonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false},freight_minimum_version:FREIGHT_MINIMUM_VERSION,freight_minimum_changed:repair.changed_count,calculation_chain_reset:calculationChain,package_integrity:validateWorkbookPackage(files)};
   return {bytes:repair.changed_count?await zipWorkbook(files,{Zip,ZipPassThrough}):bytes,repair,integrity};
 }
 async function storeVerifiedMinimum(admin:any,path:string,bytes:Uint8Array,fileName:string,metadata:Record<string,unknown>={}) {
@@ -2119,18 +2130,20 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    const period = freightNoticePeriod();
     if(body.action==='repair_freight_minimum') {
       if(workerRequest||profile.role!=='admin')return json(403,{error:'관리자 권한이 필요합니다.'});
       const route=String(body.route_key??''),year=Number(body.shipment_year),voyage=String(body.voyage??'');
       if(!route||!Number.isInteger(year)||!voyage||voyage==='00')return json(400,{error:'등록된 항차를 선택해 주세요.'});
       const found=await admin.from('shipment_excel_templates').select('id,route_key,shipment_year,voyage,file_name,storage_path,uploaded_at').eq('route_key',route).eq('shipment_year',year).eq('voyage',voyage).single();
       if(found.error)throw found.error;const template=found.data;
-      if(template.storage_path.startsWith('excel-integrity-v9/'))return json(200,{ok:true,...template});
+      const repairPrefix=`excel-integrity-v10/${route}/${year}/${voyage}/${period}/`;
+      if(template.storage_path.startsWith(repairPrefix))return json(200,{ok:true,...template});
       const original=await admin.storage.from('shipment-excel-templates').download(template.storage_path);
       if(original.error||!original.data)throw original.error??new Error('항차 원본을 찾을 수 없습니다.');
-      const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at,template.route_key);
+      const fixed=await repairMinimumBytes(new Uint8Array(await original.data.arrayBuffer()),template.uploaded_at,template.route_key,{period,routeRate:await routeOneKgRate(admin,route),useWorkbookRate:true});
       if(!fixed.repair.changed_count)return json(200,{ok:true,...template,integrity:fixed.integrity});
-      const path=`excel-integrity-v9/${route}/${year}/${voyage}/${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
+      const path=`${repairPrefix}${crypto.randomUUID()}.${template.file_name.endsWith('.xlsm')?'xlsm':'xlsx'}`;
       await storeVerifiedMinimum(admin,path,fixed.bytes,template.file_name,{freight_minimum_version:FREIGHT_MINIMUM_VERSION,previous_storage_path:template.storage_path,changed_count:fixed.repair.changed_count});
       // Retain recovery metadata and the original object. A concurrent user
       // upload wins: publish only if the exact source registration is unchanged.
@@ -2184,16 +2197,16 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
       .select('route_key,route_label,file_name,storage_path,prefer_for_export,policy_summary,updated_at')
       .eq('route_key', routeKey).eq('active', true).maybeSingle();
     if (baseTemplateError) throw baseTemplateError;
-    if(isBaseRefresh&&!workerRequest&&canReuseValidatedBase(baseTemplate,baseSync,ID_WORKBOOK_VERSION)){
+    if(isBaseRefresh&&!workerRequest&&canReuseValidatedBase(baseTemplate,baseSync,ID_WORKBOOK_VERSION,period)){
       const {data:blob,error:downloadError}=await admin.storage.from('shipment-excel-templates').download(baseTemplate.storage_path);
       if(downloadError||!blob)throw downloadError??new Error('검증된 BASE 다운로드 실패');
       const {data:latest,error:latestError}=await admin.from('excel_base_sync_state').select('revision,completed_revision,status').eq('route_key',routeKey).single();
       if(latestError)throw latestError;
-      if(canReuseValidatedBase(baseTemplate,latest,ID_WORKBOOK_VERSION)){
+      if(canReuseValidatedBase(baseTemplate,latest,ID_WORKBOOK_VERSION,period)){
         let downloadBytes=new Uint8Array(await blob.arrayBuffer());
         let minimumIntegrity=baseTemplate.policy_summary.integrity;
         if(minimumIntegrity.freight_minimum_version!==FREIGHT_MINIMUM_VERSION||minimumIntegrity.discount_identity?.version!==DISCOUNT_MATCH_VERSION||minimumIntegrity.package_integrity?.version!==WORKBOOK_PACKAGE_VERSION||(minimumIntegrity.approved_fonts??minimumIntegrity.template_styles?.approved_fonts)?.version!==APPROVED_FONT_VERSION) {
-          const fixed=await repairMinimumBytes(downloadBytes,baseTemplate.updated_at,routeKey);downloadBytes=fixed.bytes;minimumIntegrity=fixed.integrity;
+          const fixed=await repairMinimumBytes(downloadBytes,baseTemplate.updated_at,routeKey,{period,routeRate:await routeOneKgRate(admin,routeKey),useWorkbookRate:false});downloadBytes=fixed.bytes;minimumIntegrity=fixed.integrity;
           if(fixed.repair.changed_count) {
             const basePath=`base/${routeKey}/${crypto.randomUUID()}_${baseTemplate.file_name}`;
             await storeVerifiedMinimum(admin,basePath,downloadBytes,baseTemplate.file_name);
@@ -2427,6 +2440,10 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     const headerRepair=repairApprovedTemplateHeaders(files,String(template.storage_path));
     const approvedFonts=repairApprovedWorkbookFonts(files,String(template.updated_at??template.uploaded_at),{force:['kr_la_sea','kr_la_air'].includes(routeKey)});
     const noticeRepairs=repairStatementNotices(files,styleTables(strFromU8(files['xl/styles.xml'])));
+    const currentRate = await routeOneKgRate(admin,routeKey);
+    const freightNotices=refreshFreightNotices(files,{
+      period,routeRate:currentRate,useWorkbookRate:!useBase || !baseTemplate?.policy_summary?.validated_source_revision,
+    });
     beginTemplateStyleGuard(files,{headerRepair,noticeRepairs,approvedFonts:approvedFonts??{version:APPROVED_FONT_VERSION,applicable:false}});
     if(headerRepair)console.log('[EXCEL] approved header formats restored',JSON.stringify(headerRepair));
 
@@ -2558,7 +2575,7 @@ if (!routeKey || !Number.isInteger(shipmentYear) || !voyage) {
     if (!response.ok || !completed?.ok || !completed?.integrity?.stored_download_verified) {
       throw new Error(completed?.error || 'Excel 최종 검증·저장 처리에 실패했습니다. 잠시 후 다시 다운로드해 주세요.');
     }
-    const integrity=completed.integrity,exportPath=completed.storage_path;
+    const integrity={...completed.integrity,freight_notices:freightNotices},exportPath=completed.storage_path;
 
     // A latest BASE download also refreshes the registered private BASE. This
     // does not re-import rules or cargo and never overwrites a concurrent upload.

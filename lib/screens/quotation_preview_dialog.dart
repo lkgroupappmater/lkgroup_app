@@ -163,6 +163,7 @@ class _QuotationPreviewDialogState extends State<QuotationPreviewDialog> {
         customerName: widget.customerName,
         customerPhone: widget.customerPhone,
         issuedAt: _issuedAt,
+        viewedAt: DateTime.now(),
         logo: _logo!,
         qrUsd: _qrUsd!,
         qrKip: _qrKip!,
@@ -378,6 +379,7 @@ class DigitalQuotationPainter extends CustomPainter {
     this.customerName = '',
     this.customerPhone = '',
     required this.issuedAt,
+    this.viewedAt,
     required this.logo,
     required this.qrUsd,
     required this.qrKip,
@@ -397,6 +399,7 @@ class DigitalQuotationPainter extends CustomPainter {
   final String customerName;
   final String customerPhone;
   final DateTime issuedAt;
+  final DateTime? viewedAt;
   final ui.Image logo;
   final ui.Image qrUsd;
   final ui.Image qrKip;
@@ -413,11 +416,12 @@ class DigitalQuotationPainter extends CustomPainter {
   static const totalColor = DocumentFormStyle.total;
 
   DocumentTextContent get _docText {
-    final original = DocumentTextCatalog.quotation(routeLabel, issuedAt, language: language);
+    final original = DocumentTextCatalog.quotation(routeLabel, viewedAt ?? issuedAt, language: language, oneKgRate: result.oneKgRate);
     final footer = result.footerLines;
     if (footer == null) return original;
     return DocumentTextContent(remark: original.remark, language: language,
-      footerLines: footer.where((line) => !RegExp(r'이용.*감사|thank.*you', caseSensitive: false).hasMatch(line)).toList());
+      footerLines: footer.where((line) => !RegExp(r'이용.*감사|thank.*you', caseSensitive: false).hasMatch(line))
+        .map((line) => DocumentTextCatalog.applyMinimumRate(line, result.oneKgRate)).toList());
   }
   String get _remarkText => [taxRemark, _docText.remark].where((s) => s.trim().isNotEmpty).join('\n\n');
 

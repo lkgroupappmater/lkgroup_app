@@ -1,4 +1,5 @@
 import {deliverySheetIndex} from './shared-delivery-layout.mjs';
+import {linkedMinimumFormula} from './freight-notices.mjs';
 import {richTextValue} from './cell-text-format.mjs';
 
 const decoder = new TextDecoder();
@@ -24,12 +25,15 @@ function sheetNotices(xml, strings) {
     for (const [cell] of row.matchAll(/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)) {
       const open = cell.slice(0, cell.indexOf('>') + 1);
       const ref = attr(open, 'r');
-      if (!merged.has(ref) || /<f\b/.test(cell)) continue;
+      if (!merged.has(ref)) continue;
+      const formulaBody = cell.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1];
+      const formula = formulaBody && richTextValue('<t>' + formulaBody + '</t>');
+      if (/<f\b/.test(cell) && !(formula && linkedMinimumFormula.test(formula))) continue;
       const value = cell.match(/<v>([\s\S]*?)<\/v>/)?.[1];
       const type = attr(open, 't');
       const label = type === 's' ? strings[Number(value)] : type === 'inlineStr' ? richTextValue(cell) : type === 'str' ? richTextValue('<t>' + (value ?? '') + '</t>') : '';
       if (!/^\s*[*＊※•]/u.test(label || '')) continue;
-      notices.push({ref, range: merged.get(ref), label, style: Number(attr(open, 's') || 0),
+      notices.push({ref, range: merged.get(ref), label, ...(formula ? {formula} : {}), style: Number(attr(open, 's') || 0),
         height: attr(tag, 'ht'), rowStyle: attr(tag, 's'), customHeight: attr(tag, 'customHeight'), hidden: attr(tag, 'hidden')});
     }
   }

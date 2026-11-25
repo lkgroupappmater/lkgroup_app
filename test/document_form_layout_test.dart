@@ -14,6 +14,20 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/phetsarath_ot.ttf'))).load();
   });
 
+  test('validity and minimum freight use the Lao review month and the selected route band', () {
+    final at = DateTime.utc(2026, 11, 30, 17);
+    final quote = DocumentTextCatalog.quotation('la_vn_land', at, oneKgRate: 23.75);
+    final reverse = DocumentTextCatalog.statement('vn_la_land', at, oneKgRate: 16.85);
+    expect(quote.remark, contains('Dec/2026'));
+    expect(reverse.remark, contains('2026년 12월 말'));
+    expect(quote.footerText, contains('23.75/kg'));
+    expect(reverse.footerText, contains('16.85/kg'));
+    expect(DocumentTextCatalog.applyMinimumRate('* 최소 운임은 \$16.85/kg, 보관료 3불', 23.75),
+      '* 최소 운임은 \$23.75/kg, 보관료 3불');
+    expect(DocumentTextCatalog.quotation('kr_la_sea', at, oneKgRate: 1.5).remark,
+      isNot(contains('Dec/2026')));
+  });
+
   test('all route quotation and statement notes fit without clipping', () {
     final date = DateTime(2026, 9, 10);
     expect(RouteCatalog.routes.length, 11);

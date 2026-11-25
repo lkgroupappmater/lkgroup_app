@@ -139,7 +139,7 @@ class _StatementPreviewDialogState extends State<StatementPreviewDialog> {
       if (rows.isEmpty) {
         throw StateError('명세서에 표시할 화물 데이터가 없습니다.');
       }
-      final freight = await FreightService.instance.calculate(rows);
+      final freight = await FreightService.instance.calculate(rows, documentRoute: widget.routeLabel);
       final inland = await StatementService.instance.deliveryForReceipt(
         route: widget.routeLabel,
         year: widget.year,
@@ -470,7 +470,7 @@ class DigitalStatementPainter extends CustomPainter {
   static const appliedColor = DocumentFormStyle.applied;
   static const totalColor = DocumentFormStyle.total;
 
-  DocumentTextContent get _docText => DocumentTextCatalog.statement(routeLabel, DateTime.now(), language: language);
+  DocumentTextContent get _docText => DocumentTextCatalog.statement(routeLabel, DateTime.now(), language: language, oneKgRate: freight.oneKgRate);
   String get _remarkText => _displayAutoNotes.isEmpty
       ? _docText.remark : '${_docText.remark}\n\n${DocumentLocalizations.note(language, _displayAutoNotes)}';
 
@@ -852,7 +852,7 @@ class StatementDocumentRenderer {
     if (rows.isEmpty) {
       throw StateError('${request.receiptNumber}: 명세서 데이터가 없습니다.');
     }
-    final freight = await FreightService.instance.calculate(rows);
+    final freight = await FreightService.instance.calculate(rows, documentRoute: request.routeLabel);
     final inland = await StatementService.instance.deliveryForReceipt(
       route: request.routeLabel,
       year: request.year,

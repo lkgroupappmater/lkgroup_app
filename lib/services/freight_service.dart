@@ -63,6 +63,7 @@ class FreightCalculation {
     this.grossTotalUsd = 0,
     this.discountTotalUsd = 0,
     this.discountByGroup = const <String, double>{},
+    this.oneKgRate,
   });
 
   final List<FreightLineResult> lines;
@@ -74,6 +75,7 @@ class FreightCalculation {
   final double grossTotalUsd;
   final double discountTotalUsd;
   final Map<String, double> discountByGroup;
+  final double? oneKgRate;
 }
 
 class FreightService {
@@ -81,7 +83,7 @@ class FreightService {
   static final FreightService instance = FreightService._();
 
   Future<FreightCalculation> calculate(
-    List<Map<String, dynamic>> shipments,
+    List<Map<String, dynamic>> shipments, {String? documentRoute}
   ) async {
     final exchange = await ExchangeRateService.instance.fetch();
     final lines = <FreightLineResult>[];
@@ -216,8 +218,15 @@ class FreightService {
       }
     }
 
+    double? oneKgRate;
+    if (documentRoute != null) {
+      final key = RouteCatalog.keyFor(documentRoute);
+      final policy = policyCache[key] ?? await FreightPolicyService.instance.fetch(key);
+      oneKgRate = policy.rateFor(1);
+    }
     return FreightCalculation(
       lines: lines,
+      oneKgRate: oneKgRate,
       grossTotalUsd: grossTotal,
       discountTotalUsd: discountTotal,
       discountByGroup: Map<String, double>.unmodifiable(byGroup),
